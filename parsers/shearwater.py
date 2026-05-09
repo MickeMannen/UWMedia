@@ -1,12 +1,13 @@
 from lxml import etree
 from datetime import datetime, timedelta
 from typing import List
+from pathlib import Path
 from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
 
 class ShearwaterParser(BaseParser):
-    def parse(self, file_path: str) -> List[Dive]:
-        tree = etree.parse(file_path)
+    def parse(self, file_path: Path) -> List[Dive]:
+        tree = etree.parse(str(file_path))
         root = tree.getroot()
         dives = []
         

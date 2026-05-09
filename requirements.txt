@@ -1,5 +1,5 @@
 ffmpeg-python
 pydantic>=2.0.0
 lxml
-fitparse
+garmin-fit-sdk
 pytest

@@ -1,7 +1,7 @@
 import ffmpeg
 import platform
 import json
-import os
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from models.dive import Dive, Waypoint
@@ -61,21 +61,21 @@ class FFmpegEngine:
                     )
         return ",".join(filters)
 
-    def process_video(self, input_path: str, output_path: str, dive: Optional[Dive] = None, 
+    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, dive: Optional[Dive] = None, 
                       stabilize: bool = False, color_correct: bool = False, overlay: bool = False,
-                      two_pass: bool = False, layout_path: Optional[str] = None, hud_path: Optional[str] = None):
+                      two_pass: bool = False, layout_path: Optional[Path] = None, hud_path: Optional[Path] = None):
         
         # 1. Stabilization Pass 1
         if stabilize and two_pass:
             trf_file = "transforms.trf"
             print(f"Running stabilization pass 1...")
-            ffmpeg.input(input_path).filter("vidstabdetect", stepsize=32, result=trf_file).output("null", format="null").run(overwrite_output=True, quiet=True)
+            ffmpeg.input(str(input_path)).filter("vidstabdetect", stepsize=32, result=trf_file).output("null", format="null").run(overwrite_output=True, quiet=True)
             
-        stream = ffmpeg.input(input_path)
+        stream = ffmpeg.input(str(input_path))
         
         # 2. Add HUD Overlay
-        if overlay and hud_path and os.path.exists(hud_path):
-            hud = ffmpeg.input(hud_path)
+        if overlay and hud_path and hud_path.exists():
+            hud = ffmpeg.input(str(hud_path))
             stream = ffmpeg.overlay(stream, hud, x=0, y=0)
 
         # 3. Build Filter Chain
@@ -88,7 +88,7 @@ class FFmpegEngine:
         if color_correct and dive and dive.waypoints:
             print("Applying dynamic color correction...")
             video_start_offset = (dive.start_time - creation_date).total_seconds()
-            probe = ffmpeg.probe(input_path)
+            probe = ffmpeg.probe(str(input_path))
             duration = int(float(probe['format']['duration']))
             
             for t in range(0, duration, 5): # Update every 5 seconds to reduce filter count
@@ -111,11 +111,10 @@ class FFmpegEngine:
                 layout = json.load(f)
             
             # Calculate video start time offset relative to dive start
-            # If video starts 5 mins before dive, offset is -300
             video_start_offset = (dive.start_time - creation_date).total_seconds()
             
             # Get video duration
-            probe = ffmpeg.probe(input_path)
+            probe = ffmpeg.probe(str(input_path))
             duration = int(float(probe['format']['duration']))
             
             print(f"Generating telemetry for {duration} seconds...")
@@ -124,14 +123,11 @@ class FFmpegEngine:
                 t_end = t + 1
                 
                 # Find the corresponding waypoint
-                # Waypoint index in dive.waypoints is t - video_start_offset
                 wp_idx = int(t - video_start_offset)
                 
                 if wp_idx < 0:
-                    # Before dive: show 0
                     current_wp = Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0)
                 elif wp_idx >= len(dive.waypoints):
-                    # After dive: use last waypoint
                     current_wp = dive.waypoints[-1]
                 else:
                     current_wp = dive.waypoints[wp_idx]
@@ -156,6 +152,6 @@ class FFmpegEngine:
         print(f"Encoding video with {encoder}...")
         (
             stream
-            .output(output_path, vcodec=encoder, acodec="copy")
+            .output(str(output_path), vcodec=encoder, acodec="copy")
             .run(overwrite_output=True)
         )

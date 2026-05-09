@@ -1,0 +1,54 @@
+Prompt: Underwater Media Processor CLI
+Role : Act as a Senior Software Engineer specializing in Computer Vision, Data Engineering, and FFmpeg-based media pipelines. You are an expert in developing high-performance applications for macOS (Apple Silicon M4) and Windows 11.
+Task: Architect and implement a modular Python CLI application that automates the post-processing of scuba diving media. The application must handle Color Correction (depth-based), Video Stabilization, and Dynamic Telemetry Overlays.
+
+
+1. Technical Stack & Environment
+	• Target Systems:
+		○ macOS (M4): Force H.265 (HEVC) using hevc_videotoolbox for hardware acceleration.
+		○ Windows 11: Force H.265 (HEVC) with hevc_nvenc (NVIDIA) or hevc_amf (AMD) hardware acceleration support.
+	• Core Libraries:
+		○ ffmpeg-python for all video/photo processing.
+		○ Pydantic v2 for strict data validation.
+		○ lxml for high-performance UDDF (XML) parsing.
+		○ ExifTool for extracting camera metadata and geolocation.
+		○ pytest for the testing suite.
+
+
+2. Data Architecture
+	• Pydantic Models:
+		○ Waypoint: Fields for timestamp, depth (meters), temp, deco_stop, tts, ndl, time_since_start_of_dive, tank pressure (support multi tanks), O2%, He% (depends on tank).
+		○ Dive: A collection of Waypoints with start_time and end_time.
+	• Log Parsing (Strategy Pattern):
+		○ Implement a strategy to parse Garmin FIT (binary) and Shearwater UDDF (XML via lxml).'
+			▪ Garmin Fit files have a garmin time since epoc date instead of normal epoc, do support local and utc time
+			▪ Shearwater UDDF files don’t have support for UTC time, time is stored in local time.
+		○ Store all parsed dives in a dictionary lookup: dict[(datetime_start, datetime_end), DiveModel].
+
+
+3. Key Functional Requirements
+A. Metadata & Time Synchronization
+	• Sony Cameras: Extract QuickTime:CreateDate and QuickTime:Timezone.
+	• DJI/Other Cameras: If QuickTime:Timezone is missing, use QuickTime:CreateDate (local time) and infer the timezone/UTC offset from QuickTime:FileLocation to generate a standardized CreationDate in ISO format.
+	• Lookup Logic: Use the video’s datetaken (local time) to automatically identify and load the correct dive log from the dictionary.
+	• If the video starts before the dive (30min) show 00 for data points until available
+	• If video continues after the dive use the last way point for the data
+B. Processing Logic
+	• Color Correction: Calculate an RGB attenuation matrix in Python based on the depth value of the current waypoint. Apply this dynamically using FFmpeg eq or colorlevel filters.
+	• Stabilization: Support Two-Pass Stabilization using FFmpeg’s vidstabdetect (Pass 1) and vidstabtransform (Pass 2).
+	• Telemetry Overlay:
+		○ Use a JSON-driven layout for positioning data.
+		○ Support a PNG "HUD" background with configurable alpha (opacity).
+		○ Define all overlay coordinates as percentages (e.g., x: 5%, y: 10%) to ensure resolution-independent scaling.
+C. CLI Interface
+	• Inputs: source_path, output_path, file_format_override, and renaming_pattern.
+	• Toggles: --color, --stabilize, --overlay, --two-pass, and --hw-accel.
+	• Add support for divelog timezone adjustment (shearwater uddf file)
+
+
+Output Requirements
+	1. Project Structure: A clean, modular directory layout.
+	2. Pydantic Models: The Python code for Waypoint and Dive models.
+	3. FFmpeg Engine: The core logic for generating the complex filter strings and handling platform-specific H.265 hardware encoders.
+	4. Metadata Handler: The logic for resolving Sony vs. DJI timezone discrepancies.
+	5. A simple overlay json file that can be used for testing

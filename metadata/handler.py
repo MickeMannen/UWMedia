@@ -1,6 +1,7 @@
 import subprocess
 import json
 import re
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -8,7 +9,7 @@ class MetadataHandler:
     def __init__(self):
         pass
 
-    def get_video_metadata(self, file_path: str) -> dict:
+    def get_video_metadata(self, file_path: Path) -> dict:
         """Extract metadata using ExifTool."""
         cmd = [
             "exiftool",
@@ -17,7 +18,7 @@ class MetadataHandler:
             "-QuickTime:Timezone",
             "-QuickTime:FileLocation",
             "-GPSPosition",
-            file_path
+            str(file_path)
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -25,7 +26,7 @@ class MetadataHandler:
         
         return json.loads(result.stdout)[0]
 
-    def get_standardized_creation_date(self, file_path: str) -> datetime:
+    def get_standardized_creation_date(self, file_path: Path) -> datetime:
         meta = self.get_video_metadata(file_path)
         
         create_date_str = meta.get("CreateDate")

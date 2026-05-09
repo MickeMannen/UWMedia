@@ -1,6 +1,6 @@
 import argparse
-import os
 import sys
+from pathlib import Path
 from datetime import timedelta
 from parsers.shearwater import ShearwaterParser
 from parsers.garmin import GarminParser
@@ -10,16 +10,16 @@ from ffmpeg.engine import FFmpegEngine
 
 def main():
     parser = argparse.ArgumentParser(description="Underwater Media Processor CLI")
-    parser.add_argument("source", help="Source video file path")
-    parser.add_argument("output", help="Output video file path")
-    parser.add_argument("--logs", help="Directory containing dive logs", required=True)
+    parser.add_argument("source", type=Path, help="Source video file path")
+    parser.add_argument("output", type=Path, help="Output video file path")
+    parser.add_argument("--logs", type=Path, help="Directory containing dive logs", required=True)
     parser.add_argument("--color", action="store_true", help="Apply color correction")
     parser.add_argument("--stabilize", action="store_true", help="Apply stabilization")
     parser.add_argument("--overlay", action="store_true", help="Apply telemetry overlay")
     parser.add_argument("--two-pass", action="store_true", help="Use 2-pass stabilization")
     parser.add_argument("--hw-accel", action="store_true", default=True, help="Enable hardware acceleration")
-    parser.add_argument("--layout", help="JSON layout file for overlay")
-    parser.add_argument("--hud", help="PNG HUD background for overlay")
+    parser.add_argument("--layout", type=Path, help="JSON layout file for overlay")
+    parser.add_argument("--hud", type=Path, help="PNG HUD background for overlay")
     parser.add_argument("--tz-adjust", type=int, default=0, help="Timezone adjustment in hours (for Shearwater)")
 
     args = parser.parse_args()
@@ -29,10 +29,13 @@ def main():
     shearwater = ShearwaterParser()
     garmin = GarminParser()
 
-    for file in os.listdir(args.logs):
-        path = os.path.join(args.logs, file)
-        if file.endswith(".uddf"):
-            print(f"Parsing Shearwater log: {file}")
+    if not args.logs.is_dir():
+        print(f"Error: Log directory {args.logs} not found.")
+        sys.exit(1)
+
+    for path in args.logs.iterdir():
+        if path.suffix == ".uddf":
+            print(f"Parsing Shearwater log: {path.name}")
             dives = shearwater.parse(path)
             # Apply timezone adjustment if requested
             if args.tz_adjust:
@@ -42,8 +45,8 @@ def main():
                     for wp in d.waypoints:
                         wp.timestamp += timedelta(hours=args.tz_adjust)
             manager.add_dives(dives)
-        elif file.endswith(".fit"):
-            print(f"Parsing Garmin log: {file}")
+        elif path.suffix == ".fit":
+            print(f"Parsing Garmin log: {path.name}")
             manager.add_dives(garmin.parse(path))
 
     # 2. Extract Video Metadata
@@ -67,6 +70,7 @@ def main():
     engine.process_video(
         input_path=args.source,
         output_path=args.output,
+        creation_date=creation_date,
         dive=dive,
         stabilize=args.stabilize,
         color_correct=args.color,
