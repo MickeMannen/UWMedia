@@ -53,8 +53,10 @@ class GarminParser(BaseParser):
 
         id_messages = messages.get("file_id_mesgs", [])
         if id_messages:
-            dive_meta["device"] = id_messages[0].get("garmin_product")
-            dive_meta["manufactor"] = id_messages[0].get("manufacturer")
+            product = id_messages[0].get("garmin_product")
+            manufacturer = id_messages[0].get("manufacturer")
+            dive_meta["device"] = str(product) if product is not None else None
+            dive_meta["manufactor"] = str(manufacturer) if manufacturer is not None else None
 
         # Time synchronization logic
         def _get_timedata():
@@ -123,11 +125,12 @@ class GarminParser(BaseParser):
             dive_meta["end_longitude"] = semicircle_to_degree(s_data[0].get("end_position_long"))
 
         # Sensors (e.g. Tank Transmitters)
-        device_sensors = messages.get("device_info_mesgs", []) # 147 is device_info
+        device_sensors = messages.get("device_info_mesgs", [])
         sensor_data = {}
         for device in device_sensors:
             s_id = device.get("serial_number")
-            name = device.get("product_name") or device.get("nickname")
+            # Custom Tank Names are usually in 'descriptor' or 'nickname'
+            name = device.get("descriptor") or device.get("nickname") or device.get("product_name")
             if s_id:
                 sensor_data[s_id] = {"sensor_id": s_id, "name": name}
 
@@ -147,6 +150,7 @@ class GarminParser(BaseParser):
         # Tank Updates
         tank_messages_dict = {}
         tank_messages = messages.get("tank_update_mesgs", [])
+        print(f"DEBUG: Found {len(tank_messages)} tank update messages")
         for t_msg in tank_messages:
             ts = t_msg.get("timestamp")
             if isinstance(ts, int):
@@ -156,6 +160,8 @@ class GarminParser(BaseParser):
             ts_local = remove_offset(ts.astimezone(tz))
             
             sensor_id = t_msg.get("sensor")
+            tank_key = str(sensor_id) if sensor_id is not None else str(t_msg.get("gas_type_index", "default"))
+            
             tank_name = sensor_data.get(sensor_id, {}).get("name") if sensor_id else None
             
             gas_idx = t_msg.get("gas_type_index") # Field 3 usually
@@ -172,11 +178,33 @@ class GarminParser(BaseParser):
             
             if ts_local not in tank_messages_dict:
                 tank_messages_dict[ts_local] = {}
-            tank_messages_dict[ts_local][str(gas_idx or "default")] = tank_data
+            tank_messages_dict[ts_local][tank_key] = tank_data
+            # print(f"DEBUG: Tank update at {ts_local} for {tank_key}")
 
         # Process Waypoints (Records)
         waypoints = []
+        current_active_tanks = {}
         record_messages = messages.get("record_mesgs", [])
+        print(f"DEBUG: Found {len(record_messages)} record messages")
+        
+        # Sort tank updates by time for efficient merging
+        sorted_tank_times = sorted(tank_messages_dict.keys())
+        
+        # If the first record starts before the first tank update, 
+        # pre-populate with the first available readings for all unique tanks
+        initial_tanks = {}
+        unique_tank_keys = set()
+        for ts_key in sorted_tank_times:
+            for t_key in tank_messages_dict[ts_key].keys():
+                if t_key not in unique_tank_keys:
+                    initial_tanks[t_key] = tank_messages_dict[ts_key][t_key]
+                    unique_tank_keys.add(t_key)
+        
+        print(f"DEBUG: Unique tanks identified: {unique_tank_keys}")
+        
+        current_active_tanks = initial_tanks.copy()
+        tank_ptr = 0
+
         for record in record_messages:
             ts = record.get("timestamp")
             if ts is None: continue
@@ -185,11 +213,11 @@ class GarminParser(BaseParser):
             
             ts_local = remove_offset(ts.astimezone(tz))
             
-            # Map tanks for this waypoint
-            # Find nearest tank update or use last seen (simplified for now)
-            current_tanks = tank_messages_dict.get(ts_local, {})
-            if not current_tanks and waypoints:
-                current_tanks = waypoints[-1].tanks
+            # Catch up current_active_tanks to the current waypoint time
+            while tank_ptr < len(sorted_tank_times) and sorted_tank_times[tank_ptr] <= ts_local:
+                updates = tank_messages_dict[sorted_tank_times[tank_ptr]]
+                current_active_tanks.update(updates)
+                tank_ptr += 1
 
             wp = Waypoint(
                 timestamp=ts_local,
@@ -210,7 +238,7 @@ class GarminParser(BaseParser):
                 heart_rate=int(record.get("heart_rate", 0)),
                 cns=int(record.get("cns_load", 0)),
                 po2=float(record.get("po2", 1.2)),
-                tanks=current_tanks
+                tanks=current_active_tanks.copy()
             )
             waypoints.append(wp)
 
