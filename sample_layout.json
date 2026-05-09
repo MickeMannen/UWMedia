@@ -1,0 +1,12 @@
+{
+    "depth": {
+        "x": 5,
+        "y": 90,
+        "label": "Depth"
+    },
+    "temp": {
+        "x": 80,
+        "y": 90,
+        "label": "Temp"
+    }
+}
