@@ -17,3 +17,7 @@ class DiveManager:
             if start - timedelta(minutes=30) <= timestamp <= end:
                 return dive
         return None
+
+    def print_dives(self):
+        for (start, end), dive in self.dives.items():
+            print(f"{start} - {end}")

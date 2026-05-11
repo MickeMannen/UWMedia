@@ -6,7 +6,7 @@ from parsers.shearwater import ShearwaterParser
 from parsers.garmin import GarminParser
 from metadata.handler import MetadataHandler
 from models.manager import DiveManager
-from ffmpeg.engine import FFmpegEngine
+from ffmpeg import FfmpegClass
 
 def main():
     parser = argparse.ArgumentParser(description="Underwater Media Processor CLI")
@@ -49,11 +49,12 @@ def main():
             print(f"Parsing Garmin log: {path.name}")
             manager.add_dives(garmin.parse(path))
 
+    manager.print_dives()
     # 2. Extract Video Metadata
     meta_handler = MetadataHandler()
     try:
-        creation_date = meta_handler.get_standardized_creation_date(args.source)
-        print(f"Video Creation Date: {creation_date}")
+        creation_date = meta_handler.get_local_creation_date(args.source)
+        print(f"Video Local Creation Date: {creation_date}")
     except Exception as e:
         print(f"Error extracting metadata: {e}")
         sys.exit(1)
@@ -66,7 +67,7 @@ def main():
         print(f"Matched dive starting at {dive.start_time}")
 
     # 4. Process Video
-    engine = FFmpegEngine(hw_accel=args.hw_accel)
+    engine = FfmpegClass(hw_accel=args.hw_accel)
     engine.process_video(
         input_path=args.source,
         output_path=args.output,
