@@ -26,3 +26,20 @@ class TestMetadata:
             except Exception as e:
                 print(f"ERROR: {file.name} -> {e}")
 
+    def test_debug_datetaken(self):
+        # Use relative path for better portability
+        file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/test01.mp4")
+        # file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_M0281_color.MP4")
+
+        meta = MetadataHandler()
+
+
+        try:
+            metadata = meta.get_metadata(src=file)
+            print(f"DEBUG: Processing {file.name}...")
+            utc_time = meta.get_standardized_creation_date(file_path=file)
+            local_time = meta.get_local_creation_date(file_path=file)
+            print(f"RESULT: {file.name} -> UTC: {utc_time} | Local: {local_time}")
+        except Exception as e:
+            print(f"ERROR: {file.name} -> {e}")
+
