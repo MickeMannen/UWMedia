@@ -1,0 +1,40 @@
+currently the color correction is in ffmpeg_class.py - which doesnt fullfill my requirements.
+in file color_old.py I made another implementation based on: https://github.com/bornfree/dive-color-corrector/tree/main.
+this adjust frame by frame. I dont want to use the cv2.VideoWriter since this requires me to rebuild opencv-python for
+every target system.
+Below is the suggetion from gemini to acheive the same but use subprocess pip. create a new class in the file color.py that can combine my
+old solution with the suggested solution from gemini
+
+Gemini suggestion
+1. The "Subprocess Pipe" Strategy (Most Robust)
+This is the gold standard for open-source video projects.
+You use OpenCV for the processing (the math/color logic) but pipe the raw frames into a standalone FFmpeg process for encoding.
+
+Why it works: Users only need to install a standard ffmpeg binary (available on every OS via brew, apt, or choco),
+which natively handles high-res HEVC.
+
+Code Pattern:
+
+Python
+import cv2
+import subprocess as sp
+
+# Setup the FFmpeg command
+cmd = [
+    'ffmpeg', '-y',
+    '-f', 'rawvideo', '-vcodec', 'rawvideo',
+    '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', '30',
+    '-i', '-',  # Input comes from stdin
+    '-c:v', 'libx265', '-crf', '18', '-pix_fmt', 'yuv420p',
+    'output.mp4'
+]
+
+process = sp.Popen(cmd, stdin=sp.PIPE)
+
+# Inside your loop:
+# color_corrected_frame = process_logic(frame)
+process.stdin.write(color_corrected_frame.tobytes())
+
+process.stdin.close()
+process.wait()
+

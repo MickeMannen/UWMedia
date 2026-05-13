@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from metadata.handler import MetadataHandler
+from metadata.exif import MetadataHandler
 
 
 class TestMetadata:

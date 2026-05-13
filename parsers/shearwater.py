@@ -6,6 +6,22 @@ from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
 
 class ShearwaterParser(BaseParser):
+    def update_timezone(self, file_path: Path, offset_minutes: int):
+        """Adds <timezone> tag to <dive> elements if missing."""
+        tree = etree.parse(str(file_path))
+        root = tree.getroot()
+        modified = False
+        
+        for dive in root.xpath("//dive"):
+            if not dive.xpath("timezone"):
+                tz_elem = etree.SubElement(dive, "timezone")
+                tz_elem.text = str(offset_minutes)
+                modified = True
+        
+        if modified:
+            tree.write(str(file_path), pretty_print=True, xml_declaration=True, encoding="utf-8")
+            print(f"Updated timezone in UDDF: {file_path.name}")
+
     def parse(self, file_path: Path) -> List[Dive]:
         tree = etree.parse(str(file_path))
         root = tree.getroot()
@@ -21,6 +37,9 @@ class ShearwaterParser(BaseParser):
                        dive_elem.xpath("string(date/day)")
             time_str = dive_elem.xpath("string(time/hour)") + ":" + \
                        dive_elem.xpath("string(time/minute)")
+            
+            # Read timezone offset if available
+            tz_offset_str = dive_elem.xpath("string(timezone)")
             
             start_time = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
             
@@ -51,7 +70,8 @@ class ShearwaterParser(BaseParser):
                 dives.append(Dive(
                     start_time=start_time,
                     end_time=end_time,
-                    waypoints=waypoints
+                    waypoints=waypoints,
+                    timezone=tz_offset_str if tz_offset_str else None
                 ))
         
         return dives
