@@ -4,9 +4,11 @@ import math
 import subprocess as sp
 import json
 import re
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from tqdm import tqdm
 from ffmpeg.ffmpeg_class import FfmpegClass
 from ffmpeg.hud_filter import generate_hud_filter_complex
 from models.dive import Dive, Waypoint
@@ -120,11 +122,12 @@ class ColorCorrectionEngine:
         return np.clip(np.dstack([res_r, res_g, res_b]), 0, 255).astype(np.uint8)
 
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, 
-                      dive: Optional[Dive] = None, stabilize: bool = False, 
-                      overlay: bool = False, two_pass: bool = False, 
-                      layout_path: Optional[Path] = None, hud_path: Optional[Path] = None,
+                      dive: Optional[Dive] = None, stabilize: Optional[str] = None, 
+                      overlay: bool = False, 
+                      layout_path: Optional[Path] = None,
                       start_time: Optional[str] = None, end_time: Optional[str] = None,
-                      tz_offset_mins: Optional[int] = None):
+                      tz_offset_mins: Optional[int] = None,
+                      color_correct: bool = True):
         """Analyze video and process frames through OpenCV then pipe to FFmpeg."""
         cap = cv2.VideoCapture(str(input_path))
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -133,47 +136,69 @@ class ColorCorrectionEngine:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = int(total_frames / fps) if fps else 0
 
-        # 1. Stabilization Pass 1
-        trf_file = output_path.with_suffix(".trf")
-        if stabilize and two_pass:
-            print("Running stabilization pass 1...")
-            self.ffmpeg_tool.run_command([
-                "-i", str(input_path),
-                "-vf", f"vidstabdetect=stepsize=32:result='{trf_file}'",
-                "-f", "null", "-"
-            ], quiet=True)
+        # 1. Stabilization (Deshake)
+        if stabilize:
+            print(f"Stabilization enabled (level: {stabilize})...")
 
         # 2. Analysis Phase
-        print(f"Analyzing {input_path.name}...")
         filter_indices, filter_matrices = [], []
-        count = 0
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-            if count % int(fps * SAMPLE_SECONDS) == 0:
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                filter_indices.append(count)
-                filter_matrices.append(self.get_filter_matrix(rgb))
-            if count % int(fps * 2) == 0:
-                print(f"Analysis Progress: {100 * count / total_frames:.1f}%", end='\r')
-            count += 1
-        print(f"Analysis Progress: 100.0%")
-        cap.release()
-        filter_matrices = np.array(filter_matrices)
+        if color_correct:
+            print(f"Analyzing {input_path.name}...")
+            count = 0
+            with tqdm(total=total_frames, desc="Analysis", unit="frame") as pbar:
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret: break
+                    if count % int(fps * SAMPLE_SECONDS) == 0:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        filter_indices.append(count)
+                        filter_matrices.append(self.get_filter_matrix(rgb))
+                    pbar.update(1)
+                    count += 1
+            cap.release()
+            filter_matrices = np.array(filter_matrices)
+        else:
+            cap.release()
+            # Identity matrix fallback
+            filter_indices = [0]
+            filter_matrices = np.array([[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]])
 
         # 3. Telemetry Generation
         ass_path = None
         hud_filter = ""
         layout = {}
-        if overlay and layout_path and dive:
-            print("Generating telemetry overlay...")
+        actual_hud_path = None
+        # Always use OpenCV text rendering when in the pipe for reliability
+        use_opencv_text = True 
+        img_skin_alpha = None # For OpenCV skin overlay
+
+        if layout_path and dive:
+            print(f"Generating telemetry overlay using layout: {layout_path.name}")
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
             
+            print(f"DEBUG: Layout Content: {json.dumps(layout, indent=2)}")
+            
+            # Resolve actual_hud_path correctly relative to layout_path
             if "hud_skin" in layout:
-                hud_filter = generate_hud_filter_complex(layout, width, height)
+                skin_rel_path = layout["hud_skin"].get("path")
+                if skin_rel_path:
+                    actual_hud_path = layout_path.parent / skin_rel_path
+            
+            if "hud_skin" in layout and actual_hud_path and actual_hud_path.exists():
+                print(f"HUD Skin found at: {actual_hud_path}")
+                # We handle the HUD entirely in OpenCV now to ensure correct layering
+                img_skin_alpha = cv2.imread(str(actual_hud_path), cv2.IMREAD_UNCHANGED)
+                if img_skin_alpha is None:
+                    print(f"ERROR: Could not load HUD skin image at {actual_hud_path}")
+                hud_filter = "" # Disable FFmpeg HUD overlay
+            elif "hud_skin" in layout:
+                print(f"Warning: HUD skin not found at {actual_hud_path}")
             else:
-                ass_path = self.ffmpeg_tool._generate_ass_file(dive, creation_date, duration, layout, output_path)
+                if self.ffmpeg_tool.has_filter("subtitles"):
+                    ass_path = self.ffmpeg_tool._generate_ass_file(dive, creation_date, duration, layout, output_path)
+                else:
+                    use_opencv_text = True
 
         # 4. Processing & Encoding Phase
         print(f"Processing and encoding with {self.ffmpeg_tool.get_encoder()}...")
@@ -182,7 +207,12 @@ class ColorCorrectionEngine:
         # Build FFmpeg Filter Complex for the pipe
         filters = []
         if stabilize:
-            filters.append(f"vidstabtransform=input='{trf_file}'" if two_pass else "deshake")
+            if stabilize == "low":
+                filters.append("deshake=blocksize=8:rx=16:ry=16:edge=mirror")
+            elif stabilize == "mid":
+                filters.append("deshake=blocksize=16:rx=32:ry=32:edge=mirror")
+            else:  # high
+                filters.append("deshake=blocksize=32:rx=64:ry=64:edge=mirror")
         if ass_path:
             filters.append(f"subtitles='{ass_path}'")
         
@@ -203,35 +233,19 @@ class ColorCorrectionEngine:
 
         filter_target = "0:v"
 
-        # Determine HUD path from layout or argument
-
-        actual_hud_path = hud_path
-        if "hud_skin" in layout:
-            actual_hud_path = Path(layout["hud_skin"]["path"])
-
         if hud_filter:
             cmd.extend(['-i', str(actual_hud_path)]) # Input 2
-            # Use the complex filter generated
+            
+            last_label_match = re.findall(r'\[([^\]]+)\]$', hud_filter.split(';')[-1])
+            last_label = f"[{last_label_match[0]}]" if last_label_match else "[v_hud]"
+
             if filters:
-                import re
-                last_label_match = re.findall(r'\[([^\]]+)\]$', hud_filter.split(';')[-1])
-                last_label = f"[{last_label_match[0]}]" if last_label_match else "[v_hud]"
-                
                 combined_filter = hud_filter + f";{last_label}{','.join(filters)}[v_out]"
                 cmd.extend(['-filter_complex', combined_filter])
                 filter_target = "[v_out]"
             else:
-                cmd.extend(['-filter_complex', hud_filter + "[v_out]"])
-                filter_target = "[v_out]"
-        elif actual_hud_path and actual_hud_path.exists():
-            cmd.extend(['-i', str(actual_hud_path)]) # Input 2
-            overlay_filter = "[0:v][2:v]overlay=0:0"
-            if filters:
-                cmd.extend(['-filter_complex', f"{overlay_filter},{','.join(filters)}[v_out]"])
-                filter_target = "[v_out]"
-            else:
-                cmd.extend(['-filter_complex', f"{overlay_filter}[v_out]"])
-                filter_target = "[v_out]"
+                cmd.extend(['-filter_complex', hud_filter])
+                filter_target = last_label
         elif filters:
             cmd.extend(['-vf', ",".join(filters)])
             filter_target = "0:v"
@@ -248,7 +262,15 @@ class ColorCorrectionEngine:
 
         # Metadata preservation
         cmd.extend(["-map_metadata", "1"])
-        cmd.extend(["-movflags", "use_metadata_tags"])
+        cmd.extend(["-movflags", "+faststart+use_metadata_tags"])
+        
+        # Compatibility and Color Metadata
+        cmd.extend(["-tag:v", "hvc1"])
+        cmd.extend([
+            "-color_primaries", "1",
+            "-color_trc", "1",
+            "-colorspace", "1"
+        ])
         
         # Creation date with timezone
         if tz_offset_mins is not None:
@@ -266,6 +288,44 @@ class ColorCorrectionEngine:
             str(output_path)
         ])
 
+        # Prepare for OpenCV text rendering if needed
+        hud_skin = layout.get("hud_skin", {})
+        linked_elements = hud_skin.get("linked_elements", []) if use_opencv_text else []
+        skin_scale = hud_skin.get("scale", 1.0)
+        skin_opacity = hud_skin.get("opacity", 1.0)
+        
+        raw_x_pct = hud_skin.get("x_pct", 0.0)
+        raw_y_pct = hud_skin.get("y_pct", 0.0)
+        skin_x = int(raw_x_pct * width)
+        skin_y = int(raw_y_pct * height)
+
+        if self.ffmpeg_tool.debug:
+            print(f"DEBUG: Layout Positioning:")
+            print(f"  Video Res: {width}x{height}")
+            print(f"  Skin Target Pct: ({raw_x_pct:.3f}, {raw_y_pct:.3f})")
+            print(f"  Skin Target Pixel: ({skin_x}, {skin_y})")
+            print(f"  Skin Scale: {skin_scale:.2f} | Opacity: {skin_opacity:.2f}")
+
+        # Pre-process skin for OpenCV overlay
+        preloaded_skin = None
+        if layout:
+            hud_skin = layout.get("hud_skin", {})
+            skin_path = hud_skin.get("path")
+            if skin_path:
+                img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+                if img_skin is not None:
+                    skin_scale = hud_skin.get("scale", 1.0)
+                    skin_opacity = hud_skin.get("opacity", 1.0)
+                    h_orig, w_orig = img_skin.shape[:2]
+                    w_scaled = int(w_orig * skin_scale)
+                    h_scaled = int(h_orig * skin_scale)
+                    preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+                    if preloaded_skin.shape[2] == 4:
+                        preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+                    print(f"HUD Skin Pre-loaded: {w_scaled}x{h_scaled}")
+                else:
+                    print(f"Warning: Could not pre-load HUD skin from {skin_path}")
+
         print(cmd)
         process = sp.Popen(cmd, stdin=sp.PIPE)
 
@@ -273,39 +333,48 @@ class ColorCorrectionEngine:
         s_sec = self.ffmpeg_tool._parse_time(start_time) or 0.0
         e_sec = self.ffmpeg_tool._parse_time(end_time) or float(duration)
         s_frame, e_frame = int(s_sec * fps), int(e_sec * fps)
+        total_to_process = e_frame - s_frame + 1
 
         import time
         start_time_proc = time.time()
         
         count = 0
         try:
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret: break
-                
-                # Apply Color Correction if within range
-                if s_frame <= count <= e_frame:
-                    current_filter = [np.interp(count, filter_indices, filter_matrices[..., x]) for x in range(len(filter_matrices[0]))]
-                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    corrected_rgb = self.apply_filter(rgb, np.array(current_filter))
-                    frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
-                
-                process.stdin.write(frame.tobytes())
-                if count % int(fps * 2) == 0:
-                    pct = min(100.0, 100 * count / total_frames)
-                    elapsed = time.time() - start_time_proc
-                    if count > 0:
-                        total_est = (elapsed / count) * total_frames
-                        remaining = max(0, total_est - elapsed)
-                        mins, secs = divmod(int(remaining), 60)
-                        print(f"Progress: {pct:5.1f}% | Remaining: {mins:02d}:{secs:02d}", end='\r')
-                count += 1
-            print(f"Progress: 100.0% | Remaining: 00:00")
+            # Seek to start frame
+            if s_frame > 0:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, s_frame)
+                count = s_frame
+
+            with tqdm(total=total_to_process, desc="Processing", unit="frame") as pbar:
+                while cap.isOpened() and count <= e_frame:
+                    ret, frame = cap.read()
+                    if not ret: break
+                    
+                    # Apply OpenCV Color Correction and HUD
+                    if color_correct:
+                        current_filter = [np.interp(count, filter_indices, filter_matrices[..., x]) for x in range(len(filter_matrices[0]))]
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        corrected_rgb = self.apply_filter(rgb, np.array(current_filter))
+                        frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
+
+                    if layout and dive:
+                        # Find closest waypoint
+                        elapsed_total = count / fps
+                        current_time = creation_date + timedelta(seconds=elapsed_total)
+                        wp = dive.get_waypoint_at(current_time)
+                        
+                        if wp:
+                            from gui.hud_renderer import draw_hud
+                            draw_hud(frame, layout, wp, preloaded_skin=preloaded_skin)
+
+
+                    process.stdin.write(frame.tobytes())
+                    pbar.update(1)
+                    count += 1
         finally:
             cap.release()
             process.stdin.close()
             process.wait()
             if ass_path and ass_path.exists(): ass_path.unlink()
-            if trf_file and trf_file.exists(): trf_file.unlink()
         
         print(f"\nProcessing complete: {output_path.name}")

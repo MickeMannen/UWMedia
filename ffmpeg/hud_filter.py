@@ -2,7 +2,7 @@ import json
 import cv2
 from pathlib import Path
 
-def generate_hud_filter_complex(layout, video_width, video_height):
+def generate_hud_filter_complex(layout, video_width, video_height, skin_path, skip_text=False):
     """
     Generates an FFmpeg filter_complex string for a HUD skin and linked telemetry elements.
     """
@@ -10,7 +10,6 @@ def generate_hud_filter_complex(layout, video_width, video_height):
     if not hud_skin:
         return ""
 
-    path = hud_skin.get("path")
     opacity = hud_skin.get("opacity", 1.0)
     scale = hud_skin.get("scale", 1.0)
     x_pct = hud_skin.get("x_pct", 0.0)
@@ -21,8 +20,9 @@ def generate_hud_filter_complex(layout, video_width, video_height):
 
     # Get PNG dimensions for text positioning
     # We need cv2 to get the original size to calculate relative positions correctly
-    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    img = cv2.imread(str(skin_path), cv2.IMREAD_UNCHANGED)
     if img is None:
+        print(f"Error: Could not read skin image at {skin_path}")
         return ""
     h_orig, w_orig = img.shape[:2]
     w_scaled = w_orig * scale
@@ -39,6 +39,9 @@ def generate_hud_filter_complex(layout, video_width, video_height):
     
     last_label = "[v_hud]"
     
+    if skip_text:
+        return ";".join(filters)
+
     # Layer 3+: drawtext filters
     for i, element in enumerate(hud_skin.get("linked_elements", [])):
         field = element.get("field")
@@ -51,15 +54,14 @@ def generate_hud_filter_complex(layout, video_width, video_height):
         abs_x = int(x_pos + (rel_x * w_scaled))
         abs_y = int(y_pos + (rel_y * h_scaled))
         
-        # Use a placeholder for the text that FFmpeg can use
-        # For a truly dynamic solution, we might need a sidecar metadata file or ASS.
-        # But per the prompt, we use drawtext. We'll use the 'text' parameter with a variable.
-        # Since we are piping, we might burn the text values into the frame in OpenCV instead,
-        # but the prompt specifically asks for this FFmpeg translation.
+        # Use provided font_size or default to 24
+        font_size = int(element.get("font_size", 24))
         
-        # If we use FFmpeg's drawtext with a file, we can update the file.
-        # But that's slow. Let's assume the text is provided via a metadata key or similar.
-        text_val = fr"%{{metadata\:telemetry_{field}}}"
+        # Use a placeholder for the text that FFmpeg can use
+        if field.startswith("custom:"):
+            text_val = field.replace("custom:", "").replace("'", "\\'")
+        else:
+            text_val = fr"%{{metadata\:telemetry_{field}}}"
         
         txt_filter = f"drawtext=text='{text_val}':x={abs_x}:y={abs_y}:fontcolor={color}:fontsize={font_size}"
         

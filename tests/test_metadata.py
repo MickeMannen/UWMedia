@@ -30,6 +30,7 @@ class TestMetadata:
         # Use relative path for better portability
         file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/test01.mp4")
         # file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_M0281_color.MP4")
+        file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_102131_1.mp4")
 
         meta = MetadataHandler()
 

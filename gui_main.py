@@ -11,11 +11,11 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene, 
     QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QPushButton,
     QSlider, QLabel, QGraphicsPixmapItem, QGroupBox, QFormLayout,
-    QSpinBox, QListWidget, QListWidgetItem
+    QSpinBox, QListWidget, QListWidgetItem, QLineEdit
 )
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage
-from gui.hud_manager import HUDManager
+from PySide6.QtCore import Qt, QTimer, QSettings
+from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
+from gui.hud_manager import HUDManager, TelemetryItem
 from gui.hud_controls import HUDControls
 from models.manager import DiveManager
 from parsers.shearwater import ShearwaterParser
@@ -23,11 +23,60 @@ from parsers.garmin import GarminParser
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 
+class ZoomableGraphicsView(QGraphicsView):
+    def __init__(self, scene):
+        super().__init__(scene)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setBackgroundBrush(Qt.black)
+        self.setDragMode(QGraphicsView.RubberBandDrag)
+        self._is_panning = False
+
+    def wheelEvent(self, event):
+        zoom_in_factor = 1.25
+        zoom_out_factor = 1 / zoom_in_factor
+
+        if event.angleDelta().y() > 0:
+            zoom_factor = zoom_in_factor
+        else:
+            zoom_factor = zoom_out_factor
+
+        self.scale(zoom_factor, zoom_factor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self._is_panning = True
+            # Simulate a left-click for the scroll hand drag to work
+            fake_event = QMouseEvent(event.type(), event.pos(), Qt.LeftButton, Qt.LeftButton, event.modifiers())
+            super().mousePressEvent(fake_event)
+        else:
+            super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self.setDragMode(QGraphicsView.NoDrag)
+            self._is_panning = False
+            fake_event = QMouseEvent(event.type(), event.pos(), Qt.LeftButton, Qt.LeftButton, event.modifiers())
+            super().mouseReleaseEvent(fake_event)
+        else:
+            super().mouseReleaseEvent(event)
+
 class HUDDesignerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("UWMedia HUD Designer & Sync")
+        # Get revision from main entry point
+        try:
+            from main import REVISION
+            self.revision = REVISION
+        except ImportError:
+            self.revision = "dev"
+
+        self.setWindowTitle(f"UWMedia HUD Designer & Sync - Rev: {self.revision}")
         self.resize(1600, 900)
+        self.settings = QSettings("UWMedia", "HUDDesigner")
 
         # State
         self.video_cap = None
@@ -36,6 +85,11 @@ class HUDDesignerWindow(QMainWindow):
         self.current_dive = None
         self.video_creation_date = None
         self.video_fps = 30.0
+        
+        self.last_video_path = self.settings.value("last_video_path", "")
+        self.last_log_dir = self.settings.value("last_log_dir", "")
+        self.last_hud_path = self.settings.value("last_hud_path", "")
+        self.last_skin_path = self.settings.value("last_skin_path", "")
 
         # Central Widget
         self.central_widget = QWidget()
@@ -46,11 +100,15 @@ class HUDDesignerWindow(QMainWindow):
         self.canvas_layout = QVBoxLayout()
         
         self.scene = QGraphicsScene(0, 0, 1920, 1080)
-        self.view = QGraphicsView(self.scene)
+        self.view = ZoomableGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing)
-        self.view.setBackgroundBrush(Qt.black)
         
         self.canvas_layout.addWidget(self.view)
+        
+        # Reset Zoom Button overlay or below? Below is easier for now.
+        self.btn_reset_zoom = QPushButton("Reset Zoom")
+        self.btn_reset_zoom.clicked.connect(lambda: self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio))
+        self.canvas_layout.addWidget(self.btn_reset_zoom)
         
         # Video Slider
         self.slider_layout = QHBoxLayout()
@@ -75,11 +133,23 @@ class HUDDesignerWindow(QMainWindow):
         bg_box = QGroupBox("1. Background & Logs")
         bg_form = QFormLayout(bg_box)
         
+        load_bg_layout = QHBoxLayout()
         self.btn_load_bg = QPushButton("Load Video/Photo")
         self.btn_load_bg.clicked.connect(self.load_background_dialog)
+        self.btn_reload_bg = QPushButton("Reload")
+        self.btn_reload_bg.clicked.connect(self.reload_last_background)
+        self.btn_reload_bg.setEnabled(bool(self.last_video_path))
+        load_bg_layout.addWidget(self.btn_load_bg)
+        load_bg_layout.addWidget(self.btn_reload_bg)
         
+        load_log_layout = QHBoxLayout()
         self.btn_load_logs = QPushButton("Select Log Directory")
         self.btn_load_logs.clicked.connect(self.load_log_dir_dialog)
+        self.btn_reload_logs = QPushButton("Reload")
+        self.btn_reload_logs.clicked.connect(self.reload_last_logs)
+        self.btn_reload_logs.setEnabled(bool(self.last_log_dir))
+        load_log_layout.addWidget(self.btn_load_logs)
+        load_log_layout.addWidget(self.btn_reload_logs)
         
         self.tz_spin = QSpinBox()
         self.tz_spin.setRange(-24, 24)
@@ -87,13 +157,14 @@ class HUDDesignerWindow(QMainWindow):
         self.tz_spin.setSuffix(" hours")
         self.tz_spin.valueChanged.connect(self.match_dive_to_media)
         
-        bg_form.addRow(self.btn_load_bg)
-        bg_form.addRow(self.btn_load_logs)
+        bg_form.addRow(load_bg_layout)
+        bg_form.addRow(load_log_layout)
         bg_form.addRow("TZ Offset (Log vs Media):", self.tz_spin)
         self.controls_layout.addWidget(bg_box)
 
         # 2. HUD Core (Manager)
-        self.hud_manager = HUDManager(self.scene, 1920, 1080)
+        # Reduced initial size by 20% (1920*0.8=1536, 1080*0.8=864) for better UI fit
+        self.hud_manager = HUDManager(self.scene, 1536, 864)
         self.hud_controls = HUDControls(self.hud_manager)
         self.controls_layout.addWidget(self.hud_controls)
 
@@ -104,6 +175,9 @@ class HUDDesignerWindow(QMainWindow):
 
         # Dynamically get fields from Waypoint class
         wp_fields = list(Waypoint.model_fields.keys())
+        wp_fields.append("primary_tank_pressure")
+        wp_fields.append("gasmix")
+        
         for f in sorted(wp_fields):
             item = QListWidgetItem(f)
             self.fields_list.addItem(item)
@@ -111,6 +185,17 @@ class HUDDesignerWindow(QMainWindow):
         self.fields_list.itemDoubleClicked.connect(self.add_field)
         fields_layout.addWidget(QLabel("Double-click to add:"))
         fields_layout.addWidget(self.fields_list)
+        
+        # Custom Label
+        custom_layout = QHBoxLayout()
+        self.custom_text_input = QLineEdit()
+        self.custom_text_input.setPlaceholderText("Custom Label...")
+        self.btn_add_custom = QPushButton("Add")
+        self.btn_add_custom.clicked.connect(self.add_custom_label)
+        custom_layout.addWidget(self.custom_text_input)
+        custom_layout.addWidget(self.btn_add_custom)
+        fields_layout.addLayout(custom_layout)
+        
         self.controls_layout.addWidget(fields_box)
 
         
@@ -119,30 +204,127 @@ class HUDDesignerWindow(QMainWindow):
         action_layout = QVBoxLayout(action_box)
         self.btn_load_skin = QPushButton("Load PNG Skin")
         self.btn_load_skin.clicked.connect(self.load_skin_dialog)
+        self.btn_load_package = QPushButton("Load HUD Package (.zip)")
+        self.btn_load_package.clicked.connect(self.load_package_dialog)
         self.btn_save_layout = QPushButton("Save HUD Package (.zip)")
         self.btn_save_layout.clicked.connect(self.save_layout_dialog)
         
+        self.btn_align_h = QPushButton("Align Horizontally")
+        self.btn_align_h.clicked.connect(self.hud_manager.align_selected_horizontally)
+
+        self.btn_review_render = QPushButton("Review Render (OpenCV)")
+        self.btn_review_render.clicked.connect(self.review_render)
+        self.btn_review_render.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold;")
+        
         action_layout.addWidget(self.btn_load_skin)
+        action_layout.addWidget(self.btn_load_package)
         action_layout.addWidget(self.btn_save_layout)
+        action_layout.addWidget(self.btn_align_h)
+        action_layout.addWidget(self.btn_review_render)
         self.controls_layout.addWidget(action_box)
         
         self.controls_layout.addStretch()
         self.main_layout.addWidget(self.controls_scroll, stretch=1)
+        
+        self.scene.selectionChanged.connect(self.on_selection_changed)
+        self.btn_align_h.setEnabled(False)
+
+    def on_selection_changed(self):
+        items = self.scene.selectedItems()
+        telemetry_items = [i for i in items if isinstance(i, TelemetryItem)]
+        self.btn_align_h.setEnabled(len(telemetry_items) >= 2)
 
     def add_field(self, item):
         field = item.text()
         self.hud_manager.add_telemetry_field(field, 0.5, 0.5)
 
+    def add_custom_label(self):
+        text = self.custom_text_input.text()
+        if text:
+            self.hud_manager.add_custom_label(text, 0.5, 0.5)
+            self.custom_text_input.clear()
+
+    def keyPressEvent(self, event):
+        if event.key() in [Qt.Key_Delete, Qt.Key_Backspace]:
+            selected = self.scene.selectedItems()
+            for item in selected:
+                if isinstance(item, TelemetryItem):
+                    self.hud_manager.remove_item(item)
+        else:
+            super().keyPressEvent(event)
+
+    def review_render(self):
+        """Generates a preview frame using the actual OpenCV rendering logic."""
+        if not self.video_cap or not self.current_dive:
+            print("Video or Dive Log not loaded.")
+            return
+
+        # 1. Capture current frame
+        frame_idx = self.time_slider.value()
+        self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = self.video_cap.read()
+        if not ret:
+            print("Failed to read frame.")
+            return
+
+        # 2. Match waypoint
+        elapsed_total = frame_idx / self.video_fps
+        current_time = self.video_creation_date + timedelta(seconds=elapsed_total)
+        wp = self.current_dive.get_waypoint_at(current_time)
+        if not wp:
+            from models.dive import Waypoint
+            wp = Waypoint(timestamp=current_time, depth=10.5, temp=22.0)
+
+        # 3. Get layout
+        layout = self.hud_manager.get_layout_json()
+        if not layout:
+            print("No layout data.")
+            return
+
+        # 4. Draw HUD using SHARED logic
+        from gui.hud_renderer import draw_hud
+        draw_hud(frame, layout, wp)
+
+        # 5. Show in a popup window
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        h_p, w_p, ch = rgb_frame.shape
+        qimg = QImage(rgb_frame.data, w_p, h_p, w_p * ch, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(qimg)
+
+        preview_dialog = QWidget(None, Qt.Window)
+        preview_dialog.setWindowTitle("OpenCV Render Preview (Final Output Look)")
+        preview_dialog.setLayout(QVBoxLayout())
+        label = QLabel()
+        # Scale preview to 50% (960x540) to avoid screen overflow
+        label.setPixmap(pixmap.scaled(960, 540, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        preview_dialog.layout().addWidget(label)
+        preview_dialog.show()
+        self.preview_window = preview_dialog # Keep reference
+
+    def reload_last_logs(self):
+        if self.last_log_dir:
+            self.load_logs_from_path(self.last_log_dir)
+
+    def reload_last_background(self):
+        if self.last_video_path:
+            self.load_background_from_path(self.last_video_path)
+
     def load_log_dir_dialog(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Dive Log Directory")
-        if not dir_path: return
-        
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Dive Log Directory", self.last_log_dir)
+        if dir_path:
+            self.load_logs_from_path(dir_path)
+
+    def load_logs_from_path(self, dir_path):
         self.dive_manager = DiveManager() # Reset manager
         p_dir = Path(dir_path)
         shearwater = ShearwaterParser()
         garmin = GarminParser()
         
         count = 0
+        if not p_dir.exists():
+            print(f"Error: Log directory {dir_path} no longer exists.")
+            return
+
         for path in p_dir.iterdir():
             if path.suffix == ".uddf": 
                 self.dive_manager.add_dives(shearwater.parse(path))
@@ -151,13 +333,20 @@ class HUDDesignerWindow(QMainWindow):
                 self.dive_manager.add_dives(garmin.parse(path))
                 count += 1
         
+        self.last_log_dir = str(dir_path)
+        self.settings.setValue("last_log_dir", self.last_log_dir)
+        self.btn_reload_logs.setEnabled(True)
+        
         print(f"Loaded {count} log files from {p_dir.name}")
         self.match_dive_to_media()
 
     def load_background_dialog(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Background", "", "Media (*.mp4 *.mov *.jpg *.png)")
-        if not path: return
-        
+        initial_dir = str(Path(self.last_video_path).parent) if self.last_video_path else ""
+        path, _ = QFileDialog.getOpenFileName(self, "Select Background", initial_dir, "Media (*.mp4 *.mov *.jpg *.png)")
+        if path:
+            self.load_background_from_path(path)
+
+    def load_background_from_path(self, path):
         # Extract metadata for sync
         handler = MetadataHandler()
         try:
@@ -169,6 +358,10 @@ class HUDDesignerWindow(QMainWindow):
         suffix = Path(path).suffix.lower()
         if suffix in ['.mp4', '.mov']: self.load_video_background(path)
         else: self.load_image_background(path)
+        
+        self.last_video_path = str(path)
+        self.settings.setValue("last_video_path", self.last_video_path)
+        self.btn_reload_bg.setEnabled(True)
         
         self.match_dive_to_media()
 
@@ -228,7 +421,8 @@ class HUDDesignerWindow(QMainWindow):
             self.data_label.setText("Out of dive range.")
 
     def set_bg_pixmap(self, pixmap):
-        if not self.bg_pixmap_item:
+        is_new = self.bg_pixmap_item is None
+        if is_new:
             self.bg_pixmap_item = QGraphicsPixmapItem(pixmap)
             self.scene.addItem(self.bg_pixmap_item)
             self.bg_pixmap_item.setZValue(-1)
@@ -236,21 +430,68 @@ class HUDDesignerWindow(QMainWindow):
             self.bg_pixmap_item.setPixmap(pixmap)
         
         self.scene.setSceneRect(pixmap.rect())
-        self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+        if is_new:
+            self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+        
         self.hud_manager.view_width = pixmap.width()
         self.hud_manager.view_height = pixmap.height()
 
     def load_skin_dialog(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select PNG Skin", "", "PNG (*.png)")
-        if path: self.hud_manager.load_skin(path, x_pct=0.1, y_pct=0.1, scale=0.5)
+        initial_dir = str(Path(self.last_skin_path).parent) if self.last_skin_path else ""
+        path, _ = QFileDialog.getOpenFileName(self, "Select PNG Skin", initial_dir, "PNG (*.png)")
+        if path:
+            self.hud_manager.load_skin(path, x_pct=0.1, y_pct=0.1, scale=0.5)
+            self.last_skin_path = str(path)
+            self.settings.setValue("last_skin_path", self.last_skin_path)
+
+    def load_package_dialog(self):
+        initial_dir = str(Path(self.last_hud_path).parent) if self.last_hud_path else ""
+        path, _ = QFileDialog.getOpenFileName(self, "Load HUD Package", initial_dir, "ZIP HUD Package (*.zip)")
+        if not path:
+            return
+        
+        self.last_hud_path = str(path)
+        self.settings.setValue("last_hud_path", self.last_hud_path)
+
+        # Extract to a temp directory
+        tmp_dir = tempfile.mkdtemp(prefix="hud_pkg_")
+        try:
+            with zipfile.ZipFile(path, 'r') as zip_ref:
+                zip_ref.extractall(tmp_dir)
+            
+            layout_path = Path(tmp_dir) / "hud_layout.json"
+            if not layout_path.exists():
+                print("Error: Package missing hud_layout.json")
+                return
+
+            with open(layout_path, 'r') as f:
+                layout = json.load(f)
+            
+            # Resolve the skin path relative to the extracted directory
+            skin_rel_path = layout["hud_skin"]["path"]
+            skin_abs_path = str(Path(tmp_dir) / skin_rel_path)
+            layout["hud_skin"]["path"] = skin_abs_path
+            
+            self.hud_manager.load_layout(layout)
+            print(f"Loaded HUD package from {path}")
+        except Exception as e:
+            print(f"Error loading HUD package: {e}")
 
     def save_layout_dialog(self):
         if not self.hud_manager.skin_item:
             print("No skin loaded. Cannot save HUD package.")
             return
 
-        path, _ = QFileDialog.getSaveFileName(self, "Save HUD Package", "hud_package.zip", "ZIP Archive (*.zip)")
+        initial_dir = str(Path(self.last_hud_path).parent) if self.last_hud_path else ""
+        default_file = str(Path(initial_dir) / "hud_package.zip") if initial_dir else "hud_package.zip"
+        path, _ = QFileDialog.getSaveFileName(self, "Save HUD Package", default_file, "ZIP Archive (*.zip)")
         if path:
+            if not path.endswith(".zip"):
+                path += ".zip"
+            
+            self.last_hud_path = str(path)
+            self.settings.setValue("last_hud_path", self.last_hud_path)
+
             layout = self.hud_manager.get_layout_json()
             skin_path = Path(self.hud_manager.skin_item.path)
             

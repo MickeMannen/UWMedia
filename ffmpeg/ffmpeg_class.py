@@ -6,10 +6,11 @@ import re
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from tqdm import tqdm
 from models.dive import Dive, Waypoint
 from ffmpeg.hud_filter import generate_hud_filter_complex
 
-
+# @
 class FfmpegClass:
     """
     A wrapper for the locally installed FFmpeg binary.
@@ -59,12 +60,21 @@ class FfmpegClass:
 
         import time
         start_time = time.time()
+        stderr_content = []
         
         try:
+            # Custom bar_format to show percentage with one decimal (e.g. 50.1%)
+            bar_fmt = "{desc}: {percentage:3.1f}%|{bar}| {elapsed}<{remaining}"
+            pbar = tqdm(total=100, desc="Encoding", disable=not duration, bar_format=bar_fmt)
+            last_pct = 0.0
+            
             while True:
                 line = process.stderr.readline()
                 if not line and process.poll() is not None:
                     break
+                
+                if line:
+                    stderr_content.append(line)
                 
                 if duration and "out_time_us=" in line:
                     try:
@@ -72,26 +82,23 @@ class FfmpegClass:
                         current_secs = time_us / 1000000.0
                         pct = min(100.0, (current_secs / duration) * 100)
                         
-                        elapsed = time.time() - start_time
-                        if current_secs > 0:
-                            total_est = (elapsed / current_secs) * duration
-                            remaining = max(0, total_est - elapsed)
-                            mins, secs = divmod(int(remaining), 60)
-                            print(f"Progress: {pct:5.1f}% | Remaining: {mins:02d}:{secs:02d}", end="\r")
+                        pbar.update(pct - last_pct)
+                        last_pct = pct
                     except:
                         pass
             
+            pbar.close()
             process.wait()
             if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd)
-            
-            if duration:
-                print(f"Progress: 100.0% | Remaining: 00:00")
+                error_msg = "".join(stderr_content)
+                print(f"\nFFmpeg Error (Exit {process.returncode}):\n{error_msg}")
+                raise subprocess.CalledProcessError(process.returncode, cmd, stderr=error_msg)
                 
             return subprocess.CompletedProcess(cmd, process.returncode)
             
         except Exception as e:
-            process.kill()
+            if process.poll() is None:
+                process.kill()
             raise e
 
     def get_version(self) -> str:
@@ -107,6 +114,15 @@ class FfmpegClass:
         elif self.os_type == "Windows":
             return "hevc_nvenc"
         return "libx265"
+
+    def has_filter(self, filter_name: str) -> bool:
+        """Check if a specific filter is available in the current FFmpeg build."""
+        try:
+            cmd = [str(self.get_path()), "-filters"]
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
+            return f" {filter_name} " in output or f" {filter_name}\n" in output
+        except:
+            return False
 
     def get_video_duration(self, input_path: Path) -> float:
         """Uses ffprobe to get video duration."""
@@ -196,62 +212,92 @@ class FfmpegClass:
         
         return ass_path
 
+    def get_video_dimensions(self, input_path: Path) -> tuple[int, int]:
+        """Uses ffprobe to get video width and height."""
+        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
+        cmd = [
+            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0",
+            str(input_path)
+        ]
+        result = subprocess.check_output(cmd).decode().strip()
+        return map(int, result.split('x'))
+
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, dive: Optional[Dive] = None, 
-                      stabilize: bool = False, color_correct: bool = False, overlay: bool = False,
-                      two_pass: bool = False, layout_path: Optional[Path] = None, hud_path: Optional[Path] = None,
+                      stabilize: Optional[str] = None, color_correct: bool = False, overlay: bool = False,
+                      layout_path: Optional[Path] = None,
                       start_time: Optional[str] = None, end_time: Optional[str] = None,
-                      tz_offset_mins: Optional[int] = None):
+                      tz_offset_mins: Optional[int] = None,
+                      target_resolution: Optional[tuple[int, int]] = None,
+                      bitrate: Optional[str] = None):
         
-        args = ["-y"] 
+        args = ["-y"]
+        s_sec = self._parse_time(start_time) or 0.0
+        e_sec = self._parse_time(end_time) or self.get_video_duration(input_path)
+        clip_duration = max(0, e_sec - s_sec)
+
+        if start_time:
+            args.extend(["-ss", start_time])
+        if end_time:
+            args.extend(["-to", end_time])
+
         duration = int(self.get_video_duration(input_path))
-        print(f"Video duration: {duration}s")
+        width, height = self.get_video_dimensions(input_path)
+        print(f"Video: {width}x{height} | Duration: {duration}s")
         
-        # 1. Stabilization Pass 1
-        trf_file = output_path.with_suffix(".trf")
-        if stabilize and two_pass:
-            print("Running stabilization pass 1...")
-            self.run_command([
-                "-i", str(input_path),
-                "-vf", f"vidstabdetect=stepsize=32:result='{trf_file}'",
-                "-f", "null",
-                "-"
-            ])
+        # 1. Stabilization (Deshake)
+        if stabilize:
+            print(f"Stabilization enabled (level: {stabilize})...")
 
         # 2. Construct Filter Chain
         filters = []
         
+        # Scale filter
+        if target_resolution:
+            tw, th = target_resolution
+            print(f"Downscaling to {tw}x{th}...")
+            # Use -2 to maintain aspect ratio if one dimension is set, 
+            # but here we provide both, so we use scale=w:h and ensure even numbers
+            filters.append(f"scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2")
+
         if stabilize:
-            if two_pass:
-                filters.append(f"vidstabtransform=input='{trf_file}'")
-            else:
-                filters.append("deshake")
+            if stabilize == "low":
+                filters.append("deshake=blocksize=8:rx=16:ry=16:edge=mirror")
+            elif stabilize == "mid":
+                filters.append("deshake=blocksize=16:rx=32:ry=32:edge=mirror")
+            else:  # high
+                filters.append("deshake=blocksize=32:rx=64:ry=64:edge=mirror")
 
         ass_path = None
         hud_filter = ""
         layout = {}
-        # Get video dimensions for HUD scaling
-        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
-        dim_cmd = [ffprobe_bin, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(input_path)]
-        width, height = map(int, subprocess.check_output(dim_cmd).decode().strip().split('x'))
+        actual_hud_path = None
 
         if overlay and layout_path and dive:
             print("Generating telemetry overlay...")
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
             
+            # Resolve actual_hud_path correctly relative to layout_path
             if "hud_skin" in layout:
-                hud_filter = generate_hud_filter_complex(layout, width, height)
-            else:
-                ass_path = self._generate_ass_file(dive, creation_date, duration, layout, output_path)
-                filters.append(f"subtitles='{ass_path}'")
+                skin_rel_path = layout["hud_skin"].get("path")
+                if skin_rel_path:
+                    # Skin path should be relative to the layout file
+                    actual_hud_path = layout_path.parent / Path(skin_rel_path).name
+            
+            # Only generate FFmpeg-based HUD if we aren't using the OpenCV path
+            if not color_correct:
+                if "hud_skin" in layout and actual_hud_path and actual_hud_path.exists():
+                    hud_filter = generate_hud_filter_complex(layout, width, height, actual_hud_path)
+                elif "hud_skin" in layout:
+                    print(f"Warning: HUD skin not found at {actual_hud_path}")
+                else:
+                    ass_path = self._generate_ass_file(dive, creation_date, duration, layout, output_path)
+                    filters.append(f"subtitles='{ass_path}'")
 
         inputs = ["-i", str(input_path)]
         filter_complex = ""
         
-        actual_hud_path = hud_path
-        if "hud_skin" in layout:
-            actual_hud_path = Path(layout["hud_skin"]["path"])
-
         if hud_filter:
             inputs.extend(["-i", str(actual_hud_path)])
             if filters:
@@ -260,13 +306,6 @@ class FfmpegClass:
                 filter_complex = hud_filter + f";{last_label}{','.join(filters)}[v_out]"
             else:
                 filter_complex = hud_filter + "[v_out]"
-        elif actual_hud_path and actual_hud_path.exists():
-            inputs.extend(["-i", str(actual_hud_path)])
-            overlay_filter = "[0:v][1:v]overlay=0:0"
-            if filters:
-                filter_complex = f"{overlay_filter},{','.join(filters)}[v_out]"
-            else:
-                filter_complex = f"{overlay_filter}[v_out]"
         elif filters:
             filter_complex = ",".join(filters)
 
@@ -282,17 +321,29 @@ class FfmpegClass:
         
         full_args.extend(["-vcodec", self.get_encoder()])
         
-        # Quality preservation: Match source bitrate
-        try:
-            bitrate = self.get_video_bitrate(input_path)
-            print(f"Preserving source bitrate: {bitrate/1e6:.1f} Mbps")
-            full_args.extend(["-b:v", str(bitrate)])
-        except:
-            pass
+        # Quality preservation or override
+        if bitrate:
+            print(f"Applying target bitrate: {bitrate}")
+            full_args.extend(["-b:v", bitrate])
+        else:
+            try:
+                src_bitrate = self.get_video_bitrate(input_path)
+                print(f"Preserving source bitrate: {src_bitrate/1e6:.1f} Mbps")
+                full_args.extend(["-b:v", str(src_bitrate)])
+            except:
+                pass
 
         # Metadata preservation
         full_args.extend(["-map_metadata", "0"])
-        full_args.extend(["-movflags", "use_metadata_tags"])
+        full_args.extend(["-movflags", "+faststart+use_metadata_tags"])
+        
+        # Compatibility and Color Metadata
+        full_args.extend(["-tag:v", "hvc1"])
+        full_args.extend([
+            "-color_primaries", "1",
+            "-color_trc", "1",
+            "-colorspace", "1"
+        ])
         
         # Creation date with timezone
         if tz_offset_mins is not None:
@@ -308,8 +359,9 @@ class FfmpegClass:
         full_args.extend([str(output_path)])
 
         print(f"Executing FFmpeg with {self.get_encoder()}...")
+        if self.debug:
+            print(full_args)
         try:
-            self.run_command(full_args, duration=float(duration))
+            self.run_command(full_args, duration=float(clip_duration))
         finally:
             if ass_path and ass_path.exists(): ass_path.unlink()
-            if trf_file and trf_file.exists(): trf_file.unlink()

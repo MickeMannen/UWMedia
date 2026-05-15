@@ -6,3 +6,5 @@ numpy
 opencv-python
 PySide6
 pyexiftool
+tqdm
+pyinstaller

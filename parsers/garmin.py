@@ -204,6 +204,7 @@ class GarminParser(BaseParser):
         
         current_active_tanks = initial_tanks.copy()
         tank_ptr = 0
+        current_max_depth = 0.0
 
         for record in record_messages:
             ts = record.get("timestamp")
@@ -219,11 +220,17 @@ class GarminParser(BaseParser):
                 current_active_tanks.update(updates)
                 tank_ptr += 1
 
+            depth = float(record.get("depth", 0.0))
+            if depth > current_max_depth:
+                current_max_depth = depth
+
             wp = Waypoint(
                 timestamp=ts_local,
-                depth=float(record.get("depth", 0.0)),
+                depth=depth,
+                max_depth=current_max_depth,
                 temp=float(record.get("temperature", 0.0)),
                 time_since_start=int((ts_local - start_time_local).total_seconds()),
+                dive_time=int((ts_local - start_time_local).total_seconds()),
                 deco_stop_depth=float(record.get("next_stop_depth", 0.0)),
                 next_stop_depth=float(record.get("next_stop_depth", 0.0)),
                 next_stop_time=int(record.get("next_stop_time", 0)),

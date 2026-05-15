@@ -1,3 +1,4 @@
+REVISION = "dev"
 from cli_main import main
 
 if __name__ == "__main__":

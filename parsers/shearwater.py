@@ -44,12 +44,16 @@ class ShearwaterParser(BaseParser):
             start_time = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
             
             waypoints = []
+            current_max_depth = 0.0
             # Samples are usually in <samples> or <repetition>
             for sample in dive_elem.xpath(".//samples/waypoint"):
                 seconds = int(sample.xpath("string(divetime)"))
                 timestamp = start_time + timedelta(seconds=seconds)
                 depth = float(sample.xpath("string(depth)"))
                 temp = float(sample.xpath("string(temperature)"))
+                
+                if depth > current_max_depth:
+                    current_max_depth = depth
                 
                 # Tank data (simplified)
                 tanks = {}
@@ -60,8 +64,10 @@ class ShearwaterParser(BaseParser):
                 waypoints.append(Waypoint(
                     timestamp=timestamp,
                     depth=depth,
+                    max_depth=current_max_depth,
                     temp=temp,
                     time_since_start=seconds,
+                    dive_time=seconds,
                     tanks=tanks
                 ))
             
