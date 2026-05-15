@@ -1,22 +1,25 @@
-name: Build UWMedia
+name: Release Build
 
 on:
   push:
-    branches: [ main, master ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-14
+            platform: macos
 
     steps:
       - name: Checkout code
@@ -29,7 +32,7 @@ jobs:
           cache: 'pip'
 
       - name: Install System Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libimage-exiftool-perl
@@ -37,12 +40,12 @@ jobs:
           sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
 
       - name: Install System Dependencies (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.platform == 'macos'
         run: |
           brew install ffmpeg exiftool
 
       - name: Install System Dependencies (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.platform == 'windows'
         run: |
           choco install ffmpeg exiftool
 
@@ -58,7 +61,7 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             echo "REVISION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
-            echo "REVISION=build-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+            echo "REVISION=dev-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build with build.py
@@ -68,7 +71,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: uwmedia-${{ matrix.os }}
+          name: uwmedia-${{ matrix.platform }}
           path: dist/*
 
   release:
@@ -76,6 +79,8 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -85,6 +90,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/uwmedia-linux/*
+            artifacts/uwmedia-windows/*
+            artifacts/uwmedia-macos/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

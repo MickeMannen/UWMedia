@@ -3,6 +3,7 @@ import sys
 import subprocess
 import argparse
 import re
+import platform
 from pathlib import Path
 
 def update_revision(revision):
@@ -75,13 +76,27 @@ def build_app(target, revision, os_name, arch):
     except subprocess.CalledProcessError as e:
         print(f"\nFAILED: {target} build failed with exit code {e.returncode}")
 
+def get_default_os():
+    if sys.platform.startswith("win"):
+        return "windows"
+    if sys.platform.startswith("darwin"):
+        return "macos"
+    return "linux"
+
+def get_default_arch():
+    machine = platform.machine().lower()
+    if "arm" in machine or "aarch64" in machine:
+        return "arm64"
+    if "x86_64" in machine or "amd64" in machine:
+        return "x64"
+    return machine
+
 def main():
     parser = argparse.ArgumentParser(description="UWMedia PyInstaller Build Script")
     parser.add_argument("--target", choices=["cli", "gui", "both"], default="both", help="Build target (default: both)")
     parser.add_argument("--revision", required=True, help="Revision/Version string (e.g. 1.0.4)")
-    parser.add_argument("--os", default=sys.platform, help="OS label for filename (default: current sys.platform)")
-    parser.add_argument("--arch", default="arm64" if "arm" in sys.platform.lower() or "darwin" in sys.platform.lower() else "x64", 
-                        help="Architecture label for filename (default: detected)")
+    parser.add_argument("--os", default=get_default_os(), help="OS label for filename")
+    parser.add_argument("--arch", default=get_default_arch(), help="Architecture label for filename")
     
     args = parser.parse_args()
     
