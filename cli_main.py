@@ -40,7 +40,8 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
         '480p': (854, 480, "7M"),
         '360p': (640, 360, "4M")
     }
-    
+
+
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
     
     for res_name in args.convert:
