@@ -177,7 +177,7 @@ class ColorCorrectionEngine:
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
             
-            print(f"DEBUG: Layout Content: {json.dumps(layout, indent=2)}")
+            # print(f"DEBUG: Layout Content: {json.dumps(layout, indent=2)}")
             
             # Resolve actual_hud_path correctly relative to layout_path
             if "hud_skin" in layout:
