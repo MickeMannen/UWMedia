@@ -24,6 +24,12 @@ def format_telemetry_value(field, raw_val):
     """Unified formatting for telemetry values."""
     if field == "gasmix":
         return str(raw_val) if raw_val is not None else "N/A"
+    elif field.startswith("tank_name:"):
+        if raw_val:
+            return str(raw_val)
+        return field.replace("tank_name:", "")
+    elif (field == "primary_tank_pressure" or field.startswith("tank_pressure:")) and raw_val is not None:
+        return str(int(float(raw_val)))
     elif field in ["ndl", "air_remaining"] and raw_val is not None:
         val_mins = int(raw_val / 60)
         if field == "ndl" and val_mins > 99: 
@@ -45,6 +51,27 @@ def format_telemetry_value(field, raw_val):
     else:
         return str(raw_val)
 
+def draw_rounded_rect(img, pt1, pt2, color, thickness, r, d):
+    x1, y1 = pt1
+    x2, y2 = pt2
+    
+    # 1. Draw Corners (Ellipses)
+    cv2.ellipse(img, (x1 + r, y1 + r), (r, r), 180, 0, 90, color, thickness)
+    cv2.ellipse(img, (x2 - r, y1 + r), (r, r), 270, 0, 90, color, thickness)
+    cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness)
+    cv2.ellipse(img, (x1 + r, y2 - r), (r, r), 90, 0, 90, color, thickness)
+
+    if thickness > 0:
+        # Outlined: Draw 4 lines
+        cv2.line(img, (x1 + r, y1), (x2 - r, y1), color, thickness)
+        cv2.line(img, (x1 + r, y2), (x2 - r, y2), color, thickness)
+        cv2.line(img, (x1, y1 + r), (x1, y2 - r), color, thickness)
+        cv2.line(img, (x2, y1 + r), (x2, y2 - r), color, thickness)
+    else:
+        # Filled: Draw 2 rectangles to fill the center gaps between ellipses
+        cv2.rectangle(img, (x1 + r, y1), (x2 - r, y2), color, thickness)
+        cv2.rectangle(img, (x1, y1 + r), (x2, y2 - r), color, thickness)
+
 def draw_hud(frame, layout, waypoint, preloaded_skin=None):
     """
     Complete HUD rendering logic used by both CLI and GUI Review.
@@ -53,51 +80,66 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None):
     h_v, w_v = frame.shape[:2]
     hud_skin = layout.get("hud_skin", {})
     
-    skin_scale = hud_skin.get("scale", 1.0)
+    skin_type = hud_skin.get("type", "image")
+    skin_opacity = hud_skin.get("opacity", 1.0)
     skin_x_pct = hud_skin.get("x_pct", 0.0)
     skin_y_pct = hud_skin.get("y_pct", 0.0)
-    skin_opacity = hud_skin.get("opacity", 1.0)
-
-    # 1. Get Skin Image
-    img_skin = preloaded_skin
-    if img_skin is None:
-        skin_path = hud_skin.get("path")
-        if not skin_path:
-            return
-        img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-        if img_skin is None:
-            return
-        
-        # Basic resizing if not pre-loaded
-        h_orig, w_orig = img_skin.shape[:2]
-        w_scaled = int(w_orig * skin_scale)
-        h_scaled = int(h_orig * skin_scale)
-        img_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
-        if img_skin.shape[2] == 4:
-            img_skin[:, :, 3] = (img_skin[:, :, 3] * skin_opacity).astype(np.uint8)
-
-    h_scaled, w_scaled = img_skin.shape[:2]
-
-    # 2. Target coordinates
+    
     skin_x = int(skin_x_pct * w_v)
     skin_y = int(skin_y_pct * h_v)
 
-    # 3. Apply Skin Overlay (Manual Alpha Blending)
-    tx1, ty1 = max(0, skin_x), max(0, skin_y)
-    tx2, ty2 = min(w_v, skin_x + w_scaled), min(h_v, skin_y + h_scaled)
-    sx1, sy1 = max(0, -skin_x), max(0, -skin_y)
-    sx2, sy2 = sx1 + (tx2 - tx1), sy1 + (ty2 - ty1)
+    if skin_type == "shape":
+        width = hud_skin.get("width", 400)
+        height = hud_skin.get("height", 200)
+        color_hex = hud_skin.get("color", "#000000").lstrip('#')
+        color_bgr = tuple(int(color_hex[i:i+2], 16) for i in (4, 2, 0)) # BGR for OpenCV
+        radius = hud_skin.get("corner_radius", 20)
+        
+        # Create overlay for alpha blending
+        overlay = frame.copy()
+        draw_rounded_rect(overlay, (skin_x, skin_y), (skin_x + width, skin_y + height), color_bgr, -1, radius, 1)
+        cv2.addWeighted(overlay, skin_opacity, frame, 1 - skin_opacity, 0, frame)
+        
+        w_scaled, h_scaled = width, height
+        skin_scale = 1.0
+    else:
+        # 1. Get Skin Image
+        skin_scale = hud_skin.get("scale", 1.0)
+        img_skin = preloaded_skin
+        if img_skin is None:
+            skin_path = hud_skin.get("path")
+            if not skin_path:
+                return
+            img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+            if img_skin is None:
+                return
+            
+            # Basic resizing if not pre-loaded
+            h_orig, w_orig = img_skin.shape[:2]
+            w_scaled = int(w_orig * skin_scale)
+            h_scaled = int(h_orig * skin_scale)
+            img_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+            if img_skin.shape[2] == 4:
+                img_skin[:, :, 3] = (img_skin[:, :, 3] * skin_opacity).astype(np.uint8)
 
-    if ty2 > ty1 and tx2 > tx1:
-        overlay_part = img_skin[sy1:sy2, sx1:sx2]
-        target_roi = frame[ty1:ty2, tx1:tx2]
-        if overlay_part.shape[2] == 4:
-            alpha = overlay_part[:, :, 3:4] / 255.0
-            color = overlay_part[:, :, :3]
-            blended = (color * alpha + target_roi * (1.0 - alpha)).astype(np.uint8)
-            frame[ty1:ty2, tx1:tx2] = blended
-        else:
-            frame[ty1:ty2, tx1:tx2] = overlay_part[:, :, :3]
+        h_scaled, w_scaled = img_skin.shape[:2]
+
+        # 3. Apply Skin Overlay (Manual Alpha Blending)
+        tx1, ty1 = max(0, skin_x), max(0, skin_y)
+        tx2, ty2 = min(w_v, skin_x + w_scaled), min(h_v, skin_y + h_scaled)
+        sx1, sy1 = max(0, -skin_x), max(0, -skin_y)
+        sx2, sy2 = sx1 + (tx2 - tx1), sy1 + (ty2 - ty1)
+
+        if ty2 > ty1 and tx2 > tx1:
+            overlay_part = img_skin[sy1:sy2, sx1:sx2]
+            target_roi = frame[ty1:ty2, tx1:tx2]
+            if overlay_part.shape[2] == 4:
+                alpha = overlay_part[:, :, 3:4] / 255.0
+                color = overlay_part[:, :, :3]
+                blended = (color * alpha + target_roi * (1.0 - alpha)).astype(np.uint8)
+                frame[ty1:ty2, tx1:tx2] = blended
+            else:
+                frame[ty1:ty2, tx1:tx2] = overlay_part[:, :, :3]
 
     # 4. Draw Telemetry
     skin_info = {
@@ -128,6 +170,17 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
         field = elem.get("field", "")
         if field.startswith("custom:"):
             val = field.replace("custom:", "")
+        elif field.startswith("tank_pressure:"):
+            tank_name = field.replace("tank_pressure:", "")
+            # Check if tank exists in waypoint
+            tank_data = waypoint.tanks.get(tank_name)
+            raw_val = tank_data.pressure_bar if tank_data else None
+            val = format_telemetry_value(field, raw_val)
+        elif field.startswith("tank_name:"):
+            tank_name = field.replace("tank_name:", "")
+            tank_data = waypoint.tanks.get(tank_name)
+            raw_val = tank_data.name if tank_data else tank_name
+            val = format_telemetry_value(field, raw_val)
         else:
             raw_val = getattr(waypoint, field, None)
             val = format_telemetry_value(field, raw_val)

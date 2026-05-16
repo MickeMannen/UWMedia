@@ -4,6 +4,7 @@ from typing import List, Optional, Dict
 from pathlib import Path
 from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
+from utils.config import get_config
 
 FIT_EPOCH_S = 631065600
 
@@ -25,6 +26,20 @@ def timezone_from_pair(local_dt: datetime, utc_dt: datetime) -> timezone:
     return timezone(timedelta(minutes=minutes))
 
 class GarminParser(BaseParser):
+    def get_unique_tank_serials(self, file_path: Path) -> List[str]:
+        """Scans a FIT file and returns all unique tank sensor serial numbers."""
+        stream = Stream.from_file(str(file_path))
+        decoder = Decoder(stream)
+        messages, _ = decoder.read()
+        
+        serials = set()
+        tank_messages = messages.get("tank_update_mesgs", [])
+        for t_msg in tank_messages:
+            s_id = t_msg.get("sensor")
+            if s_id is not None:
+                serials.add(str(s_id))
+        return list(serials)
+
     def parse(self, file_path: Path) -> List[Dive]:
         """Entry point for the parser, utilizing the extended parse_garmin logic."""
         return self.parse_garmin(file_path)
@@ -160,7 +175,10 @@ class GarminParser(BaseParser):
             ts_local = remove_offset(ts.astimezone(tz))
             
             sensor_id = t_msg.get("sensor")
-            tank_key = str(sensor_id) if sensor_id is not None else str(t_msg.get("gas_type_index", "default"))
+            tank_serial = str(sensor_id) if sensor_id is not None else str(t_msg.get("gas_type_index", "default"))
+            
+            # Map serial to friendly name from config
+            tank_key = get_config().map_tank_name(tank_serial)
             
             tank_name = sensor_data.get(sensor_id, {}).get("name") if sensor_id else None
             

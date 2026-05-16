@@ -66,8 +66,9 @@ def build_app(target, revision, os_name, arch):
     
     cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--onefile",
+        "--onedir",
         "--clean",
+        "--noconfirm",
         "--name", exe_name,
         "--distpath", str(dist_path),
         "--workpath", str(work_path),
@@ -87,7 +88,8 @@ def build_app(target, revision, os_name, arch):
     cmd.extend([
         "--hidden-import", "pydantic_core._pydantic_core",
         "--hidden-import", "PIL._imaging",
-        "--hidden-import", "PIL.ImageFont"
+        "--hidden-import", "PIL.ImageFont",
+        "--hidden-import", "yaml"
     ])
     
     print(f"\n>>> Building {target.upper()}...")
@@ -96,10 +98,17 @@ def build_app(target, revision, os_name, arch):
     try:
         subprocess.run(cmd, check=True)
         print(f"\nSUCCESS: {target} build complete.")
-        exe_ext = ".exe" if os_name.lower() in ["windows", "win32"] else ""
-        result_path = dist_path / f"{exe_name}{exe_ext}"
-        if result_path.exists():
-            print(f"Binary located at: {result_path}")
+        
+        # Create ZIP archive
+        import shutil
+        zip_name = dist_path / f"{exe_name}"
+        dir_to_zip = dist_path / exe_name
+        
+        if dir_to_zip.exists():
+            print(f">>> Creating ZIP archive: {zip_name}.zip")
+            shutil.make_archive(str(zip_name), 'zip', str(dir_to_zip))
+            print(f"Archive created at: {zip_name}.zip")
+            
     except subprocess.CalledProcessError as e:
         print(f"\nFAILED: {target} build failed with exit code {e.returncode}")
 

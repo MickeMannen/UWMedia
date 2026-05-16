@@ -231,6 +231,7 @@ def main():
     parser.add_argument("--tz-adjust", type=int, default=0, help="Timezone adjustment in hours (for Shearwater)")
     parser.add_argument("--force-media-tz", type=float, help="Force a specific timezone offset for media (in hours, e.g. +8 or -5.5)")
     parser.add_argument("--fix-tz", action="store_true", help="Only update the timezone metadata and exit (requires --force-media-tz)")
+    parser.add_argument("--create-config", action="store_true", help="Scan log directory for tanks and create/overwrite config.yaml")
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
@@ -310,6 +311,7 @@ def main():
 
     # 1. Load Dive Logs
     manager = DiveManager()
+    found_garmin = False
     if args.logs:
         shearwater = ShearwaterParser()
         garmin = GarminParser()
@@ -318,8 +320,23 @@ def main():
             print(f"Error: Log directory {args.logs} not found.")
             sys.exit(1)
 
+        # Handle Config Generation
+        if args.create_config:
+            print(f"Scanning {args.logs} for tanks...")
+            all_serials = set()
+            for path in args.logs.iterdir():
+                if path.suffix == ".fit":
+                    serials = garmin.get_unique_tank_serials(path)
+                    all_serials.update(serials)
+            
+            from utils.config import get_config
+            get_config().save_config(list(all_serials))
+            print("You can now edit config.yaml to set friendly names for these tanks.")
+            sys.exit(0)
+
         for path in args.logs.iterdir():
             if path.suffix == ".uddf":
+                # ... (shearwater parsing)
                 if args.tz_adjust:
                     shearwater.update_timezone(path, args.tz_adjust * 60)
                 dives = shearwater.parse(path)
@@ -331,7 +348,17 @@ def main():
                             wp.timestamp += timedelta(hours=args.tz_adjust)
                 manager.add_dives(dives)
             elif path.suffix == ".fit":
+                found_garmin = True
                 manager.add_dives(garmin.parse(path))
+
+    # Warning for Garmin logs without config
+    from utils.config import get_config
+    if found_garmin and not get_config().is_loaded():
+        print("\n" + "!" * 60)
+        print("WARNING: Garmin logs found but no config.yaml loaded.")
+        print("Tank serial numbers will be used instead of friendly names.")
+        print("Run with --create-config --logs <dir> to generate a mapping file.")
+        print("!" * 60 + "\n")
 
     meta_handler = MetadataHandler()
 

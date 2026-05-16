@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene, 
     QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QPushButton,
     QSlider, QLabel, QGraphicsPixmapItem, QGroupBox, QFormLayout,
-    QSpinBox, QListWidget, QListWidgetItem, QLineEdit
+    QSpinBox, QListWidget, QListWidgetItem, QLineEdit, QScrollArea
 )
 from PySide6.QtCore import Qt, QTimer, QSettings
 from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
@@ -75,7 +75,7 @@ class HUDDesignerWindow(QMainWindow):
             self.revision = "dev"
 
         self.setWindowTitle(f"UWMedia HUD Designer & Sync - Rev: {self.revision}")
-        self.resize(1600, 900)
+        self.resize(1280, 720) # More reasonable default for laptops
         self.settings = QSettings("UWMedia", "HUDDesigner")
 
         # State
@@ -125,9 +125,14 @@ class HUDDesignerWindow(QMainWindow):
         
         self.main_layout.addLayout(self.canvas_layout, stretch=4)
 
-        # Right Column: Controls Panel
-        self.controls_scroll = QWidget()
-        self.controls_layout = QVBoxLayout(self.controls_scroll)
+        # Right Column: Controls Panel with Scroll Area
+        self.right_panel_scroll = QScrollArea()
+        self.right_panel_scroll.setWidgetResizable(True)
+        self.right_panel_scroll.setFixedWidth(350)
+        
+        self.controls_content = QWidget()
+        self.controls_layout = QVBoxLayout(self.controls_content)
+        self.right_panel_scroll.setWidget(self.controls_content)
         
         # 1. Background & Logs
         bg_box = QGroupBox("1. Background & Logs")
@@ -172,15 +177,7 @@ class HUDDesignerWindow(QMainWindow):
         fields_box = QGroupBox("3. Available Fields")
         fields_layout = QVBoxLayout(fields_box)
         self.fields_list = QListWidget()
-
-        # Dynamically get fields from Waypoint class
-        wp_fields = list(Waypoint.model_fields.keys())
-        wp_fields.append("primary_tank_pressure")
-        wp_fields.append("gasmix")
-        
-        for f in sorted(wp_fields):
-            item = QListWidgetItem(f)
-            self.fields_list.addItem(item)
+        self.update_available_fields()
 
         self.fields_list.itemDoubleClicked.connect(self.add_field)
         fields_layout.addWidget(QLabel("Double-click to add:"))
@@ -204,6 +201,8 @@ class HUDDesignerWindow(QMainWindow):
         action_layout = QVBoxLayout(action_box)
         self.btn_load_skin = QPushButton("Load PNG Skin")
         self.btn_load_skin.clicked.connect(self.load_skin_dialog)
+        self.btn_create_shape = QPushButton("Create Shape Background")
+        self.btn_create_shape.clicked.connect(lambda: self.hud_manager.create_shape_skin())
         self.btn_load_package = QPushButton("Load HUD Package (.zip)")
         self.btn_load_package.clicked.connect(self.load_package_dialog)
         self.btn_save_layout = QPushButton("Save HUD Package (.zip)")
@@ -217,6 +216,7 @@ class HUDDesignerWindow(QMainWindow):
         self.btn_review_render.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold;")
         
         action_layout.addWidget(self.btn_load_skin)
+        action_layout.addWidget(self.btn_create_shape)
         action_layout.addWidget(self.btn_load_package)
         action_layout.addWidget(self.btn_save_layout)
         action_layout.addWidget(self.btn_align_h)
@@ -224,10 +224,34 @@ class HUDDesignerWindow(QMainWindow):
         self.controls_layout.addWidget(action_box)
         
         self.controls_layout.addStretch()
-        self.main_layout.addWidget(self.controls_scroll, stretch=1)
+        self.main_layout.addWidget(self.right_panel_scroll)
         
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.btn_align_h.setEnabled(False)
+
+    def update_available_fields(self):
+        """Refreshes the fields list with primary fields and any specific tanks found in the dive."""
+        self.fields_list.clear()
+        
+        # 1. Standard Fields
+        standard_fields = list(Waypoint.model_fields.keys())
+        standard_fields.append("primary_tank_pressure")
+        standard_fields.append("gasmix")
+        
+        for f in sorted(standard_fields):
+            if f == "tanks": continue # Don't add raw dict
+            self.fields_list.addItem(QListWidgetItem(f))
+            
+        # 2. Dynamic Tank Fields
+        if self.current_dive and self.current_dive.waypoints:
+            unique_tanks = set()
+            for wp in self.current_dive.waypoints:
+                for tank_name in wp.tanks.keys():
+                    unique_tanks.add(tank_name)
+            
+            for tank_name in sorted(list(unique_tanks)):
+                self.fields_list.addItem(QListWidgetItem(f"tank_pressure:{tank_name}"))
+                self.fields_list.addItem(QListWidgetItem(f"tank_name:{tank_name}"))
 
     def on_selection_changed(self):
         items = self.scene.selectedItems()
@@ -373,6 +397,7 @@ class HUDDesignerWindow(QMainWindow):
             
             if self.current_dive:
                 print(f"Matched dive! Offset: {self.tz_spin.value()}h")
+                self.update_available_fields()
                 self.sync_data_to_frame(self.time_slider.value() / self.video_fps)
             else:
                 self.data_label.setText("No matching dive found for this date/offset.")
@@ -493,24 +518,26 @@ class HUDDesignerWindow(QMainWindow):
             self.settings.setValue("last_hud_path", self.last_hud_path)
 
             layout = self.hud_manager.get_layout_json()
-            skin_path = Path(self.hud_manager.skin_item.path)
+            is_shape = layout["hud_skin"].get("type") == "shape"
+            skin_path = None if is_shape else Path(self.hud_manager.skin_item.path)
             
-            # Use relative path in JSON for the zip archive
-            layout["hud_skin"]["path"] = skin_path.name
+            if not is_shape:
+                # Use relative path in JSON for the zip archive
+                layout["hud_skin"]["path"] = skin_path.name
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 json_path = os.path.join(tmpdir, "hud_layout.json")
                 with open(json_path, 'w') as f:
                     json.dump(layout, f, indent=2)
                 
-                # Copy skin to temp dir
-                tmp_skin_path = os.path.join(tmpdir, skin_path.name)
-                shutil.copy2(skin_path, tmp_skin_path)
-                
                 # Create ZIP
                 with zipfile.ZipFile(path, "w") as zip_file:
                     zip_file.write(json_path, arcname="hud_layout.json")
-                    zip_file.write(tmp_skin_path, arcname=skin_path.name)
+                    if not is_shape:
+                        # Copy and write skin image
+                        tmp_skin_path = os.path.join(tmpdir, skin_path.name)
+                        shutil.copy2(skin_path, tmp_skin_path)
+                        zip_file.write(tmp_skin_path, arcname=skin_path.name)
             print(f"Saved HUD package to {path}")
 
 import multiprocessing

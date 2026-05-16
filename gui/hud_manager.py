@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 from PySide6.QtWidgets import (
     QGraphicsPixmapItem, QGraphicsTextItem, QGraphicsItem, 
-    QGraphicsScene, QGraphicsView
+    QGraphicsScene, QGraphicsView, QGraphicsPathItem
 )
-from PySide6.QtCore import Qt, QPointF, Signal, QObject
-from PySide6.QtGui import QPixmap, QColor, QFont
+from PySide6.QtCore import Qt, QPointF, Signal, QObject, QRectF
+from PySide6.QtGui import QPixmap, QColor, QFont, QPainterPath, QPen, QBrush
 
 from gui.hud_renderer import format_telemetry_value
 
@@ -39,16 +39,21 @@ class HUDManager(QObject):
             self.item_selected.emit(None)
 
     def align_selected_horizontally(self):
-        """Aligns selected telemetry items to the Y-coordinate of the first selected item."""
+        """Aligns selected telemetry items to the bottom edge of the first selected item."""
         items = [i for i in self.scene.selectedItems() if isinstance(i, TelemetryItem)]
         if len(items) < 2:
             return
             
-        target_y = items[0].pos().y()
-        for item in items[1:]:
-            item.setY(target_y)
+        # Use the first item's bottom edge as the reference
+        first = items[0]
+        target_bottom = first.pos().y() + (first.boundingRect().height() * first.scale())
         
-        print(f"Aligned {len(items)} items horizontally at Y={target_y:.1f}")
+        for item in items[1:]:
+            # Adjust each item's Y so its bottom matches the target bottom
+            item_height = item.boundingRect().height() * item.scale()
+            item.setY(target_bottom - item_height)
+        
+        print(f"Aligned {len(items)} items horizontally (bottom-aligned).")
 
     def load_skin(self, pixmap_path: str, opacity: float = 1.0, scale: float = 1.0, x_pct: float = 0.0, y_pct: float = 0.0):
         if self.skin_item:
@@ -69,7 +74,20 @@ class HUDManager(QObject):
         self.skin_loaded.emit(self.skin_item)
         return self.skin_item
 
-    def add_telemetry_field(self, field: str, rel_x: float, rel_y: float, color: str = "#FFFFFF", font_size: int = 12):
+    def create_shape_skin(self, width: int = 400, height: int = 200, color: str = "#000000", opacity: float = 0.5, corner_radius: int = 20, x_pct: float = 0.1, y_pct: float = 0.1):
+        if self.skin_item:
+            self.scene.removeItem(self.skin_item)
+        
+        self.skin_item = HUDShapeItem(width, height, color, corner_radius)
+        self.scene.addItem(self.skin_item)
+        
+        self.skin_item.setOpacity(opacity)
+        self.skin_item.setPos(x_pct * self.view_width, y_pct * self.view_height)
+        
+        self.skin_loaded.emit(self.skin_item)
+        return self.skin_item
+
+    def add_telemetry_field(self, field: str, rel_x: float, rel_y: float, color: str = "#FFFFFF", font_size: int = 30):
         if not self.skin_item:
             print("Error: No skin loaded. Load a skin before adding telemetry fields.")
             return
@@ -79,15 +97,14 @@ class HUDManager(QObject):
         item.set_font_size(font_size)
         
         # Position relative to skin (0.0 to 1.0 of skin dimensions)
-        skin_rect = self.skin_item.pixmap().rect()
-        item.setPos(rel_x * skin_rect.width(), rel_y * skin_rect.height())
+        rect = self.skin_item.pixmap().rect() if isinstance(self.skin_item, HUDSkinItem) else self.skin_item.rect()
+        item.setPos(rel_x * rect.width(), rel_y * rect.height())
         
-        # Track by unique field name or generate one for custom text
-        key = f"field_{field}_{len(self.linked_elements)}"
-        self.linked_elements[key] = item
+        # Track using the item itself as the key to avoid name collisions
+        self.linked_elements[item] = item
         return item
 
-    def add_custom_label(self, text: str, rel_x: float, rel_y: float, color: str = "#FFFFFF", font_size: int = 12):
+    def add_custom_label(self, text: str, rel_x: float, rel_y: float, color: str = "#FFFFFF", font_size: int = 30):
         if not self.skin_item: return None
         
         item = TelemetryItem(f"custom:{text}", self.skin_item)
@@ -97,19 +114,17 @@ class HUDManager(QObject):
         item.set_font_size(font_size)
         item.setPlainText(text)
         
-        skin_rect = self.skin_item.pixmap().rect()
-        item.setPos(rel_x * skin_rect.width(), rel_y * skin_rect.height())
+        rect = self.skin_item.pixmap().rect() if isinstance(self.skin_item, HUDSkinItem) else self.skin_item.rect()
+        item.setPos(rel_x * rect.width(), rel_y * rect.height())
         
-        key = f"custom_{len(self.linked_elements)}"
-        self.linked_elements[key] = item
+        self.linked_elements[item] = item
         return item
 
     def remove_item(self, item):
         if not item: return
-        # Find and remove from dictionary
-        keys_to_remove = [k for k, v in self.linked_elements.items() if v == item]
-        for k in keys_to_remove:
-            del self.linked_elements[k]
+        # Remove from dictionary
+        if item in self.linked_elements:
+            del self.linked_elements[item]
         
         if item.scene():
             self.scene.removeItem(item)
@@ -125,15 +140,27 @@ class HUDManager(QObject):
                 self.scene.removeItem(item)
         self.linked_elements = {}
 
-        self.load_skin(
-            hud_skin["path"],
-            opacity=hud_skin.get("opacity", 1.0),
-            scale=hud_skin.get("scale", 1.0),
-            x_pct=hud_skin.get("x_pct", 0.0),
-            y_pct=hud_skin.get("y_pct", 0.0)
-        )
+        if hud_skin.get("type") == "shape":
+            self.create_shape_skin(
+                width=hud_skin.get("width", 400),
+                height=hud_skin.get("height", 200),
+                color=hud_skin.get("color", "#000000"),
+                opacity=hud_skin.get("opacity", 0.5),
+                corner_radius=hud_skin.get("corner_radius", 20),
+                x_pct=hud_skin.get("x_pct", 0.1),
+                y_pct=hud_skin.get("y_pct", 0.1)
+            )
+        else:
+            self.load_skin(
+                hud_skin["path"],
+                opacity=hud_skin.get("opacity", 1.0),
+                scale=hud_skin.get("scale", 1.0),
+                x_pct=hud_skin.get("x_pct", 0.0),
+                y_pct=hud_skin.get("y_pct", 0.0)
+            )
 
         for element in hud_skin.get("linked_elements", []):
+            # ... (rest of element loading logic)
             field = element.get("field", "")
             if field.startswith("custom:"):
                 text = field.replace("custom:", "")
@@ -158,48 +185,98 @@ class HUDManager(QObject):
                     item.setScale(element.get("scale", 1.0))
 
     def update_telemetry_data(self, waypoint: 'Waypoint'):
+        # ... (unchanged)
         """
         Updates the text of all linked telemetry elements based on waypoint data.
         """
-        for key, item in self.linked_elements.items():
+        for item in self.linked_elements.values():
             if getattr(item, 'is_custom', False):
                 continue
                 
             field = item.field
-            raw_val = getattr(waypoint, field, None)
-            val = format_telemetry_value(field, raw_val)
+            if field.startswith("tank_pressure:"):
+                tank_name = field.replace("tank_pressure:", "")
+                tank_data = waypoint.tanks.get(tank_name)
+                raw_val = tank_data.pressure_bar if tank_data else None
+                val = format_telemetry_value(field, raw_val)
+            elif field.startswith("tank_name:"):
+                tank_name = field.replace("tank_name:", "")
+                tank_data = waypoint.tanks.get(tank_name)
+                val = tank_data.name if (tank_data and tank_data.name) else tank_name
+            else:
+                raw_val = getattr(waypoint, field, None)
+                val = format_telemetry_value(field, raw_val)
             item.update_value(val)
 
     def get_layout_json(self):
         if not self.skin_item:
             return {}
 
-        skin_rect = self.skin_item.pixmap().rect()
+        is_shape = isinstance(self.skin_item, HUDShapeItem)
+        rect = self.skin_item.rect() if is_shape else self.skin_item.pixmap().rect()
+        
         linked_elements = []
-        for key, item in self.linked_elements.items():
+        for item in self.linked_elements.values():
             field_name = item.field
             if getattr(item, 'is_custom', False):
                 field_name = f"custom:{item.custom_text}"
                 
             linked_elements.append({
                 "field": field_name,
-                "rel_x": item.pos().x() / skin_rect.width(),
-                "rel_y": item.pos().y() / skin_rect.height(),
+                "rel_x": item.pos().x() / rect.width(),
+                "rel_y": item.pos().y() / rect.height(),
                 "color": item.defaultTextColor().name(),
                 "font_size": item.font().pixelSize(),
                 "scale": item.scale()
             })
 
-        return {
-            "hud_skin": {
-                "path": self.skin_item.path,
-                "opacity": self.skin_item.opacity(),
-                "scale": self.skin_item.scale(),
-                "x_pct": self.skin_item.pos().x() / self.view_width,
-                "y_pct": self.skin_item.pos().y() / self.view_height,
-                "linked_elements": linked_elements
-            }
+        skin_data = {
+            "type": "shape" if is_shape else "image",
+            "opacity": self.skin_item.opacity(),
+            "x_pct": self.skin_item.pos().x() / self.view_width,
+            "y_pct": self.skin_item.pos().y() / self.view_height,
+            "linked_elements": linked_elements
         }
+
+        if is_shape:
+            skin_data.update({
+                "width": self.skin_item.width,
+                "height": self.skin_item.height,
+                "color": self.skin_item.color_hex,
+                "corner_radius": self.skin_item.corner_radius
+            })
+        else:
+            skin_data.update({
+                "path": self.skin_item.path,
+                "scale": self.skin_item.scale(),
+            })
+
+        return {"hud_skin": skin_data}
+
+class HUDShapeItem(QGraphicsPathItem):
+    def __init__(self, width, height, color_hex, corner_radius=20):
+        super().__init__()
+        self.width = width
+        self.height = height
+        self.color_hex = color_hex
+        self.corner_radius = corner_radius
+        
+        self.setFlags(
+            QGraphicsItem.ItemIsMovable | 
+            QGraphicsItem.ItemIsSelectable | 
+            QGraphicsItem.ItemSendsGeometryChanges
+        )
+        self.update_path()
+
+    def update_path(self):
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, self.width, self.height), self.corner_radius, self.corner_radius)
+        self.setPath(path)
+        self.setBrush(QBrush(QColor(self.color_hex)))
+        self.setPen(QPen(Qt.NoPen))
+
+    def rect(self):
+        return QRectF(0, 0, self.width, self.height)
 
 class HUDSkinItem(QGraphicsPixmapItem):
     def __init__(self, pixmap, path):
@@ -220,9 +297,17 @@ class TelemetryItem(QGraphicsTextItem):
             QGraphicsItem.ItemIsSelectable | 
             QGraphicsItem.ItemSendsGeometryChanges
         )
-        self.setPlainText(f"[{field}]")
-        font = QFont("Arial", 16)
-        font.setPixelSize(16) 
+        
+        # Friendly initial text
+        display_name = field
+        if field.startswith("tank_pressure:"):
+            display_name = field.replace("tank_pressure:", "") + " (Bar)"
+        elif field.startswith("tank_name:"):
+            display_name = field.replace("tank_name:", "")
+            
+        self.setPlainText(display_name)
+        font = QFont("Arial", 30)
+        font.setPixelSize(30) 
         self.setFont(font)
         self.setDefaultTextColor(QColor("#FFFFFF"))
         self.document().setDocumentMargin(0)

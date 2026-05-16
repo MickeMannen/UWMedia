@@ -33,7 +33,7 @@ class TestMetadata:
         file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_102131_1.mp4")
         file = Path("/Users/mikael/DivingMedia/20260501_Phuket/videos_original/DJI_20260502110658_0002_D_A001.MP4")
         file = Path("/Users/mikael/development/UWMedia/test_data/videos_wrong_tz/DJI_20260502110658_0002_D_A001_correct_tz.mp4")
-
+        file = Path("/Users/mikael/DivingMedia/20260501_Phuket/videos_original_corrected/DJI_20260503123846_0017_D_A001.mp4")
         meta = MetadataHandler()
 
 

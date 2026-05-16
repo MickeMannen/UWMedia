@@ -23,8 +23,8 @@ class HUDControls(QWidget):
         self.layout = QVBoxLayout(self)
 
         # 1. Skin Controls
-        skin_group = QGroupBox("1. Skin (Overall HUD)")
-        skin_layout = QFormLayout(skin_group)
+        self.skin_group = QGroupBox("1. Skin (Overall HUD)")
+        self.skin_layout = QFormLayout(self.skin_group)
         
         self.opacity_slider = QSlider(Qt.Horizontal)
         self.opacity_slider.setRange(0, 100)
@@ -38,13 +38,38 @@ class HUDControls(QWidget):
         self.scale_slider.valueChanged.connect(self.on_scale_changed)
         self.scale_label = QLabel("1.00")
         
-        skin_layout.addRow("Opacity:", self.opacity_slider)
-        skin_layout.addRow("", self.opacity_label)
-        skin_layout.addRow("Global Scale:", self.scale_slider)
-        skin_layout.addRow("", self.scale_label)
-        self.layout.addWidget(skin_group)
+        # Shape specific controls (Hidden by default)
+        self.width_spin = QSpinBox()
+        self.width_spin.setRange(10, 2000)
+        self.width_spin.valueChanged.connect(self.on_shape_dim_changed)
+        
+        self.height_spin = QSpinBox()
+        self.height_spin.setRange(10, 2000)
+        self.height_spin.valueChanged.connect(self.on_shape_dim_changed)
+        
+        self.radius_spin = QSpinBox()
+        self.radius_spin.setRange(0, 500)
+        self.radius_spin.valueChanged.connect(self.on_shape_dim_changed)
+
+        self.shape_color_btn = QPushButton("Select BG Color")
+        self.shape_color_btn.clicked.connect(self.pick_shape_color)
+
+        self.skin_layout.addRow("Opacity:", self.opacity_slider)
+        self.skin_layout.addRow("", self.opacity_label)
+        
+        # We store these to toggle visibility
+        self.scale_row = self.skin_layout.addRow("Global Scale:", self.scale_slider)
+        self.scale_label_row = self.skin_layout.addRow("", self.scale_label)
+        
+        self.width_row = self.skin_layout.addRow("Width:", self.width_spin)
+        self.height_row = self.skin_layout.addRow("Height:", self.height_spin)
+        self.radius_row = self.skin_layout.addRow("Corner Radius:", self.radius_spin)
+        self.color_row = self.skin_layout.addRow("BG Color:", self.shape_color_btn)
+        
+        self.layout.addWidget(self.skin_group)
 
         # 2. Item Controls (Contextual)
+        # ... (rest of UI remains similar)
         self.item_group = QGroupBox("2. Selected Item")
         self.item_layout = QFormLayout(self.item_group)
         
@@ -71,20 +96,57 @@ class HUDControls(QWidget):
 
     def sync_skin_controls(self, skin_item):
         """Syncs the sliders with the loaded skin properties."""
+        from gui.hud_manager import HUDShapeItem
+        is_shape = isinstance(skin_item, HUDShapeItem)
+        
         self.opacity_slider.blockSignals(True)
-        self.scale_slider.blockSignals(True)
-        
-        opacity = skin_item.opacity()
-        scale = skin_item.scale()
-        
-        self.opacity_slider.setValue(int(opacity * 100))
-        self.opacity_label.setText(f"{opacity:.2f}")
-        
-        self.scale_slider.setValue(int(scale * 100))
-        self.scale_label.setText(f"{scale:.2f}")
-        
+        self.opacity_slider.setValue(int(skin_item.opacity() * 100))
+        self.opacity_label.setText(f"{skin_item.opacity():.2f}")
         self.opacity_slider.blockSignals(False)
-        self.scale_slider.blockSignals(False)
+        
+        # Toggle visibility
+        self.skin_layout.setRowVisible(self.scale_row, not is_shape)
+        self.skin_layout.setRowVisible(self.scale_label_row, not is_shape)
+        self.skin_layout.setRowVisible(self.width_row, is_shape)
+        self.skin_layout.setRowVisible(self.height_row, is_shape)
+        self.skin_layout.setRowVisible(self.radius_row, is_shape)
+        self.skin_layout.setRowVisible(self.color_row, is_shape)
+
+        if is_shape:
+            self.width_spin.blockSignals(True)
+            self.width_spin.setValue(skin_item.width)
+            self.width_spin.blockSignals(False)
+            
+            self.height_spin.blockSignals(True)
+            self.height_spin.setValue(skin_item.height)
+            self.height_spin.blockSignals(False)
+            
+            self.radius_spin.blockSignals(True)
+            self.radius_spin.setValue(skin_item.corner_radius)
+            self.radius_spin.blockSignals(False)
+        else:
+            self.scale_slider.blockSignals(True)
+            self.scale_slider.setValue(int(skin_item.scale() * 100))
+            self.scale_label.setText(f"{skin_item.scale():.2f}")
+            self.scale_slider.blockSignals(False)
+
+    def on_shape_dim_changed(self):
+        from gui.hud_manager import HUDShapeItem
+        if isinstance(self.hud_manager.skin_item, HUDShapeItem):
+            self.hud_manager.skin_item.width = self.width_spin.value()
+            self.hud_manager.skin_item.height = self.height_spin.value()
+            self.hud_manager.skin_item.corner_radius = self.radius_spin.value()
+            self.hud_manager.skin_item.update_path()
+
+    def pick_shape_color(self):
+        from gui.hud_manager import HUDShapeItem
+        if not isinstance(self.hud_manager.skin_item, HUDShapeItem): return
+        
+        current_color = QColor(self.hud_manager.skin_item.color_hex)
+        color = QColorDialog.getColor(current_color, self, "Choose Background Color")
+        if color.isValid():
+            self.hud_manager.skin_item.color_hex = color.name()
+            self.hud_manager.skin_item.update_path()
 
     def on_item_selected(self, item):
         self.selected_item = item

@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from exiftool import ExifTool, ExifToolHelper
 
 date_time_formats = [(re.compile(r'^(?P<date>\d+:\d+:\d+) (?P<time>\d+:\d+:\d+.\d+)(?P<zone>[+-]\d+:\d+)$'),

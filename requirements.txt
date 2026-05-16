@@ -8,3 +8,4 @@ PySide6
 pyexiftool
 tqdm
 pyinstaller
+PyYAML
