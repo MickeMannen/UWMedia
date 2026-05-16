@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 import tempfile
 import shutil
 import json
@@ -41,7 +42,6 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
         '360p': (640, 360, "4M")
     }
 
-
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
     
     for res_name in args.convert:
@@ -66,7 +66,8 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
         
         # Post-processing metadata
         try:
-            meta_handler.copy_all(source, target_path)
+            forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
+            meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
         except Exception as e:
             print(f"Warning: Failed to copy metadata: {e}")
 
@@ -107,6 +108,30 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     
     print(f"Output path: {target_path}")
 
+    # Calculate Timezone Offset for Media
+    if args.force_media_tz is not None:
+        tz_offset_mins = int(args.force_media_tz * 60)
+        print(f"Using Forced Timezone Offset: {args.force_media_tz:+.1f} hours")
+    else:
+        tz_offset_mins = meta_handler.get_timezone_offset(source)
+        if tz_offset_mins is not None:
+            print(f"Detected Timezone Offset: {tz_offset_mins/60:+.1f} hours")
+
+    # Fast Timezone Fix Mode
+    if args.fix_tz:
+        if args.force_media_tz is None and args.modify_quicktime is None:
+            print("Error: --fix-tz requires --force-media-tz or --modify-quicktime to be specified.")
+            sys.exit(1)
+            
+        print(f"Fast Mode: Copying file and fixing metadata -> {target_path.name}")
+        shutil.copy2(source, target_path)
+        try:
+            meta_handler.copy_all(source, target_path, force_tz_mins=tz_offset_mins, custom_tags=args.modify_quicktime)
+            print("Success: Metadata updated.")
+        except Exception as e:
+            print(f"Error updating metadata: {e}")
+        return
+
     # Match Dive
     dive = manager.find_dive_for_timestamp(creation_date) if manager.dives else None
     if manager.dives and not dive:
@@ -115,11 +140,6 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         print(f"Matched dive starting at {dive.start_time}")
 
     overlay = True if args.layout else False
-
-    # Calculate Timezone Offset for Media
-    tz_offset_mins = meta_handler.get_timezone_offset(source)
-    if tz_offset_mins is not None:
-        print(f"Detected Timezone Offset: {tz_offset_mins/60:+.1f} hours")
 
     # Determine if it's a video
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
@@ -176,16 +196,29 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     # Post-processing metadata
     print("Post-processing metadata...")
     try:
-        meta_handler.copy_all(source, target_path)
+        forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
+        meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
     except Exception as e:
         print(f"Warning: Failed to copy metadata: {e}")
 
-def main():
-    # Try to get revision from __main__
-    revision = getattr(sys.modules['__main__'], 'REVISION', 'dev')
-    print(f"UWMedia CLI - Revision: {revision}")
+class UWMediaParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"Error: {message}")
+        print("Use --help for usage information.")
+        sys.exit(2)
 
-    parser = argparse.ArgumentParser(description="Underwater Media Processor CLI")
+def main():
+    # Ignore helper subprocesses spawned by libraries (OpenCV, tqdm, etc.)
+    # These often don't pass the original arguments.
+    if len(sys.argv) > 1 and ("--multiprocessing-fork" in sys.argv or "spawn" in sys.argv):
+        return
+    
+    # If we are in a subprocess but it didn't have the flags, 
+    # check if we have any arguments at all.
+    if len(sys.argv) == 1 and getattr(sys, 'frozen', False):
+        return
+
+    parser = UWMediaParser(description="Underwater Media Processor CLI")
     parser.add_argument("source", type=Path, help="Source video/photo file or directory")
     parser.add_argument("output", type=Path, help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
@@ -196,11 +229,49 @@ def main():
     parser.add_argument("--hw-accel", action="store_true", default=False, help="Enable hardware acceleration")
     parser.add_argument("--layout", type=Path, help="JSON layout file or ZIP HUD package for overlay. Automatically enables overlay.")
     parser.add_argument("--tz-adjust", type=int, default=0, help="Timezone adjustment in hours (for Shearwater)")
+    parser.add_argument("--force-media-tz", type=float, help="Force a specific timezone offset for media (in hours, e.g. +8 or -5.5)")
+    parser.add_argument("--fix-tz", action="store_true", help="Only update the timezone metadata and exit (requires --force-media-tz)")
+    parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
 
     args = parser.parse_args()
+
+    # Resolve paths to absolute immediately to avoid issues with relative paths in bundled apps
+    args.source = args.source.resolve()
+    args.output = args.output.resolve()
+
+    # Try to get revision from __main__
+    revision = getattr(sys.modules['__main__'], 'REVISION', 'dev')
+    print(f"UWMedia CLI - Revision: {revision}")
+
+    # Basic Validation
+    if not args.source.exists():
+        print(f"Error: Source path '{args.source}' does not exist.")
+        sys.exit(1)
+
+    if str(args.output).strip() == "." or str(args.output).strip() == "":
+        # We already check for source == output, but let's be extra safe about empty/current dir
+        pass
+
+    try:
+        source_res = args.source.resolve()
+        output_res = args.output.resolve() if args.output.exists() else args.output.parent.resolve()
+        
+        if source_res == output_res:
+            print("Error: Source and output paths cannot be the same.")
+            sys.exit(1)
+    except Exception:
+        pass
+
+    # Check writability of output parent
+    output_parent = args.output.parent if args.output.suffix else args.output
+    if not os.access(output_parent if output_parent.exists() else output_parent.parent, os.W_OK):
+        # Only warn if it exists, if it doesn't we'll try to create it later
+        if output_parent.exists() and not os.access(output_parent, os.W_OK):
+            print(f"Error: Output directory '{output_parent}' is not writable.")
+            sys.exit(1)
 
     # Handle HUD Package / Layout
     tmp_hud_dir = None

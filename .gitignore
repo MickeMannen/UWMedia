@@ -175,6 +175,9 @@ Thumbs.db
 /test_data/
 /dist/
 /build/
+/pyinstaller/dist/
+/pyinstaller/build/
+/pyinstaller/*.spec
 *.zip
 *.png
 *.jpg

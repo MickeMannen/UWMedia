@@ -24,20 +24,37 @@ class FfmpegClass:
         if not self.executable_path:
             raise RuntimeError("FFmpeg executable not found in PATH or common installation locations.")
 
+    def _is_actually_ffmpeg(self, path: Path) -> bool:
+        try:
+            result = subprocess.run([str(path), "-version"], capture_output=True, text=True, timeout=2)
+            return "ffmpeg version" in result.stdout.lower()
+        except:
+            return False
+
     def _find_ffmpeg(self) -> Optional[Path]:
         ffmpeg_bin = shutil.which("ffmpeg")
         if ffmpeg_bin:
-            return Path(ffmpeg_bin)
+            p = Path(ffmpeg_bin)
+            if self._is_actually_ffmpeg(p):
+                return p
 
+        # Common locations
+        search_paths = []
         if self.os_type == "Windows":
-            search_paths = [
+            search_paths.extend([
                 Path("C:/ffmpeg/bin/ffmpeg.exe"),
                 Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
                 Path(Path.home() / "ffmpeg/bin/ffmpeg.exe"),
-            ]
-            for p in search_paths:
-                if p.exists():
-                    return p
+            ])
+        elif self.os_type == "Darwin":
+            search_paths.extend([
+                Path("/usr/local/bin/ffmpeg"),
+                Path("/opt/homebrew/bin/ffmpeg"),
+            ])
+        
+        for p in search_paths:
+            if p.exists() and self._is_actually_ffmpeg(p):
+                return p
         return None
 
     def get_path(self) -> Path:

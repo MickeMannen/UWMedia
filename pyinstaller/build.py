@@ -6,11 +6,32 @@ import re
 import platform
 from pathlib import Path
 
+def get_next_revision():
+    """Reads current REVISION from main.py and increments the patch version."""
+    main_path = Path(__file__).parent.parent / "main.py"
+    if not main_path.exists():
+        return "0.0.1"
+    
+    content = main_path.read_text()
+    match = re.search(r'REVISION = "(.*?)"', content)
+    if not match:
+        return "0.0.1"
+    
+    current = match.group(1)
+    parts = current.split('.')
+    try:
+        # Increment the last numeric part
+        parts[-1] = str(int(parts[-1]) + 1)
+        return ".".join(parts)
+    except (ValueError, IndexError):
+        return current + ".1"
+
 def update_revision(revision):
     """Updates the REVISION variable in main.py."""
-    main_path = Path("main.py")
+    # Since we are in pyinstaller/, main.py is in the parent directory
+    main_path = Path(__file__).parent.parent / "main.py"
     if not main_path.exists():
-        print("Error: main.py not found")
+        print(f"Error: {main_path} not found")
         return
     
     content = main_path.read_text()
@@ -26,11 +47,14 @@ def update_revision(revision):
 
 def build_app(target, revision, os_name, arch):
     """Runs PyInstaller to build a onefile executable."""
-    dist_path = Path("dist")
+    root_dir = Path(__file__).parent.parent
+    pyinstaller_dir = Path(__file__).parent
+    dist_path = pyinstaller_dir / "dist"
+    work_path = pyinstaller_dir / "build"
     
     targets = {
-        "cli": "main.py",
-        "gui": "gui_main.py"
+        "cli": root_dir / "main.py",
+        "gui": root_dir / "gui_main.py"
     }
     
     if target not in targets:
@@ -38,14 +62,17 @@ def build_app(target, revision, os_name, arch):
         return
 
     entry_point = targets[target]
-    exe_name = f"uwmedia-{target}-{os_name}-{arch}-{revision}"
+    exe_name = f"uwmedia-{target}-{os_name}-{arch}"
     
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
         "--clean",
         "--name", exe_name,
-        entry_point
+        "--distpath", str(dist_path),
+        "--workpath", str(work_path),
+        "--specpath", str(pyinstaller_dir),
+        str(entry_point)
     ]
     
     # OS specific flags
@@ -94,21 +121,27 @@ def get_default_arch():
 def main():
     parser = argparse.ArgumentParser(description="UWMedia PyInstaller Build Script")
     parser.add_argument("--target", choices=["cli", "gui", "both"], default="both", help="Build target (default: both)")
-    parser.add_argument("--revision", required=True, help="Revision/Version string (e.g. 1.0.4)")
-    parser.add_argument("--os", default=get_default_os(), help="OS label for filename")
-    parser.add_argument("--arch", default=get_default_arch(), help="Architecture label for filename")
+    parser.add_argument("--revision", help="Revision/Version string (e.g. 1.0.4). If omitted, increments patch version in main.py.")
+    parser.add_argument("--os", default=get_default_os(), 
+                        help="OS label for filename (e.g., windows, macos, linux)")
+    parser.add_argument("--arch", default=get_default_arch(), 
+                        help="Architecture label for filename (e.g., x64, arm64)")
     
     args = parser.parse_args()
+
+    revision = args.revision
+    if not revision:
+        revision = get_next_revision()
     
     # 1. Inject Revision into main.py
-    update_revision(args.revision)
+    update_revision(revision)
     
     # 2. Perform Builds
     if args.target in ["cli", "both"]:
-        build_app("cli", args.revision, args.os, args.arch)
+        build_app("cli", revision, args.os, args.arch)
     
     if args.target in ["gui", "both"]:
-        build_app("gui", args.revision, args.os, args.arch)
+        build_app("gui", revision, args.os, args.arch)
 
 if __name__ == "__main__":
     main()

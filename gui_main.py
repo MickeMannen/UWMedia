@@ -513,11 +513,16 @@ class HUDDesignerWindow(QMainWindow):
                     zip_file.write(tmp_skin_path, arcname=skin_path.name)
             print(f"Saved HUD package to {path}")
 
+import multiprocessing
+
 def main():
+    if "--multiprocessing-fork" in sys.argv:
+        return
     app = QApplication(sys.argv)
     window = HUDDesignerWindow()
     window.show()
     sys.exit(app.exec())
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

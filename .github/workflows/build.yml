@@ -66,13 +66,13 @@ jobs:
 
       - name: Build with build.py
         run: |
-          python build.py --revision ${{ steps.rev.outputs.REVISION }}
+          python pyinstaller/build.py --revision ${{ steps.rev.outputs.REVISION }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: uwmedia-${{ matrix.platform }}
-          path: dist/*
+          path: pyinstaller/dist/*
 
   release:
     name: Create Release

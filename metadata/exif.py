@@ -23,34 +23,42 @@ class MetadataHandler:
     def __init__(self):
         pass
 
-    def copy_all(self, src: Path, dest: Path):
-        """Copies all metadata from source to target."""
+    def copy_all(self, src: Path, dest: Path, force_tz_mins: Optional[int] = None, custom_tags: Optional[List[str]] = None):
+        """Copies all metadata from source to target and applies overrides."""
 
         with ExifTool() as et:
             et.execute(b"-TagsFromFile", str(src).encode('utf-8'),
                        b"-all:all", b"-overwrite_original", str(dest).encode('utf-8'))
 
-        tz_offset_mins = self.get_timezone_offset(src)
-        # 7. Apply Timezone Tags if missing/calculated
+        if force_tz_mins is not None:
+            tz_offset_mins = force_tz_mins
+        else:
+            tz_offset_mins = self.get_timezone_offset(src)
+
+        # Apply Timezone Tags if missing/calculated
         if tz_offset_mins is not None:
             creation_date = self.get_local_creation_date(src)
-
             sign = "+" if tz_offset_mins >= 0 else "-"
             hours = abs(tz_offset_mins) // 60
             mins = abs(tz_offset_mins) % 60
-            # ISO 8601 offset format for CreationDate: +HH:MM
             tz_iso = f"{sign}{hours:02}:{mins:02}"
-
-            # Format: 2023:10:27 12:34:56+08:00
             creation_date_with_tz = creation_date.strftime("%Y:%m:%d %H:%M:%S") + tz_iso
 
             tags = {
                 "QuickTime:CreationDate": creation_date_with_tz,
                 "QuickTime:Timezone": tz_iso,
-                "QuickTime:TimeZone": tz_iso  # Sony style
+                "QuickTime:TimeZone": tz_iso
             }
-            print(f"Injecting Timezone Tags: {tags}")
             self.set_quicktime_tags(dest, tags)
+
+        # Apply Custom Tags
+        if custom_tags:
+            print(f"Applying custom tags: {custom_tags}")
+            cmd = [f"-{tag}".encode('utf-8') for tag in custom_tags]
+            cmd.append(b"-overwrite_original")
+            cmd.append(str(dest).encode('utf-8'))
+            with ExifTool() as et:
+                et.execute(*cmd)
 
         # Set xmp date taken if not present
         meta = self.get_metadata(src)
