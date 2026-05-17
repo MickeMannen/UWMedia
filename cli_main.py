@@ -15,6 +15,178 @@ from models.dive import Waypoint, Dive
 from models.manager import DiveManager
 from ffmpeg import FfmpegClass
 
+import cv2
+import numpy as np
+
+def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0):
+    """Generates a minimal FCPXML 1.10 file for the given video."""
+    xml_path = video_path.with_suffix(".xml")
+    
+    # FCP uses fractional durations for precision
+    # For exactly 30fps, 1/30s is correct.
+    frame_duration = "1/30s"
+    if fps == 24.0: frame_duration = "1/24s"
+    elif fps == 60.0: frame_duration = "1/60s"
+    
+    # Duration in rational format or simple seconds with 's' suffix
+    dur_str = f"{duration}s"
+    
+    # File URL must be absolute and prefixed with file:///
+    abs_path = video_path.resolve()
+    # file:// + absolute path (which starts with /) = file:///
+    file_url = f"file://{abs_path}"
+
+    content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.10">
+    <resources>
+        <format id="r1" name="FFVideoFormat1080p{int(fps)}" frameDuration="{frame_duration}" width="1920" height="1080"/>
+        <asset id="r2" name="{video_path.stem}" start="0s" duration="{dur_str}" hasVideo="1" format="r1" src="{file_url}"/>
+    </resources>
+    <library>
+        <event name="UWMedia Import">
+            <asset-clip name="{video_path.stem}" ref="r2" offset="0s" start="0s" duration="{dur_str}" format="r1"/>
+        </event>
+    </library>
+</fcpxml>"""
+
+    with open(xml_path, "w") as f:
+        f.write(content)
+    print(f"FCPXML generated: {xml_path.name}")
+
+def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_dir):
+    """Generates a video from a dive log and layout on a black background."""
+    print(f"\n--- Generating Video from Log: {log_path.name} ---")
+    
+    # 1. Parse the specific log file
+    suffix = log_path.suffix.lower()
+    dives = []
+    if suffix == ".uddf":
+        parser = ShearwaterParser()
+        if args.tz_adjust:
+            parser.update_timezone(log_path, args.tz_adjust * 60)
+        dives = parser.parse(log_path)
+        if args.tz_adjust:
+            for d in dives:
+                d.start_time += timedelta(hours=args.tz_adjust)
+                d.end_time += timedelta(hours=args.tz_adjust)
+                for wp in d.waypoints:
+                    wp.timestamp += timedelta(hours=args.tz_adjust)
+    elif suffix == ".fit":
+        parser = GarminParser()
+        dives = parser.parse(log_path)
+    else:
+        print(f"Error: Unsupported log format {suffix}")
+        sys.exit(1)
+
+    if not dives:
+        print(f"Error: No dives found in {log_path.name}")
+        sys.exit(1)
+    
+    # Process the first dive found in the file
+    dive = dives[0]
+    duration = dive.duration
+    if duration <= 0:
+        print("Error: Dive duration is zero.")
+        sys.exit(1)
+
+    # 2. Determine Output Filename: divelog filename + layoutname.mp4
+    layout_name = args.original_layout_stem or "default"
+    
+    filename = f"{log_path.stem}_{layout_name}.mp4"
+    target_path = output_dir / filename
+    if output_dir.is_file(): # User specified a full path as output
+        target_path = output_dir
+    else:
+        target_path = get_unique_path(target_path)
+
+    print(f"Output path: {target_path}")
+
+    # 3. Setup FFmpeg and HUD
+    ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
+    
+    # Pre-load layout
+    with open(args.layout, 'r') as f:
+        layout = json.load(f)
+    
+    hud_skin = layout.get("hud_skin", {})
+    skin_path = hud_skin.get("path")
+    preloaded_skin = None
+    if skin_path:
+        img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+        if img_skin is not None:
+            skin_scale = hud_skin.get("scale", 1.0)
+            skin_opacity = hud_skin.get("opacity", 1.0)
+            h_orig, w_orig = img_skin.shape[:2]
+            w_scaled = int(w_orig * skin_scale)
+            h_scaled = int(h_orig * skin_scale)
+            preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+            if preloaded_skin.shape[2] == 4:
+                preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+
+    # 4. Processing Phase (Similar to ColorCorrectionEngine.process_video but without source video)
+    fps = 30.0
+    width, height = 1920, 1080
+    total_frames = int(duration * fps)
+    
+    cmd = [
+        str(ff.get_path()), '-y',
+        '-f', 'rawvideo', '-vcodec', 'rawvideo',
+        '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
+        '-i', '-', 
+        '-vcodec', ff.get_encoder(),
+        '-pix_fmt', 'yuv420p',
+        '-tag:v', 'hvc1', # Force HEVC
+        '-crf', '20',
+        str(target_path)
+    ]
+
+    if not args.debug:
+        cmd.extend(["-nostats", "-loglevel", "error"])
+
+    print(f"Generating video frames ({total_frames} frames)...")
+    import subprocess as sp
+    from gui.hud_renderer import draw_hud
+    
+    process = sp.Popen(cmd, stdin=sp.PIPE)
+    
+    cached_frame = None
+    last_wp = None
+    
+    # Create a dummy waypoint for when current_wp is None
+    # This allows draw_hud to still render something (which will show "--" due to format_telemetry_value)
+    dummy_wp = Waypoint(timestamp=dive.start_time, depth=None, temp=None, time_since_start=0)
+
+    try:
+        with tqdm(total=total_frames, desc="Rendering", unit="frame") as pbar:
+            for i in range(total_frames):
+                # Get waypoint
+                current_time = dive.start_time + timedelta(seconds=i/fps)
+                wp = dive.get_waypoint_at(current_time)
+                
+                # Check if we need to redraw
+                # We compare by timestamp to detect "new" waypoints from the log
+                wp_timestamp = wp.timestamp if wp else None
+                last_wp_timestamp = last_wp.timestamp if last_wp else None
+                
+                if cached_frame is None or wp_timestamp != last_wp_timestamp:
+                    # Redraw
+                    frame = np.zeros((height, width, 3), dtype=np.uint8)
+                    draw_hud(frame, layout, wp or dummy_wp, preloaded_skin=preloaded_skin)
+                    cached_frame = frame
+                    last_wp = wp
+                
+                process.stdin.write(cached_frame.tobytes())
+                pbar.update(1)
+    finally:
+        process.stdin.close()
+        process.wait()
+
+    # 5. Generate FCPXML
+    generate_fcpxml(target_path, duration, fps=fps)
+
+    print(f"\nDone: {target_path.name}")
+
 def validate_layout(layout_path: Path, manager: DiveManager):
     """Validates the HUD layout against loaded dive logs."""
     if not layout_path or not layout_path.exists():
@@ -280,8 +452,8 @@ def main():
         return
 
     parser = UWMediaParser(description="Underwater Media Processor CLI")
-    parser.add_argument("source", type=Path, help="Source video/photo file or directory")
-    parser.add_argument("output", type=Path, help="Output file or directory")
+    parser.add_argument("source", type=Path, nargs='?', help="Source video/photo file or directory")
+    parser.add_argument("output", type=Path, nargs='?', help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
     parser.add_argument("--color", action="store_true", help="Apply color correction")
     parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
@@ -297,11 +469,34 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
+    parser.add_argument("--render-log", type=Path, help="Create a telemetry-only video from a specific dive log file (requires --layout)")
 
     args = parser.parse_args()
 
+    if args.render_log:
+        if not args.layout:
+            print("Error: --render-log requires --layout to be specified.")
+            sys.exit(1)
+        if not args.render_log.exists():
+            print(f"Error: Dive log file '{args.render_log}' does not exist.")
+            sys.exit(1)
+        
+        # If only one positional argument is provided, treat it as the output directory/file
+        if args.source and not args.output:
+            args.output = args.source
+            args.source = None
+        
+        # If no output is specified at all, default to current directory
+        if not args.output:
+            args.output = Path.cwd()
+    else:
+        if not args.source or not args.output:
+            print("Error: Source and output are required unless using --render-log.")
+            sys.exit(2)
+
     # Resolve paths to absolute immediately to avoid issues with relative paths in bundled apps
-    args.source = args.source.resolve()
+    if args.source:
+        args.source = args.source.resolve()
     args.output = args.output.resolve()
 
     # Try to get revision from __main__
@@ -309,7 +504,7 @@ def main():
     print(f"UWMedia CLI - Revision: {revision}")
 
     # Basic Validation
-    if not args.source.exists():
+    if args.source and not args.source.exists():
         print(f"Error: Source path '{args.source}' does not exist.")
         sys.exit(1)
 
@@ -337,6 +532,7 @@ def main():
 
     # Handle HUD Package / Layout
     tmp_hud_dir = None
+    args.original_layout_stem = args.layout.stem if args.layout else None
     if args.layout and args.layout.suffix.lower() == ".zip":
         if not args.layout.exists():
             print(f"Error: HUD package {args.layout} not found.")
@@ -423,6 +619,13 @@ def main():
 
     if args.layout:
         validate_layout(args.layout, manager)
+
+    if args.render_log:
+        process_log_only(args.render_log, args.output, args, manager, tmp_hud_dir)
+        # Cleanup temp HUD files if used
+        if tmp_hud_dir:
+            shutil.rmtree(tmp_hud_dir)
+        sys.exit(0)
 
     meta_handler = MetadataHandler()
 

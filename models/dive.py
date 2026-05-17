@@ -13,8 +13,8 @@ class TankData(BaseModel):
 
 class Waypoint(BaseModel):
     timestamp: datetime
-    depth: float = Field(..., description="Depth in meters")
-    temp: float = Field(..., description="Temperature in Celsius")
+    depth: Optional[float] = Field(None, description="Depth in meters")
+    temp: Optional[float] = Field(None, description="Temperature in Celsius")
     max_depth: float = Field(0.0, description="Maximum depth reached until this waypoint")
     deco_stop_depth: Optional[float] = Field(None, description="Current deco stop depth in meters")
     tts: Optional[int] = Field(None, description="Time to surface in seconds")

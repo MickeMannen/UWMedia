@@ -45,7 +45,7 @@ def format_telemetry_value(field, raw_val):
     elif field in ["primary_tank_pressure", "volume_sac"] and raw_val is not None:
         return str(int(float(raw_val)))
     elif raw_val is None:
-        return "N/A"
+        return "--"
     elif isinstance(raw_val, float):
         return f"{raw_val:.1f}"
     else:

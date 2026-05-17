@@ -11,6 +11,9 @@ UWMedia is a comprehensive tool for processing underwater videos and photos. It 
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
 - **Dynamic Naming**: Automatically rename files based on the "Date Taken" metadata (`YYYYMMDD_HHMMSS`).
 - **HUD Packaging**: Support for portable HUD designs via `.zip` packages containing layouts and skins.
+- **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background.
+- **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
+- **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 
 ## Installation
 
@@ -41,6 +44,9 @@ python main.py ./raw_videos/ ./output/ --color --stabilize
 
 # Complete processing with dive logs and telemetry overlay
 python main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --color
+
+# Generate telemetry video directly from a log file
+python main.py --render-log dive_log.fit --layout perdix_layout.json
 ```
 
 #### Key Arguments:
@@ -48,8 +54,10 @@ python main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --col
 - `--stabilize [low|mid|high]`: Apply stabilization. `high` is optimized for 4K.
 - `--logs <dir>`: Path to directory containing `.uddf` or `.fit` logs.
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
+- `--render-log <file>`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`).
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
+
 
 ### Graphical User Interface (GUI)
 
@@ -69,6 +77,12 @@ Powered by **PyExifTool**, UWMedia ensures that your processed files are not "bl
 
 ### High-Resolution Stabilization
 Optimized for 4K footage, the stabilization system uses an expanded search range and mirrored edge handling to provide a professional look without the common "black border" effect.
+
+### Layout Validation
+To ensure reliability during batch processing, UWMedia validates HUD layouts against the actual dive telemetry before starting the render. It checks for:
+- **Field Existence**: Verifies that requested telemetry fields (depth, temp, etc.) exist in the data model.
+- **Tank Serial Matching**: Alerts users if the layout expects tank data (e.g., from a Garmin transmitter) that isn't present in the provided log files.
+- **JSON Integrity**: Ensures layouts are correctly formatted and skin assets are accessible.
 
 ## License
 
