@@ -11,8 +11,69 @@ from tqdm import tqdm
 from parsers.shearwater import ShearwaterParser
 from parsers.garmin import GarminParser
 from metadata.exif import MetadataHandler
+from models.dive import Waypoint, Dive
 from models.manager import DiveManager
 from ffmpeg import FfmpegClass
+
+def validate_layout(layout_path: Path, manager: DiveManager):
+    """Validates the HUD layout against loaded dive logs."""
+    if not layout_path or not layout_path.exists():
+        return
+
+    try:
+        with open(layout_path, 'r') as f:
+            layout_data = json.load(f)
+    except Exception as e:
+        print(f"Error: Failed to parse layout JSON {layout_path.name}: {e}")
+        sys.exit(1)
+
+    hud_skin = layout_data.get("hud_skin", {})
+    linked_elements = hud_skin.get("linked_elements", [])
+    
+    if not linked_elements:
+        print(f"Warning: Layout {layout_path.name} has no linked telemetry elements.")
+        return
+
+    # Basic field validation
+    # Use Pydantic's model_fields to get valid Waypoint fields
+    valid_fields = set(Waypoint.model_fields.keys()) | {"gasmix", "primary_tank_pressure"}
+    
+    layout_fields = [elem.get("field") for elem in linked_elements if elem.get("field")]
+    
+    tank_serials_in_layout = set()
+    invalid_fields = []
+    
+    for field in layout_fields:
+        if field.startswith("custom:"):
+            continue
+        if field.startswith("tank_pressure:") or field.startswith("tank_name:"):
+            serial = field.split(":", 1)[1]
+            tank_serials_in_layout.add(serial)
+            continue
+        
+        if field not in valid_fields:
+            invalid_fields.append(field)
+
+    if invalid_fields:
+        print(f"Error: Layout {layout_path.name} contains unknown fields: {', '.join(invalid_fields)}")
+        sys.exit(1)
+
+    if tank_serials_in_layout and manager.dives:
+        found_serials = set()
+        for dive in manager.dives.values():
+            if dive.waypoints:
+                # We check all waypoints because a tank might appear later in a dive (though unlikely)
+                # but for validation, any occurrence is enough.
+                # Actually, checking first waypoint is usually enough.
+                # Let's check first waypoint that has any tanks.
+                for wp in dive.waypoints:
+                    if wp.tanks:
+                        found_serials.update(wp.tanks.keys())
+                        break
+        
+        missing_serials = tank_serials_in_layout - found_serials
+        if missing_serials:
+            print(f"Warning: Layout references tank serials not found in loaded logs: {', '.join(missing_serials)}")
 
 def get_unique_path(path: Path) -> Path:
     """If file exists, append _1, _2, etc. Always returns lowercase extension."""
@@ -359,6 +420,9 @@ def main():
         print("Tank serial numbers will be used instead of friendly names.")
         print("Run with --create-config --logs <dir> to generate a mapping file.")
         print("!" * 60 + "\n")
+
+    if args.layout:
+        validate_layout(args.layout, manager)
 
     meta_handler = MetadataHandler()
 

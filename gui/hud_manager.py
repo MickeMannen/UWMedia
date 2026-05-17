@@ -134,11 +134,17 @@ class HUDManager(QObject):
         if not hud_skin:
             return
 
-        # Clear existing elements
+        # Explicitly clear elements and decrease their ref counts
         for item in self.linked_elements.values():
             if item.scene():
                 self.scene.removeItem(item)
+            item.setParentItem(None)
         self.linked_elements = {}
+
+        if self.skin_item:
+            if self.skin_item.scene():
+                self.scene.removeItem(self.skin_item)
+            self.skin_item = None
 
         if hud_skin.get("type") == "shape":
             self.create_shape_skin(
@@ -151,13 +157,17 @@ class HUDManager(QObject):
                 y_pct=hud_skin.get("y_pct", 0.1)
             )
         else:
-            self.load_skin(
-                hud_skin["path"],
-                opacity=hud_skin.get("opacity", 1.0),
-                scale=hud_skin.get("scale", 1.0),
-                x_pct=hud_skin.get("x_pct", 0.0),
-                y_pct=hud_skin.get("y_pct", 0.0)
-            )
+            skin_path = hud_skin.get("path")
+            if skin_path:
+                self.load_skin(
+                    skin_path,
+                    opacity=hud_skin.get("opacity", 1.0),
+                    scale=hud_skin.get("scale", 1.0),
+                    x_pct=hud_skin.get("x_pct", 0.0),
+                    y_pct=hud_skin.get("y_pct", 0.0)
+                )
+            else:
+                print("Warning: Image-type HUD skin missing 'path'.")
 
         for element in hud_skin.get("linked_elements", []):
             # ... (rest of element loading logic)
@@ -260,6 +270,7 @@ class HUDShapeItem(QGraphicsPathItem):
         self.height = height
         self.color_hex = color_hex
         self.corner_radius = corner_radius
+        self.path = None # For attribute consistency with HUDSkinItem
         
         self.setFlags(
             QGraphicsItem.ItemIsMovable | 

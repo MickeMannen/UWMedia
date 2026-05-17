@@ -487,43 +487,60 @@ class HUDDesignerWindow(QMainWindow):
             layout_path = Path(tmp_dir) / "hud_layout.json"
             if not layout_path.exists():
                 print("Error: Package missing hud_layout.json")
+                shutil.rmtree(tmp_dir)
                 return
 
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
             
             # Resolve the skin path relative to the extracted directory
-            skin_rel_path = layout["hud_skin"]["path"]
-            skin_abs_path = str(Path(tmp_dir) / skin_rel_path)
-            layout["hud_skin"]["path"] = skin_abs_path
+            hud_skin = layout.get("hud_skin", {})
+            skin_rel_path = hud_skin.get("path")
+            if skin_rel_path:
+                skin_abs_path = str(Path(tmp_dir) / skin_rel_path)
+                hud_skin["path"] = skin_abs_path
             
             self.hud_manager.load_layout(layout)
             print(f"Loaded HUD package from {path}")
+            # Note: We don't rmtree here because the HUDManager might need the skin file path
+            # However, we should track it for cleanup on window close.
+            if not hasattr(self, 'temp_dirs'): self.temp_dirs = []
+            self.temp_dirs.append(tmp_dir)
         except Exception as e:
             print(f"Error loading HUD package: {e}")
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
 
     def save_layout_dialog(self):
-        if not self.hud_manager.skin_item:
+        if not self.hud_manager or not self.hud_manager.skin_item:
             print("No skin loaded. Cannot save HUD package.")
             return
 
         initial_dir = str(Path(self.last_hud_path).parent) if self.last_hud_path else ""
-        default_file = str(Path(initial_dir) / "hud_package.zip") if initial_dir else "hud_package.zip"
+        default_file = os.path.join(initial_dir, "hud_package.zip") if initial_dir else "hud_package.zip"
+        
         path, _ = QFileDialog.getSaveFileName(self, "Save HUD Package", default_file, "ZIP Archive (*.zip)")
-        if path:
-            if not path.endswith(".zip"):
-                path += ".zip"
-            
-            self.last_hud_path = str(path)
-            self.settings.setValue("last_hud_path", self.last_hud_path)
+        if not path:
+            return
 
+        if not path.endswith(".zip"):
+            path += ".zip"
+        
+        self.last_hud_path = str(path)
+        self.settings.setValue("last_hud_path", self.last_hud_path)
+
+        try:
             layout = self.hud_manager.get_layout_json()
-            is_shape = layout["hud_skin"].get("type") == "shape"
-            skin_path = None if is_shape else Path(self.hud_manager.skin_item.path)
+            hud_skin = layout.get("hud_skin", {})
+            is_shape = hud_skin.get("type") == "shape"
             
-            if not is_shape:
+            # Use getattr to safely get path from HUDSkinItem or HUDShapeItem
+            skin_path_val = getattr(self.hud_manager.skin_item, 'path', None)
+            skin_path = Path(skin_path_val) if skin_path_val else None
+            
+            if not is_shape and skin_path:
                 # Use relative path in JSON for the zip archive
-                layout["hud_skin"]["path"] = skin_path.name
+                hud_skin["path"] = skin_path.name
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 json_path = os.path.join(tmpdir, "hud_layout.json")
@@ -533,12 +550,26 @@ class HUDDesignerWindow(QMainWindow):
                 # Create ZIP
                 with zipfile.ZipFile(path, "w") as zip_file:
                     zip_file.write(json_path, arcname="hud_layout.json")
-                    if not is_shape:
+                    if not is_shape and skin_path and skin_path.exists():
                         # Copy and write skin image
                         tmp_skin_path = os.path.join(tmpdir, skin_path.name)
                         shutil.copy2(skin_path, tmp_skin_path)
                         zip_file.write(tmp_skin_path, arcname=skin_path.name)
+            
             print(f"Saved HUD package to {path}")
+        except Exception as e:
+            print(f"Error saving HUD package: {e}")
+
+    def closeEvent(self, event):
+        """Cleanup temporary directories on close."""
+        if hasattr(self, 'temp_dirs'):
+            for d in self.temp_dirs:
+                if os.path.exists(d):
+                    try:
+                        shutil.rmtree(d)
+                    except:
+                        pass
+        super().closeEvent(event)
 
 import multiprocessing
 

@@ -296,3 +296,41 @@ class MetadataHandler:
             return utc_dt.replace(tzinfo=None)
 
         raise ValueError("No valid creation date found in video metadata")
+
+    def get_tags(self, src: Path, tag_names: List[str]) -> Dict[str, str]:
+        """Extracts specific tags from a file. Returns values as strings."""
+        try:
+            with ExifToolHelper() as et:
+                metadata = et.get_tags(str(src), tags=tag_names)
+                result = {}
+                if metadata:
+                    meta = metadata[0]
+                    for name in tag_names:
+                        # ExifToolHelper often returns tags without the group prefix
+                        # or with different capitalization. We'll try to find the best match.
+                        val = meta.get(name)
+                        if val is None:
+                            # Try searching for the tag name part after ':'
+                            tag_only = name.split(':')[-1]
+                            for k, v in meta.items():
+                                if k.endswith(tag_only):
+                                    val = v
+                                    break
+                        result[name] = str(val) if val is not None else ""
+                return result
+        except Exception as e:
+            print(f"Error reading tags: {e}")
+            return {name: "" for name in tag_names}
+
+    def set_tags(self, src: Path, tags: Dict[str, str]):
+        """Writes specific tags to a file and overwrites the original."""
+        if not tags:
+            return
+            
+        try:
+            with ExifToolHelper() as et:
+                et.set_tags(str(src), tags=tags, params=["-overwrite_original"])
+            print(f"Successfully updated tags for {src}")
+        except Exception as e:
+            print(f"Error writing tags: {e}")
+            raise
