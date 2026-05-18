@@ -40,6 +40,13 @@ class Waypoint(BaseModel):
     switchmix: Optional[float] = None
     battery: Optional[float] = None
 
+    # Reference to parent dive info
+    _dive: Optional['Dive'] = None
+
+    @property
+    def log_filename(self) -> Optional[str]:
+        return self._dive.log_filename if self._dive else None
+
     @property
     def primary_tank_pressure(self) -> Optional[float]:
         """Returns the pressure of the first tank in the dictionary."""
@@ -82,6 +89,15 @@ class Dive(BaseModel):
     end_longitude: Optional[float] = None
     timezone: Optional[str] = None
     duration_seconds: Optional[int] = None
+    
+    # Source Info
+    log_filename: Optional[str] = None
+    log_path: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        """Set back-reference to parent dive on all waypoints."""
+        for wp in self.waypoints:
+            wp._dive = self
 
     @property
     def duration(self) -> int:

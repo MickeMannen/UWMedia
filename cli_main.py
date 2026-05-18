@@ -18,7 +18,7 @@ from ffmpeg import FfmpegClass
 import cv2
 import numpy as np
 
-def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0):
+def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0, width: int = 1920, height: int = 1080):
     """Generates a minimal FCPXML 1.10 file for the given video."""
     xml_path = video_path.with_suffix(".xml")
     
@@ -36,11 +36,16 @@ def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0):
     # file:// + absolute path (which starts with /) = file:///
     file_url = f"file://{abs_path}"
 
+    # Resource name should reflect resolution
+    res_name = f"{width}x{height}"
+    if width == 1920 and height == 1080: res_name = "1080p"
+    elif width == 3840 and height == 2160: res_name = "4K"
+
     content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fcpxml>
 <fcpxml version="1.10">
     <resources>
-        <format id="r1" name="FFVideoFormat1080p{int(fps)}" frameDuration="{frame_duration}" width="1920" height="1080"/>
+        <format id="r1" name="FFVideoFormat{res_name}{int(fps)}" frameDuration="{frame_duration}" width="{width}" height="{height}"/>
         <asset id="r2" name="{video_path.stem}" start="0s" duration="{dur_str}" hasVideo="1" format="r1" src="{file_url}"/>
     </resources>
     <library>
@@ -112,21 +117,34 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     hud_skin = layout.get("hud_skin", {})
     skin_path = hud_skin.get("path")
     preloaded_skin = None
-    if skin_path:
+    
+    # Default resolution (will be overridden by skin dimensions)
+    width, height = 1920, 1080
+
+    if hud_skin.get("type") == "shape":
+        width = (int(hud_skin.get("width", 400)) // 2) * 2
+        height = (int(hud_skin.get("height", 200)) // 2) * 2
+    elif skin_path:
         img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
         if img_skin is not None:
             skin_scale = hud_skin.get("scale", 1.0)
             skin_opacity = hud_skin.get("opacity", 1.0)
             h_orig, w_orig = img_skin.shape[:2]
-            w_scaled = int(w_orig * skin_scale)
-            h_scaled = int(h_orig * skin_scale)
-            preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+            # Ensure dimensions are even for YUV420p compatibility
+            width = (int(w_orig * skin_scale) // 2) * 2
+            height = (int(h_orig * skin_scale) // 2) * 2
+            preloaded_skin = cv2.resize(img_skin, (width, height), interpolation=cv2.INTER_AREA)
             if preloaded_skin.shape[2] == 4:
                 preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+    
+    # Force the skin to the top-left (0,0) in this standalone video mode
+    if "hud_skin" not in layout:
+        layout["hud_skin"] = {}
+    layout["hud_skin"]["x_pct"] = 0.0
+    layout["hud_skin"]["y_pct"] = 0.0
 
     # 4. Processing Phase (Similar to ColorCorrectionEngine.process_video but without source video)
     fps = 30.0
-    width, height = 1920, 1080
     total_frames = int(duration * fps)
     
     cmd = [
@@ -158,7 +176,9 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     dummy_wp = Waypoint(timestamp=dive.start_time, depth=None, temp=None, time_since_start=0)
 
     try:
-        with tqdm(total=total_frames, desc="Rendering", unit="frame") as pbar:
+        # Use rate_noinv_fmt (string) instead of rate_noinv (float/None) to avoid crash at t=0
+        bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_noinv_fmt}]"
+        with tqdm(total=total_frames, desc="Rendering", unit="frame", bar_format=bar_format) as pbar:
             for i in range(total_frames):
                 # Get waypoint
                 current_time = dive.start_time + timedelta(seconds=i/fps)
@@ -183,7 +203,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
         process.wait()
 
     # 5. Generate FCPXML
-    generate_fcpxml(target_path, duration, fps=fps)
+    generate_fcpxml(target_path, duration, fps=fps, width=width, height=height)
 
     print(f"\nDone: {target_path.name}")
 

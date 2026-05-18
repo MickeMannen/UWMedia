@@ -29,7 +29,11 @@ class HUDManager(QObject):
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
     def on_selection_changed(self):
-        items = self.scene.selectedItems()
+        try:
+            items = self.scene.selectedItems()
+        except RuntimeError:
+            return
+            
         # Filter to only TelemetryItems
         telemetry_items = [i for i in items if isinstance(i, TelemetryItem)]
         
@@ -40,7 +44,11 @@ class HUDManager(QObject):
 
     def align_selected_horizontally(self):
         """Aligns selected telemetry items to the bottom edge of the first selected item."""
-        items = [i for i in self.scene.selectedItems() if isinstance(i, TelemetryItem)]
+        try:
+            items = [i for i in self.scene.selectedItems() if isinstance(i, TelemetryItem)]
+        except RuntimeError:
+            return
+            
         if len(items) < 2:
             return
             

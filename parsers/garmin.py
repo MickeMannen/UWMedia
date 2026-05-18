@@ -274,6 +274,8 @@ class GarminParser(BaseParser):
             start_time=start_time_local,
             end_time=end_time_local,
             waypoints=waypoints,
+            log_filename=filename.name,
+            log_path=str(filename),
             **dive_meta
         )
         

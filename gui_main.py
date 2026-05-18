@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene, 
     QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QPushButton,
     QSlider, QLabel, QGraphicsPixmapItem, QGroupBox, QFormLayout,
-    QSpinBox, QListWidget, QListWidgetItem, QLineEdit, QScrollArea
+    QSpinBox, QListWidget, QListWidgetItem, QLineEdit, QScrollArea,
+    QDialog, QTextEdit
 )
 from PySide6.QtCore import Qt, QTimer, QSettings
 from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
@@ -117,11 +118,14 @@ class HUDDesignerWindow(QMainWindow):
         self.time_slider.valueChanged.connect(self.on_slider_moved)
         self.time_label = QLabel("00:00:00")
         self.data_label = QLabel("Depth: -- | Temp: --")
+        self.log_label = QLabel("Current Log: None")
+        self.log_label.setStyleSheet("color: #888; font-style: italic;")
         
         self.slider_layout.addWidget(self.time_slider)
         self.slider_layout.addWidget(self.time_label)
         self.canvas_layout.addLayout(self.slider_layout)
         self.canvas_layout.addWidget(self.data_label)
+        self.canvas_layout.addWidget(self.log_label)
         
         self.main_layout.addLayout(self.canvas_layout, stretch=4)
 
@@ -214,6 +218,9 @@ class HUDDesignerWindow(QMainWindow):
         self.btn_review_render = QPushButton("Review Render (OpenCV)")
         self.btn_review_render.clicked.connect(self.review_render)
         self.btn_review_render.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold;")
+
+        self.btn_show_wp = QPushButton("Show Raw Waypoint Data")
+        self.btn_show_wp.clicked.connect(self.show_waypoint_data_dialog)
         
         action_layout.addWidget(self.btn_load_skin)
         action_layout.addWidget(self.btn_create_shape)
@@ -221,6 +228,7 @@ class HUDDesignerWindow(QMainWindow):
         action_layout.addWidget(self.btn_save_layout)
         action_layout.addWidget(self.btn_align_h)
         action_layout.addWidget(self.btn_review_render)
+        action_layout.addWidget(self.btn_show_wp)
         self.controls_layout.addWidget(action_box)
         
         self.controls_layout.addStretch()
@@ -254,7 +262,11 @@ class HUDDesignerWindow(QMainWindow):
                 self.fields_list.addItem(QListWidgetItem(f"tank_name:{tank_name}"))
 
     def on_selection_changed(self):
-        items = self.scene.selectedItems()
+        try:
+            items = self.scene.selectedItems()
+        except RuntimeError:
+            return
+            
         telemetry_items = [i for i in items if isinstance(i, TelemetryItem)]
         self.btn_align_h.setEnabled(len(telemetry_items) >= 2)
 
@@ -267,15 +279,16 @@ class HUDDesignerWindow(QMainWindow):
         if text:
             self.hud_manager.add_custom_label(text, 0.5, 0.5)
             self.custom_text_input.clear()
-
     def keyPressEvent(self, event):
         if event.key() in [Qt.Key_Delete, Qt.Key_Backspace]:
-            selected = self.scene.selectedItems()
+            try:
+                selected = self.scene.selectedItems()
+            except RuntimeError:
+                return
             for item in selected:
                 if isinstance(item, TelemetryItem):
                     self.hud_manager.remove_item(item)
-        else:
-            super().keyPressEvent(event)
+        super().keyPressEvent(event)
 
     def review_render(self):
         """Generates a preview frame using the actual OpenCV rendering logic."""
@@ -441,9 +454,11 @@ class HUDDesignerWindow(QMainWindow):
         
         if wp:
             self.data_label.setText(f"Depth: {wp.depth:.1f}m | Temp: {wp.temp:.1f}C")
+            self.log_label.setText(f"Current Log: {wp.log_filename or 'Unknown'}")
             self.hud_manager.update_telemetry_data(wp)
         else:
             self.data_label.setText("Out of dive range.")
+            self.log_label.setText("Current Log: None (No Match)")
 
     def set_bg_pixmap(self, pixmap):
         is_new = self.bg_pixmap_item is None
@@ -502,6 +517,10 @@ class HUDDesignerWindow(QMainWindow):
             
             self.hud_manager.load_layout(layout)
             print(f"Loaded HUD package from {path}")
+            
+            # Immediately refresh data on the HUD
+            self.sync_data_to_frame(self.time_slider.value() / self.video_fps)
+
             # Note: We don't rmtree here because the HUDManager might need the skin file path
             # However, we should track it for cleanup on window close.
             if not hasattr(self, 'temp_dirs'): self.temp_dirs = []
@@ -559,6 +578,51 @@ class HUDDesignerWindow(QMainWindow):
             print(f"Saved HUD package to {path}")
         except Exception as e:
             print(f"Error saving HUD package: {e}")
+
+    def show_waypoint_data_dialog(self):
+        """Opens a window showing the raw data for the current waypoint."""
+        if not self.current_dive:
+            print("No dive log loaded.")
+            return
+
+        # Get current waypoint
+        frame_idx = self.time_slider.value()
+        seconds = frame_idx / self.video_fps
+        target_ts = self.video_creation_date + timedelta(hours=self.tz_spin.value(), seconds=seconds)
+        
+        wp = None
+        for w in self.current_dive.waypoints:
+            if w.timestamp >= target_ts:
+                wp = w
+                break
+        
+        if not wp:
+            print("No waypoint data for current frame.")
+            return
+
+        # Format data as JSON for pretty display
+        data_json = wp.model_dump_json(indent=4)
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Current Waypoint Raw Data")
+        dialog.resize(600, 800)
+        layout = QVBoxLayout(dialog)
+        
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText(data_json)
+        # Use monospace font for JSON
+        font = QFont("Courier New" if sys.platform == "win32" else "Menlo")
+        font.setStyleHint(QFont.Monospace)
+        text_edit.setFont(font)
+        
+        layout.addWidget(text_edit)
+        
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(dialog.accept)
+        layout.addWidget(btn_close)
+
+        dialog.exec()
 
     def closeEvent(self, event):
         """Cleanup temporary directories on close."""

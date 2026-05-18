@@ -32,10 +32,12 @@ def format_telemetry_value(field, raw_val):
         return str(int(float(raw_val)))
     elif field in ["ndl", "air_remaining"] and raw_val is not None:
         val_mins = int(raw_val / 60)
-        if field == "ndl" and val_mins > 99: 
-            return "99+"
-        else: 
-            return f"{val_mins:02d}" if field == "ndl" else str(val_mins)
+        if field == "ndl":
+            if val_mins > 99 or val_mins <= 0:
+                return "99+"
+            return f"{val_mins:02d}"
+        else:
+            return str(val_mins)
     elif field in ["dive_time", "tts"] and raw_val is not None:
         mins = int(raw_val // 60)
         secs = int(raw_val % 60)
@@ -181,6 +183,8 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
             tank_data = waypoint.tanks.get(tank_name)
             raw_val = tank_data.name if tank_data else tank_name
             val = format_telemetry_value(field, raw_val)
+        elif field == "log_filename":
+            val = str(raw_val) if raw_val is not None else "No Log"
         else:
             raw_val = getattr(waypoint, field, None)
             val = format_telemetry_value(field, raw_val)
@@ -213,6 +217,27 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
             
         # Draw main text
         draw.text((abs_x, abs_y), str(val), font=font, fill=color_rgb)
+
+    # 5. Draw Active Log Filename at the very bottom of the HUD skin
+    log_name = waypoint.log_filename
+    if log_name:
+        log_font_size = int(14 * skin_scale)
+        if log_font_size < 8: log_font_size = 8
+        log_font = get_font(log_font_size)
+        
+        # Calculate centering
+        bbox = draw.textbbox((0, 0), log_name, font=log_font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        
+        tx = skin_x + (w_scaled - tw) // 2
+        ty = skin_y + h_scaled - th - int(8 * skin_scale) # 8px padding from bottom
+        
+        # Draw with outline
+        o_dist = 1
+        for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
+            draw.text((tx + dx, ty + dy), log_name, font=log_font, fill=(0, 0, 0))
+        draw.text((tx, ty), log_name, font=log_font, fill=(200, 200, 200)) # Light grey
 
     # Convert back to BGR for OpenCV
     frame[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
