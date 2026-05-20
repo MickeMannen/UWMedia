@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import timedelta, datetime
 import zipfile
 from tqdm import tqdm
-from parsers.shearwater import ShearwaterParser
+from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint, Dive
@@ -67,7 +67,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     suffix = log_path.suffix.lower()
     dives = []
     if suffix == ".uddf":
-        parser = ShearwaterParser()
+        parser = UDDFParser()
         if args.tz_adjust:
             parser.update_timezone(log_path, args.tz_adjust * 60)
         dives = parser.parse(log_path)
@@ -98,11 +98,11 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     # 2. Determine Output Filename: divelog filename + layoutname.mp4
     layout_name = args.original_layout_stem or "default"
     
-    filename = f"{log_path.stem}_{layout_name}.mp4"
-    target_path = output_dir / filename
-    if output_dir.is_file(): # User specified a full path as output
+    if output_dir.suffix: # User specified a full path as output
         target_path = output_dir
     else:
+        filename = f"{log_path.stem}_{layout_name}.mp4"
+        target_path = output_dir / filename
         target_path = get_unique_path(target_path)
 
     print(f"Output path: {target_path}")
@@ -590,7 +590,7 @@ def main():
     manager = DiveManager()
     found_garmin = False
     if args.logs:
-        shearwater = ShearwaterParser()
+        shearwater = UDDFParser()
         garmin = GarminParser()
 
         if not args.logs.is_dir():

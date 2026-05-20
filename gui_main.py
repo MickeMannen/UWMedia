@@ -19,7 +19,7 @@ from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
 from gui.hud_manager import HUDManager, TelemetryItem
 from gui.hud_controls import HUDControls
 from models.manager import DiveManager
-from parsers.shearwater import ShearwaterParser
+from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
@@ -354,7 +354,7 @@ class HUDDesignerWindow(QMainWindow):
     def load_logs_from_path(self, dir_path):
         self.dive_manager = DiveManager() # Reset manager
         p_dir = Path(dir_path)
-        shearwater = ShearwaterParser()
+        uddf = UDDFParser()
         garmin = GarminParser()
         
         count = 0
@@ -364,7 +364,7 @@ class HUDDesignerWindow(QMainWindow):
 
         for path in p_dir.iterdir():
             if path.suffix == ".uddf": 
-                self.dive_manager.add_dives(shearwater.parse(path))
+                self.dive_manager.add_dives(uddf.parse(path))
                 count += 1
             elif path.suffix == ".fit":
                 self.dive_manager.add_dives(garmin.parse(path))

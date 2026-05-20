@@ -327,8 +327,37 @@ class FfmpegClass:
             filter_complex = ",".join(filters)
 
         # 3. Final Assembly
+        # Passthrough mode: Use -c copy if no video adjustments are requested
+        is_passthrough = not (filter_complex or stabilize or target_resolution or bitrate or color_correct)
+        
         full_args = args + inputs
         
+        if is_passthrough:
+            print("No adjustments requested. Using fast stream copy (passthrough)...")
+            # Map video and audio, but ignore unsupported data/metadata streams in container
+            # Using -map 0:v -map 0:a -map 0:s? to get video, audio, and optional subtitles
+            full_args.extend(["-c", "copy", "-map", "0:v", "-map", "0:a?", "-map", "0:s?", "-map_metadata", "0"])
+            
+            # Creation date with timezone
+            if tz_offset_mins is not None:
+                sign = "+" if tz_offset_mins >= 0 else "-"
+                hours = abs(tz_offset_mins) // 60
+                mins = abs(tz_offset_mins) % 60
+                tz_str = f"{sign}{hours:02}{mins:02}"
+                iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
+                full_args.extend(["-metadata", f"creation_time={iso_date}"])
+            
+            full_args.extend(["-movflags", "+faststart+use_metadata_tags"])
+            full_args.extend([str(output_path)])
+            
+            if self.debug:
+                print(full_args)
+            try:
+                self.run_command(full_args, duration=float(clip_duration))
+            finally:
+                if ass_path and ass_path.exists(): ass_path.unlink()
+            return
+
         filter_target = "0:v"
         if filter_complex:
             full_args.extend(["-filter_complex", filter_complex])

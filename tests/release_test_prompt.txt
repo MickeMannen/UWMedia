@@ -1,0 +1,13 @@
+create release test of the cli_main.py in file /tests/release_test.py
+
+test content:
+in folder /test_data/release_test there are video and photo files that should be used
+
+test cases
+
+1. start to test metadata
+1.1 for video make sure that QuickTime:CreateDate and QuickTime:CreationDate correct
+1.2 for photo make sure that exif date taken are correct
+
+2. Garmin Parser
+2.1 Parse files in /test_data/fit, assert based on waypoints and model for each file

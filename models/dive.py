@@ -100,6 +100,12 @@ class Dive(BaseModel):
             wp._dive = self
 
     @property
+    def max_depth(self) -> float:
+        if not self.waypoints:
+            return 0.0
+        return max((wp.depth or 0.0) for wp in self.waypoints)
+
+    @property
     def duration(self) -> int:
         return int((self.end_time - self.start_time).total_seconds())
 
