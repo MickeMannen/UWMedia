@@ -151,17 +151,20 @@ class TestRelease:
 
     # 6. Standalone Log Rendering
     def test_render_log_fit(self):
-        log = FIT_DIR / "461 Sipadan, Turtle Tomb.fit"
-        layout = COMPUTERS_DIR / "Garmin_x50_simple.zip"
-        # Use OUTPUT_DIR instead of TEST_DATA_DIR to avoid permission or path issues
-        output_file = OUTPUT_DIR / f"{log.stem}_Garmin_x50_simple.mp4"
+        log = FIT_DIR / "488 Phuket, Camera Bay.fit"
+
+        for file in COMPUTERS_DIR.glob("*.zip"):
+
+            # layout = COMPUTERS_DIR / "Garmin_x50_simple.zip"
+            # Use OUTPUT_DIR instead of TEST_DATA_DIR to avoid permission or path issues
+            output_file = OUTPUT_DIR / f"{log.stem}_{file.stem}.mp4"
         
-        cmd = [
-            "python3", "cli_main.py", str(output_file),
-            "--render-log", str(log), "--layout", str(layout)
-        ]
-        subprocess.run(cmd, check=True)
-        assert output_file.exists()
+            cmd = [
+                "python3", "cli_main.py", str(output_file),
+                "--render-log", str(log), "--layout", str(file)
+            ]
+            subprocess.run(cmd, check=True)
+            assert output_file.exists()
 
     def test_render_log_uddf(self):
         log = UDDF_DIR / "Perdix 2 453 2025-10-19 16-44-12.uddf"

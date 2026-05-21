@@ -24,7 +24,7 @@ class HUDManager(QObject):
         self.view_width = view_width
         self.view_height = view_height
         self.skin_item = None
-        self.linked_elements = {} # field -> TelemetryItem
+        self.linked_elements = {} # item -> item
         
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
@@ -34,11 +34,11 @@ class HUDManager(QObject):
         except RuntimeError:
             return
             
-        # Filter to only TelemetryItems
-        telemetry_items = [i for i in items if isinstance(i, TelemetryItem)]
+        # Filter to only TelemetryItems or the Skin itself
+        targets = [i for i in items if isinstance(i, (TelemetryItem, HUDSkinItem, HUDShapeItem))]
         
-        if telemetry_items:
-            self.item_selected.emit(telemetry_items[0])
+        if targets:
+            self.item_selected.emit(targets[0])
         else:
             self.item_selected.emit(None)
 
@@ -142,20 +142,32 @@ class HUDManager(QObject):
         if not hud_skin:
             return
 
-        # Explicitly clear elements and decrease their ref counts
-        for item in self.linked_elements.values():
-            if item.scene():
-                self.scene.removeItem(item)
-            item.setParentItem(None)
+        # 1. Safely clear existing telemetry elements
+        for item in list(self.linked_elements.values()):
+            try:
+                if item.scene():
+                    self.scene.removeItem(item)
+                item.setParentItem(None)
+            except RuntimeError:
+                pass
         self.linked_elements = {}
 
+        # 2. Safely clear existing skin
         if self.skin_item:
-            if self.skin_item.scene():
-                self.scene.removeItem(self.skin_item)
+            try:
+                if self.skin_item.scene():
+                    self.scene.removeItem(self.skin_item)
+            except RuntimeError:
+                pass
             self.skin_item = None
 
+        # 3. Load new skin
+        anchor = hud_skin.get("anchor", "TOP_LEFT")
+        # Legacy support: if anchor missing, it was likely designed at 1080p
+        # For now, we'll continue using percentages but resolve them to the anchor in get_layout_json
+        
         if hud_skin.get("type") == "shape":
-            self.create_shape_skin(
+            self.skin_item = self.create_shape_skin(
                 width=hud_skin.get("width", 400),
                 height=hud_skin.get("height", 200),
                 color=hud_skin.get("color", "#000000"),
@@ -167,18 +179,19 @@ class HUDManager(QObject):
         else:
             skin_path = hud_skin.get("path")
             if skin_path:
-                self.load_skin(
+                self.skin_item = self.load_skin(
                     skin_path,
                     opacity=hud_skin.get("opacity", 1.0),
                     scale=hud_skin.get("scale", 1.0),
                     x_pct=hud_skin.get("x_pct", 0.0),
                     y_pct=hud_skin.get("y_pct", 0.0)
                 )
-            else:
-                print("Warning: Image-type HUD skin missing 'path'.")
+        
+        if self.skin_item:
+            self.skin_item.anchor = anchor
 
+        # 4. Load new telemetry elements
         for element in hud_skin.get("linked_elements", []):
-            # ... (rest of element loading logic)
             field = element.get("field", "")
             if field.startswith("custom:"):
                 text = field.replace("custom:", "")
@@ -189,8 +202,6 @@ class HUDManager(QObject):
                     color=element.get("color", "#FFFFFF"),
                     font_size=element.get("font_size", 12)
                 )
-                if item:
-                    item.setScale(element.get("scale", 1.0))
             else:
                 item = self.add_telemetry_field(
                     field,
@@ -199,32 +210,35 @@ class HUDManager(QObject):
                     color=element.get("color", "#FFFFFF"),
                     font_size=element.get("font_size", 12)
                 )
-                if item:
-                    item.setScale(element.get("scale", 1.0))
+            if item:
+                item.setScale(element.get("scale", 1.0))
 
     def update_telemetry_data(self, waypoint: 'Waypoint'):
-        # ... (unchanged)
         """
         Updates the text of all linked telemetry elements based on waypoint data.
         """
-        for item in self.linked_elements.values():
-            if getattr(item, 'is_custom', False):
-                continue
+        for item in list(self.linked_elements.values()):
+            try:
+                if not item or not item.scene(): continue
+                if getattr(item, 'is_custom', False): continue
+                    
+                field = item.field
+                if field.startswith("tank_pressure:"):
+                    tank_name = field.replace("tank_pressure:", "")
+                    tank_data = waypoint.tanks.get(tank_name)
+                    raw_val = tank_data.pressure_bar if tank_data else None
+                    val = format_telemetry_value(field, raw_val)
+                elif field.startswith("tank_name:"):
+                    tank_name = field.replace("tank_name:", "")
+                    tank_data = waypoint.tanks.get(tank_name)
+                    val = tank_data.name if (tank_data and tank_data.name) else tank_name
+                else:
+                    raw_val = getattr(waypoint, field, None)
+                    val = format_telemetry_value(field, raw_val)
                 
-            field = item.field
-            if field.startswith("tank_pressure:"):
-                tank_name = field.replace("tank_pressure:", "")
-                tank_data = waypoint.tanks.get(tank_name)
-                raw_val = tank_data.pressure_bar if tank_data else None
-                val = format_telemetry_value(field, raw_val)
-            elif field.startswith("tank_name:"):
-                tank_name = field.replace("tank_name:", "")
-                tank_data = waypoint.tanks.get(tank_name)
-                val = tank_data.name if (tank_data and tank_data.name) else tank_name
-            else:
-                raw_val = getattr(waypoint, field, None)
-                val = format_telemetry_value(field, raw_val)
-            item.update_value(val)
+                item.update_value(val)
+            except RuntimeError:
+                continue
 
     def get_layout_json(self):
         if not self.skin_item:
@@ -248,11 +262,58 @@ class HUDManager(QObject):
                 "scale": item.scale()
             })
 
+        # --- Corner-to-Corner Anchor Logic ---
+        anchor = getattr(self.skin_item, 'anchor', 'TOP_LEFT')
+        pos = self.skin_item.pos()
+        sw = rect.width() * self.skin_item.scale()
+        sh = rect.height() * self.skin_item.scale()
+        
+        # We calculate the offset from the SCREEN ANCHOR to the HUD'S MATCHING ANCHOR point
+        # e.g., BOTTOM_RIGHT offset = Distance from Screen Bottom-Right to HUD Bottom-Right
+        ref_x, ref_y = 0.0, 0.0
+        
+        # 1. Resolve HUD's own anchor point (Top-Left of HUD is pos.x, pos.y)
+        if 'LEFT' in anchor:
+            hud_ref_x = pos.x()
+        elif 'CENTER' in anchor:
+            hud_ref_x = pos.x() + (sw / 2.0)
+        elif 'RIGHT' in anchor:
+            hud_ref_x = pos.x() + sw
+            
+        if 'TOP' in anchor:
+            hud_ref_y = pos.y()
+        elif 'MIDDLE' in anchor:
+            hud_ref_y = pos.y() + (sh / 2.0)
+        elif 'BOTTOM' in anchor:
+            hud_ref_y = pos.y() + sh
+
+        # 2. Resolve Screen anchor point
+        if 'LEFT' in anchor:
+            screen_ref_x = 0.0
+        elif 'CENTER' in anchor:
+            screen_ref_x = self.view_width / 2.0
+        elif 'RIGHT' in anchor:
+            screen_ref_x = float(self.view_width)
+            
+        if 'TOP' in anchor:
+            screen_ref_y = 0.0
+        elif 'MIDDLE' in anchor:
+            screen_ref_y = self.view_height / 2.0
+        elif 'BOTTOM' in anchor:
+            screen_ref_y = float(self.view_height)
+
+        # 3. Reference Offset is the distance between these two points
+        ref_x = hud_ref_x - screen_ref_x
+        ref_y = hud_ref_y - screen_ref_y
+
         skin_data = {
             "type": "shape" if is_shape else "image",
+            "anchor": anchor,
+            "ref_offset_x": ref_x,
+            "ref_offset_y": ref_y,
             "opacity": self.skin_item.opacity(),
-            "x_pct": self.skin_item.pos().x() / self.view_width,
-            "y_pct": self.skin_item.pos().y() / self.view_height,
+            "x_pct": pos.x() / self.view_width, # Legacy fallback
+            "y_pct": pos.y() / self.view_height, # Legacy fallback
             "linked_elements": linked_elements
         }
 
@@ -269,7 +330,11 @@ class HUDManager(QObject):
                 "scale": self.skin_item.scale(),
             })
 
-        return {"hud_skin": skin_data}
+        return {
+            "hud_skin": skin_data,
+            "design_width": self.view_width,
+            "design_height": self.view_height
+        }
 
 class HUDShapeItem(QGraphicsPathItem):
     def __init__(self, width, height, color_hex, corner_radius=20):
@@ -278,7 +343,8 @@ class HUDShapeItem(QGraphicsPathItem):
         self.height = height
         self.color_hex = color_hex
         self.corner_radius = corner_radius
-        self.path = None # For attribute consistency with HUDSkinItem
+        self.path = None 
+        self.anchor = "TOP_LEFT"
         
         self.setFlags(
             QGraphicsItem.ItemIsMovable | 
@@ -301,6 +367,7 @@ class HUDSkinItem(QGraphicsPixmapItem):
     def __init__(self, pixmap, path):
         super().__init__(pixmap)
         self.path = path
+        self.anchor = "TOP_LEFT"
         self.setFlags(
             QGraphicsItem.ItemIsMovable | 
             QGraphicsItem.ItemIsSelectable | 
@@ -317,7 +384,6 @@ class TelemetryItem(QGraphicsTextItem):
             QGraphicsItem.ItemSendsGeometryChanges
         )
         
-        # Friendly initial text
         display_name = field
         if field.startswith("tank_pressure:"):
             display_name = field.replace("tank_pressure:", "") + " (Bar)"
@@ -338,9 +404,6 @@ class TelemetryItem(QGraphicsTextItem):
         font = self.font()
         font.setPixelSize(size)
         self.setFont(font)
-
-    def set_scale(self, scale):
-        self.setScale(scale)
 
     def update_value(self, value):
         self.setPlainText(str(value))

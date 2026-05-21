@@ -314,15 +314,24 @@ class ColorCorrectionEngine:
             if skin_path:
                 img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
                 if img_skin is not None:
-                    skin_scale = hud_skin.get("scale", 1.0)
+                    # Use design_width from layout or default to 1920
+                    design_w = float(layout.get("design_width", 1920))
+                    user_scale = hud_skin.get("scale", 1.0)
+                    res_scale = width / design_w
+                    final_skin_scale = user_scale * res_scale
+                    
                     skin_opacity = hud_skin.get("opacity", 1.0)
                     h_orig, w_orig = img_skin.shape[:2]
-                    w_scaled = int(w_orig * skin_scale)
-                    h_scaled = int(h_orig * skin_scale)
+                    w_scaled = int(w_orig * final_skin_scale)
+                    h_scaled = int(h_orig * final_skin_scale)
+                    
+                    if w_scaled < 1: w_scaled = 1
+                    if h_scaled < 1: h_scaled = 1
+                    
                     preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
                     if preloaded_skin.shape[2] == 4:
                         preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
-                    print(f"HUD Skin Pre-loaded: {w_scaled}x{h_scaled}")
+                    print(f"HUD Skin Pre-loaded: {w_scaled}x{h_scaled} (res_scale: {res_scale:.2f} based on design_w: {design_w})")
                 else:
                     print(f"Warning: Could not pre-load HUD skin from {skin_path}")
 

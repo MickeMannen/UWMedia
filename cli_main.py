@@ -389,6 +389,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     dive = manager.find_dive_for_timestamp(creation_date) if manager.dives else None
     if manager.dives and not dive:
         print("Warning: No matching dive log found for this file.")
+        print(f"Creation Date: {creation_date}")
     elif dive:
         print(f"Matched dive starting at {dive.start_time}")
 
@@ -442,9 +443,45 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 tz_offset_mins=tz_offset_mins
             )
     else:
-        # Simple copy for photos for now
-        print(f"Skipping video processing for: {source.name} (Copying as photo)")
-        shutil.copy2(source, target_path)
+        # Photo Processing with optional Color/Overlay
+        needs_color = args.color
+        needs_overlay = True if args.layout else False
+
+        if needs_color or needs_overlay:
+            print(f"Applying processing to photo: {source.name}")
+            frame = cv2.imread(str(source))
+            if frame is None:
+                print(f"Error: Could not read image {source}")
+                shutil.copy2(source, target_path)
+            else:
+                # 1. Color Correction
+                if needs_color:
+                    from ffmpeg.color import ColorCorrectionEngine
+                    ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
+                    engine = ColorCorrectionEngine(ff)
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    filt = engine.get_filter_matrix(rgb)
+                    corrected_rgb = engine.apply_filter(rgb, filt)
+                    frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
+                
+                # 2. HUD Overlay
+                if needs_overlay and dive:
+                    from gui.hud_renderer import draw_hud
+                    with open(args.layout, 'r') as f:
+                        layout = json.load(f)
+                    
+                    # Match waypoint to photo creation time
+                    wp = dive.get_waypoint_at(creation_date)
+                    if wp:
+                        draw_hud(frame, layout, wp)
+                    else:
+                        print("Warning: No dive data matched for this photo's timestamp.")
+
+                cv2.imwrite(str(target_path), frame)
+        else:
+            # Simple copy for photos for now
+            print(f"Skipping video processing for: {source.name} (Copying as photo)")
+            shutil.copy2(source, target_path)
 
     # Post-processing metadata
     print("Post-processing metadata...")

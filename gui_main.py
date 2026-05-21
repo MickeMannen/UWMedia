@@ -423,6 +423,18 @@ class HUDDesignerWindow(QMainWindow):
         self.time_slider.setEnabled(True)
         self.on_slider_moved(0)
 
+    def load_image_background(self, path):
+        if self.video_cap:
+            self.video_cap.release()
+            self.video_cap = None
+        
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            self.set_bg_pixmap(pixmap)
+            self.time_slider.setEnabled(False)
+            self.time_label.setText("Photo Mode")
+            self.sync_data_to_frame(0)
+
     def on_slider_moved(self, frame_idx):
         if self.video_cap:
             self.video_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
@@ -462,19 +474,31 @@ class HUDDesignerWindow(QMainWindow):
 
     def set_bg_pixmap(self, pixmap):
         is_new = self.bg_pixmap_item is None
+        
+        # Standardize Designer to 1920px reference width
+        # We use a dynamic height based on the aspect ratio to avoid cropping
+        # This ensures all saved percentages are relative to the FULL frame
+        target_w = 1920
+        aspect = pixmap.width() / pixmap.height()
+        target_h = int(target_w / aspect)
+        
+        # Scale background to fit our normalized design canvas
+        scaled_bg = pixmap.scaled(target_w, target_h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+
         if is_new:
-            self.bg_pixmap_item = QGraphicsPixmapItem(pixmap)
+            self.bg_pixmap_item = QGraphicsPixmapItem(scaled_bg)
             self.scene.addItem(self.bg_pixmap_item)
             self.bg_pixmap_item.setZValue(-1)
         else:
-            self.bg_pixmap_item.setPixmap(pixmap)
+            self.bg_pixmap_item.setPixmap(scaled_bg)
         
-        self.scene.setSceneRect(pixmap.rect())
+        self.scene.setSceneRect(0, 0, target_w, target_h)
         if is_new:
             self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
         
-        self.hud_manager.view_width = pixmap.width()
-        self.hud_manager.view_height = pixmap.height()
+        # Inform HUDManager of our normalized reference dimensions
+        self.hud_manager.view_width = target_w
+        self.hud_manager.view_height = target_h
 
     def load_skin_dialog(self):
         initial_dir = str(Path(self.last_skin_path).parent) if self.last_skin_path else ""
