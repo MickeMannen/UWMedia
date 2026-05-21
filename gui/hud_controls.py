@@ -42,7 +42,7 @@ class HUDControls(QWidget):
         self.opacity_label = QLabel("1.00")
         
         self.scale_slider = QSlider(Qt.Horizontal)
-        self.scale_slider.setRange(1, 500) # Increased to 5x
+        self.scale_slider.setRange(1, 500) 
         self.scale_slider.setValue(100)
         self.scale_slider.valueChanged.connect(self.on_scale_changed)
         self.scale_label = QLabel("1.00")
@@ -67,13 +67,14 @@ class HUDControls(QWidget):
         self.skin_layout.addRow("Opacity:", self.opacity_slider)
         self.skin_layout.addRow("", self.opacity_label)
         
-        self.scale_row = self.skin_layout.addRow("Global Scale:", self.scale_slider)
-        self.scale_label_row = self.skin_layout.addRow("", self.scale_label)
+        # We store these to toggle visibility by widget reference
+        self.skin_layout.addRow("Global Scale:", self.scale_slider)
+        self.skin_layout.addRow("", self.scale_label)
         
-        self.width_row = self.skin_layout.addRow("Width:", self.width_spin)
-        self.height_row = self.skin_layout.addRow("Height:", self.height_spin)
-        self.radius_row = self.skin_layout.addRow("Corner Radius:", self.radius_spin)
-        self.color_row = self.skin_layout.addRow("BG Color:", self.shape_color_btn)
+        self.skin_layout.addRow("Width:", self.width_spin)
+        self.skin_layout.addRow("Height:", self.height_spin)
+        self.skin_layout.addRow("Corner Radius:", self.radius_spin)
+        self.skin_layout.addRow("BG Color:", self.shape_color_btn)
         
         self.layout.addWidget(self.skin_group)
 
@@ -142,21 +143,23 @@ class HUDControls(QWidget):
         self.opacity_label.setText(f"{skin_item.opacity():.2f}")
         self.opacity_slider.blockSignals(False)
         
-        # Toggle visibility
-        self.skin_layout.setRowVisible(self.scale_row, not is_shape)
-        self.skin_layout.setRowVisible(self.scale_label_row, not is_shape)
-        self.skin_layout.setRowVisible(self.width_row, is_shape)
-        self.skin_layout.setRowVisible(self.height_row, is_shape)
-        self.skin_layout.setRowVisible(self.radius_row, is_shape)
-        self.skin_layout.setRowVisible(self.color_row, is_shape)
+        # Toggle visibility using the actual widgets in those rows
+        self.skin_layout.setRowVisible(self.scale_slider, not is_shape)
+        self.skin_layout.setRowVisible(self.scale_label, not is_shape)
+        self.skin_layout.setRowVisible(self.width_spin, is_shape)
+        self.skin_layout.setRowVisible(self.height_spin, is_shape)
+        self.skin_layout.setRowVisible(self.radius_spin, is_shape)
+        self.skin_layout.setRowVisible(self.shape_color_btn, is_shape)
 
         if is_shape:
             self.width_spin.blockSignals(True)
             self.width_spin.setValue(skin_item.width)
             self.width_spin.blockSignals(False)
+            
             self.height_spin.blockSignals(True)
             self.height_spin.setValue(skin_item.height)
             self.height_spin.blockSignals(False)
+            
             self.radius_spin.blockSignals(True)
             self.radius_spin.setValue(skin_item.corner_radius)
             self.radius_spin.blockSignals(False)

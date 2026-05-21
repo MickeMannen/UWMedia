@@ -118,31 +118,23 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     skin_path = hud_skin.get("path")
     preloaded_skin = None
     
-    # Default resolution (will be overridden by skin dimensions)
+    # Default resolution for standalone telemetry video
+    # Standardizing to 1920x1080 ensures consistent scaling for HUD elements
     width, height = 1920, 1080
 
-    if hud_skin.get("type") == "shape":
-        width = (int(hud_skin.get("width", 400)) // 2) * 2
-        height = (int(hud_skin.get("height", 200)) // 2) * 2
-    elif skin_path:
+    # Ensure layout knows it's being rendered on a 1920-width canvas
+    # This aligns with our universal scaling factor calculation: res_scale = w_v / design_w
+    if "design_width" not in layout:
+        layout["design_width"] = 1920
+        layout["design_height"] = 1080
+
+    if skin_path:
         img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
         if img_skin is not None:
-            skin_scale = hud_skin.get("scale", 1.0)
-            skin_opacity = hud_skin.get("opacity", 1.0)
-            h_orig, w_orig = img_skin.shape[:2]
-            # Ensure dimensions are even for YUV420p compatibility
-            width = (int(w_orig * skin_scale) // 2) * 2
-            height = (int(h_orig * skin_scale) // 2) * 2
-            preloaded_skin = cv2.resize(img_skin, (width, height), interpolation=cv2.INTER_AREA)
-            if preloaded_skin.shape[2] == 4:
-                preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+            # We DON'T pre-scale the skin here anymore, we let draw_hud handle it
+            # based on the 1920 reference width we've set above.
+            pass
     
-    # Force the skin to the top-left (0,0) in this standalone video mode
-    if "hud_skin" not in layout:
-        layout["hud_skin"] = {}
-    layout["hud_skin"]["x_pct"] = 0.0
-    layout["hud_skin"]["y_pct"] = 0.0
-
     # 4. Processing Phase (Similar to ColorCorrectionEngine.process_video but without source video)
     fps = 30.0
     total_frames = int(duration * fps)
@@ -192,7 +184,8 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 if cached_frame is None or wp_timestamp != last_wp_timestamp:
                     # Redraw
                     frame = np.zeros((height, width, 3), dtype=np.uint8)
-                    draw_hud(frame, layout, wp or dummy_wp, preloaded_skin=preloaded_skin)
+                    from gui.hud_renderer import draw_hud
+                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0))
                     cached_frame = frame
                     last_wp = wp
                 

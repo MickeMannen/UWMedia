@@ -163,8 +163,30 @@ class HUDManager(QObject):
 
         # 3. Load new skin
         anchor = hud_skin.get("anchor", "TOP_LEFT")
-        # Legacy support: if anchor missing, it was likely designed at 1080p
-        # For now, we'll continue using percentages but resolve them to the anchor in get_layout_json
+        ref_x = hud_skin.get("ref_offset_x")
+        ref_y = hud_skin.get("ref_offset_y")
+        
+        # Determine initial position (Top-Left of HUD in GUI)
+        initial_x, initial_y = 0.0, 0.0
+        
+        # Prefer Anchor + Offset if available
+        if ref_x is not None and ref_y is not None:
+            # Reconstruct Top-Left from Anchor in current view
+            base_x, base_y = 0.0, 0.0
+            if 'CENTER' in anchor: base_x = self.view_width / 2.0
+            elif 'RIGHT' in anchor: base_x = float(self.view_width)
+            
+            if 'MIDDLE' in anchor: base_y = self.view_height / 2.0
+            elif 'BOTTOM' in anchor: base_y = float(self.view_height)
+            
+            # Pivot adjustment (we need HUD dimensions to find Top-Left)
+            # This is tricky because we haven't loaded the skin yet.
+            # We'll set the position AFTER loading the skin.
+            pass 
+        else:
+            # Fallback to percentages
+            initial_x = hud_skin.get("x_pct", 0.0) * self.view_width
+            initial_y = hud_skin.get("y_pct", 0.0) * self.view_height
         
         if hud_skin.get("type") == "shape":
             self.skin_item = self.create_shape_skin(
@@ -173,8 +195,7 @@ class HUDManager(QObject):
                 color=hud_skin.get("color", "#000000"),
                 opacity=hud_skin.get("opacity", 0.5),
                 corner_radius=hud_skin.get("corner_radius", 20),
-                x_pct=hud_skin.get("x_pct", 0.1),
-                y_pct=hud_skin.get("y_pct", 0.1)
+                x_pct=0, y_pct=0 # Set temporary 0
             )
         else:
             skin_path = hud_skin.get("path")
@@ -183,14 +204,37 @@ class HUDManager(QObject):
                     skin_path,
                     opacity=hud_skin.get("opacity", 1.0),
                     scale=hud_skin.get("scale", 1.0),
-                    x_pct=hud_skin.get("x_pct", 0.0),
-                    y_pct=hud_skin.get("y_pct", 0.0)
+                    x_pct=0, y_pct=0
                 )
         
         if self.skin_item:
             self.skin_item.anchor = anchor
+            
+            # Now set the correct position based on anchor and offsets
+            if ref_x is not None and ref_y is not None:
+                rect = self.skin_item.rect() if isinstance(self.skin_item, HUDShapeItem) else self.skin_item.pixmap().rect()
+                sw = rect.width() * self.skin_item.scale()
+                sh = rect.height() * self.skin_item.scale()
+                
+                base_x, base_y = 0.0, 0.0
+                if 'CENTER' in anchor: base_x = self.view_width / 2.0
+                elif 'RIGHT' in anchor: base_x = float(self.view_width)
+                if 'MIDDLE' in anchor: base_y = self.view_height / 2.0
+                elif 'BOTTOM' in anchor: base_y = float(self.view_height)
+                
+                pivot_x, pivot_y = 0.0, 0.0
+                if 'CENTER' in anchor: pivot_x = sw / 2.0
+                elif 'RIGHT' in anchor: pivot_x = sw
+                if 'MIDDLE' in anchor: pivot_y = sh / 2.0
+                elif 'BOTTOM' in anchor: pivot_y = sh
+                
+                self.skin_item.setPos(base_x + ref_x - pivot_x, base_y + ref_y - pivot_y)
+            else:
+                # Use calculated fallback
+                self.skin_item.setPos(initial_x, initial_y)
 
         # 4. Load new telemetry elements
+        rect = self.skin_item.rect() if isinstance(self.skin_item, HUDShapeItem) else self.skin_item.pixmap().rect()
         for element in hud_skin.get("linked_elements", []):
             field = element.get("field", "")
             if field.startswith("custom:"):
