@@ -2,7 +2,7 @@
 
 UWMedia is a comprehensive tool for processing underwater videos and photos. It bridges the gap between your dive computer and your camera by matching dive logs (UDDF/FIT) to your media files, applying advanced color correction, and overlaying real-time telemetry.
 
-Example (YouTube)
+[Example (YouTube)](https://www.youtube.com/@MickeMannen8)
 
 ## Key Features
 
