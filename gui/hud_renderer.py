@@ -75,7 +75,7 @@ def draw_rounded_rect(img, pt1, pt2, color, thickness, r, d):
         cv2.rectangle(img, (x1 + r, y1), (x2 - r, y2), color, thickness)
         cv2.rectangle(img, (x1, y1 + r), (x2, y2 - r), color, thickness)
 
-def draw_hud(frame, layout, waypoint, preloaded_skin=None):
+def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False):
     """
     Complete HUD rendering logic used by both CLI and GUI Review.
     Now using Corner-to-Corner Layout Anchor System.
@@ -85,7 +85,7 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None):
     
     # --- Universal Scaling Factor (Base 1920px) ---
     design_w = float(layout.get("design_width", 1920))
-    res_scale = w_v / design_w
+    res_scale = 1.0 if render_log else (w_v / design_w)
     
     skin_type = hud_skin.get("type", "image")
     skin_opacity = hud_skin.get("opacity", 1.0)
@@ -133,8 +133,12 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None):
     ref_y = hud_skin.get("ref_offset_y", 0.0)
     
     # Final Top-Left Coordinate
-    skin_x = int(base_x + (ref_x * res_scale) - pivot_x)
-    skin_y = int(base_y + (ref_y * res_scale) - pivot_y)
+    if render_log:
+        skin_x = 0
+        skin_y = 0
+    else:
+        skin_x = int(base_x + (ref_x * res_scale) - pivot_x)
+        skin_y = int(base_y + (ref_y * res_scale) - pivot_y)
 
     if os.environ.get("UW_DEBUG"):
         print(f"HUD Render Debug (Anchor: {anchor}):")
@@ -180,7 +184,8 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None):
     # --- 6. Draw Telemetry ---
     skin_info = {
         'x': skin_x, 'y': skin_y, 'w': w_hud, 'h': h_hud,
-        'res_scale': res_scale, 'user_scale': user_scale if skin_type == "image" else 1.0
+        'res_scale': res_scale, 'user_scale': user_scale if skin_type == "image" else 1.0,
+        'render_log': render_log
     }
     draw_telemetry_on_frame(frame, layout, waypoint, skin_info)
 
@@ -195,6 +200,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
     h_scaled = skin_info['h']
     res_scale = skin_info['res_scale']
     user_scale = skin_info['user_scale']
+    render_log = skin_info.get('render_log', False)
 
     pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(pil_img)
@@ -232,7 +238,10 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
         item_scale = elem.get("scale", 1.0)
         
         # Scaling font
-        final_size = int(base_font_size * res_scale * item_scale)
+        if render_log:
+            final_size = int(base_font_size * user_scale * item_scale)
+        else:
+            final_size = int(base_font_size * user_scale * res_scale * item_scale)
         if final_size < 1: final_size = 1
         
         font = get_font(final_size)

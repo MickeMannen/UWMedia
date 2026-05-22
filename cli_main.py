@@ -90,6 +90,13 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     
     # Process the first dive found in the file
     dive = dives[0]
+    
+    # Slice waypoints and adjust end_time if limit_waypoints is set
+    limit_waypoints = getattr(args, 'limit_waypoints', None)
+    if limit_waypoints is not None and len(dive.waypoints) > 0:
+        dive.waypoints = dive.waypoints[:limit_waypoints]
+        dive.end_time = dive.waypoints[-1].timestamp
+        
     duration = dive.duration
     if duration <= 0:
         print("Error: Dive duration is zero.")
@@ -118,22 +125,29 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     skin_path = hud_skin.get("path")
     preloaded_skin = None
     
-    # Default resolution for standalone telemetry video
-    # Standardizing to 1920x1080 ensures consistent scaling for HUD elements
-    width, height = 1920, 1080
+    # Determine resolution of standalone telemetry video based on HUD dimensions
+    skin_type = hud_skin.get("type", "image")
+    user_scale = hud_skin.get("scale", 1.0)
+    
+    if skin_type == "shape":
+        width = int(hud_skin.get("width", 400))
+        height = int(hud_skin.get("height", 200))
+    else:
+        if skin_path:
+            img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+            if img_temp is not None:
+                width = int(img_temp.shape[1] * user_scale)
+                height = int(img_temp.shape[0] * user_scale)
+            else:
+                width, height = 1920, 1080
+        else:
+            width, height = 1920, 1080
 
-    # Ensure layout knows it's being rendered on a 1920-width canvas
-    # This aligns with our universal scaling factor calculation: res_scale = w_v / design_w
-    if "design_width" not in layout:
-        layout["design_width"] = 1920
-        layout["design_height"] = 1080
-
-    if skin_path:
-        img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-        if img_skin is not None:
-            # We DON'T pre-scale the skin here anymore, we let draw_hud handle it
-            # based on the 1920 reference width we've set above.
-            pass
+    # Ensure width and height are divisible by 2 for FFmpeg
+    if width % 2 != 0:
+        width += 1
+    if height % 2 != 0:
+        height += 1
     
     # 4. Processing Phase (Similar to ColorCorrectionEngine.process_video but without source video)
     fps = 30.0
@@ -185,7 +199,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                     # Redraw
                     frame = np.zeros((height, width, 3), dtype=np.uint8)
                     from gui.hud_renderer import draw_hud
-                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0))
+                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True)
                     cached_frame = frame
                     last_wp = wp
                 
@@ -519,7 +533,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
-    parser.add_argument("--render-log", type=Path, help="Create a telemetry-only video from a specific dive log file (requires --layout)")
+    parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
 
     args = parser.parse_args()
 
@@ -527,9 +541,23 @@ def main():
         if not args.layout:
             print("Error: --render-log requires --layout to be specified.")
             sys.exit(1)
-        if not args.render_log.exists():
-            print(f"Error: Dive log file '{args.render_log}' does not exist.")
+        
+        log_path_str = args.render_log[0]
+        limit_waypoints = None
+        if len(args.render_log) > 1:
+            try:
+                limit_waypoints = int(args.render_log[1])
+            except ValueError:
+                print(f"Error: Number of waypoints must be an integer, got '{args.render_log[1]}'")
+                sys.exit(1)
+        
+        log_path = Path(log_path_str)
+        if not log_path.exists():
+            print(f"Error: Dive log file '{log_path}' does not exist.")
             sys.exit(1)
+            
+        args.render_log = log_path
+        args.limit_waypoints = limit_waypoints
         
         # If only one positional argument is provided, treat it as the output directory/file
         if args.source and not args.output:

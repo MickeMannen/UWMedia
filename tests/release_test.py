@@ -161,7 +161,7 @@ class TestRelease:
         
             cmd = [
                 "python3", "cli_main.py", str(output_file),
-                "--render-log", str(log), "--layout", str(file)
+                "--render-log", str(log), "100", "--layout", str(file)
             ]
             subprocess.run(cmd, check=True)
             assert output_file.exists()
@@ -173,7 +173,7 @@ class TestRelease:
         
         cmd = [
             "python3", "cli_main.py", str(output_file),
-            "--render-log", str(log), "--layout", str(layout)
+            "--render-log", str(log), "100", "--layout", str(layout)
         ]
         subprocess.run(cmd, check=True)
         assert output_file.exists()
