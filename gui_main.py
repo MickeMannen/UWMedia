@@ -12,9 +12,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QPushButton,
     QSlider, QLabel, QGraphicsPixmapItem, QGroupBox, QFormLayout,
     QSpinBox, QListWidget, QListWidgetItem, QLineEdit, QScrollArea,
-    QDialog, QTextEdit
+    QDialog, QTextEdit, QMenu, QGesture, QPinchGesture, QGestureEvent
 )
-from PySide6.QtCore import Qt, QTimer, QSettings
+from PySide6.QtCore import Qt, QTimer, QSettings, QEvent
 from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
 from gui.hud_manager import HUDManager, TelemetryItem
 from gui.hud_controls import HUDControls
@@ -25,8 +25,9 @@ from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 
 class ZoomableGraphicsView(QGraphicsView):
-    def __init__(self, scene):
-        super().__init__(scene)
+    def __init__(self, scene, parent=None):
+        super().__init__(scene, parent)
+        self.parent_win = parent
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -34,17 +35,39 @@ class ZoomableGraphicsView(QGraphicsView):
         self.setBackgroundBrush(Qt.black)
         self.setDragMode(QGraphicsView.RubberBandDrag)
         self._is_panning = False
+        
+        # Grab gesture for touchpad pinch zoom
+        self.grabGesture(Qt.PinchGesture)
+
+    def event(self, event):
+        if event.type() == QEvent.Gesture:
+            return self.gestureEvent(event)
+        return super().event(event)
+
+    def gestureEvent(self, event):
+        pinch = event.gesture(Qt.PinchGesture)
+        if pinch:
+            self.pinchTriggered(pinch)
+            return True
+        return False
+
+    def pinchTriggered(self, gesture):
+        factor = gesture.scaleFactor()
+        # Dampen zoom to make it less reactive
+        dampened_factor = 1.0 + (factor - 1.0) * 0.4
+        self.scale(dampened_factor, dampened_factor)
 
     def wheelEvent(self, event):
-        zoom_in_factor = 1.25
-        zoom_out_factor = 1 / zoom_in_factor
-
-        if event.angleDelta().y() > 0:
-            zoom_factor = zoom_in_factor
+        # Zoom only when Ctrl key is held (standard trackpad/mouse scroll behavior)
+        if event.modifiers() == Qt.ControlModifier:
+            angle = event.angleDelta().y()
+            # Dampen scroll wheel zoom factor
+            factor = 1.0 + (angle / 1200.0) * 0.3
+            factor = max(0.9, min(1.1, factor))
+            self.scale(factor, factor)
         else:
-            zoom_factor = zoom_out_factor
-
-        self.scale(zoom_factor, zoom_factor)
+            # Delegate to standard scroll behavior (panning/scrolling)
+            super().wheelEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
@@ -64,6 +87,45 @@ class ZoomableGraphicsView(QGraphicsView):
             super().mouseReleaseEvent(fake_event)
         else:
             super().mouseReleaseEvent(event)
+
+    def contextMenuEvent(self, event):
+        selected_items = []
+        try:
+            selected_items = [item for item in self.scene().selectedItems() if isinstance(item, TelemetryItem)]
+        except RuntimeError:
+            pass
+
+        if len(selected_items) >= 2 and self.parent_win and hasattr(self.parent_win, 'hud_manager'):
+            menu = QMenu(self)
+            
+            h_menu = menu.addMenu("Horizontal Alignment")
+            h_top = h_menu.addAction("Align Top")
+            h_bottom = h_menu.addAction("Align Bottom")
+            h_center = h_menu.addAction("Align Center")
+            
+            v_menu = menu.addMenu("Vertical Alignment")
+            v_left = v_menu.addAction("Align Left")
+            v_right = v_menu.addAction("Align Right")
+            v_center = v_menu.addAction("Align Center")
+            
+            action = menu.exec(event.globalPos())
+            if not action:
+                return
+                
+            if action == h_top:
+                self.parent_win.hud_manager.align_selected("h_top")
+            elif action == h_bottom:
+                self.parent_win.hud_manager.align_selected("h_bottom")
+            elif action == h_center:
+                self.parent_win.hud_manager.align_selected("h_center")
+            elif action == v_left:
+                self.parent_win.hud_manager.align_selected("v_left")
+            elif action == v_right:
+                self.parent_win.hud_manager.align_selected("v_right")
+            elif action == v_center:
+                self.parent_win.hud_manager.align_selected("v_center")
+        else:
+            super().contextMenuEvent(event)
 
 class HUDDesignerWindow(QMainWindow):
     def __init__(self):
@@ -101,7 +163,7 @@ class HUDDesignerWindow(QMainWindow):
         self.canvas_layout = QVBoxLayout()
         
         self.scene = QGraphicsScene(0, 0, 1920, 1080)
-        self.view = ZoomableGraphicsView(self.scene)
+        self.view = ZoomableGraphicsView(self.scene, self)
         self.view.setRenderHint(QPainter.Antialiasing)
         
         self.canvas_layout.addWidget(self.view)

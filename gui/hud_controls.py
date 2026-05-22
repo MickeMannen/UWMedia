@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QSlider, QLabel, QFormLayout, 
-    QColorDialog, QPushButton, QSpinBox, QGroupBox, QComboBox
+    QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QFormLayout, 
+    QColorDialog, QPushButton, QSpinBox, QGroupBox, QComboBox, QLineEdit
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -35,17 +35,37 @@ class HUDControls(QWidget):
         ])
         self.anchor_combo.currentTextChanged.connect(self.on_anchor_changed)
 
+        # Opacity slider + text input layout
         self.opacity_slider = QSlider(Qt.Horizontal)
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(100)
         self.opacity_slider.valueChanged.connect(self.on_opacity_changed)
-        self.opacity_label = QLabel("1.00")
         
+        self.opacity_input = QLineEdit("1.00")
+        self.opacity_input.setFixedWidth(50)
+        self.opacity_input.editingFinished.connect(self.on_opacity_input_changed)
+        
+        self.opacity_container = QWidget()
+        opacity_hbox = QHBoxLayout(self.opacity_container)
+        opacity_hbox.setContentsMargins(0, 0, 0, 0)
+        opacity_hbox.addWidget(self.opacity_slider)
+        opacity_hbox.addWidget(self.opacity_input)
+        
+        # Scale slider + text input layout
         self.scale_slider = QSlider(Qt.Horizontal)
         self.scale_slider.setRange(1, 500) 
         self.scale_slider.setValue(100)
         self.scale_slider.valueChanged.connect(self.on_scale_changed)
-        self.scale_label = QLabel("1.00")
+        
+        self.scale_input = QLineEdit("1.00")
+        self.scale_input.setFixedWidth(50)
+        self.scale_input.editingFinished.connect(self.on_scale_input_changed)
+        
+        self.scale_container = QWidget()
+        scale_hbox = QHBoxLayout(self.scale_container)
+        scale_hbox.setContentsMargins(0, 0, 0, 0)
+        scale_hbox.addWidget(self.scale_slider)
+        scale_hbox.addWidget(self.scale_input)
         
         # Shape specific controls
         self.width_spin = QSpinBox()
@@ -64,12 +84,8 @@ class HUDControls(QWidget):
         self.shape_color_btn.clicked.connect(self.pick_shape_color)
 
         self.skin_layout.addRow("Layout Anchor:", self.anchor_combo)
-        self.skin_layout.addRow("Opacity:", self.opacity_slider)
-        self.skin_layout.addRow("", self.opacity_label)
-        
-        # We store these to toggle visibility by widget reference
-        self.skin_layout.addRow("Global Scale:", self.scale_slider)
-        self.skin_layout.addRow("", self.scale_label)
+        self.skin_layout.addRow("Opacity:", self.opacity_container)
+        self.skin_layout.addRow("Global Scale:", self.scale_container)
         
         self.skin_layout.addRow("Width:", self.width_spin)
         self.skin_layout.addRow("Height:", self.height_spin)
@@ -95,12 +111,18 @@ class HUDControls(QWidget):
         self.item_scale_slider.valueChanged.connect(self.on_item_scale_changed)
         self.item_scale_label = QLabel("1.00")
         
+        self.custom_text_edit = QLineEdit()
+        self.custom_text_edit.setPlaceholderText("Custom label text...")
+        self.custom_text_edit.textChanged.connect(self.on_custom_text_changed)
+        
         self.item_layout.addRow("Color:", self.color_btn)
         self.item_layout.addRow("Font Size (px):", self.font_spin)
         self.item_layout.addRow("Item Scale:", self.item_scale_slider)
         self.item_layout.addRow("", self.item_scale_label)
+        self.item_layout.addRow("Custom Text:", self.custom_text_edit)
         
         self.item_group.setEnabled(False)
+        self.item_layout.setRowVisible(self.custom_text_edit, False)
         self.layout.addWidget(self.item_group)
 
     def on_item_selected(self, item):
@@ -121,14 +143,24 @@ class HUDControls(QWidget):
             self.item_scale_label.setText(f"{item.scale():.2f}")
             self.item_scale_slider.blockSignals(False)
             
+            # Custom label text sync and visibility
+            is_custom = getattr(item, 'is_custom', False)
+            self.item_layout.setRowVisible(self.custom_text_edit, is_custom)
+            if is_custom:
+                self.custom_text_edit.blockSignals(True)
+                self.custom_text_edit.setText(getattr(item, 'custom_text', ''))
+                self.custom_text_edit.blockSignals(False)
+            
         elif isinstance(item, (HUDSkinItem, HUDShapeItem)):
             self.item_group.setEnabled(False)
             self.skin_group.setEnabled(True)
             self.sync_skin_controls(item)
+            self.item_layout.setRowVisible(self.custom_text_edit, False)
         else:
             self.item_group.setEnabled(False)
             # If nothing selected, enable skin group if a skin exists
             self.skin_group.setEnabled(self.hud_manager.skin_item is not None)
+            self.item_layout.setRowVisible(self.custom_text_edit, False)
 
     def sync_skin_controls(self, skin_item):
         from gui.hud_manager import HUDShapeItem
@@ -140,12 +172,14 @@ class HUDControls(QWidget):
 
         self.opacity_slider.blockSignals(True)
         self.opacity_slider.setValue(int(skin_item.opacity() * 100))
-        self.opacity_label.setText(f"{skin_item.opacity():.2f}")
         self.opacity_slider.blockSignals(False)
         
+        self.opacity_input.blockSignals(True)
+        self.opacity_input.setText(f"{skin_item.opacity():.2f}")
+        self.opacity_input.blockSignals(False)
+        
         # Toggle visibility using the actual widgets in those rows
-        self.skin_layout.setRowVisible(self.scale_slider, not is_shape)
-        self.skin_layout.setRowVisible(self.scale_label, not is_shape)
+        self.skin_layout.setRowVisible(self.scale_container, not is_shape)
         self.skin_layout.setRowVisible(self.width_spin, is_shape)
         self.skin_layout.setRowVisible(self.height_spin, is_shape)
         self.skin_layout.setRowVisible(self.radius_spin, is_shape)
@@ -166,8 +200,11 @@ class HUDControls(QWidget):
         else:
             self.scale_slider.blockSignals(True)
             self.scale_slider.setValue(int(skin_item.scale() * 100))
-            self.scale_label.setText(f"{skin_item.scale():.2f}")
             self.scale_slider.blockSignals(False)
+            
+            self.scale_input.blockSignals(True)
+            self.scale_input.setText(f"{skin_item.scale():.2f}")
+            self.scale_input.blockSignals(False)
 
     def on_anchor_changed(self, text):
         if self.hud_manager.skin_item:
@@ -177,13 +214,56 @@ class HUDControls(QWidget):
         opacity = value / 100.0
         if self.hud_manager.skin_item:
             self.hud_manager.skin_item.setOpacity(opacity)
-            self.opacity_label.setText(f"{opacity:.2f}")
+            self.opacity_input.blockSignals(True)
+            self.opacity_input.setText(f"{opacity:.2f}")
+            self.opacity_input.blockSignals(False)
 
     def on_scale_changed(self, value):
         scale = value / 100.0
         if self.hud_manager.skin_item:
             self.hud_manager.skin_item.setScale(scale)
-            self.scale_label.setText(f"{scale:.2f}")
+            self.scale_input.blockSignals(True)
+            self.scale_input.setText(f"{scale:.2f}")
+            self.scale_input.blockSignals(False)
+
+    def on_opacity_input_changed(self):
+        try:
+            opacity = float(self.opacity_input.text())
+            opacity = max(0.0, min(1.0, opacity))
+            self.opacity_slider.blockSignals(True)
+            self.opacity_slider.setValue(int(opacity * 100))
+            self.opacity_slider.blockSignals(False)
+            
+            if self.hud_manager.skin_item:
+                self.hud_manager.skin_item.setOpacity(opacity)
+            self.opacity_input.setText(f"{opacity:.2f}")
+        except ValueError:
+            if self.hud_manager.skin_item:
+                current = self.hud_manager.skin_item.opacity()
+                self.opacity_input.setText(f"{current:.2f}")
+
+    def on_scale_input_changed(self):
+        try:
+            scale = float(self.scale_input.text())
+            scale = max(0.01, min(5.0, scale))
+            self.scale_slider.blockSignals(True)
+            self.scale_slider.setValue(int(scale * 100))
+            self.scale_slider.blockSignals(False)
+            
+            if self.hud_manager.skin_item:
+                self.hud_manager.skin_item.setScale(scale)
+            self.scale_input.setText(f"{scale:.2f}")
+        except ValueError:
+            if self.hud_manager.skin_item:
+                current = self.hud_manager.skin_item.scale()
+                self.scale_input.setText(f"{current:.2f}")
+
+    def on_custom_text_changed(self, text):
+        from gui.hud_manager import TelemetryItem
+        if isinstance(self.selected_item, TelemetryItem) and getattr(self.selected_item, 'is_custom', False):
+            self.selected_item.custom_text = text
+            self.selected_item.field = f"custom:{text}"
+            self.selected_item.setPlainText(text)
 
     def on_shape_dim_changed(self):
         from gui.hud_manager import HUDShapeItem

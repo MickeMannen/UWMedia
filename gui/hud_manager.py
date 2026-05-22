@@ -44,6 +44,10 @@ class HUDManager(QObject):
 
     def align_selected_horizontally(self):
         """Aligns selected telemetry items to the bottom edge of the first selected item."""
+        self.align_selected("h_bottom")
+
+    def align_selected(self, mode: str):
+        """Aligns selected telemetry items based on the given mode."""
         try:
             items = [i for i in self.scene.selectedItems() if isinstance(i, TelemetryItem)]
         except RuntimeError:
@@ -51,17 +55,42 @@ class HUDManager(QObject):
             
         if len(items) < 2:
             return
-            
-        # Use the first item's bottom edge as the reference
-        first = items[0]
-        target_bottom = first.pos().y() + (first.boundingRect().height() * first.scale())
-        
-        for item in items[1:]:
-            # Adjust each item's Y so its bottom matches the target bottom
-            item_height = item.boundingRect().height() * item.scale()
-            item.setY(target_bottom - item_height)
-        
-        print(f"Aligned {len(items)} items horizontally (bottom-aligned).")
+
+        if mode == "h_top":
+            target_y = min(item.pos().y() for item in items)
+            for item in items:
+                item.setY(target_y)
+        elif mode == "h_bottom":
+            target_bottom = max(item.pos().y() + item.boundingRect().height() * item.scale() for item in items)
+            for item in items:
+                item_h = item.boundingRect().height() * item.scale()
+                item.setY(target_bottom - item_h)
+        elif mode == "h_center":
+            min_y = min(item.pos().y() for item in items)
+            max_bottom = max(item.pos().y() + item.boundingRect().height() * item.scale() for item in items)
+            center_y = (min_y + max_bottom) / 2.0
+            for item in items:
+                item_h = item.boundingRect().height() * item.scale()
+                item.setY(center_y - item_h / 2.0)
+        elif mode == "v_left":
+            target_x = min(item.pos().x() for item in items)
+            for item in items:
+                item.setX(target_x)
+        elif mode == "v_right":
+            target_right = max(item.pos().x() + item.boundingRect().width() * item.scale() for item in items)
+            for item in items:
+                item_w = item.boundingRect().width() * item.scale()
+                item.setX(target_right - item_w)
+        elif mode == "v_center":
+            min_x = min(item.pos().x() for item in items)
+            max_right = max(item.pos().x() + item.boundingRect().width() * item.scale() for item in items)
+            center_x = (min_x + max_right) / 2.0
+            for item in items:
+                item_w = item.boundingRect().width() * item.scale()
+                item.setX(center_x - item_w / 2.0)
+
+        print(f"Aligned {len(items)} items using mode: {mode}")
+
 
     def load_skin(self, pixmap_path: str, opacity: float = 1.0, scale: float = 1.0, x_pct: float = 0.0, y_pct: float = 0.0):
         if self.skin_item:
