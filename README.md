@@ -32,6 +32,8 @@ cd UWMedia
 pip install -r requirements.txt
 ```
 
+Alternative if 
+
 ## Usage
 
 ### Command Line Interface (CLI)
@@ -47,6 +49,9 @@ python main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --col
 
 # Generate telemetry video directly from a log file
 python main.py --render-log dive_log.fit --layout perdix_layout.json
+
+# Generate telemetry video directly from a log file, limiting to the first 100 waypoints (useful for testing)
+python main.py --render-log dive_log.fit 100 --layout perdix_layout.json
 ```
 
 #### Key Arguments:
@@ -54,7 +59,7 @@ python main.py --render-log dive_log.fit --layout perdix_layout.json
 - `--stabilize [low|mid|high]`: Apply stabilization. `high` is optimized for 4K.
 - `--logs <dir>`: Path to directory containing `.uddf` or `.fit` logs.
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
-- `--render-log <file>`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`).
+- `--render-log <file> [num_waypoints]`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`). You can optionally specify a second argument for the number of waypoints to render (e.g., `100`) to limit processing time during testing.
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
 

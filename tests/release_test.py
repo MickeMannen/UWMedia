@@ -4,6 +4,9 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
+
+from _pytest._py import path
+
 from parsers.garmin import GarminParser
 from parsers.uddf import UDDFParser
 from metadata.exif import MetadataHandler
@@ -105,15 +108,18 @@ class TestRelease:
         assert len(found) == 1
 
     def test_color_correction_photo(self):
-        src = TEST_DATA_DIR / "DSC03861.JPG"
-        cmd = [
-            "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
-            "--color", "--filename-format", "%Y%m%d_%H%M%S_test04_color"
-        ]
-        subprocess.run(cmd, check=True)
-        
+
+        i = 0
+        for file in TEST_DATA_DIR.glob("*.JPG"):
+            i += 1
+            cmd = [
+                "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
+                "--color", "--filename-format", "%Y%m%d_%H%M%S_test04_color"
+            ]
+            subprocess.run(cmd, check=True)
+
         found = list(OUTPUT_DIR.glob("*_test04_color.jpg"))
-        assert len(found) == 1
+        assert len(found) == i
 
     # 5. Color Correction with Overlay
     def test_overlay_video(self):
