@@ -2,6 +2,8 @@
 
 UWMedia is a comprehensive tool for processing underwater videos and photos. It bridges the gap between your dive computer and your camera by matching dive logs (UDDF/FIT) to your media files, applying advanced color correction, and overlaying real-time telemetry.
 
+Example (YouTube)
+
 ## Key Features
 
 - **Batch Processing**: Process entire directories of videos and photos in one command.
@@ -32,7 +34,7 @@ cd UWMedia
 pip install -r requirements.txt
 ```
 
-Alternative if 
+Alternative if you want to use a binary (pyinstaller) - download from releases, make sure to use the latest overlays or edit your own overlay with new gui_main
 
 ## Usage
 
@@ -63,6 +65,11 @@ python main.py --render-log dive_log.fit 100 --layout perdix_layout.json
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
 
+Color Correction:
+
+<img width="6192" height="4128" alt="before_small" src="https://github.com/user-attachments/assets/6eaf0890-834b-4400-a536-8e1c0785c552" />
+<img width="6192" height="4128" alt="after_small" src="https://github.com/user-attachments/assets/3bf2d8a3-e694-478e-ac11-c90236c95f07" />
+
 
 ### Graphical User Interface (GUI)
 
@@ -71,6 +78,11 @@ Launch the interactive HUD designer and preview tool:
 ```bash
 python gui_main.py
 ```
+
+HUD Example
+<img width="440" height="282" alt="vlcsnap-2026-05-22-21h12m24s234" src="https://github.com/user-attachments/assets/2bd926a2-2812-4ab9-b152-007a2f69c746" />
+<img width="366" height="302" alt="vlcsnap-2026-05-22-21h12m00s027" src="https://github.com/user-attachments/assets/d7437bbd-9042-4a97-a925-b7ad0bc6e910" />
+
 
 ## Technical Highlights
 
