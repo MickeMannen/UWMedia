@@ -2,6 +2,8 @@
 
 UWMedia is a comprehensive tool for processing underwater videos and photos. It bridges the gap between your dive computer and your camera by matching dive logs (UDDF/FIT) to your media files, applying advanced color correction, and overlaying real-time telemetry.
 
+This project is created using Gemini CLI and Antigravity CLI. 
+
 [Example (YouTube)](https://youtu.be/5EOqNcAbn4w)
 
 ## Key Features

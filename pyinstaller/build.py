@@ -54,7 +54,9 @@ def build_app(target, revision, os_name, arch):
     
     targets = {
         "cli": root_dir / "main.py",
-        "gui": root_dir / "gui_main.py"
+        "gui": root_dir / "gui_main.py",
+        "tag_editor": root_dir / "tag_editor_main.py",
+        "tag_editor_main": root_dir / "tag_editor_main.py"
     }
     
     if target not in targets:
@@ -62,7 +64,8 @@ def build_app(target, revision, os_name, arch):
         return
 
     entry_point = targets[target]
-    exe_name = f"uwmedia-{target}-{os_name}-{arch}"
+    exe_target_name = target.replace('_', '-')
+    exe_name = f"uwmedia-{exe_target_name}-{os_name}-{arch}"
     
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -78,10 +81,10 @@ def build_app(target, revision, os_name, arch):
     
     # OS specific flags
     if os_name.lower() == "darwin":
-        if target == "gui":
+        if target in ["gui", "tag_editor", "tag_editor_main"]:
             cmd.append("--windowed")
     elif os_name.lower() == "windows" or os_name.lower() == "win32":
-        if target == "gui":
+        if target in ["gui", "tag_editor", "tag_editor_main"]:
             cmd.append("--noconsole")
             
     # Add hidden imports if necessary (common with PySide6, Pydantic, and Pillow)
@@ -129,7 +132,7 @@ def get_default_arch():
 
 def main():
     parser = argparse.ArgumentParser(description="UWMedia PyInstaller Build Script")
-    parser.add_argument("--target", choices=["cli", "gui", "both"], default="both", help="Build target (default: both)")
+    parser.add_argument("--target", choices=["cli", "gui", "tag_editor", "tag_editor_main", "both", "all"], default="both", help="Build target (default: both)")
     parser.add_argument("--revision", help="Revision/Version string (e.g. 1.0.4). If omitted, increments patch version in main.py.")
     parser.add_argument("--os", default=get_default_os(), 
                         help="OS label for filename (e.g., windows, macos, linux)")
@@ -146,11 +149,16 @@ def main():
     update_revision(revision)
     
     # 2. Perform Builds
-    if args.target in ["cli", "both"]:
+    if args.target in ["cli", "both", "all"]:
         build_app("cli", revision, args.os, args.arch)
     
-    if args.target in ["gui", "both"]:
+    if args.target in ["gui", "both", "all"]:
         build_app("gui", revision, args.os, args.arch)
+
+    if args.target in ["tag_editor", "all"]:
+        build_app("tag_editor", revision, args.os, args.arch)
+    elif args.target == "tag_editor_main":
+        build_app("tag_editor_main", revision, args.os, args.arch)
 
 if __name__ == "__main__":
     main()
