@@ -26,6 +26,16 @@ class HUDControls(QWidget):
         self.skin_group = QGroupBox("1. Skin (Overall HUD)")
         self.skin_layout = QFormLayout(self.skin_group)
         
+        # Manufacturer & Model Selection
+        self.manufacturer_combo = QComboBox()
+        self.manufacturer_combo.addItems(["Shearwater", "Garmin", "Generic"])
+        self.manufacturer_combo.currentTextChanged.connect(self.on_manufacturer_changed)
+        
+        self.model_combo = QComboBox()
+        self.model_combo.currentTextChanged.connect(self.on_model_changed)
+        
+        self.update_model_options()
+
         # Anchor Selection
         self.anchor_combo = QComboBox()
         self.anchor_combo.addItems([
@@ -83,6 +93,8 @@ class HUDControls(QWidget):
         self.shape_color_btn = QPushButton("Select BG Color")
         self.shape_color_btn.clicked.connect(self.pick_shape_color)
 
+        self.skin_layout.addRow("Manufacturer:", self.manufacturer_combo)
+        self.skin_layout.addRow("Model:", self.model_combo)
         self.skin_layout.addRow("Layout Anchor:", self.anchor_combo)
         self.skin_layout.addRow("Opacity:", self.opacity_container)
         self.skin_layout.addRow("Global Scale:", self.scale_container)
@@ -165,6 +177,19 @@ class HUDControls(QWidget):
     def sync_skin_controls(self, skin_item):
         from gui.hud_manager import HUDShapeItem
         is_shape = isinstance(skin_item, HUDShapeItem)
+        
+        self.manufacturer_combo.blockSignals(True)
+        mfg = getattr(self.hud_manager, 'manufacturer', 'Shearwater')
+        if mfg in ["Shearwater", "Garmin", "Generic"]:
+            self.manufacturer_combo.setCurrentText(mfg)
+        self.manufacturer_combo.blockSignals(False)
+
+        self.update_model_options()
+
+        self.model_combo.blockSignals(True)
+        model = getattr(self.hud_manager, 'model', 'Perdix2')
+        self.model_combo.setCurrentText(model)
+        self.model_combo.blockSignals(False)
         
         self.anchor_combo.blockSignals(True)
         self.anchor_combo.setCurrentText(getattr(skin_item, 'anchor', 'TOP_LEFT'))
@@ -300,3 +325,34 @@ class HUDControls(QWidget):
             color = QColorDialog.getColor(self.selected_item.defaultTextColor(), self, "Choose Text Color")
             if color.isValid():
                 self.selected_item.set_color(color.name())
+
+    def update_model_options(self):
+        self.model_combo.blockSignals(True)
+        current_model = self.model_combo.currentText()
+        self.model_combo.clear()
+        
+        mfg = self.manufacturer_combo.currentText()
+        if mfg == "Garmin":
+            models = ["x50i"]
+        elif mfg == "Shearwater":
+            models = ["Perdix2", "Peregrine TX"]
+        else:
+            models = []
+            
+        self.model_combo.addItems(models)
+        self.model_combo.setEnabled(len(models) > 0)
+        
+        if current_model in models:
+            self.model_combo.setCurrentText(current_model)
+        else:
+            if models:
+                self.model_combo.setCurrentIndex(0)
+        self.model_combo.blockSignals(False)
+
+    def on_manufacturer_changed(self, text):
+        self.hud_manager.manufacturer = text
+        self.update_model_options()
+        self.hud_manager.model = self.model_combo.currentText() if self.model_combo.isEnabled() else ""
+
+    def on_model_changed(self, text):
+        self.hud_manager.model = text

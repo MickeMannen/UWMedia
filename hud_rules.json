@@ -1,0 +1,64 @@
+{
+  "Shearwater": {
+    "ndl": [
+      {"max": 10, "color": "#FF0000"},
+      {"min": 10, "max": 30, "color": "#FFFF00"},
+      {"min": 30, "color": "#FFFFFF"}
+    ],
+    "safety_stop": {
+      "text": "SAFETY STOP",
+      "color": "#FFFF00",
+      "trigger_max_depth": 10.0,
+      "min_depth": 3.0,
+      "max_depth": 6.0
+    },
+    "Perdix2": {
+      "tank_pressure": [
+        {"max": 60, "color": "#FF0000"},
+        {"max": 70, "color": "#FFA500"}
+      ]
+    },
+    "Peregrine TX": {
+      "tank_pressure": [
+        {"max": 60, "color": "#FF0000"},
+        {"max": 70, "color": "#FFA500"}
+      ]
+    }
+  },
+  "Garmin": {
+    "ndl": [
+      {"max": 10, "color": "#FF0000"},
+      {"min": 10, "max": 30, "color": "#FFFF00"},
+      {"min": 30, "color": "#FFFFFF"}
+    ],
+    "tank_pressure": [
+      {"max": 60, "color": "#FF0000"},
+      {"max": 70, "color": "#FFA500"}
+    ],
+    "safety_stop": {
+      "text": "SAFETY STOP",
+      "color": "#FFFF00",
+      "trigger_max_depth": 10.0,
+      "min_depth": 3.0,
+      "max_depth": 6.0
+    }
+  },
+  "default": {
+    "ndl": [
+      {"max": 10, "color": "#FF0000"},
+      {"min": 10, "max": 30, "color": "#FFFF00"},
+      {"min": 30, "color": "#FFFFFF"}
+    ],
+    "tank_pressure": [
+      {"max": 60, "color": "#FF0000"},
+      {"max": 70, "color": "#FFA500"}
+    ],
+    "safety_stop": {
+      "text": "SAFETY STOP",
+      "color": "#FFFF00",
+      "trigger_max_depth": 10.0,
+      "min_depth": 3.0,
+      "max_depth": 6.0
+    }
+  }
+}

@@ -208,8 +208,15 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
     for elem in linked_elements:
         field = elem.get("field", "")
         # Get formatted value (same logic)
-        if field.startswith("custom:"):
+        if field == "safety_stop":
+            from utils.hud_rules_engine import get_safety_stop_text
+            manufacturer = layout.get("manufacturer", "Shearwater")
+            model = layout.get("model", "Perdix2")
+            val = get_safety_stop_text(manufacturer, model, waypoint)
+            raw_val = None
+        elif field.startswith("custom:"):
             val = field.replace("custom:", "")
+            raw_val = None
         elif field.startswith("tank_pressure:"):
             tank_name = field.replace("tank_pressure:", "")
             tank_data = waypoint.tanks.get(tank_name)
@@ -224,6 +231,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
             raw_val = getattr(waypoint, field, None)
             val = format_telemetry_value(field, raw_val)
 
+        if val is None or str(val) == "":
+            continue
+
         # Positioning relative to skin
         rel_x = elem.get("rel_x", 0.0)
         rel_y = elem.get("rel_y", 0.0)
@@ -231,7 +241,12 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
         abs_x = int(skin_x + (rel_x * w_scaled))
         abs_y = int(skin_y + (rel_y * h_scaled))
         
-        color_hex = elem.get("color", "#FFFFFF").lstrip('#')
+        # Get dynamic color
+        from utils.hud_rules_engine import get_dynamic_color
+        manufacturer = layout.get("manufacturer", "Shearwater")
+        model = layout.get("model", "Perdix2")
+        default_color = elem.get("color", "#FFFFFF")
+        color_hex = get_dynamic_color(manufacturer, model, field, raw_val, default_color).lstrip('#')
         color_rgb = tuple(int(color_hex[i:i+2], 16) for i in (0, 2, 4))
 
         base_font_size = elem.get("font_size", 16)

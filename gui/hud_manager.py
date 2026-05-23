@@ -25,6 +25,8 @@ class HUDManager(QObject):
         self.view_height = view_height
         self.skin_item = None
         self.linked_elements = {} # item -> item
+        self.manufacturer = "Shearwater"
+        self.model = "Perdix2"
         
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
@@ -167,6 +169,8 @@ class HUDManager(QObject):
             self.scene.removeItem(item)
 
     def load_layout(self, layout_json: dict):
+        self.manufacturer = layout_json.get("manufacturer", "Shearwater")
+        self.model = layout_json.get("model", "Perdix2")
         hud_skin = layout_json.get("hud_skin")
         if not hud_skin:
             return
@@ -296,7 +300,13 @@ class HUDManager(QObject):
                 if getattr(item, 'is_custom', False): continue
                     
                 field = item.field
-                if field.startswith("tank_pressure:"):
+                if field == "safety_stop":
+                    from utils.hud_rules_engine import get_safety_stop_text
+                    mfg = getattr(self, 'manufacturer', 'Shearwater')
+                    model = getattr(self, 'model', 'Perdix2')
+                    val = get_safety_stop_text(mfg, model, waypoint)
+                    raw_val = None
+                elif field.startswith("tank_pressure:"):
                     tank_name = field.replace("tank_pressure:", "")
                     tank_data = waypoint.tanks.get(tank_name)
                     raw_val = tank_data.pressure_bar if tank_data else None
@@ -305,11 +315,19 @@ class HUDManager(QObject):
                     tank_name = field.replace("tank_name:", "")
                     tank_data = waypoint.tanks.get(tank_name)
                     val = tank_data.name if (tank_data and tank_data.name) else tank_name
+                    raw_val = None
                 else:
                     raw_val = getattr(waypoint, field, None)
                     val = format_telemetry_value(field, raw_val)
                 
                 item.update_value(val)
+                
+                # Dynamic threshold color evaluation
+                from utils.hud_rules_engine import get_dynamic_color
+                mfg = getattr(self, 'manufacturer', 'Shearwater')
+                model = getattr(self, 'model', 'Perdix2')
+                color = get_dynamic_color(mfg, model, field, raw_val, getattr(item, 'base_color', '#FFFFFF'))
+                item.setDefaultTextColor(QColor(color))
             except RuntimeError:
                 continue
 
@@ -330,7 +348,7 @@ class HUDManager(QObject):
                 "field": field_name,
                 "rel_x": item.pos().x() / rect.width(),
                 "rel_y": item.pos().y() / rect.height(),
-                "color": item.defaultTextColor().name(),
+                "color": getattr(item, 'base_color', item.defaultTextColor().name()),
                 "font_size": item.font().pixelSize(),
                 "scale": item.scale()
             })
@@ -404,6 +422,8 @@ class HUDManager(QObject):
             })
 
         return {
+            "manufacturer": self.manufacturer,
+            "model": self.model,
             "hud_skin": skin_data,
             "design_width": self.view_width,
             "design_height": self.view_height
@@ -451,6 +471,7 @@ class TelemetryItem(QGraphicsTextItem):
     def __init__(self, field, parent=None):
         super().__init__(parent)
         self.field = field
+        self.base_color = "#FFFFFF"
         self.setFlags(
             QGraphicsItem.ItemIsMovable | 
             QGraphicsItem.ItemIsSelectable | 
@@ -471,6 +492,7 @@ class TelemetryItem(QGraphicsTextItem):
         self.document().setDocumentMargin(0)
 
     def set_color(self, hex_color):
+        self.base_color = hex_color
         self.setDefaultTextColor(QColor(hex_color))
 
     def set_font_size(self, size):

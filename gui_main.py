@@ -308,6 +308,7 @@ class HUDDesignerWindow(QMainWindow):
         standard_fields = list(Waypoint.model_fields.keys())
         standard_fields.append("primary_tank_pressure")
         standard_fields.append("gasmix")
+        standard_fields.append("safety_stop")
         
         for f in sorted(standard_fields):
             if f == "tanks": continue # Don't add raw dict
