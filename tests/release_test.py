@@ -16,6 +16,7 @@ BASE_DIR = Path(__file__).parent.parent
 TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
 FIT_DIR = TEST_DATA_DIR / "fit"
 UDDF_DIR = TEST_DATA_DIR / "uddf"
+SSRF_DIR = TEST_DATA_DIR / "ssrf"
 OUTPUT_DIR = TEST_DATA_DIR / "output"
 COMPUTERS_DIR = BASE_DIR / "computers"
 
@@ -189,3 +190,17 @@ class TestRelease:
         ]
         subprocess.run(cmd, check=True)
         assert output_file.exists()
+
+    def test_11_overlay_photo(self):
+        src = TEST_DATA_DIR / "DSC06422.JPG"
+        layout = COMPUTERS_DIR / "generic_depth_temp.zip"
+        logs = SSRF_DIR
+        cmd = [
+            "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+            "--color", "--layout", str(layout), "--logs", str(logs),
+            "--filename-format", "%Y%m%d_%H%M%S_test11_overlay_generic"
+        ]
+        subprocess.run(cmd, check=True)
+
+        target = list(OUTPUT_DIR.glob("*_test11_overlay_generic.jpg"))[0]
+        assert target.exists()

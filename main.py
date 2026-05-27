@@ -1,4 +1,4 @@
-REVISION = "0.0.9"
+REVISION = "0.0.10"
 import multiprocessing
 from cli_main import main
 

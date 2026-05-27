@@ -1,4 +1,4 @@
-from garmin_fit_sdk import Decoder, Stream
+from garmin_fit_sdk import Decoder, Stream, Encoder
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict
 from pathlib import Path
@@ -280,3 +280,24 @@ class GarminParser(BaseParser):
         )
         
         return [dive]
+
+    def adjust_time(self, filename: Path, target:Path) -> bool:
+
+        # Create a stream to write to a file
+        stream = Stream.from_file(str(target))
+        encoder = Encoder(stream)
+
+        # 1. Write the File Header
+        # encoder.write_file_header()
+
+        # 2. Define and write messages (e.g., File Id, Records)
+        file_id_message = {
+            'type': 'file_id',
+            'product': 1,
+            'serial_number': 12345,
+            'time_created': 1000000000  # FIT Epoch time
+        }
+        encoder.write_mesg(file_id_message)
+
+        # 3. Finalize the file (calculates CRC and updates header)
+        encoder.close()

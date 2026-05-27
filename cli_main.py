@@ -10,6 +10,7 @@ import zipfile
 from tqdm import tqdm
 from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
+from parsers.subsurface import SubsurfaceParser
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint, Dive
 from models.manager import DiveManager
@@ -80,6 +81,15 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     elif suffix == ".fit":
         parser = GarminParser()
         dives = parser.parse(log_path)
+    elif suffix in (".ssrf", ".xml"):
+        parser = SubsurfaceParser()
+        dives = parser.parse(log_path)
+        if args.tz_adjust:
+            for d in dives:
+                d.start_time += timedelta(hours=args.tz_adjust)
+                d.end_time += timedelta(hours=args.tz_adjust)
+                for wp in d.waypoints:
+                    wp.timestamp += timedelta(hours=args.tz_adjust)
     else:
         print(f"Error: Unsupported log format {suffix}")
         sys.exit(1)
@@ -650,6 +660,7 @@ def main():
     if args.logs:
         shearwater = UDDFParser()
         garmin = GarminParser()
+        subsurface = SubsurfaceParser()
 
         if not args.logs.is_dir():
             print(f"Error: Log directory {args.logs} not found.")
@@ -685,6 +696,15 @@ def main():
             elif path.suffix == ".fit":
                 found_garmin = True
                 manager.add_dives(garmin.parse(path))
+            elif path.suffix in (".ssrf", ".xml"):
+                dives = subsurface.parse(path)
+                if args.tz_adjust:
+                    for d in dives:
+                        d.start_time += timedelta(hours=args.tz_adjust)
+                        d.end_time += timedelta(hours=args.tz_adjust)
+                        for wp in d.waypoints:
+                            wp.timestamp += timedelta(hours=args.tz_adjust)
+                manager.add_dives(dives)
 
     # Warning for Garmin logs without config
     from utils.config import get_config

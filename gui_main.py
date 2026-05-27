@@ -21,6 +21,7 @@ from gui.hud_controls import HUDControls
 from models.manager import DiveManager
 from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
+from parsers.subsurface import SubsurfaceParser
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 
@@ -418,6 +419,7 @@ class HUDDesignerWindow(QMainWindow):
         p_dir = Path(dir_path)
         uddf = UDDFParser()
         garmin = GarminParser()
+        subsurface = SubsurfaceParser()
         
         count = 0
         if not p_dir.exists():
@@ -430,6 +432,9 @@ class HUDDesignerWindow(QMainWindow):
                 count += 1
             elif path.suffix == ".fit":
                 self.dive_manager.add_dives(garmin.parse(path))
+                count += 1
+            elif path.suffix in (".ssrf", ".xml"):
+                self.dive_manager.add_dives(subsurface.parse(path))
                 count += 1
         
         self.last_log_dir = str(dir_path)
