@@ -105,8 +105,9 @@ class TestRelease:
         subprocess.run(cmd, check=True)
         
         # Verify file exists in output
-        found = list(OUTPUT_DIR.glob("*_test04_color.mp4"))
+        found = list(OUTPUT_DIR.glob("*_test05_color.mp4"))
         assert len(found) == 1
+
 
     def test_06_color_correction_photo(self):
 
@@ -119,7 +120,7 @@ class TestRelease:
             ]
             subprocess.run(cmd, check=True)
 
-        found = list(OUTPUT_DIR.glob("*_test04_color.jpg"))
+        found = list(OUTPUT_DIR.glob("*_test06_color_*.jpg"))
         assert len(found) == i
 
     # 5. Color Correction with Overlay
@@ -159,7 +160,7 @@ class TestRelease:
         ]
         subprocess.run(cmd, check=True)
         
-        target = list(OUTPUT_DIR.glob("*_test05_overlay_generic.jpg"))[0]
+        target = list(OUTPUT_DIR.glob("*_test08_overlay_generic_*.jpg"))[0]
         assert target.exists()
 
     # 6. Standalone Log Rendering
@@ -202,5 +203,5 @@ class TestRelease:
         ]
         subprocess.run(cmd, check=True)
 
-        target = list(OUTPUT_DIR.glob("*_test11_overlay_generic.jpg"))[0]
+        target = list(OUTPUT_DIR.glob("*_test11_overlay_generic_*.jpg"))[0]
         assert target.exists()

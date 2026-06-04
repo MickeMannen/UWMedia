@@ -405,8 +405,8 @@ class FfmpegClass:
         full_args.extend([str(output_path)])
 
         print(f"Executing FFmpeg with {self.get_encoder()}...")
-        if self.debug:
-            print(full_args)
+        # if self.debug:
+        #     print(full_args)
         try:
             self.run_command(full_args, duration=float(clip_duration))
         finally:

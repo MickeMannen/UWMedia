@@ -267,7 +267,7 @@ class MetadataHandler:
         if not meta:
             raise ValueError("Could not extract metadata")
         
-        # 1. Try common video tags
+        # 1. Try common video/photo tags
         creation_str = meta.get("QuickTime:CreationDate") or meta.get("CreationDate") or \
                        meta.get("EXIF:DateTimeOriginal") or meta.get("DateTimeOriginal") or \
                        meta.get("EXIF:CreateDate")
@@ -276,7 +276,26 @@ class MetadataHandler:
             try:
                 creation_str = str(creation_str)
                 # Handle formats like '2023:10:27 12:34:56' or with offset
-                return datetime.strptime(creation_str[:19], "%Y:%m:%d %H:%M:%S")
+                dt = datetime.strptime(creation_str[:19], "%Y:%m:%d %H:%M:%S")
+                
+                # Check for subseconds in the datetime string or separate tag
+                match = re.search(r'\.(\d+)', creation_str)
+                subsec_str = None
+                if match:
+                    subsec_str = match.group(1)
+                else:
+                    subsec_val = meta.get("EXIF:SubSecTimeOriginal") or meta.get("SubSecTimeOriginal") or \
+                                 meta.get("EXIF:SubSecTimeDigitized") or meta.get("SubSecTimeDigitized") or \
+                                 meta.get("EXIF:SubSecTime") or meta.get("SubSecTime")
+                    if subsec_val is not None:
+                        subsec_str = str(subsec_val)
+                
+                if subsec_str:
+                    subsec_str = "".join(c for c in subsec_str if c.isdigit())
+                    if subsec_str:
+                        microsecond = int(float("0." + subsec_str) * 1_000_000)
+                        dt = dt.replace(microsecond=microsecond)
+                return dt
             except:
                 pass
 

@@ -372,8 +372,22 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 filename = source.stem + source.suffix.lower()
         else:
             filename = source.stem + source.suffix.lower()
+
+    # Add milliseconds to photo filenames (limit to 2 digits)
+    is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
+    if not is_video:
+        ms = creation_date.microsecond // 10000
+        p = Path(filename)
+        filename = f"{p.stem}_{ms:02d}{p.suffix}"
     
     target_path = output_dir / filename
+
+    # Check no-overwrite option (only when running --color or --layout)
+    if (args.color or args.layout) and args.no_overwrite:
+        if target_path.exists():
+            print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
+            return
+
     target_path = get_unique_path(target_path)
     
     print(f"Output path: {target_path}")
@@ -508,6 +522,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     except Exception as e:
         print(f"Warning: Failed to copy metadata: {e}")
 
+    # Move original source file if requested (only when running --color or --layout)
+    if (args.color or args.layout) and args.move_original:
+        dest_dir = Path(args.move_original)
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_dir / source.name
+            dest_path = get_unique_path(dest_path)
+            print(f"Moving original file to: {dest_path}")
+            shutil.move(str(source), str(dest_path))
+        except Exception as e:
+            print(f"Error moving original file {source} to {dest_dir}: {e}")
+
 class UWMediaParser(argparse.ArgumentParser):
     def error(self, message):
         print(f"Error: {message}")
@@ -542,6 +568,8 @@ def main():
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
+    parser.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
+    parser.add_argument("--move-original", type=Path, help="Directory to move original source file to after successful processing (only when running --color or --layout)")
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
 

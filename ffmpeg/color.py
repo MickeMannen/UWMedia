@@ -335,7 +335,7 @@ class ColorCorrectionEngine:
                 else:
                     print(f"Warning: Could not pre-load HUD skin from {skin_path}")
 
-        print(cmd)
+        # print(cmd)
         process = sp.Popen(cmd, stdin=sp.PIPE)
 
         # Time range parsing

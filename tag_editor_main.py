@@ -1,17 +1,21 @@
 import sys
 import os
+import re
 from pathlib import Path
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QListWidget, QListWidgetItem, QLineEdit, QLabel,
-    QFormLayout, QFileDialog, QMessageBox, QGroupBox, QFrame
+    QFormLayout, QFileDialog, QMessageBox, QGroupBox, QFrame,
+    QProgressDialog
 )
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QColor, QPalette, QIcon
 
 from metadata.exif import MetadataHandler
+
 
 # Tags to manage with metadata guidance
 TAG_GUIDE = [
@@ -92,6 +96,12 @@ class TagEditorApp(QMainWindow):
         self.file_name_label = QLabel("None")
         self.file_name_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         info_layout.addWidget(self.file_name_label)
+        
+        self.dji_label = QLabel("DJI sets datetaken correct. Values calculated using OriginalFilePath.")
+        self.dji_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 13px; margin-top: 5px;")
+        self.dji_label.setVisible(False)
+        info_layout.addWidget(self.dji_label)
+        
         self.right_layout.addWidget(info_group)
 
         # 2. Tags Group
@@ -134,6 +144,11 @@ class TagEditorApp(QMainWindow):
         self.btn_cancel.setFixedHeight(40)
         self.btn_cancel.clicked.connect(self.revert_changes)
         
+        self.btn_update_all = QPushButton("Update All")
+        self.btn_update_all.setFixedHeight(40)
+        self.btn_update_all.setStyleSheet("background-color: #1565C0; color: white; font-weight: bold;")
+        self.btn_update_all.clicked.connect(self.update_all)
+        
         self.btn_update = QPushButton("Write to File")
         self.btn_update.setFixedHeight(40)
         self.btn_update.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold;")
@@ -141,6 +156,7 @@ class TagEditorApp(QMainWindow):
         
         self.button_layout.addStretch()
         self.button_layout.addWidget(self.btn_cancel)
+        self.button_layout.addWidget(self.btn_update_all)
         self.button_layout.addWidget(self.btn_update)
         self.right_layout.addLayout(self.button_layout)
         
@@ -213,17 +229,77 @@ class TagEditorApp(QMainWindow):
         self.current_file = file_path
         self.file_name_label.setText(file_path.name)
         
-        # Load Tags
-        self.current_tags = self.meta_handler.get_tags(file_path, TARGET_TAGS)
-        for tag, value in self.current_tags.items():
-            self.tag_inputs[tag].setText(value)
+        # Load Tags (include OriginalFilePath to detect DJI and extract local time)
+        tags_to_get = TARGET_TAGS + ["QuickTime:OriginalFilePath"]
+        self.current_tags = self.meta_handler.get_tags(file_path, tags_to_get)
+        
+        calculated_tags = self.calculate_dji_datetimes(file_path, self.current_tags)
+        if calculated_tags:
+            self.dji_label.setText("DJI sets datetaken correct. Values calculated using OriginalFilePath.")
+            self.dji_label.setVisible(True)
+            for tag in TARGET_TAGS:
+                self.tag_inputs[tag].setText(calculated_tags[tag])
+        else:
+            self.dji_label.setVisible(False)
+            for tag in TARGET_TAGS:
+                self.tag_inputs[tag].setText(self.current_tags.get(tag, ""))
+
+    def calculate_dji_datetimes(self, file_path: Path, current_tags: Dict[str, str]) -> Optional[Dict[str, str]]:
+        dji_pattern = re.compile(r'DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})', re.IGNORECASE)
+        original_fp = current_tags.get("QuickTime:OriginalFilePath") or ""
+        match = dji_pattern.search(str(original_fp))
+        if not match:
+            match = dji_pattern.search(file_path.name)
+            
+        if not match:
+            return None
+            
+        # Parse local datetime from DJI filename
+        year, month, day, hour, minute, second = match.groups()
+        try:
+            local_dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+        except ValueError:
+            return None
+            
+        # Get UTC time from CreateDate
+        utc_str = current_tags.get("QuickTime:CreateDate") or current_tags.get("CreateDate")
+        if not utc_str:
+            return None
+            
+        utc_dt = None
+        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                utc_dt = datetime.strptime(str(utc_str)[:19], fmt)
+                break
+            except ValueError:
+                continue
+                
+        if not utc_dt:
+            return None
+            
+        # Calculate timezone offset in minutes
+        diff_seconds = (local_dt - utc_dt).total_seconds()
+        offset_mins = round(diff_seconds / 60 / 15) * 15
+        
+        sign = "+" if offset_mins >= 0 else "-"
+        hours = abs(offset_mins) // 60
+        mins = abs(offset_mins) % 60
+        tz_offset_str = f"{sign}{hours:02}:{mins:02}"
+        
+        # Format correct datetimes
+        local_str = local_dt.strftime("%Y:%m:%d %H:%M:%S")
+        calculated = {
+            "QuickTime:CreationDate": local_str + tz_offset_str,
+            "QuickTime:CreateDate": utc_dt.strftime("%Y:%m:%d %H:%M:%S"),
+            "EXIF:DateTimeOriginal": local_str,
+            "EXIF:CreateDate": local_str
+        }
+        return calculated
 
     def revert_changes(self):
         if not self.current_file:
             return
-        # Just reload from current_tags
-        for tag, value in self.current_tags.items():
-            self.tag_inputs[tag].setText(value)
+        self.on_file_selected(self.file_list.currentRow())
 
     def update_tags(self):
         if not self.current_file:
@@ -232,7 +308,7 @@ class TagEditorApp(QMainWindow):
         updates = {}
         for tag, edit in self.tag_inputs.items():
             new_val = edit.text().strip()
-            if new_val != self.current_tags.get(tag):
+            if new_val != self.current_tags.get(tag, ""):
                 updates[tag] = new_val
                 
         if not updates:
@@ -242,12 +318,83 @@ class TagEditorApp(QMainWindow):
         try:
             self.meta_handler.set_tags(self.current_file, updates)
             # Confirm by reloading
-            self.current_tags = self.meta_handler.get_tags(self.current_file, TARGET_TAGS)
-            for tag, value in self.current_tags.items():
-                self.tag_inputs[tag].setText(value)
+            self.on_file_selected(self.file_list.currentRow())
             QMessageBox.information(self, "Success", f"Updated {len(updates)} tags successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to update tags: {e}")
+
+    def update_all(self):
+        count = self.file_list.count()
+        if count == 0:
+            QMessageBox.information(self, "No Files", "No files in the list to update.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Update All",
+            f"Are you sure you want to scan all {count} files and automatically update DJI videos with corrected datetimes?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.No:
+            return
+
+        progress = QProgressDialog("Updating files...", "Cancel", 0, count, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+
+        updated_count = 0
+        error_count = 0
+
+        for i in range(count):
+            if progress.wasCanceled():
+                break
+
+            item = self.file_list.item(i)
+            file_path = Path(item.data(Qt.UserRole))
+
+            progress.setLabelText(f"Processing {file_path.name}...")
+            progress.setValue(i)
+            QApplication.processEvents()
+
+            try:
+                tags_to_get = TARGET_TAGS + ["QuickTime:OriginalFilePath"]
+                current_tags = self.meta_handler.get_tags(file_path, tags_to_get)
+
+                calculated_tags = self.calculate_dji_datetimes(file_path, current_tags)
+                if calculated_tags:
+                    updates = {}
+                    for tag in TARGET_TAGS:
+                        new_val = calculated_tags[tag]
+                        curr_val = current_tags.get(tag, "")
+                        if new_val != curr_val:
+                            updates[tag] = new_val
+
+                    if updates:
+                        self.meta_handler.set_tags(file_path, updates)
+                        updated_count += 1
+            except Exception as e:
+                error_count += 1
+                print(f"Error updating {file_path.name}: {e}")
+
+        progress.setValue(count)
+
+        if self.current_file:
+            self.on_file_selected(self.file_list.currentRow())
+
+        if error_count > 0:
+            QMessageBox.warning(
+                self,
+                "Finished with Errors",
+                f"Successfully updated {updated_count} files.\nFailed to update {error_count} files."
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Successfully updated {updated_count} files."
+            )
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

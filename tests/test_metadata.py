@@ -48,3 +48,84 @@ class TestMetadata:
         except Exception as e:
             print(f"ERROR: {file.name} -> {e}")
 
+    def test_dji_timezone_calculation(self):
+        from tag_editor_main import TagEditorApp
+        from PySide6.QtWidgets import QApplication
+        import sys
+        
+        # We need a QApplication instance to create/test PySide6 widgets
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
+            
+        editor = TagEditorApp()
+        
+        # Test case: mock tags
+        file_path = Path("DJI_20260502110658_0002_D_A001.MP4")
+        mock_tags = {
+            "QuickTime:OriginalFilePath": "/mnt/media_rw/sd/DCIM/DJI_001/DJI_20260502100659_0002_D_A001.MP4",
+            "QuickTime:CreateDate": "2026:05:02 03:06:59",
+            "CreateDate": "2026:05:02 03:06:59"
+        }
+        
+        calculated = editor.calculate_dji_datetimes(file_path, mock_tags)
+        assert calculated is not None
+        assert calculated["QuickTime:CreationDate"] == "2026:05:02 10:06:59+07:00"
+        assert calculated["QuickTime:CreateDate"] == "2026:05:02 03:06:59"
+        assert calculated["EXIF:DateTimeOriginal"] == "2026:05:02 10:06:59"
+        assert calculated["EXIF:CreateDate"] == "2026:05:02 10:06:59"
+
+    def test_cli_no_overwrite_and_move_original(self, tmp_path):
+        import subprocess
+        import shutil
+        
+        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        
+        # 1. Setup temp source and output dirs
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        move_dir = tmp_path / "move"
+        move_dir.mkdir()
+        
+        temp_src = src_dir / "DSC03491.JPG"
+        shutil.copy2(src_photo, temp_src)
+        
+        # 2. Run first time: should process and output the file with milliseconds
+        expected_output = out_dir / "20251203_091548_98.jpg"
+        
+        cmd = [
+            "python3", "cli_main.py", str(temp_src), str(out_dir),
+            "--color", "--filename-format", "%Y%m%d_%H%M%S"
+        ]
+        subprocess.run(cmd, check=True)
+        assert expected_output.exists()
+        
+        # Modify the output file content slightly so we can detect if it got overwritten
+        with open(expected_output, "w") as f:
+            f.write("mock_content")
+            
+        # 3. Run second time with --no-overwrite: should skip because target exists
+        cmd_no_overwrite = cmd + ["--no-overwrite"]
+        subprocess.run(cmd_no_overwrite, check=True)
+        
+        # Verify it skipped (the file should still have our mocked content instead of being overwritten with a real image)
+        with open(expected_output, "r") as f:
+            content = f.read()
+        assert content == "mock_content"
+        
+        # 4. Run third time with --move-original: should process (if we delete the output file or use a different output name)
+        # and then move the original file to move_dir
+        expected_output.unlink() # delete the target so it processes
+        
+        cmd_move = cmd + ["--move-original", str(move_dir)]
+        subprocess.run(cmd_move, check=True)
+        
+        # Verify the original source has been moved to move_dir
+        expected_moved_src = move_dir / "DSC03491.JPG"
+        assert expected_moved_src.exists()
+        assert not temp_src.exists()
+
+
+
