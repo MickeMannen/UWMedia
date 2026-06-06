@@ -126,19 +126,44 @@ class HUDControls(QWidget):
         self.custom_text_edit = QLineEdit()
         self.custom_text_edit.setPlaceholderText("Custom label text...")
         self.custom_text_edit.textChanged.connect(self.on_custom_text_changed)
+
+        self.item_width_spin = QSpinBox()
+        self.item_width_spin.setRange(10, 2000)
+        self.item_width_spin.valueChanged.connect(self.on_item_dim_changed)
+        
+        self.item_height_spin = QSpinBox()
+        self.item_height_spin.setRange(10, 2000)
+        self.item_height_spin.valueChanged.connect(self.on_item_dim_changed)
+        
+        self.item_marker_combo = QComboBox()
+        self.item_marker_combo.addItems(["Highlight Dot", "Cross", "Bold Cross"])
+        self.item_marker_combo.currentTextChanged.connect(self.on_marker_style_changed)
+        
+        self.item_marker_size_spin = QSpinBox()
+        self.item_marker_size_spin.setRange(1, 50)
+        self.item_marker_size_spin.setValue(6)
+        self.item_marker_size_spin.valueChanged.connect(self.on_marker_size_changed)
         
         self.item_layout.addRow("Color:", self.color_btn)
         self.item_layout.addRow("Font Size (px):", self.font_spin)
         self.item_layout.addRow("Item Scale:", self.item_scale_slider)
         self.item_layout.addRow("", self.item_scale_label)
         self.item_layout.addRow("Custom Text:", self.custom_text_edit)
+        self.item_layout.addRow("Width:", self.item_width_spin)
+        self.item_layout.addRow("Height:", self.item_height_spin)
+        self.item_layout.addRow("Marker Style:", self.item_marker_combo)
+        self.item_layout.addRow("Marker Size:", self.item_marker_size_spin)
         
         self.item_group.setEnabled(False)
         self.item_layout.setRowVisible(self.custom_text_edit, False)
+        self.item_layout.setRowVisible(self.item_width_spin, False)
+        self.item_layout.setRowVisible(self.item_height_spin, False)
+        self.item_layout.setRowVisible(self.item_marker_combo, False)
+        self.item_layout.setRowVisible(self.item_marker_size_spin, False)
         self.layout.addWidget(self.item_group)
 
     def on_item_selected(self, item):
-        from gui.hud_manager import TelemetryItem, HUDSkinItem, HUDShapeItem
+        from gui.hud_manager import TelemetryItem, HUDSkinItem, HUDShapeItem, HUDGraphItem
         self.selected_item = item
         
         if isinstance(item, TelemetryItem):
@@ -157,22 +182,72 @@ class HUDControls(QWidget):
             
             # Custom label text sync and visibility
             is_custom = getattr(item, 'is_custom', False)
+            self.item_layout.setRowVisible(self.color_btn, True)
+            self.item_layout.setRowVisible(self.font_spin, True)
+            self.item_layout.setRowVisible(self.item_scale_slider, True)
+            self.item_layout.setRowVisible(self.item_scale_label, True)
             self.item_layout.setRowVisible(self.custom_text_edit, is_custom)
+            self.item_layout.setRowVisible(self.item_width_spin, False)
+            self.item_layout.setRowVisible(self.item_height_spin, False)
+            self.item_layout.setRowVisible(self.item_marker_combo, False)
+            self.item_layout.setRowVisible(self.item_marker_size_spin, False)
+            
             if is_custom:
                 self.custom_text_edit.blockSignals(True)
                 self.custom_text_edit.setText(getattr(item, 'custom_text', ''))
                 self.custom_text_edit.blockSignals(False)
+            
+        elif isinstance(item, HUDGraphItem):
+            self.item_group.setEnabled(True)
+            self.skin_group.setEnabled(False)
+            
+            # Sync values
+            self.item_width_spin.blockSignals(True)
+            self.item_width_spin.setValue(item.width)
+            self.item_width_spin.blockSignals(False)
+            
+            self.item_height_spin.blockSignals(True)
+            self.item_height_spin.setValue(item.height)
+            self.item_height_spin.blockSignals(False)
+            
+            self.item_marker_combo.blockSignals(True)
+            style_map = {"dot": "Highlight Dot", "cross": "Cross", "bold_cross": "Bold Cross"}
+            marker_val = getattr(item, 'marker_style', 'dot')
+            self.item_marker_combo.setCurrentText(style_map.get(marker_val, "Highlight Dot"))
+            self.item_marker_combo.blockSignals(False)
+
+            self.item_marker_size_spin.blockSignals(True)
+            self.item_marker_size_spin.setValue(getattr(item, 'marker_size', 6))
+            self.item_marker_size_spin.blockSignals(False)
+            
+            self.item_layout.setRowVisible(self.color_btn, True)
+            self.item_layout.setRowVisible(self.font_spin, False)
+            self.item_layout.setRowVisible(self.item_scale_slider, False)
+            self.item_layout.setRowVisible(self.item_scale_label, False)
+            self.item_layout.setRowVisible(self.custom_text_edit, False)
+            self.item_layout.setRowVisible(self.item_width_spin, True)
+            self.item_layout.setRowVisible(self.item_height_spin, True)
+            self.item_layout.setRowVisible(self.item_marker_combo, True)
+            self.item_layout.setRowVisible(self.item_marker_size_spin, True)
             
         elif isinstance(item, (HUDSkinItem, HUDShapeItem)):
             self.item_group.setEnabled(False)
             self.skin_group.setEnabled(True)
             self.sync_skin_controls(item)
             self.item_layout.setRowVisible(self.custom_text_edit, False)
+            self.item_layout.setRowVisible(self.item_width_spin, False)
+            self.item_layout.setRowVisible(self.item_height_spin, False)
+            self.item_layout.setRowVisible(self.item_marker_combo, False)
+            self.item_layout.setRowVisible(self.item_marker_size_spin, False)
         else:
             self.item_group.setEnabled(False)
             # If nothing selected, enable skin group if a skin exists
             self.skin_group.setEnabled(self.hud_manager.skin_item is not None)
             self.item_layout.setRowVisible(self.custom_text_edit, False)
+            self.item_layout.setRowVisible(self.item_width_spin, False)
+            self.item_layout.setRowVisible(self.item_height_spin, False)
+            self.item_layout.setRowVisible(self.item_marker_combo, False)
+            self.item_layout.setRowVisible(self.item_marker_size_spin, False)
 
     def sync_skin_controls(self, skin_item):
         from gui.hud_manager import HUDShapeItem
@@ -298,6 +373,22 @@ class HUDControls(QWidget):
             self.hud_manager.skin_item.corner_radius = self.radius_spin.value()
             self.hud_manager.skin_item.update_path()
 
+    def on_item_dim_changed(self):
+        from gui.hud_manager import HUDGraphItem
+        if isinstance(self.selected_item, HUDGraphItem):
+            self.selected_item.set_dimensions(self.item_width_spin.value(), self.item_height_spin.value())
+
+    def on_marker_style_changed(self, text):
+        from gui.hud_manager import HUDGraphItem
+        if isinstance(self.selected_item, HUDGraphItem):
+            style_map = {"Highlight Dot": "dot", "Cross": "cross", "Bold Cross": "bold_cross"}
+            self.selected_item.set_marker_style(style_map.get(text, "dot"))
+
+    def on_marker_size_changed(self, value):
+        from gui.hud_manager import HUDGraphItem
+        if isinstance(self.selected_item, HUDGraphItem):
+            self.selected_item.set_marker_size(value)
+
     def pick_shape_color(self):
         from gui.hud_manager import HUDShapeItem
         if not isinstance(self.hud_manager.skin_item, HUDShapeItem): return
@@ -320,9 +411,14 @@ class HUDControls(QWidget):
             self.item_scale_label.setText(f"{scale:.2f}")
 
     def pick_color(self):
-        from gui.hud_manager import TelemetryItem
+        from gui.hud_manager import TelemetryItem, HUDGraphItem
         if isinstance(self.selected_item, TelemetryItem):
             color = QColorDialog.getColor(self.selected_item.defaultTextColor(), self, "Choose Text Color")
+            if color.isValid():
+                self.selected_item.set_color(color.name())
+        elif isinstance(self.selected_item, HUDGraphItem):
+            current_color = QColor(self.selected_item.color_hex)
+            color = QColorDialog.getColor(current_color, self, "Choose Graph Color")
             if color.isValid():
                 self.selected_item.set_color(color.name())
 

@@ -75,7 +75,7 @@ def draw_rounded_rect(img, pt1, pt2, color, thickness, r, d):
         cv2.rectangle(img, (x1 + r, y1), (x2 - r, y2), color, thickness)
         cv2.rectangle(img, (x1, y1 + r), (x2, y2 - r), color, thickness)
 
-def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False):
+def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False, waypoints=None):
     """
     Complete HUD rendering logic used by both CLI and GUI Review.
     Now using Corner-to-Corner Layout Anchor System.
@@ -187,9 +187,101 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False):
         'res_scale': res_scale, 'user_scale': user_scale if skin_type == "image" else 1.0,
         'render_log': render_log
     }
-    draw_telemetry_on_frame(frame, layout, waypoint, skin_info)
+    draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=waypoints)
 
-def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
+def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
+    skin_x = skin_info['x']
+    skin_y = skin_info['y']
+    w_scaled = skin_info['w']
+    h_scaled = skin_info['h']
+    res_scale = skin_info['res_scale']
+    
+    rel_x = elem.get("rel_x", 0.0)
+    rel_y = elem.get("rel_y", 0.0)
+    
+    graph_w = int(elem.get("width", 300) * res_scale)
+    graph_h = int(elem.get("height", 150) * res_scale)
+    
+    abs_x = int(skin_x + (rel_x * w_scaled))
+    abs_y = int(skin_y + (rel_y * h_scaled))
+    
+    color_hex = elem.get("color", "#00FF00").lstrip('#')
+    color_bgr = tuple(int(color_hex[i:i+2], 16) for i in (4, 2, 0))
+    
+    # Background
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), (0, 0, 0), -1)
+    cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), color_bgr, 1)
+    cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
+    
+    if not waypoints:
+        return
+        
+    max_d = max(wp.depth for wp in waypoints) if waypoints else 1.0
+    if max_d <= 0:
+        max_d = 1.0
+    max_d *= 1.1
+    
+    n_wps = len(waypoints)
+    if n_wps < 2:
+        return
+        
+    dx = graph_w / (n_wps - 1)
+    dy = graph_h / max_d
+    
+    # Fill path
+    fill_overlay = frame.copy()
+    pts = []
+    pts.append([abs_x, abs_y])
+    for i in range(n_wps):
+        x = int(abs_x + i * dx)
+        y = int(abs_y + waypoints[i].depth * dy)
+        pts.append([x, y])
+    pts.append([abs_x + graph_w, abs_y])
+    
+    pts = np.array(pts, dtype=np.int32)
+    cv2.fillPoly(fill_overlay, [pts], color_bgr)
+    cv2.addWeighted(fill_overlay, 0.15, frame, 0.85, 0, frame)
+    
+    # Outline line
+    line_pts = []
+    for i in range(n_wps):
+        x = int(abs_x + i * dx)
+        y = int(abs_y + waypoints[i].depth * dy)
+        line_pts.append([x, y])
+    line_pts = np.array(line_pts, dtype=np.int32)
+    cv2.polylines(frame, [line_pts], False, color_bgr, int(2 * res_scale))
+    
+    # Cursor
+    if waypoint:
+        curr_idx = 0
+        closest_diff = float('inf')
+        for idx, wp in enumerate(waypoints):
+            diff = abs((wp.timestamp - waypoint.timestamp).total_seconds())
+            if diff < closest_diff:
+                closest_diff = diff
+                curr_idx = idx
+                
+        curr_x = int(abs_x + curr_idx * dx)
+        curr_y = int(abs_y + waypoints[curr_idx].depth * dy)
+        
+        cv2.line(frame, (curr_x, abs_y), (curr_x, abs_y + graph_h), color_bgr, 1)
+        
+        marker_style = elem.get("marker_style", "dot")
+        marker_size = elem.get("marker_size", 6)
+        scaled_size = int(marker_size * res_scale)
+        if marker_style == "dot":
+            cv2.circle(frame, (curr_x, curr_y), scaled_size, color_bgr, -1)
+            cv2.circle(frame, (curr_x, curr_y), scaled_size, (255, 255, 255), 1)
+        elif marker_style == "cross":
+            cv2.line(frame, (curr_x - scaled_size, curr_y), (curr_x + scaled_size, curr_y), color_bgr, 1)
+            cv2.line(frame, (curr_x, curr_y - scaled_size), (curr_x, curr_y + scaled_size), color_bgr, 1)
+        elif marker_style == "bold_cross":
+            thickness = max(2, int(3 * res_scale))
+            cv2.line(frame, (curr_x - scaled_size, curr_y), (curr_x + scaled_size, curr_y), color_bgr, thickness)
+            cv2.line(frame, (curr_x, curr_y - scaled_size), (curr_x, curr_y + scaled_size), color_bgr, thickness)
+
+def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     """
     Renders the HUD telemetry elements using Pillow for TrueType parity.
     """
@@ -202,11 +294,20 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info):
     user_scale = skin_info['user_scale']
     render_log = skin_info.get('render_log', False)
 
+    # Filter out graphs first and draw them using OpenCV directly on the frame
+    for elem in linked_elements:
+        field = elem.get("field", "")
+        if elem.get("type") == "graph" or field == "depth_graph":
+            draw_depth_graph(frame, elem, waypoint, waypoints, skin_info)
+
     pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(pil_img)
 
     for elem in linked_elements:
         field = elem.get("field", "")
+        if elem.get("type") == "graph" or field == "depth_graph":
+            continue
+
         # Get formatted value (same logic)
         if field == "safety_stop":
             from utils.hud_rules_engine import get_safety_stop_text

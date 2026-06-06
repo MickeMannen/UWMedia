@@ -260,6 +260,13 @@ class HUDDesignerWindow(QMainWindow):
         custom_layout.addWidget(self.btn_add_custom)
         fields_layout.addLayout(custom_layout)
         
+        # Custom Overlays
+        overlays_layout = QHBoxLayout()
+        self.btn_add_depth_graph = QPushButton("Add Depth Graph Overlay")
+        self.btn_add_depth_graph.clicked.connect(self.add_depth_graph)
+        overlays_layout.addWidget(self.btn_add_depth_graph)
+        fields_layout.addLayout(overlays_layout)
+        
         self.controls_layout.addWidget(fields_box)
 
         
@@ -343,6 +350,9 @@ class HUDDesignerWindow(QMainWindow):
         if text:
             self.hud_manager.add_custom_label(text, 0.5, 0.5)
             self.custom_text_input.clear()
+
+    def add_depth_graph(self):
+        self.hud_manager.add_depth_graph(0.5, 0.5)
     def keyPressEvent(self, event):
         if event.key() in [Qt.Key_Delete, Qt.Key_Backspace]:
             try:
@@ -384,7 +394,7 @@ class HUDDesignerWindow(QMainWindow):
 
         # 4. Draw HUD using SHARED logic
         from gui.hud_renderer import draw_hud
-        draw_hud(frame, layout, wp)
+        draw_hud(frame, layout, wp, waypoints=self.current_dive.waypoints if self.current_dive else None)
 
         # 5. Show in a popup window
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -535,7 +545,7 @@ class HUDDesignerWindow(QMainWindow):
         if wp:
             self.data_label.setText(f"Depth: {wp.depth:.1f}m | Temp: {wp.temp:.1f}C")
             self.log_label.setText(f"Current Log: {wp.log_filename or 'Unknown'}")
-            self.hud_manager.update_telemetry_data(wp)
+            self.hud_manager.update_telemetry_data(wp, self.current_dive.waypoints if self.current_dive else None)
         else:
             self.data_label.setText("Out of dive range.")
             self.log_label.setText("Current Log: None (No Match)")

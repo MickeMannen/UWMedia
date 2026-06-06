@@ -126,3 +126,43 @@ def test_hud_renderer_user_scale():
         called_sizes = [args[0] for args, kwargs in mock_get_font.call_args_list]
         assert 15 in called_sizes
 
+def test_hud_renderer_depth_graph():
+    waypoints = [
+        Waypoint(timestamp=datetime.now(), depth=0.0, time_since_start=0),
+        Waypoint(timestamp=datetime.now(), depth=10.0, time_since_start=10),
+        Waypoint(timestamp=datetime.now(), depth=15.0, time_since_start=20),
+        Waypoint(timestamp=datetime.now(), depth=12.5, time_since_start=30)
+    ]
+    wp = Waypoint(timestamp=datetime.now(), depth=12.5, time_since_start=30)
+
+    for marker_style in ["dot", "cross", "bold_cross"]:
+        layout = {
+            "design_width": 1000,
+            "design_height": 800,
+            "hud_skin": {
+                "type": "shape",
+                "width": 200,
+                "height": 100,
+                "anchor": "TOP_LEFT",
+                "linked_elements": [
+                    {
+                        "field": "depth_graph",
+                        "type": "graph",
+                        "width": 100,
+                        "height": 50,
+                        "color": "#00FF00",
+                        "rel_x": 0.1,
+                        "rel_y": 0.2,
+                        "marker_style": marker_style,
+                        "marker_size": 10
+                    }
+                ]
+            }
+        }
+        
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        draw_hud(frame, layout, wp, render_log=False, waypoints=waypoints)
+        assert not np.all(frame == 0)
+
+
+

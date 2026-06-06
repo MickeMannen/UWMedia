@@ -374,7 +374,7 @@ class ColorCorrectionEngine:
                         
                         if wp:
                             from gui.hud_renderer import draw_hud
-                            draw_hud(frame, layout, wp, preloaded_skin=preloaded_skin)
+                            draw_hud(frame, layout, wp, preloaded_skin=preloaded_skin, waypoints=dive.waypoints)
 
 
                     process.stdin.write(frame.tobytes())

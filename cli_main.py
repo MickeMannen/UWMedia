@@ -209,7 +209,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                     # Redraw
                     frame = np.zeros((height, width, 3), dtype=np.uint8)
                     from gui.hud_renderer import draw_hud
-                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True)
+                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True, waypoints=dive.waypoints)
                     cached_frame = frame
                     last_wp = wp
                 
@@ -504,7 +504,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     # Match waypoint to photo creation time
                     wp = dive.get_waypoint_at(creation_date)
                     if wp:
-                        draw_hud(frame, layout, wp)
+                        draw_hud(frame, layout, wp, waypoints=dive.waypoints)
                     else:
                         print("Warning: No dive data matched for this photo's timestamp.")
 

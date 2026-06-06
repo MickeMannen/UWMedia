@@ -37,7 +37,7 @@ class HUDManager(QObject):
             return
             
         # Filter to only TelemetryItems or the Skin itself
-        targets = [i for i in items if isinstance(i, (TelemetryItem, HUDSkinItem, HUDShapeItem))]
+        targets = [i for i in items if isinstance(i, (TelemetryItem, HUDSkinItem, HUDShapeItem, HUDGraphItem))]
         
         if targets:
             self.item_selected.emit(targets[0])
@@ -140,6 +140,26 @@ class HUDManager(QObject):
         item.setPos(rel_x * rect.width(), rel_y * rect.height())
         
         # Track using the item itself as the key to avoid name collisions
+        self.linked_elements[item] = item
+        return item
+
+    def add_depth_graph(self, rel_x: float, rel_y: float, width: int = 300, height: int = 150, color: str = "#00FF00", marker_style: str = "dot", marker_size: int = 6):
+        if not self.skin_item:
+            return None
+            
+        item = HUDGraphItem(parent=self.skin_item)
+        item.set_color(color)
+        item.set_dimensions(width, height)
+        item.set_marker_style(marker_style)
+        item.set_marker_size(marker_size)
+        
+        # Position relative to skin
+        rect = self.skin_item.pixmap().rect() if isinstance(self.skin_item, HUDSkinItem) else self.skin_item.rect()
+        item.setPos(rel_x * rect.width(), rel_y * rect.height())
+        
+        if getattr(self, 'last_waypoints', None) is not None:
+            item.set_data(self.last_waypoints, self.last_current_wp)
+            
         self.linked_elements[item] = item
         return item
 
@@ -270,7 +290,17 @@ class HUDManager(QObject):
         rect = self.skin_item.rect() if isinstance(self.skin_item, HUDShapeItem) else self.skin_item.pixmap().rect()
         for element in hud_skin.get("linked_elements", []):
             field = element.get("field", "")
-            if field.startswith("custom:"):
+            if element.get("type") == "graph" or field == "depth_graph":
+                item = self.add_depth_graph(
+                    rel_x=element["rel_x"],
+                    rel_y=element["rel_y"],
+                    width=element.get("width", 300),
+                    height=element.get("height", 150),
+                    color=element.get("color", "#00FF00"),
+                    marker_style=element.get("marker_style", "dot"),
+                    marker_size=element.get("marker_size", 6)
+                )
+            elif field.startswith("custom:"):
                 text = field.replace("custom:", "")
                 item = self.add_custom_label(
                     text,
@@ -290,13 +320,18 @@ class HUDManager(QObject):
             if item:
                 item.setScale(element.get("scale", 1.0))
 
-    def update_telemetry_data(self, waypoint: 'Waypoint'):
+    def update_telemetry_data(self, waypoint: 'Waypoint', waypoints: list = None):
         """
         Updates the text of all linked telemetry elements based on waypoint data.
         """
+        self.last_current_wp = waypoint
+        self.last_waypoints = waypoints
         for item in list(self.linked_elements.values()):
             try:
                 if not item or not item.scene(): continue
+                if isinstance(item, HUDGraphItem):
+                    item.set_data(waypoints or [], waypoint)
+                    continue
                 if getattr(item, 'is_custom', False): continue
                     
                 field = item.field
@@ -340,6 +375,20 @@ class HUDManager(QObject):
         
         linked_elements = []
         for item in self.linked_elements.values():
+            if isinstance(item, HUDGraphItem):
+                linked_elements.append({
+                    "field": item.field,
+                    "rel_x": item.pos().x() / rect.width(),
+                    "rel_y": item.pos().y() / rect.height(),
+                    "color": item.color_hex,
+                    "width": item.width,
+                    "height": item.height,
+                    "type": "graph",
+                    "marker_style": item.marker_style,
+                    "marker_size": item.marker_size
+                })
+                continue
+
             field_name = item.field
             if getattr(item, 'is_custom', False):
                 field_name = f"custom:{item.custom_text}"
@@ -502,3 +551,137 @@ class TelemetryItem(QGraphicsTextItem):
 
     def update_value(self, value):
         self.setPlainText(str(value))
+
+class HUDGraphItem(QGraphicsPathItem):
+    def __init__(self, field="depth_graph", parent=None):
+        super().__init__(parent)
+        self.field = field
+        self.width = 300
+        self.height = 150
+        self.color_hex = "#00FF00"
+        self.marker_style = "dot"
+        self.marker_size = 6
+        self.waypoints = []
+        self.current_wp = None
+        self.setFlags(
+            QGraphicsItem.ItemIsMovable | 
+            QGraphicsItem.ItemIsSelectable | 
+            QGraphicsItem.ItemSendsGeometryChanges
+        )
+        self.update_path()
+
+    def set_color(self, hex_color):
+        self.color_hex = hex_color
+        self.update_path()
+
+    def set_dimensions(self, w, h):
+        self.width = w
+        self.height = h
+        self.update_path()
+
+    def set_marker_style(self, style):
+        self.marker_style = style
+        self.update_path()
+
+    def set_marker_size(self, size):
+        self.marker_size = size
+        self.update_path()
+
+    def rect(self):
+        return QRectF(0, 0, self.width, self.height)
+
+    def set_data(self, waypoints, current_wp):
+        self.waypoints = waypoints
+        self.current_wp = current_wp
+        self.update_path()
+
+    def update_path(self):
+        # We define path just for selection bounding box in QGraphicsScene
+        path = QPainterPath()
+        path.addRect(QRectF(0, 0, self.width, self.height))
+        self.setPath(path)
+        self.setBrush(QBrush(Qt.NoBrush))
+        self.setPen(QPen(Qt.NoPen)) # We draw custom outline in paint()
+        self.update()
+
+    def paint(self, painter, option, widget=None):
+        # 1. Draw border and semi-transparent background
+        pen = QPen(QColor(self.color_hex), 1, Qt.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(QBrush(QColor(0, 0, 0, 100))) # Semi-transparent background
+        painter.drawRect(0, 0, self.width, self.height)
+
+        if not self.waypoints:
+            return
+
+        # 2. Scale points
+        max_d = max(wp.depth for wp in self.waypoints) if self.waypoints else 1.0
+        if max_d <= 0:
+            max_d = 1.0
+        max_d *= 1.1
+
+        n_wps = len(self.waypoints)
+        if n_wps < 2:
+            return
+
+        dx = self.width / (n_wps - 1)
+        dy = self.height / max_d
+
+        # 3. Draw filled area under the curve (semi-transparent)
+        fill_path = QPainterPath()
+        fill_path.moveTo(0, 0)
+        for i in range(n_wps):
+            x = i * dx
+            y = self.waypoints[i].depth * dy
+            fill_path.lineTo(x, y)
+        fill_path.lineTo(self.width, 0)
+        fill_path.closeSubpath()
+        
+        fill_color = QColor(self.color_hex)
+        fill_color.setAlpha(40)
+        painter.setBrush(QBrush(fill_color))
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(fill_path)
+
+        # 4. Draw depth profile line
+        line_path = QPainterPath()
+        line_path.moveTo(0, self.waypoints[0].depth * dy)
+        for i in range(1, n_wps):
+            line_path.lineTo(i * dx, self.waypoints[i].depth * dy)
+        
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor(self.color_hex), 2, Qt.SolidLine))
+        painter.drawPath(line_path)
+
+        # 5. Draw cursor indicator
+        if self.current_wp:
+            # Find closest waypoint by timestamp
+            curr_idx = 0
+            closest_diff = float('inf')
+            for idx, wp in enumerate(self.waypoints):
+                diff = abs((wp.timestamp - self.current_wp.timestamp).total_seconds())
+                if diff < closest_diff:
+                    closest_diff = diff
+                    curr_idx = idx
+            
+            curr_x = curr_idx * dx
+            curr_y = self.waypoints[curr_idx].depth * dy
+
+            # Draw vertical cursor line
+            painter.setPen(QPen(QColor(self.color_hex), 1, Qt.DotLine))
+            painter.drawLine(curr_x, 0, curr_x, self.height)
+
+            # Draw cursor marker
+            if self.marker_style == "dot":
+                painter.setPen(QPen(QColor("#FFFFFF"), 1))
+                painter.setBrush(QBrush(QColor(self.color_hex)))
+                painter.drawEllipse(QPointF(curr_x, curr_y), self.marker_size, self.marker_size)
+            elif self.marker_style == "cross":
+                painter.setPen(QPen(QColor(self.color_hex), 1, Qt.SolidLine))
+                painter.drawLine(curr_x - self.marker_size, curr_y, curr_x + self.marker_size, curr_y)
+                painter.drawLine(curr_x, curr_y - self.marker_size, curr_x, curr_y + self.marker_size)
+            elif self.marker_style == "bold_cross":
+                painter.setPen(QPen(QColor(self.color_hex), 3, Qt.SolidLine))
+                painter.drawLine(curr_x - self.marker_size, curr_y, curr_x + self.marker_size, curr_y)
+                painter.drawLine(curr_x, curr_y - self.marker_size, curr_x, curr_y + self.marker_size)
+
