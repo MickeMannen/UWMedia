@@ -9,11 +9,7 @@ from models.dive import Waypoint, Dive, TankData
 class TestGarmin:
 
     def test_load(self):
-        # file = Path("/Users/mikael/development/UWMedia/test_data/fit/488 Phuket, Camera Bay.fit")
-        file = Path("/Users/mikael/DivingMedia/20260524_Sipadan/logs/494 Sipadan, Whitetip Avenue.fit")
-        file = Path("/Users/mikael/DivingMedia/20260524_Sipadan/logs/493 Mabul Island, Ray Point.fit")
-        file = Path("/Users/mikael/DivingMedia/20260524_Sipadan/logs/494_ebcf9f47-771b-4cbf-bca4-e890544fcb6e.fit")
-        file = Path("/Users/mikael/DivingMedia/20260524_Sipadan/logs/494_63776789-32ad-4c9c-becf-68909bd060c8.fit")
+        file = Path(__file__).parent.parent / "test_data" / "release_test" / "fit" / "488 Phuket, Camera Bay.fit"
         dives = GarminParser().parse(file_path=file)
 
         assert len(dives) > 0

@@ -1,2 +1,2 @@
 from .ffmpeg_class import FfmpegClass
-from .color import ColorCorrectionEngine
+from .color_new import ColorCorrectionEngine

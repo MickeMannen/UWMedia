@@ -125,6 +125,28 @@ class TestRelease:
         found = list(OUTPUT_DIR.glob("*_test06_color_*.jpg"))
         assert len(found) == i
 
+    def test_06c_color_correction_photo_profiles(self):
+        file = TEST_DATA_DIR / "DSC03491.JPG"
+        for profile in ["vivid", "subtle"]:
+            cmd = [
+                "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
+                "--color", profile, "--filename-format", f"%Y%m%d_%H%M%S_test06c_{profile}"
+            ]
+            subprocess.run(cmd, check=True)
+            found = list(OUTPUT_DIR.glob(f"*_test06c_{profile}_*.jpg"))
+            assert len(found) == 1
+
+    def test_05b_color_correction_video_profiles(self):
+        src = TEST_DATA_DIR / "20251019_M0284.MP4"
+        for profile in ["vivid", "subtle"]:
+            cmd = [
+                "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+                "--color", profile, "--filename-format", f"%Y%m%d_%H%M%S_test05_profile_{profile}", "--hw-accel"
+            ]
+            subprocess.run(cmd, check=True)
+            found = list(OUTPUT_DIR.glob(f"*_test05_profile_{profile}.mp4"))
+            assert len(found) == 1
+
     def test_06b_color_correction_photo_sidebyside(self):
         import cv2
         import numpy as np
@@ -219,7 +241,7 @@ class TestRelease:
             subprocess.run(cmd, check=True)
 
         for t in target_list:
-            n = len(list(OUTPUT_DIR.glob(f"*{t}*")))
+            n = len(list(OUTPUT_DIR.glob(f"*test08_{t}*.jpg")))
             assert n == 1
 
     # 6. Standalone Log Rendering

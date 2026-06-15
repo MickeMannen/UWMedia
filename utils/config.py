@@ -75,5 +75,6 @@ class ConfigManager:
         mapping = self.get_tank_mapping()
         return mapping.get(str(serial), str(serial))
 
+
 def get_config() -> ConfigManager:
     return ConfigManager()
