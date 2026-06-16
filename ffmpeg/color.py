@@ -87,6 +87,10 @@ class ColorCorrectionEngine:
         self.bh_decay = float(profile.get("bh_decay", 0.85))
         self.bh_fallback = float(profile.get("bh_fallback", 0.67))
 
+        # Enable OpenCL (GPU Transparent API) if available
+        if cv2.ocl.haveOpenCL():
+            cv2.ocl.setUseOpenCL(True)
+
         # Precompute sRGB -> Linear lookup table (for 8-bit uint8 inputs)
         self.lut_linear = np.array([
             ((i / 255.0) / 12.92) if (i / 255.0) <= 0.04045
@@ -359,9 +363,9 @@ class ColorCorrectionEngine:
         m1 = L_in - 0.1055613458 * a1 - 0.0638541728 * b1
         s1 = L_in - 0.0894841775 * a1 - 1.2914855480 * b1
 
-        l1 = np.power(l1, 3.0)
-        m1 = np.power(m1, 3.0)
-        s1 = np.power(s1, 3.0)
+        l1 = l1 * l1 * l1
+        m1 = m1 * m1 * m1
+        s1 = s1 * s1 * s1
 
         r = 4.0767416621 * l1 - 3.3077115913 * m1 + 0.2309699292 * s1
         g = -1.2684380046 * l1 + 2.6097574011 * m1 - 0.3413193965 * s1
@@ -438,31 +442,54 @@ class ColorCorrectionEngine:
                       tz_offset_mins: Optional[int] = None,
                       color_correct: bool = True):
         """Analyze video and process frames through OpenCV then pipe to FFmpeg."""
-        cap = cv2.VideoCapture(str(input_path))
+        # Open video capture with hardware acceleration support and safe fallback
+        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
+            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
+        ])
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(str(input_path))
+
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = int(total_frames / fps) if fps else 0
 
+        # 10-bit Color Preservation detection
+        is_10bit = False
+        try:
+            if self.ffmpeg_tool:
+                src_pix_fmt = self.ffmpeg_tool.get_video_pix_fmt(input_path)
+                if "10" in src_pix_fmt or "12" in src_pix_fmt or "p010" in src_pix_fmt:
+                    is_10bit = True
+                    print(f"Detected 10-bit/high bit-depth input ({src_pix_fmt}). Enabling 10-bit color preservation.")
+        except Exception as e:
+            pass
+
         if stabilize:
             print(f"Stabilization enabled (level: {stabilize})...")
 
-        # 2. Analysis Phase
+        # 2. Analysis Phase (Seek-based fast analysis)
         filter_indices, filter_matrices = [], []
         if color_correct:
             print(f"Analyzing {input_path.name}...")
-            count = 0
-            with tqdm(total=total_frames, desc="Analysis", unit="frame") as pbar:
-                while cap.isOpened():
+            step = int(fps * SAMPLE_SECONDS)
+            if step <= 0:
+                step = 30
+            sample_frames = list(range(0, total_frames, step))
+            if (total_frames - 1) not in sample_frames and total_frames > 0:
+                sample_frames.append(total_frames - 1)
+            
+            with tqdm(total=len(sample_frames), desc="Analysis", unit="frame") as pbar:
+                for idx in sample_frames:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                     ret, frame = cap.read()
-                    if not ret: break
-                    if count % int(fps * SAMPLE_SECONDS) == 0:
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        filter_indices.append(count)
-                        filter_matrices.append(self.get_filter_matrix(rgb))
+                    if not ret:
+                        continue
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    filter_indices.append(idx)
+                    filter_matrices.append(self.get_filter_matrix(rgb))
                     pbar.update(1)
-                    count += 1
             cap.release()
             filter_matrices = np.array(filter_matrices)
         else:
@@ -522,8 +549,12 @@ class ColorCorrectionEngine:
                     if preloaded_skin.shape[2] == 4:
                         preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
 
-        # Re-open video capture for processing phase
-        cap = cv2.VideoCapture(str(input_path))
+        # Re-open video capture for processing phase with hardware decoding and safe fallback
+        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
+            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
+        ])
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(str(input_path))
 
         # Build FFmpeg pipe
         filters = []
@@ -589,9 +620,11 @@ class ColorCorrectionEngine:
             iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
             cmd.extend(["-metadata", f"creation_time={iso_date}"])
 
+        # Use p010le (standard YUV 10-bit) for 10-bit color preservation, otherwise standard yuv420p
+        output_pix_fmt = 'p010le' if is_10bit else 'yuv420p'
         cmd.extend([
             '-vcodec', self.ffmpeg_tool.get_encoder(),
-            '-pix_fmt', 'yuv420p',
+            '-pix_fmt', output_pix_fmt,
             '-acodec', 'copy',
             str(output_path)
         ])
@@ -602,6 +635,15 @@ class ColorCorrectionEngine:
         e_sec = self.ffmpeg_tool._parse_time(end_time) or float(duration)
         s_frame, e_frame = int(s_sec * fps), int(e_sec * fps)
         total_to_process = e_frame - s_frame + 1
+
+        # Precompute interpolated filters for all frames to avoid slow frame-by-frame interpolation
+        interpolated_filters = None
+        if color_correct and len(filter_matrices) > 0:
+            all_counts = np.arange(total_frames)
+            num_params = filter_matrices.shape[1]
+            interpolated_filters = np.zeros((total_frames, num_params), dtype=np.float32)
+            for x in range(num_params):
+                interpolated_filters[:, x] = np.interp(all_counts, filter_indices, filter_matrices[:, x])
 
         count = 0
         try:
@@ -615,9 +657,11 @@ class ColorCorrectionEngine:
                     if not ret: break
                     
                     if color_correct:
-                        current_filter = [np.interp(count, filter_indices, filter_matrices[..., x]) for x in range(len(filter_matrices[0]))]
+                        # Fetch precomputed filter for current frame index
+                        idx_filter = min(count, len(interpolated_filters) - 1)
+                        current_filter = interpolated_filters[idx_filter]
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        corrected_rgb = self.apply_filter(rgb, np.array(current_filter))
+                        corrected_rgb = self.apply_filter(rgb, current_filter)
                         frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
 
                     if layout and dive:

@@ -240,6 +240,16 @@ class FfmpegClass:
         result = subprocess.check_output(cmd).decode().strip()
         return map(int, result.split('x'))
 
+    def get_video_pix_fmt(self, input_path: Path) -> str:
+        """Uses ffprobe to get video pixel format."""
+        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
+        cmd = [
+            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=pix_fmt", "-of", "default=noprint_wrappers=1:nokey=1",
+            str(input_path)
+        ]
+        return subprocess.check_output(cmd).decode().strip()
+
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, dive: Optional[Dive] = None, 
                       stabilize: Optional[str] = None, color_correct: bool = False, overlay: bool = False,
                       layout_path: Optional[Path] = None,
