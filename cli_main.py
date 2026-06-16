@@ -445,7 +445,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
         if use_opencv_pipe:
             from ffmpeg.color import ColorCorrectionEngine
-            engine = ColorCorrectionEngine(ff)
+            engine = ColorCorrectionEngine(ff, color_profile=needs_color)
             engine.process_video(
                 input_path=source,
                 output_path=target_path,
@@ -489,7 +489,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 if needs_color:
                     from ffmpeg.color import ColorCorrectionEngine
                     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
-                    engine = ColorCorrectionEngine(ff)
+                    engine = ColorCorrectionEngine(ff, color_profile=needs_color)
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     filt = engine.get_filter_matrix(rgb)
                     corrected_rgb = engine.apply_filter(rgb, filt)
@@ -534,6 +534,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         except Exception as e:
             print(f"Error moving original file {source} to {dest_dir}: {e}")
 
+def _parallel_worker(task):
+    """Worker function for multi-core parallel processing of a single file."""
+    file, output_dir, args, manager, tmp_hud_dir = task
+    # Re-initialize MetadataHandler locally inside the subprocess to prevent ExifTool locking/resource conflicts
+    local_meta_handler = MetadataHandler()
+    try:
+        process_single_file(file, output_dir, args, manager, local_meta_handler, tmp_hud_dir)
+        return True, file.name, None
+    except Exception as e:
+        import traceback
+        return False, file.name, f"{e}\n{traceback.format_exc()}"
+
 class UWMediaParser(argparse.ArgumentParser):
     def error(self, message):
         print(f"Error: {message}")
@@ -555,7 +567,7 @@ def main():
     parser.add_argument("source", type=Path, nargs='?', help="Source video/photo file or directory")
     parser.add_argument("output", type=Path, nargs='?', help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
-    parser.add_argument("--color", action="store_true", help="Apply color correction")
+    parser.add_argument("--color", nargs='?', const='default', default=None, help="Apply color correction with selected profile (e.g. default, vivid, subtle). Defaults to 'default' if specified without a profile name.")
     parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--end-time", help="End time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--stabilize", nargs='?', const='high', choices=['low', 'mid', 'high'], help="Stabilization level (low, mid, high). Default: high")
@@ -572,6 +584,7 @@ def main():
     parser.add_argument("--move-original", type=Path, help="Directory to move original source file to after successful processing (only when running --color or --layout)")
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
+    parser.add_argument("--export-json", type=Path, help="Read logs from a directory and create a JSON file for each log file using same filename but json extension.")
 
     args = parser.parse_args()
 
@@ -605,46 +618,141 @@ def main():
         # If no output is specified at all, default to current directory
         if not args.output:
             args.output = Path.cwd()
+    elif args.export_json:
+        args.export_json = args.export_json.resolve()
     else:
         if not args.source or not args.output:
-            print("Error: Source and output are required unless using --render-log.")
+            print("Error: Source and output are required unless using --render-log or --export-json.")
             sys.exit(2)
 
     # Resolve paths to absolute immediately to avoid issues with relative paths in bundled apps
     if args.source:
         args.source = args.source.resolve()
-    args.output = args.output.resolve()
+    if args.output:
+        args.output = args.output.resolve()
+    if args.logs:
+        args.logs = args.logs.resolve()
 
     # Try to get revision from __main__
     revision = getattr(sys.modules['__main__'], 'REVISION', 'dev')
     print(f"UWMedia CLI - Revision: {revision}")
+
+    if args.export_json:
+        # Determine source (input) directory for logs
+        # If --logs is specified, read logs from args.logs. Otherwise, read from args.export_json.
+        input_dir = args.logs if args.logs else args.export_json
+        output_dir = args.export_json
+        
+        if not input_dir.exists() or not input_dir.is_dir():
+            print(f"Error: Log directory '{input_dir}' does not exist or is not a directory.")
+            sys.exit(1)
+            
+        # Ensure output directory exists
+        output_dir.mkdir(parents=True, exist_ok=True)
+            
+        print(f"Reading logs from: {input_dir}")
+        print(f"Exporting JSONs to: {output_dir}")
+        
+        shearwater = UDDFParser()
+        garmin = GarminParser()
+        subsurface = SubsurfaceParser()
+        
+        log_files = [f for f in sorted(input_dir.iterdir()) if f.is_file() and not f.name.startswith('.')]
+        
+        processed_count = 0
+        for path in log_files:
+            suffix = path.suffix.lower()
+            if suffix not in (".uddf", ".fit", ".ssrf", ".xml"):
+                continue
+            
+            print(f"Processing log file: {path.name}")
+            dives = []
+            try:
+                if suffix == ".uddf":
+                    if args.tz_adjust:
+                        shearwater.update_timezone(path, args.tz_adjust * 60)
+                    dives = shearwater.parse(path)
+                    if args.tz_adjust:
+                        for d in dives:
+                            d.start_time += timedelta(hours=args.tz_adjust)
+                            d.end_time += timedelta(hours=args.tz_adjust)
+                            for wp in d.waypoints:
+                                wp.timestamp += timedelta(hours=args.tz_adjust)
+                elif suffix == ".fit":
+                    dives = garmin.parse(path)
+                    if args.tz_adjust:
+                        for d in dives:
+                            d.start_time += timedelta(hours=args.tz_adjust)
+                            d.end_time += timedelta(hours=args.tz_adjust)
+                            for wp in d.waypoints:
+                                wp.timestamp += timedelta(hours=args.tz_adjust)
+                elif suffix in (".ssrf", ".xml"):
+                    dives = subsurface.parse(path)
+                    if args.tz_adjust:
+                        for d in dives:
+                            d.start_time += timedelta(hours=args.tz_adjust)
+                            d.end_time += timedelta(hours=args.tz_adjust)
+                            for wp in d.waypoints:
+                                wp.timestamp += timedelta(hours=args.tz_adjust)
+            except Exception as e:
+                print(f"Error parsing {path.name}: {e}")
+                continue
+
+            if not dives:
+                print(f"No dives found in {path.name}")
+                continue
+
+            # Extract waypoints
+            all_waypoints = []
+            for dive in dives:
+                for wp in dive.waypoints:
+                    formatted_ts = wp.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                    all_waypoints.append({
+                        "timestamp": formatted_ts,
+                        "depth": wp.depth
+                    })
+
+            # Create json file in output_dir using same filename but json extension
+            json_path = output_dir / f"{path.stem}.json"
+            try:
+                with open(json_path, "w") as f:
+                    json.dump(all_waypoints, f, indent=2)
+                print(f"Created JSON: {json_path.name}")
+                processed_count += 1
+            except Exception as e:
+                print(f"Error writing JSON for {path.name}: {e}")
+
+        print(f"Export completed. Processed {processed_count} log files.")
+        sys.exit(0)
 
     # Basic Validation
     if args.source and not args.source.exists():
         print(f"Error: Source path '{args.source}' does not exist.")
         sys.exit(1)
 
-    if str(args.output).strip() == "." or str(args.output).strip() == "":
-        # We already check for source == output, but let's be extra safe about empty/current dir
-        pass
+    if args.output:
+        if str(args.output).strip() == "." or str(args.output).strip() == "":
+            # We already check for source == output, but let's be extra safe about empty/current dir
+            pass
 
-    try:
-        source_res = args.source.resolve()
-        output_res = args.output.resolve() if args.output.exists() else args.output.parent.resolve()
-        
-        if source_res == output_res:
-            print("Error: Source and output paths cannot be the same.")
-            sys.exit(1)
-    except Exception:
-        pass
+        try:
+            if args.source:
+                source_res = args.source.resolve()
+                output_res = args.output.resolve() if args.output.exists() else args.output.parent.resolve()
+                
+                if source_res == output_res:
+                    print("Error: Source and output paths cannot be the same.")
+                    sys.exit(1)
+        except Exception:
+            pass
 
-    # Check writability of output parent
-    output_parent = args.output.parent if args.output.suffix else args.output
-    if not os.access(output_parent if output_parent.exists() else output_parent.parent, os.W_OK):
-        # Only warn if it exists, if it doesn't we'll try to create it later
-        if output_parent.exists() and not os.access(output_parent, os.W_OK):
-            print(f"Error: Output directory '{output_parent}' is not writable.")
-            sys.exit(1)
+        # Check writability of output parent
+        output_parent = args.output.parent if args.output.suffix else args.output
+        if not os.access(output_parent if output_parent.exists() else output_parent.parent, os.W_OK):
+            # Only warn if it exists, if it doesn't we'll try to create it later
+            if output_parent.exists() and not os.access(output_parent, os.W_OK):
+                print(f"Error: Output directory '{output_parent}' is not writable.")
+                sys.exit(1)
 
     # Handle HUD Package / Layout
     tmp_hud_dir = None
@@ -765,8 +873,22 @@ def main():
         
         # Process all files in directory
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
-        for file in tqdm(files, desc="Batch Processing", unit="file"):
-            process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
+        if len(files) > 1:
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory
+            max_workers = min(4, os.cpu_count() or 4)
+            print(f"Starting parallel batch processing with {max_workers} workers...")
+            
+            tasks = [(file, args.output, args, manager, tmp_hud_dir) for file in files]
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file"):
+                    success, filename, error_msg = future.result()
+                    if not success:
+                        print(f"Error processing {filename}: {error_msg}")
+        else:
+            for file in tqdm(files, desc="Batch Processing", unit="file"):
+                process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
     else:
         # Single file source
         forced_filename = None

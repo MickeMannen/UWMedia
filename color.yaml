@@ -1,0 +1,125 @@
+# UWMedia Color Correction Profiles.
+# The correction pipeline operates in linear sRGB color space:
+# 1. Color Factors: Evaluates Green vs Red/Blue depletion to estimate restoration scaling.
+# 2. Black Point Floor: Discovers and subtracts the true black floor per channel using a histogram CDF cutoff.
+# 3. Gray World White Balance: Blurs the image to isolate and scale ambient illumination.
+# 4. Dehaze curves: Applies local contrast adjustments based on saturation bins.
+# 5. Exposure: Computes the brightness distribution to normalize exposure.
+# 6. Blue Hue Translation: Transforms colors perceptually in OKLCh space to restore blue background hue.
+
+default:
+  # --- General Blend ---
+  # cifval: Blend factor between the corrected image (1.0) and the original raw image (0.0)
+  cifval: 1.0
+
+  # --- Color Restoration (Red/Blue Channel Boost) ---
+  # red_threshold: Threshold above which red channel factor estimation activates. Lower = more red boost.
+  red_threshold: 0.3
+  # red_scale: Scale factor for red factor calculation. Smaller = more aggressive red boost.
+  red_scale: 0.2
+  # blue_threshold: Threshold above which blue channel factor estimation activates.
+  blue_threshold: 0.3
+  # blue_scale: Scale factor for blue factor calculation.
+  blue_scale: 0.6
+
+  # --- Black Point Floor ---
+  # black_point_cutoff: CDF histogram cutoff threshold to determine the black point floor.
+  black_point_cutoff: 0.001
+
+  # --- Gray World White Balance ---
+  # gw_mask_mult: Multiplier to define the foreground mask (b < g * mask_mult).
+  gw_mask_mult: 1.5
+  # gw_mask_fallback: Fallback weight applied to background pixels in WB calculations.
+  gw_mask_fallback: 0.2
+  # gw_blur_radius: Gaussian blur kernel size for local illumination estimation (must be odd).
+  gw_blur_radius: 9
+  # gw_blur_sigma: Gaussian blur standard deviation.
+  gw_blur_sigma: 1.8
+  # gw_isolation_threshold: Threshold of local variation to qualify a pixel for white balance.
+  gw_isolation_threshold: 0.07
+  # gw_isolation_min_sum: Minimum mask sum threshold to use local instead of global white balance.
+  gw_isolation_min_sum: 100.0
+
+  # --- De-haze Adjustment ---
+  # dehaze_sat_cutoff: Saturation CDF threshold to determine dehaze floor.
+  dehaze_sat_cutoff: 0.1
+  # dehaze_sat_scale: Scaling divisor for saturation value.
+  dehaze_sat_scale: 0.75
+  # dehaze_min: Minimum bound for the calculated dehaze factor.
+  dehaze_min: 0.81
+  # dehaze_max: Maximum bound for the calculated dehaze factor.
+  dehaze_max: 1.0
+
+  # --- Exposure Normalization ---
+  # exposure_cdf_cutoff: Processed brightness CDF threshold to determine exposure ceiling.
+  exposure_cdf_cutoff: 0.01
+  # exposure_numerator: Reference target brightness level for scaling.
+  exposure_numerator: 0.5
+  # exposure_min: Minimum allowed exposure multiplier.
+  exposure_min: 1.0
+  # exposure_max: Maximum allowed exposure multiplier.
+  exposure_max: 2.0
+
+  # --- Blue Hue Translation (OKLCh Perceptual Space) ---
+  # bh_min_idx: Lower bin index (0-255) for background water hue scanning.
+  bh_min_idx: 155
+  # bh_max_idx: Upper bin index (0-255) for background water hue scanning.
+  bh_max_idx: 218
+  # bh_decay: Decay/smooth weight for adjacent bins in water hue detection.
+  bh_decay: 0.85
+  # bh_fallback: Fallback blue hue if no dominant water background is detected.
+  bh_fallback: 0.67
+
+vivid:
+  # Vivid profile uses a lower red threshold and higher exposure ceiling for brighter, warmer closeups
+  cifval: 1.0
+  red_threshold: 0.25
+  red_scale: 0.15
+  blue_threshold: 0.3
+  blue_scale: 0.6
+  black_point_cutoff: 0.001
+  gw_mask_mult: 1.6
+  gw_mask_fallback: 0.15
+  gw_blur_radius: 9
+  gw_blur_sigma: 2.0
+  gw_isolation_threshold: 0.06
+  gw_isolation_min_sum: 80.0
+  dehaze_sat_cutoff: 0.1
+  dehaze_sat_scale: 0.7
+  dehaze_min: 0.75
+  dehaze_max: 1.1
+  exposure_cdf_cutoff: 0.01
+  exposure_numerator: 0.55
+  exposure_min: 1.0
+  exposure_max: 2.5
+  bh_min_idx: 150
+  bh_max_idx: 225
+  bh_decay: 0.9
+  bh_fallback: 0.67
+
+subtle:
+  # Subtle profile blends the original raw image back in (cifval = 0.70) and uses more conservative thresholds
+  cifval: 0.7
+  red_threshold: 0.35
+  red_scale: 0.25
+  blue_threshold: 0.35
+  blue_scale: 0.7
+  black_point_cutoff: 0.0015
+  gw_mask_mult: 1.4
+  gw_mask_fallback: 0.25
+  gw_blur_radius: 9
+  gw_blur_sigma: 1.5
+  gw_isolation_threshold: 0.08
+  gw_isolation_min_sum: 120.0
+  dehaze_sat_cutoff: 0.12
+  dehaze_sat_scale: 0.8
+  dehaze_min: 0.85
+  dehaze_max: 1.0
+  exposure_cdf_cutoff: 0.015
+  exposure_numerator: 0.45
+  exposure_min: 1.0
+  exposure_max: 1.6
+  bh_min_idx: 160
+  bh_max_idx: 210
+  bh_decay: 0.8
+  bh_fallback: 0.67
