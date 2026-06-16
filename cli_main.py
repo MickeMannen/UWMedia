@@ -444,7 +444,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         use_opencv_pipe = needs_color or needs_overlay
 
         if use_opencv_pipe:
-            from ffmpeg.color_new import ColorCorrectionEngine
+            from ffmpeg.color import ColorCorrectionEngine
             engine = ColorCorrectionEngine(ff, color_profile=needs_color)
             engine.process_video(
                 input_path=source,
@@ -487,7 +487,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             else:
                 # 1. Color Correction
                 if needs_color:
-                    from ffmpeg.color_new import ColorCorrectionEngine
+                    from ffmpeg.color import ColorCorrectionEngine
                     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
                     engine = ColorCorrectionEngine(ff, color_profile=needs_color)
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
