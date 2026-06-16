@@ -534,6 +534,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         except Exception as e:
             print(f"Error moving original file {source} to {dest_dir}: {e}")
 
+def _parallel_worker(task):
+    """Worker function for multi-core parallel processing of a single file."""
+    file, output_dir, args, manager, tmp_hud_dir = task
+    # Re-initialize MetadataHandler locally inside the subprocess to prevent ExifTool locking/resource conflicts
+    local_meta_handler = MetadataHandler()
+    try:
+        process_single_file(file, output_dir, args, manager, local_meta_handler, tmp_hud_dir)
+        return True, file.name, None
+    except Exception as e:
+        import traceback
+        return False, file.name, f"{e}\n{traceback.format_exc()}"
+
 class UWMediaParser(argparse.ArgumentParser):
     def error(self, message):
         print(f"Error: {message}")
@@ -861,8 +873,22 @@ def main():
         
         # Process all files in directory
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
-        for file in tqdm(files, desc="Batch Processing", unit="file"):
-            process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
+        if len(files) > 1:
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory
+            max_workers = min(4, os.cpu_count() or 4)
+            print(f"Starting parallel batch processing with {max_workers} workers...")
+            
+            tasks = [(file, args.output, args, manager, tmp_hud_dir) for file in files]
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file"):
+                    success, filename, error_msg = future.result()
+                    if not success:
+                        print(f"Error processing {filename}: {error_msg}")
+        else:
+            for file in tqdm(files, desc="Batch Processing", unit="file"):
+                process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
     else:
         # Single file source
         forced_filename = None

@@ -87,6 +87,20 @@ class ColorCorrectionEngine:
         self.bh_decay = float(profile.get("bh_decay", 0.85))
         self.bh_fallback = float(profile.get("bh_fallback", 0.67))
 
+        # Precompute sRGB -> Linear lookup table (for 8-bit uint8 inputs)
+        self.lut_linear = np.array([
+            ((i / 255.0) / 12.92) if (i / 255.0) <= 0.04045
+            else (((i / 255.0) + 0.055) / 1.055) ** 2.4
+            for i in range(256)
+        ], dtype=np.float32)
+
+        # Precompute Linear -> sRGB lookup table (12-bit lookup for float inputs)
+        self.lut_srgb = np.array([
+            ((i / 4095.0) * 12.92) if (i / 4095.0) <= 0.0031308
+            else (((i / 4095.0) ** 0.41666666667) * 1.055) - 0.055
+            for i in range(4096)
+        ], dtype=np.float32)
+
     # =========================================================================
     # 1. CORE ANALYTICAL PIPELINE (Exposes configuration hooks)
     # =========================================================================
@@ -291,14 +305,7 @@ class ColorCorrectionEngine:
             scale *= 2
 
         img_small = cv2.resize(img_srgb, (w // scale, h // scale), interpolation=cv2.INTER_AREA)
-        img_small_normalized = img_small.astype(np.float32) / 255.0
-
-        mask_low = img_small_normalized <= 0.04045
-        img_linear = np.where(
-            mask_low,
-            img_small_normalized / 12.92,
-            np.power((img_small_normalized + 0.055) / 1.055, 2.4),
-        )
+        img_linear = self.lut_linear[img_small]
 
         cfval = self.calculate_color_factors(img_linear)
         bpval = self.calculate_black_point(img_linear, cfval)
@@ -371,15 +378,8 @@ class ColorCorrectionEngine:
         expfval = filt[9]
         bhval = filt[10]
 
-        values = mat.astype(np.float32) / 255.0
-
-        # sRGB to Linear
-        mask_low = values <= 0.04045
-        values = np.where(
-            mask_low,
-            values / 12.92,
-            np.power((values + 0.055) / 1.055, 2.4),
-        )
+        # sRGB to Linear via precomputed 8-bit LUT
+        values = self.lut_linear[mat]
 
         original_values = values.copy()
 
@@ -421,16 +421,9 @@ class ColorCorrectionEngine:
             lch_alt = self._rgb_to_oklch(values)
             values = np.clip(self._oklch_to_rgb(lch_alt), 0.0, 1.0)
 
-        # Linear to sRGB (Gamma compression)
-        mask_high = values > 0.0031308
-        values = np.where(
-            mask_high,
-            (np.power(values, 0.41666666667) * 1.055) - 0.055,
-            values * 12.92,
-        )
-        values = np.clip(values, 0.0, 1.0)
-
-        final_rgb = (values * 255.0).astype(np.uint8)
+        # Linear to sRGB via precomputed 12-bit LUT
+        idx = np.clip(values * 4095.0 + 0.5, 0, 4095).astype(np.int32)
+        final_rgb = (np.clip(self.lut_srgb[idx], 0.0, 1.0) * 255.0).astype(np.uint8)
         return final_rgb
 
     # =========================================================================
