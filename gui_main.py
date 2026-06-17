@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QPushButton,
     QSlider, QLabel, QGraphicsPixmapItem, QGroupBox, QFormLayout,
     QSpinBox, QListWidget, QListWidgetItem, QLineEdit, QScrollArea,
-    QDialog, QTextEdit, QMenu, QGesture, QPinchGesture, QGestureEvent
+    QDialog, QTextEdit, QMenu, QGesture, QPinchGesture, QGestureEvent,
+    QComboBox
 )
 from PySide6.QtCore import Qt, QTimer, QSettings, QEvent
 from PySide6.QtGui import QPixmap, QColor, QFont, QPainter, QImage, QMouseEvent
@@ -261,10 +262,13 @@ class HUDDesignerWindow(QMainWindow):
         fields_layout.addLayout(custom_layout)
         
         # Custom Overlays
-        overlays_layout = QHBoxLayout()
-        self.btn_add_depth_graph = QPushButton("Add Depth Graph Overlay")
-        self.btn_add_depth_graph.clicked.connect(self.add_depth_graph)
-        overlays_layout.addWidget(self.btn_add_depth_graph)
+        overlays_layout = QVBoxLayout()
+        self.combo_overlays = QComboBox()
+        self.combo_overlays.addItem("Depth Graph Overlay")
+        self.btn_add_overlay = QPushButton("Add")
+        self.btn_add_overlay.clicked.connect(self.add_selected_overlay)
+        overlays_layout.addWidget(self.combo_overlays)
+        overlays_layout.addWidget(self.btn_add_overlay)
         fields_layout.addLayout(overlays_layout)
         
         self.controls_layout.addWidget(fields_box)
@@ -353,6 +357,11 @@ class HUDDesignerWindow(QMainWindow):
 
     def add_depth_graph(self):
         self.hud_manager.add_depth_graph(0.5, 0.5)
+
+    def add_selected_overlay(self):
+        selected = self.combo_overlays.currentText()
+        if selected == "Depth Graph Overlay":
+            self.add_depth_graph()
     def keyPressEvent(self, event):
         if event.key() in [Qt.Key_Delete, Qt.Key_Backspace]:
             try:
