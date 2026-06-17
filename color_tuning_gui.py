@@ -26,11 +26,14 @@ class ColorTuningApp(QMainWindow):
         self.default_profile_data = {}
         self.current_profile = "default"
         
+        # QSettings for remembering paths
+        from PySide6.QtCore import QSettings
+        self.settings = QSettings("UWMedia", "ColorTuning")
+        self.last_orig_path = self.settings.value("last_orig_path", "")
+        
         # Image state
         self.orig_image = None  # Full res original
-        self.target_image = None  # Full res target
         self.resized_orig = None  # Resized original BGR (for fast preview)
-        self.resized_target = None  # Resized target BGR (for display)
         
         # Color engine
         self.engine = ColorCorrectionEngine(ffmpeg_tool=None, color_profile="default")
@@ -99,6 +102,8 @@ class ColorTuningApp(QMainWindow):
         profile["bh_max_idx"] = int(self.slider_bh_max_idx.value())
         profile["bh_decay"] = float(self.slider_bh_decay.value() / 100.0)
         profile["bh_fallback"] = float(self.slider_bh_fallback.value() / 100.0)
+        profile["sharpness"] = float(self.slider_sharpness.value() / 100.0)
+        profile["darkness"] = float(self.slider_darkness.value() / 100.0)
         
         self.config_data[self.current_profile] = profile
         
@@ -110,6 +115,62 @@ class ColorTuningApp(QMainWindow):
                 self.default_profile_data = self.config_data.get("default", {})
         except Exception as e:
             print(f"Error saving yaml: {e}")
+
+    def save_new_profile(self):
+        from PySide6.QtWidgets import QInputDialog
+        new_name, ok = QInputDialog.getText(self, "Save Profile", "Enter new profile name:")
+        if ok and new_name:
+            new_name = new_name.strip()
+            if not new_name:
+                return
+            
+            # Update current profile from sliders
+            profile = {}
+            profile["cifval"] = float(self.slider_cifval.value() / 100.0)
+            profile["red_threshold"] = float(self.slider_red_threshold.value() / 100.0)
+            profile["red_scale"] = float(self.slider_red_scale.value() / 100.0)
+            profile["blue_threshold"] = float(self.slider_blue_threshold.value() / 100.0)
+            profile["blue_scale"] = float(self.slider_blue_scale.value() / 100.0)
+            profile["black_point_cutoff"] = float(self.slider_black_point_cutoff.value() / 10000.0)
+            profile["gw_mask_mult"] = float(self.slider_gw_mask_mult.value() / 100.0)
+            profile["gw_mask_fallback"] = float(self.slider_gw_mask_fallback.value() / 100.0)
+            profile["gw_blur_radius"] = int(self.slider_gw_blur_radius.value())
+            profile["gw_blur_sigma"] = float(self.slider_gw_blur_sigma.value() / 10.0)
+            profile["gw_isolation_threshold"] = float(self.slider_gw_isolation_threshold.value() / 1000.0)
+            profile["gw_isolation_min_sum"] = float(self.slider_gw_isolation_min_sum.value())
+            profile["dehaze_sat_cutoff"] = float(self.slider_dehaze_sat_cutoff.value() / 100.0)
+            profile["dehaze_sat_scale"] = float(self.slider_dehaze_sat_scale.value() / 100.0)
+            profile["dehaze_min"] = float(self.slider_dehaze_min.value() / 100.0)
+            profile["dehaze_max"] = float(self.slider_dehaze_max.value() / 100.0)
+            profile["exposure_cdf_cutoff"] = float(self.slider_exposure_cdf_cutoff.value() / 1000.0)
+            profile["exposure_numerator"] = float(self.slider_exposure_numerator.value() / 100.0)
+            profile["exposure_min"] = float(self.slider_exposure_min.value() / 100.0)
+            profile["exposure_max"] = float(self.slider_exposure_max.value() / 100.0)
+            profile["bh_min_idx"] = int(self.slider_bh_min_idx.value())
+            profile["bh_max_idx"] = int(self.slider_bh_max_idx.value())
+            profile["bh_decay"] = float(self.slider_bh_decay.value() / 100.0)
+            profile["bh_fallback"] = float(self.slider_bh_fallback.value() / 100.0)
+            profile["sharpness"] = float(self.slider_sharpness.value() / 100.0)
+            profile["darkness"] = float(self.slider_darkness.value() / 100.0)
+            
+            self.config_data[new_name] = profile
+            
+            try:
+                with open(self.yaml_path, 'w') as f:
+                    yaml.dump(self.config_data, f, default_flow_style=False, sort_keys=False)
+                print(f"Saved new profile '{new_name}' to: {self.yaml_path}")
+                
+                # Refresh profiles combo box and select the new one
+                self.block_updates = True
+                self.combo_profile.clear()
+                self.combo_profile.addItems(list(self.config_data.keys()))
+                self.combo_profile.setCurrentText(new_name)
+                self.current_profile = new_name
+                self.block_updates = False
+                
+                self.trigger_pipeline_update()
+            except Exception as e:
+                print(f"Error saving new profile: {e}")
 
     def setup_ui(self):
         # Apply dark stylesheet
@@ -200,10 +261,6 @@ class ColorTuningApp(QMainWindow):
         self.btn_load_orig.clicked.connect(self.choose_original)
         toolbar.addWidget(self.btn_load_orig)
         
-        self.btn_load_target = QPushButton("Load Target Image")
-        self.btn_load_target.clicked.connect(self.choose_target)
-        toolbar.addWidget(self.btn_load_target)
-        
         toolbar.addSpacing(20)
         
         lbl_profile = QLabel("Profile:")
@@ -211,40 +268,49 @@ class ColorTuningApp(QMainWindow):
         toolbar.addWidget(lbl_profile)
         
         self.combo_profile = QComboBox()
-        self.combo_profile.addItems(["default", "vivid", "subtle"])
+        self.combo_profile.addItems(list(self.config_data.keys()) if self.config_data else ["default", "vivid", "subtle"])
         self.combo_profile.currentTextChanged.connect(self.change_profile)
         toolbar.addWidget(self.combo_profile)
         
         toolbar.addStretch()
+
+        self.btn_save_new = QPushButton("Save as New Profile")
+        self.btn_save_new.setStyleSheet("background-color: #3b82f6;") # Blue
+        self.btn_save_new.clicked.connect(self.save_new_profile)
+        toolbar.addWidget(self.btn_save_new)
         
         self.btn_save = QPushButton("Save to color.yaml")
         self.btn_save.setStyleSheet("background-color: #10b981;") # Emerald Green
         self.btn_save.clicked.connect(self.save_yaml)
         toolbar.addWidget(self.btn_save)
         
-        # Image Grid (Target vs Result)
+        # Image Grid (Original vs Result)
         grid_layout = QHBoxLayout()
         left_layout.addLayout(grid_layout)
         
-        # Target Image View (Left)
-        target_v = QVBoxLayout()
-        target_v.addWidget(QLabel("<b>Target (Manual Edit)</b>"))
-        self.lbl_target = QLabel("No target image loaded")
-        self.lbl_target.setAlignment(Qt.AlignCenter)
-        self.lbl_target.setStyleSheet("background-color: #0f0f12; border: 1px solid #2e2e38; border-radius: 6px;")
-        self.lbl_target.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        target_v.addWidget(self.lbl_target)
-        grid_layout.addLayout(target_v)
+        # Original Image View (Left)
+        orig_v = QVBoxLayout()
+        orig_v.addWidget(QLabel("<b>Original</b>"))
+        self.lbl_original = QLabel("No original image loaded")
+        self.lbl_original.setAlignment(Qt.AlignCenter)
+        self.lbl_original.setStyleSheet("background-color: #0f0f12; border: 1px solid #2e2e38; border-radius: 6px;")
+        self.lbl_original.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        orig_v.addWidget(self.lbl_original)
+        grid_layout.addLayout(orig_v)
         
         # Result Image View (Right)
         result_v = QVBoxLayout()
-        result_v.addWidget(QLabel("<b>Result (Color Engine)</b>"))
+        result_v.addWidget(QLabel("<b>Adjusted (Color Engine)</b>"))
         self.lbl_result = QLabel("No preview available")
         self.lbl_result.setAlignment(Qt.AlignCenter)
         self.lbl_result.setStyleSheet("background-color: #0f0f12; border: 1px solid #2e2e38; border-radius: 6px;")
         self.lbl_result.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         result_v.addWidget(self.lbl_result)
         grid_layout.addLayout(result_v)
+
+        # Status Bar in the bottom of the screen
+        from PySide6.QtWidgets import QStatusBar
+        self.setStatusBar(QStatusBar(self))
 
         # Right Side - Control Panel (Sliders)
         control_scroll = QScrollArea()
@@ -391,6 +457,20 @@ class ColorTuningApp(QMainWindow):
             lambda: self.slider_bh_fallback.setValue(int(self.default_profile_data.get("bh_fallback", 0.67) * 100))
         )
         scroll_layout.addWidget(group_hue)
+        
+        # 7. Final Adjustments (Sharpness & Darkness)
+        group_final = QGroupBox("7. Final Adjustments")
+        final_layout = QFormLayout(group_final)
+        
+        self.slider_sharpness, self.lbl_sharpness = self.create_float_slider(
+            0.0, 3.0, 0.0, 100, final_layout, "Sharpness:",
+            lambda: self.slider_sharpness.setValue(int(self.default_profile_data.get("sharpness", 0.0) * 100))
+        )
+        self.slider_darkness, self.lbl_darkness = self.create_float_slider(
+            -1.0, 1.0, 0.0, 100, final_layout, "Darkness:",
+            lambda: self.slider_darkness.setValue(int(self.default_profile_data.get("darkness", 0.0) * 100))
+        )
+        scroll_layout.addWidget(group_final)
         
         scroll_layout.addStretch()
 
@@ -542,29 +622,24 @@ class ColorTuningApp(QMainWindow):
         
         self.slider_bh_fallback.setValue(int(profile.get("bh_fallback", 0.67) * 100))
         self.lbl_bh_fallback.setText(f"{profile.get('bh_fallback', 0.67):.2f}")
+        
+        self.slider_sharpness.setValue(int(profile.get("sharpness", 0.0) * 100))
+        self.lbl_sharpness.setText(f"{profile.get('sharpness', 0.0):.2f}")
+        
+        self.slider_darkness.setValue(int(profile.get("darkness", 0.0) * 100))
+        self.lbl_darkness.setText(f"{profile.get('darkness', 0.0):.2f}")
 
     def choose_original(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open Original Photo", "test_data/color_correction/", "Images (*.jpg *.jpeg *.png *.JPG *.JPEG *.PNG)")
+        initial_dir = "test_data/color_correction/"
+        if self.last_orig_path:
+            p_dir = Path(self.last_orig_path).parent
+            if p_dir.exists():
+                initial_dir = str(p_dir)
+        filename, _ = QFileDialog.getOpenFileName(self, "Open Original Photo", initial_dir, "Images (*.jpg *.jpeg *.png *.JPG *.JPEG *.PNG)")
         if filename:
+            self.last_orig_path = filename
+            self.settings.setValue("last_orig_path", filename)
             self.load_original(filename)
-            
-            # Automatically try to find target image (e.g. if loaded DSC06641.JPG, look for DSC06641_Edited.JPEG)
-            p = Path(filename)
-            edited_sibling1 = p.parent / f"{p.stem}_Edited.JPEG"
-            edited_sibling2 = p.parent / f"{p.stem}_Edited.jpg"
-            edited_sibling3 = p.parent / f"{p.stem}_Edited.JPG"
-            
-            if edited_sibling1.exists():
-                self.load_target(str(edited_sibling1))
-            elif edited_sibling2.exists():
-                self.load_target(str(edited_sibling2))
-            elif edited_sibling3.exists():
-                self.load_target(str(edited_sibling3))
-
-    def choose_target(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open Target Photo", "test_data/color_correction/", "Images (*.jpg *.jpeg *.png *.JPG *.JPEG *.PNG)")
-        if filename:
-            self.load_target(filename)
 
     def load_original(self, filepath):
         self.orig_image = cv2.imread(filepath)
@@ -576,30 +651,25 @@ class ColorTuningApp(QMainWindow):
             target_h = int(h * scale)
             self.resized_orig = cv2.resize(self.orig_image, (target_w, target_h), interpolation=cv2.INTER_AREA)
             
+            # Display Original Image in left view
+            rgb = cv2.cvtColor(self.resized_orig, cv2.COLOR_BGR2RGB)
+            self.show_pixmap(rgb, self.lbl_original)
+            
+            # Show status bar info
+            abs_path = os.path.abspath(filepath)
+            self.statusBar().showMessage(abs_path)
+            
             self.trigger_pipeline_update()
 
-    def load_target(self, filepath):
-        self.target_image = cv2.imread(filepath)
-        if self.target_image is not None:
-            if self.resized_orig is not None:
-                th, tw = self.resized_orig.shape[:2]
-                self.resized_target = cv2.resize(self.target_image, (tw, th), interpolation=cv2.INTER_AREA)
-            else:
-                h, w = self.target_image.shape[:2]
-                max_dim = 600
-                scale = max_dim / max(h, w)
-                self.resized_target = cv2.resize(self.target_image, (int(w*scale), int(h*scale)), interpolation=cv2.INTER_AREA)
-                
-            rgb = cv2.cvtColor(self.resized_target, cv2.COLOR_BGR2RGB)
-            self.show_pixmap(rgb, self.lbl_target)
-
     def auto_load_default_sample(self):
+        # First try the remembered path if it exists
+        if self.last_orig_path and os.path.exists(self.last_orig_path):
+            self.load_original(self.last_orig_path)
+            return
+
         default_file = Path("test_data/color_correction/DSC06641.JPG")
         if default_file.exists():
             self.load_original(str(default_file))
-            target_file = Path("test_data/color_correction/DSC06641_Edited.JPEG")
-            if target_file.exists():
-                self.load_target(str(target_file))
 
     def trigger_pipeline_update(self):
         if getattr(self, 'block_updates', False) or self.resized_orig is None:
@@ -629,6 +699,8 @@ class ColorTuningApp(QMainWindow):
         self.engine.bh_max_idx = int(self.slider_bh_max_idx.value())
         self.engine.bh_decay = float(self.slider_bh_decay.value() / 100.0)
         self.engine.bh_fallback = float(self.slider_bh_fallback.value() / 100.0)
+        self.engine.sharpness = float(self.slider_sharpness.value() / 100.0)
+        self.engine.darkness = float(self.slider_darkness.value() / 100.0)
         
         # Run Pipeline
         rgb_orig = cv2.cvtColor(self.resized_orig, cv2.COLOR_BGR2RGB)

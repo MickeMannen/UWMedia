@@ -86,6 +86,8 @@ class ColorCorrectionEngine:
         self.bh_max_idx = int(profile.get("bh_max_idx", 218))
         self.bh_decay = float(profile.get("bh_decay", 0.85))
         self.bh_fallback = float(profile.get("bh_fallback", 0.67))
+        self.sharpness = float(profile.get("sharpness", 0.0))
+        self.darkness = float(profile.get("darkness", 0.0))
 
         # Enable OpenCL (GPU Transparent API) if available
         if cv2.ocl.haveOpenCL():
@@ -395,10 +397,11 @@ class ColorCorrectionEngine:
         values = values - np.array(bpval)
         values = np.clip(values * np.array(gwfval), 0.0, 1.0)
 
-        # Dehaze adjustment curves
+        # Dehaze adjustment curves & Darkness correction
         max_value = np.max(values, axis=-1, keepdims=True)
         new_dhf = max_value / dhfval + 1.0 - max_value
-        values = expfval * (new_dhf * (values - 1.0) + 1.0)
+        adjusted_expf = expfval * (1.0 - self.darkness)
+        values = adjusted_expf * (new_dhf * (values - 1.0) + 1.0)
         values = np.clip(values, 0.0, 1.0)
 
         # Perceptual Hue Translation
@@ -428,6 +431,12 @@ class ColorCorrectionEngine:
         # Linear to sRGB via precomputed 12-bit LUT
         idx = np.clip(values * 4095.0 + 0.5, 0, 4095).astype(np.int32)
         final_rgb = (np.clip(self.lut_srgb[idx], 0.0, 1.0) * 255.0).astype(np.uint8)
+
+        # Apply Sharpness (unsharp mask)
+        if self.sharpness > 0.0:
+            blurred = cv2.GaussianBlur(final_rgb, (0, 0), 1.0)
+            final_rgb = cv2.addWeighted(final_rgb, 1.0 + self.sharpness, blurred, -self.sharpness, 0)
+
         return final_rgb
 
     # =========================================================================
