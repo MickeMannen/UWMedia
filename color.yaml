@@ -23,8 +23,8 @@ default:
   bh_max_idx: 218
   bh_decay: 0.85
   bh_fallback: 0.67
-  sharpness: 0.0
-  darkness: 0.0
+  sharpness: 0.47
+  darkness: -0.26
 vivid:
   cifval: 1.0
   red_threshold: 0.25
@@ -79,30 +79,4 @@ subtle:
   bh_fallback: 0.67
   sharpness: 0.0
   darkness: 0.0
-default_new:
-  cifval: 1.0
-  red_threshold: 0.3
-  red_scale: 0.2
-  blue_threshold: 0.3
-  blue_scale: 0.6
-  black_point_cutoff: 0.001
-  gw_mask_mult: 1.5
-  gw_mask_fallback: 0.2
-  gw_blur_radius: 9
-  gw_blur_sigma: 1.8
-  gw_isolation_threshold: 0.07
-  gw_isolation_min_sum: 100.0
-  dehaze_sat_cutoff: 0.1
-  dehaze_sat_scale: 0.75
-  dehaze_min: 0.81
-  dehaze_max: 1.0
-  exposure_cdf_cutoff: 0.01
-  exposure_numerator: 0.5
-  exposure_min: 1.0
-  exposure_max: 2.0
-  bh_min_idx: 155
-  bh_max_idx: 218
-  bh_decay: 0.85
-  bh_fallback: 0.67
-  sharpness: 0.47
-  darkness: -0.26
+
