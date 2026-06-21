@@ -373,12 +373,12 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         else:
             filename = source.stem + source.suffix.lower()
 
-    # Add milliseconds to photo filenames (limit to 2 digits)
+    # Add milliseconds to photo filenames (limit to 3 digits)
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
     if not is_video:
-        ms = creation_date.microsecond // 10000
+        ms = creation_date.microsecond // 1000
         p = Path(filename)
-        filename = f"{p.stem}_{ms:02d}{p.suffix}"
+        filename = f"{p.stem}_{ms:03d}{p.suffix}"
     
     target_path = output_dir / filename
 
@@ -451,7 +451,6 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 output_path=target_path,
                 creation_date=creation_date,
                 dive=dive,
-                stabilize=args.stabilize,
                 overlay=needs_overlay,
                 layout_path=args.layout,
                 start_time=args.start_time,
@@ -465,7 +464,6 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 output_path=target_path,
                 creation_date=creation_date,
                 dive=dive,
-                stabilize=args.stabilize,
                 color_correct=False,
                 overlay=needs_overlay,
                 layout_path=args.layout,
@@ -508,7 +506,31 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     else:
                         print("Warning: No dive data matched for this photo's timestamp.")
 
-                cv2.imwrite(str(target_path), frame)
+                if target_path.suffix.lower() in ('.jpg', '.jpeg'):
+                    subsampling = -1
+                    qtables = None
+                    if source.suffix.lower() in ('.jpg', '.jpeg'):
+                        try:
+                            from PIL import Image, JpegImagePlugin
+                            with Image.open(source) as img:
+                                subsampling = JpegImagePlugin.get_sampling(img)
+                                qtables = img.quantization
+                        except Exception as e:
+                            print(f"Warning: Could not read subsampling/quantization from {source}: {e}")
+                    
+                    try:
+                        from PIL import Image
+                        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        pil_img = Image.fromarray(rgb_frame)
+                        if qtables is not None:
+                            pil_img.save(target_path, qtables=qtables, subsampling=subsampling, optimize=True)
+                        else:
+                            pil_img.save(target_path, quality=100, subsampling=subsampling, optimize=True)
+                    except Exception as e:
+                        print(f"Error saving image with PIL: {e}. Falling back to cv2.imwrite")
+                        cv2.imwrite(str(target_path), frame)
+                else:
+                    cv2.imwrite(str(target_path), frame)
         else:
             # Simple copy for photos for now
             print(f"Skipping video processing for: {source.name} (Copying as photo)")
@@ -570,7 +592,6 @@ def main():
     parser.add_argument("--color", nargs='?', const='default', default=None, help="Apply color correction with selected profile (e.g. default, vivid, subtle). Defaults to 'default' if specified without a profile name.")
     parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--end-time", help="End time for clipping/processing (HH:MM:SS or MM:SS)")
-    parser.add_argument("--stabilize", nargs='?', const='high', choices=['low', 'mid', 'high'], help="Stabilization level (low, mid, high). Default: high")
     parser.add_argument("--hw-accel", action="store_true", default=False, help="Enable hardware acceleration")
     parser.add_argument("--layout", type=Path, help="JSON layout file or ZIP HUD package for overlay. Automatically enables overlay.")
     parser.add_argument("--tz-adjust", type=int, default=0, help="Timezone adjustment in hours (for Shearwater)")
@@ -875,17 +896,32 @@ def main():
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
         if len(files) > 1:
             from concurrent.futures import ProcessPoolExecutor, as_completed
+            import multiprocessing
             # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory
             max_workers = min(4, os.cpu_count() or 4)
             print(f"Starting parallel batch processing with {max_workers} workers...")
             
             tasks = [(file, args.output, args, manager, tmp_hud_dir) for file in files]
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            shutdown_wait = True
+            try:
                 futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
                 for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file"):
                     success, filename, error_msg = future.result()
                     if not success:
                         print(f"Error processing {filename}: {error_msg}")
+            except KeyboardInterrupt:
+                print("\n[!] KeyboardInterrupt received. Terminating all worker processes...")
+                shutdown_wait = False
+                for proc in multiprocessing.active_children():
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                executor.shutdown(wait=False, cancel_futures=True)
+                sys.exit(1)
+            finally:
+                executor.shutdown(wait=shutdown_wait)
         else:
             for file in tqdm(files, desc="Batch Processing", unit="file"):
                 process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)

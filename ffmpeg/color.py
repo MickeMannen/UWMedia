@@ -444,7 +444,7 @@ class ColorCorrectionEngine:
     # =========================================================================
 
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, 
-                      dive: Optional[Dive] = None, stabilize: Optional[str] = None, 
+                      dive: Optional[Dive] = None, 
                       overlay: bool = False, 
                       layout_path: Optional[Path] = None,
                       start_time: Optional[str] = None, end_time: Optional[str] = None,
@@ -474,9 +474,6 @@ class ColorCorrectionEngine:
                     print(f"Detected 10-bit/high bit-depth input ({src_pix_fmt}). Enabling 10-bit color preservation.")
         except Exception as e:
             pass
-
-        if stabilize:
-            print(f"Stabilization enabled (level: {stabilize})...")
 
         # 2. Analysis Phase (Seek-based fast analysis)
         filter_indices, filter_matrices = [], []
@@ -567,13 +564,6 @@ class ColorCorrectionEngine:
 
         # Build FFmpeg pipe
         filters = []
-        if stabilize:
-            if stabilize == "low":
-                filters.append("deshake=blocksize=8:rx=16:ry=16:edge=mirror")
-            elif stabilize == "mid":
-                filters.append("deshake=blocksize=16:rx=32:ry=32:edge=mirror")
-            else:
-                filters.append("deshake=blocksize=32:rx=64:ry=64:edge=mirror")
         if ass_path:
             filters.append(f"subtitles='{ass_path}'")
         
@@ -685,9 +675,16 @@ class ColorCorrectionEngine:
                     process.stdin.write(frame.tobytes())
                     pbar.update(1)
                     count += 1
+        except BaseException as e:
+            if process.poll() is None:
+                process.kill()
+            raise e
         finally:
             cap.release()
-            process.stdin.close()
+            try:
+                process.stdin.close()
+            except Exception:
+                pass
             process.wait()
             if ass_path and ass_path.exists(): ass_path.unlink()
         

@@ -93,7 +93,7 @@ class TestMetadata:
         shutil.copy2(src_photo, temp_src)
         
         # 2. Run first time: should process and output the file with milliseconds
-        expected_output = out_dir / "20251203_091548_98.jpg"
+        expected_output = out_dir / "20251203_091548_980.jpg"
         
         cmd = [
             "python3", "cli_main.py", str(temp_src), str(out_dir),
@@ -126,6 +126,51 @@ class TestMetadata:
         expected_moved_src = move_dir / "DSC03491.JPG"
         assert expected_moved_src.exists()
         assert not temp_src.exists()
+
+    def test_jpeg_quality_and_subsampling(self, tmp_path):
+        import subprocess
+        import shutil
+        from PIL import Image, JpegImagePlugin
+
+        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        
+        # 1. Setup temp source and output dirs
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        
+        temp_src = src_dir / "DSC03491.JPG"
+        shutil.copy2(src_photo, temp_src)
+        
+        # 2. Get original subsampling
+        with Image.open(src_photo) as img:
+            original_subsampling = JpegImagePlugin.get_sampling(img)
+        
+        # 3. Run cli_main.py with --color
+        cmd = [
+            "python3", "cli_main.py", str(temp_src), str(out_dir),
+            "--color", "--filename-format", "%Y%m%d_%H%M%S"
+        ]
+        subprocess.run(cmd, check=True)
+        
+        # 4. Verify output file exists
+        expected_output = out_dir / "20251203_091548_980.jpg"
+        assert expected_output.exists()
+        
+        # 5. Verify quality and subsampling match the original
+        with Image.open(expected_output) as img:
+            saved_subsampling = JpegImagePlugin.get_sampling(img)
+            quantization = img.quantization
+            
+        assert saved_subsampling == original_subsampling
+        
+        # Check that quantization tables match the original ones
+        with Image.open(src_photo) as orig:
+            original_quantization = orig.quantization
+        
+        assert quantization == original_quantization
+
 
 
 

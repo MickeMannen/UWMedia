@@ -27,8 +27,16 @@ class MetadataHandler:
         """Copies all metadata from source to target and applies overrides."""
 
         with ExifTool() as et:
-            et.execute(b"-TagsFromFile", str(src).encode('utf-8'),
-                       b"-all:all", b"-overwrite_original", str(dest).encode('utf-8'))
+            et.execute(
+                b"-TagsFromFile", str(src).encode('utf-8'),
+                b"-all:all",
+                b"--ThumbnailImage",
+                b"--PreviewImage",
+                b"--JpgFromRaw",
+                b"--OtherImage",
+                b"-overwrite_original",
+                str(dest).encode('utf-8')
+            )
 
         if force_tz_mins is not None:
             tz_offset_mins = force_tz_mins

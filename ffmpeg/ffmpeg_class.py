@@ -113,7 +113,7 @@ class FfmpegClass:
                 
             return subprocess.CompletedProcess(cmd, process.returncode)
             
-        except Exception as e:
+        except BaseException as e:
             if process.poll() is None:
                 process.kill()
             raise e
@@ -251,7 +251,7 @@ class FfmpegClass:
         return subprocess.check_output(cmd).decode().strip()
 
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, dive: Optional[Dive] = None, 
-                      stabilize: Optional[str] = None, color_correct: bool = False, overlay: bool = False,
+                      color_correct: bool = False, overlay: bool = False,
                       layout_path: Optional[Path] = None,
                       start_time: Optional[str] = None, end_time: Optional[str] = None,
                       tz_offset_mins: Optional[int] = None,
@@ -272,10 +272,6 @@ class FfmpegClass:
         width, height = self.get_video_dimensions(input_path)
         print(f"Video: {width}x{height} | Duration: {duration}s")
         
-        # 1. Stabilization (Deshake)
-        if stabilize:
-            print(f"Stabilization enabled (level: {stabilize})...")
-
         # 2. Construct Filter Chain
         filters = []
         
@@ -287,13 +283,7 @@ class FfmpegClass:
             # but here we provide both, so we use scale=w:h and ensure even numbers
             filters.append(f"scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2")
 
-        if stabilize:
-            if stabilize == "low":
-                filters.append("deshake=blocksize=8:rx=16:ry=16:edge=mirror")
-            elif stabilize == "mid":
-                filters.append("deshake=blocksize=16:rx=32:ry=32:edge=mirror")
-            else:  # high
-                filters.append("deshake=blocksize=32:rx=64:ry=64:edge=mirror")
+
 
         ass_path = None
         hud_filter = ""
@@ -338,7 +328,7 @@ class FfmpegClass:
 
         # 3. Final Assembly
         # Passthrough mode: Use -c copy if no video adjustments are requested
-        is_passthrough = not (filter_complex or stabilize or target_resolution or bitrate or color_correct)
+        is_passthrough = not (filter_complex or target_resolution or bitrate or color_correct)
         
         full_args = args + inputs
         
