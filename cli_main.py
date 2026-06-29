@@ -375,7 +375,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
     # Add milliseconds to photo filenames (limit to 3 digits)
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
-    if not is_video:
+    if not is_video and creation_date.microsecond > 0:
         ms = creation_date.microsecond // 1000
         p = Path(filename)
         filename = f"{p.stem}_{ms:03d}{p.suffix}"
