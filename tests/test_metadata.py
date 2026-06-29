@@ -249,6 +249,40 @@ class TestMetadata:
         
         assert quantization == original_quantization
 
+    def test_summary_output(self, tmp_path):
+        import subprocess
+        import shutil
+
+        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        
+        # Setup temp source and output dirs
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        
+        temp_src = src_dir / "DSC03491.JPG"
+        shutil.copy2(src_photo, temp_src)
+        
+        # Run cli_main.py with --color and --summary
+        cmd = [
+            "python3", "cli_main.py", str(temp_src), str(out_dir),
+            "--color", "--summary"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        # Verify output exists
+        expected_output = out_dir / "20251203_091548_980.jpg"
+        assert expected_output.exists()
+        
+        # Verify summary section exists in output
+        assert "UWMedia Activity Summary" in result.stdout
+        assert "Reading Photo" in result.stdout
+        assert "Color Correction" in result.stdout
+        assert "Saving Photo" in result.stdout
+        assert "Metadata Copying" in result.stdout
+
+
 
 
 

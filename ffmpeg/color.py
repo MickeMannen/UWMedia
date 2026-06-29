@@ -6,6 +6,8 @@ import json
 import re
 import time
 import sys
+import tempfile
+from io import StringIO
 import yaml
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -439,6 +441,204 @@ class ColorCorrectionEngine:
 
         return final_rgb
 
+    def generate_3d_lut(self, filt: np.ndarray, size: int = 64) -> np.ndarray:
+        """Takes a filter parameter array (11 floats) and generates a 3D LUT."""
+        # Create grid of all RGB input values (0-255)
+        steps = np.linspace(0, 255, size).astype(np.uint8)
+        # .cube format order: R fastest, G middle, B slowest
+        bb, gg, rr = np.meshgrid(steps, steps, steps, indexing='ij')
+        grid = np.stack([rr.ravel(), gg.ravel(), bb.ravel()], axis=1).astype(np.uint8)
+        # apply_filter expects (H, W, 3) uint8 RGB input
+        grid_img = grid.reshape(1, -1, 3)
+        corrected = self.apply_filter(grid_img, filt)
+        # Normalize to 0.0-1.0
+        return corrected.reshape(size, size, size, 3).astype(np.float32) / 255.0
+
+    def write_cube_file(self, lut: np.ndarray, path: Path, title: str = 'UWMedia'):
+        """Writes the LUT to .cube format."""
+        size = lut.shape[0]
+        buf = StringIO()
+        buf.write(f'TITLE "{title}"\n')
+        buf.write(f'LUT_3D_SIZE {size}\n\n')
+        flat = lut.reshape(-1, 3)
+        for row in flat:
+            buf.write(f'{row[0]:.6f} {row[1]:.6f} {row[2]:.6f}\n')
+        path.write_text(buf.getvalue())
+
+    def process_video_lut(self, input_path: Path, output_path: Path, creation_date: datetime,
+                          start_time: Optional[str] = None, end_time: Optional[str] = None,
+                          tz_offset_mins: Optional[int] = None,
+                          color_correct: bool = True):
+        """Fast path: analyze video, generate 3D LUTs, and process natively via FFmpeg lut3d filter."""
+        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
+            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
+        ])
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(str(input_path))
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = total_frames / fps if fps else 0
+
+        is_10bit = False
+        try:
+            if self.ffmpeg_tool:
+                src_pix_fmt = self.ffmpeg_tool.get_video_pix_fmt(input_path)
+                if "10" in src_pix_fmt or "12" in src_pix_fmt or "p010" in src_pix_fmt:
+                    is_10bit = True
+                    print(f"Detected 10-bit input ({src_pix_fmt}). Enabling 10-bit preservation.")
+        except Exception:
+            pass
+
+        # Analysis Phase
+        t_start_analysis = time.time()
+        filter_indices, filter_matrices = [], []
+        print(f"Analyzing {input_path.name}...")
+        step = int(fps * SAMPLE_SECONDS)
+        if step <= 0:
+            step = 30
+        sample_frames = list(range(0, total_frames, step))
+        if (total_frames - 1) not in sample_frames and total_frames > 0:
+            sample_frames.append(total_frames - 1)
+
+        with tqdm(total=len(sample_frames), desc="Analysis", unit="frame") as pbar:
+            for idx in sample_frames:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                if not ret:
+                    continue
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                filter_indices.append(idx)
+                filter_matrices.append(self.get_filter_matrix(rgb))
+                pbar.update(1)
+        cap.release()
+        filter_matrices = np.array(filter_matrices)
+        analysis_duration = time.time() - t_start_analysis
+
+        if len(filter_matrices) == 0:
+            print("Error: Could not analyze any frames.")
+            return
+
+        # Generate LUT files
+        t_start_lut = time.time()
+        lut_dir = Path(tempfile.mkdtemp(prefix='uwmedia_lut_'))
+        lut_paths = []
+        lut_timestamps = []  # in seconds
+
+        try:
+            # Deduplicate: group consecutive similar filter matrices
+            unique_filters = [filter_matrices[0]]
+            unique_indices = [filter_indices[0]]
+            for i in range(1, len(filter_matrices)):
+                if not np.allclose(filter_matrices[i], unique_filters[-1], atol=0.01):
+                    unique_filters.append(filter_matrices[i])
+                    unique_indices.append(filter_indices[i])
+
+            print(f"Generating {len(unique_filters)} 3D LUT(s) (64\u00b3)...")
+            with tqdm(total=len(unique_filters), desc="LUT Generation", unit="lut") as pbar:
+                for i, filt in enumerate(unique_filters):
+                    lut = self.generate_3d_lut(filt)
+                    lut_path = lut_dir / f"lut_{i:04d}.cube"
+                    self.write_cube_file(lut, lut_path)
+                    lut_paths.append(lut_path)
+                    lut_timestamps.append(unique_indices[i] / fps)
+                    pbar.update(1)
+            lut_gen_duration = time.time() - t_start_lut
+
+            # Build FFmpeg command
+            s_sec = self.ffmpeg_tool._parse_time(start_time) or 0.0
+            e_sec = self.ffmpeg_tool._parse_time(end_time) or duration
+            clip_duration = max(0, e_sec - s_sec)
+
+            # Build video filter
+            first_lut = str(lut_paths[0]).replace('\\', '/')
+            if len(lut_paths) == 1:
+                vf = f"lut3d=file='{first_lut}':interp=trilinear"
+            else:
+                # Write sendcmd script for LUT switching
+                sendcmd_path = lut_dir / "sendcmd.txt"
+                with open(sendcmd_path, 'w') as f:
+                    for i, (lp, ts) in enumerate(zip(lut_paths, lut_timestamps)):
+                        lp_str = str(lp).replace('\\', '/')
+                        f.write(f"{ts:.3f} [enter] lut3d file '{lp_str}';\n")
+                sendcmd_str = str(sendcmd_path).replace('\\', '/')
+                vf = f"sendcmd=f='{sendcmd_str}',lut3d=file='{first_lut}':interp=trilinear"
+
+            args = ["-y"]
+
+            if not self.ffmpeg_tool.debug:
+                args.extend(["-nostats", "-loglevel", "error"])
+
+            # Enable hardware-accelerated decoding
+            if self.ffmpeg_tool.hw_accel:
+                if self.ffmpeg_tool.os_type == "Darwin":
+                    args.extend(["-hwaccel", "videotoolbox"])
+                else:
+                    args.extend(["-hwaccel", "auto"])
+
+            if start_time:
+                args.extend(["-ss", start_time])
+            if end_time:
+                args.extend(["-to", end_time])
+
+            args.extend(["-i", str(input_path)])
+            args.extend(["-vf", vf])
+            args.extend(["-map", "0:v:0", "-map", "0:a?"])
+
+            try:
+                bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
+                args.extend(["-b:v", str(bitrate)])
+            except:
+                pass
+
+            args.extend(["-map_metadata", "0"])
+            args.extend(["-movflags", "+faststart+use_metadata_tags"])
+            args.extend(["-tag:v", "hvc1"])
+            args.extend([
+                "-color_primaries", "1",
+                "-color_trc", "1",
+                "-colorspace", "1"
+            ])
+
+            if tz_offset_mins is not None:
+                sign = "+" if tz_offset_mins >= 0 else "-"
+                hours = abs(tz_offset_mins) // 60
+                mins = abs(tz_offset_mins) % 60
+                tz_str = f"{sign}{hours:02}{mins:02}"
+                iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
+                args.extend(["-metadata", f"creation_time={iso_date}"])
+
+            output_pix_fmt = 'p010le' if is_10bit else 'yuv420p'
+            args.extend([
+                "-vcodec", self.ffmpeg_tool.get_encoder(),
+                "-pix_fmt", output_pix_fmt,
+                "-acodec", "copy",
+                str(output_path)
+            ])
+
+            print(f"Processing {input_path.name} using fast LUT path...")
+            t_start_render = time.time()
+            self.ffmpeg_tool.run_command(args, duration=clip_duration)
+            render_duration = time.time() - t_start_render
+            print(f"\nProcessing complete: {output_path.name}")
+            
+            total_to_process = int(clip_duration * fps) if clip_duration > 0 else total_frames
+            return {
+                "total_frames": total_frames,
+                "analysis_time": analysis_duration,
+                "analysis_fps": len(sample_frames) / analysis_duration if analysis_duration > 0 else 0,
+                "lut_gen_time": lut_gen_duration,
+                "render_time": render_duration,
+                "render_fps": total_to_process / render_duration if render_duration > 0 else 0,
+            }
+
+        finally:
+            # Clean up temp LUT files
+            import shutil
+            shutil.rmtree(lut_dir, ignore_errors=True)
+
     # =========================================================================
     # 3. VIDEO PROCESSING INTERFACE
     # =========================================================================
@@ -476,6 +676,7 @@ class ColorCorrectionEngine:
             pass
 
         # 2. Analysis Phase (Seek-based fast analysis)
+        t_start_analysis = time.time()
         filter_indices, filter_matrices = [], []
         if color_correct:
             print(f"Analyzing {input_path.name}...")
@@ -498,11 +699,13 @@ class ColorCorrectionEngine:
                     pbar.update(1)
             cap.release()
             filter_matrices = np.array(filter_matrices)
+            analysis_duration = time.time() - t_start_analysis
         else:
             cap.release()
             # Identity/noop parameters fallback
             filter_indices = [0]
             filter_matrices = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.67]])
+            analysis_duration = 0.0
 
         # HUD and overlay initialization
         ass_path = None
@@ -644,6 +847,7 @@ class ColorCorrectionEngine:
             for x in range(num_params):
                 interpolated_filters[:, x] = np.interp(all_counts, filter_indices, filter_matrices[:, x])
 
+        t_start_render = time.time()
         count = 0
         try:
             if s_frame > 0:
@@ -675,6 +879,7 @@ class ColorCorrectionEngine:
                     process.stdin.write(frame.tobytes())
                     pbar.update(1)
                     count += 1
+            render_duration = time.time() - t_start_render
         except BaseException as e:
             if process.poll() is None:
                 process.kill()
@@ -689,3 +894,10 @@ class ColorCorrectionEngine:
             if ass_path and ass_path.exists(): ass_path.unlink()
         
         print(f"\nProcessing complete: {output_path.name}")
+        return {
+            "total_frames": total_frames,
+            "analysis_time": analysis_duration,
+            "analysis_fps": len(sample_frames) / analysis_duration if (color_correct and analysis_duration > 0) else 0,
+            "render_time": render_duration,
+            "render_fps": total_to_process / render_duration if render_duration > 0 else 0,
+        }

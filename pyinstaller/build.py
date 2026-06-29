@@ -101,31 +101,6 @@ def build_app(target, revision, os_name, arch):
     try:
         subprocess.run(cmd, check=True)
         print(f"\nSUCCESS: {target} build complete.")
-        
-        # Create ZIP archive
-        import shutil
-        zip_name = dist_path / f"{exe_name}"
-        
-        target_item = dist_path / exe_name
-        if os_name.lower() in ["windows", "win32"] or sys.platform.startswith("win"):
-            if not target_item.exists() and (dist_path / f"{exe_name}.exe").exists():
-                target_item = dist_path / f"{exe_name}.exe"
-        elif os_name.lower() == "darwin" and target in ["gui", "tag_editor", "tag_editor_main"]:
-            if not target_item.exists() and (dist_path / f"{exe_name}.app").exists():
-                target_item = dist_path / f"{exe_name}.app"
-                
-        if target_item.exists():
-            if target_item.is_dir():
-                print(f">>> Creating ZIP archive of directory: {zip_name}.zip")
-                shutil.make_archive(str(zip_name), 'zip', root_dir=str(dist_path), base_dir=target_item.name)
-                print(f"Archive created at: {zip_name}.zip")
-            else:
-                print(f">>> Creating ZIP archive of single file: {zip_name}.zip")
-                import zipfile
-                with zipfile.ZipFile(f"{zip_name}.zip", 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    zipf.write(str(target_item), target_item.name)
-                print(f"Archive created at: {zip_name}.zip")
-            
     except subprocess.CalledProcessError as e:
         print(f"\nFAILED: {target} build failed with exit code {e.returncode}")
 

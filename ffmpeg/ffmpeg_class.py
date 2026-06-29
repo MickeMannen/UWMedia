@@ -1,6 +1,7 @@
 import shutil
 import platform
 import subprocess
+import time
 import json
 import re
 from pathlib import Path
@@ -240,6 +241,26 @@ class FfmpegClass:
         result = subprocess.check_output(cmd).decode().strip()
         return map(int, result.split('x'))
 
+    def get_video_frame_count(self, input_path: Path) -> int:
+        """Uses ffprobe to get video frame count."""
+        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
+        cmd = [
+            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_frames", "-of", "default=noprint_wrappers=1:nokey=1",
+            str(input_path)
+        ]
+        try:
+            out = subprocess.check_output(cmd).decode().strip()
+            if out.isdigit():
+                return int(out)
+        except:
+            pass
+        try:
+            duration = self.get_video_duration(input_path)
+            return int(duration * 30.0)
+        except:
+            return 0
+
     def get_video_pix_fmt(self, input_path: Path) -> str:
         """Uses ffprobe to get video pixel format."""
         ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
@@ -407,7 +428,17 @@ class FfmpegClass:
         print(f"Executing FFmpeg with {self.get_encoder()}...")
         # if self.debug:
         #     print(full_args)
+        t_start = time.time()
         try:
             self.run_command(full_args, duration=float(clip_duration))
         finally:
             if ass_path and ass_path.exists(): ass_path.unlink()
+        render_duration = time.time() - t_start
+        
+        total_frames = self.get_video_frame_count(input_path)
+        
+        return {
+            "total_frames": total_frames,
+            "render_time": render_duration,
+            "render_fps": total_frames / render_duration if render_duration > 0 else 0,
+        }

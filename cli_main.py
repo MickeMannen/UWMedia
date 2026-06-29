@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import time
 import tempfile
 import shutil
 import json
@@ -343,7 +344,14 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
 
 def process_single_file(source: Path, output_dir: Path, args, manager, meta_handler, tmp_hud_dir, forced_filename=None):
     """Processes a single video or photo file."""
+    t_file_start = time.time()
     print(f"\n--- Processing: {source.name} ---")
+    
+    stats = {
+        "file": source.name,
+        "type": "video" if source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi'] else "photo",
+        "stages": []
+    }
     
     # Extract Metadata
     try:
@@ -351,7 +359,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         print(f"Local Creation Date: {creation_date}")
     except Exception as e:
         print(f"Error extracting metadata for {source}: {e}")
-        return
+        return {"file": source.name, "error": f"Error extracting metadata: {e}"}
 
     # Determine Output Path
     if forced_filename:
@@ -386,7 +394,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     if (args.color or args.layout) and args.no_overwrite:
         if target_path.exists():
             print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
-            return
+            return {"file": source.name, "skipped": True}
 
     target_path = get_unique_path(target_path)
     
@@ -409,12 +417,16 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             
         print(f"Fast Mode: Copying file and fixing metadata -> {target_path.name}")
         shutil.copy2(source, target_path)
+        t_meta_start = time.time()
         try:
             meta_handler.copy_all(source, target_path, force_tz_mins=tz_offset_mins, custom_tags=args.modify_quicktime)
             print("Success: Metadata updated.")
+            meta_time = time.time() - t_meta_start
+            stats["stages"].append({"name": "Metadata Copying", "time": meta_time})
         except Exception as e:
             print(f"Error updating metadata: {e}")
-        return
+        stats["total_time"] = time.time() - t_file_start
+        return stats
 
     # Match Dive
     dive = manager.find_dive_for_timestamp(creation_date) if manager.dives else None
@@ -431,22 +443,46 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     
     if is_video and args.convert:
         # Multi-resolution conversion mode
+        t_conv_start = time.time()
         process_conversions(source, output_dir, args, creation_date, tz_offset_mins, meta_handler)
-        return
+        conv_time = time.time() - t_conv_start
+        stats["stages"].append({"name": "Multi-res Conversion", "time": conv_time})
+        stats["total_time"] = time.time() - t_file_start
+        return stats
 
     if is_video:
         ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
         needs_color = args.color
         needs_overlay = True if args.layout else False
         
-        # Use OpenCV pipe if color correction OR overlay is requested
-        # Telemetry overlays are much easier to sync in the OpenCV pipe
-        use_opencv_pipe = needs_color or needs_overlay
-
-        if use_opencv_pipe:
+        # Use fast LUT path for color-only processing (no overlay)
+        use_lut_path = needs_color and not needs_overlay and not args.color_legacy
+        
+        t_proc_start = time.time()
+        if use_lut_path:
             from ffmpeg.color import ColorCorrectionEngine
             engine = ColorCorrectionEngine(ff, color_profile=needs_color)
-            engine.process_video(
+            lut_stats = engine.process_video_lut(
+                input_path=source,
+                output_path=target_path,
+                creation_date=creation_date,
+                start_time=args.start_time,
+                end_time=args.end_time,
+                tz_offset_mins=tz_offset_mins
+            )
+            proc_time = time.time() - t_proc_start
+            
+            if lut_stats:
+                total_frames = lut_stats.get("total_frames", 0)
+                stats["stages"].append({"name": "Analysis Phase", "time": lut_stats["analysis_time"], "fps": lut_stats["analysis_fps"]})
+                stats["stages"].append({"name": "LUT Generation", "time": lut_stats["lut_gen_time"]})
+                stats["stages"].append({"name": "Processing/Encoding", "time": lut_stats["render_time"], "fps": lut_stats["render_fps"]})
+                if total_frames > 0:
+                    stats["overall_fps"] = total_frames / proc_time
+        elif needs_color or needs_overlay:
+            from ffmpeg.color import ColorCorrectionEngine
+            engine = ColorCorrectionEngine(ff, color_profile=needs_color)
+            legacy_stats = engine.process_video(
                 input_path=source,
                 output_path=target_path,
                 creation_date=creation_date,
@@ -458,8 +494,16 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 tz_offset_mins=tz_offset_mins,
                 color_correct=needs_color
             )
+            proc_time = time.time() - t_proc_start
+            
+            if legacy_stats:
+                total_frames = legacy_stats.get("total_frames", 0)
+                stats["stages"].append({"name": "Analysis Phase", "time": legacy_stats["analysis_time"], "fps": legacy_stats["analysis_fps"]})
+                stats["stages"].append({"name": "Processing/Encoding", "time": legacy_stats["render_time"], "fps": legacy_stats["render_fps"]})
+                if total_frames > 0:
+                    stats["overall_fps"] = total_frames / proc_time
         else:
-            ff.process_video(
+            ff_stats = ff.process_video(
                 input_path=source,
                 output_path=target_path,
                 creation_date=creation_date,
@@ -471,6 +515,13 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 end_time=args.end_time,
                 tz_offset_mins=tz_offset_mins
             )
+            proc_time = time.time() - t_proc_start
+            
+            if ff_stats:
+                total_frames = ff_stats.get("total_frames", 0)
+                stats["stages"].append({"name": "FFmpeg Native Processing", "time": ff_stats["render_time"], "fps": ff_stats["render_fps"]})
+                if total_frames > 0:
+                    stats["overall_fps"] = total_frames / proc_time
     else:
         # Photo Processing with optional Color/Overlay
         needs_color = args.color
@@ -478,13 +529,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
         if needs_color or needs_overlay:
             print(f"Applying processing to photo: {source.name}")
+            t_read = time.time()
             frame = cv2.imread(str(source))
+            read_time = time.time() - t_read
+            stats["stages"].append({"name": "Reading Photo", "time": read_time})
+            
             if frame is None:
                 print(f"Error: Could not read image {source}")
                 shutil.copy2(source, target_path)
             else:
                 # 1. Color Correction
                 if needs_color:
+                    t_color = time.time()
                     from ffmpeg.color import ColorCorrectionEngine
                     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
                     engine = ColorCorrectionEngine(ff, color_profile=needs_color)
@@ -492,9 +548,12 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     filt = engine.get_filter_matrix(rgb)
                     corrected_rgb = engine.apply_filter(rgb, filt)
                     frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
+                    color_time = time.time() - t_color
+                    stats["stages"].append({"name": "Color Correction", "time": color_time})
                 
                 # 2. HUD Overlay
                 if needs_overlay and dive:
+                    t_overlay = time.time()
                     from gui.hud_renderer import draw_hud
                     with open(args.layout, 'r') as f:
                         layout = json.load(f)
@@ -505,7 +564,10 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                         draw_hud(frame, layout, wp, waypoints=dive.waypoints)
                     else:
                         print("Warning: No dive data matched for this photo's timestamp.")
+                    overlay_time = time.time() - t_overlay
+                    stats["stages"].append({"name": "HUD Overlay", "time": overlay_time})
 
+                t_save = time.time()
                 if target_path.suffix.lower() in ('.jpg', '.jpeg'):
                     subsampling = -1
                     qtables = None
@@ -531,16 +593,24 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                         cv2.imwrite(str(target_path), frame)
                 else:
                     cv2.imwrite(str(target_path), frame)
+                save_time = time.time() - t_save
+                stats["stages"].append({"name": "Saving Photo", "time": save_time})
         else:
             # Simple copy for photos for now
             print(f"Skipping video processing for: {source.name} (Copying as photo)")
+            t_copy = time.time()
             shutil.copy2(source, target_path)
+            copy_time = time.time() - t_copy
+            stats["stages"].append({"name": "Copying Photo", "time": copy_time})
 
     # Post-processing metadata
     print("Post-processing metadata...")
+    t_meta_start = time.time()
     try:
         forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
         meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
+        meta_time = time.time() - t_meta_start
+        stats["stages"].append({"name": "Metadata Copying", "time": meta_time})
     except Exception as e:
         print(f"Warning: Failed to copy metadata: {e}")
 
@@ -552,9 +622,15 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             dest_path = dest_dir / source.name
             dest_path = get_unique_path(dest_path)
             print(f"Moving original file to: {dest_path}")
+            t_move = time.time()
             shutil.move(str(source), str(dest_path))
+            move_time = time.time() - t_move
+            stats["stages"].append({"name": "Moving Original File", "time": move_time})
         except Exception as e:
             print(f"Error moving original file {source} to {dest_dir}: {e}")
+
+    stats["total_time"] = time.time() - t_file_start
+    return stats
 
 def _parallel_worker(task):
     """Worker function for multi-core parallel processing of a single file."""
@@ -562,8 +638,8 @@ def _parallel_worker(task):
     # Re-initialize MetadataHandler locally inside the subprocess to prevent ExifTool locking/resource conflicts
     local_meta_handler = MetadataHandler()
     try:
-        process_single_file(file, output_dir, args, manager, local_meta_handler, tmp_hud_dir)
-        return True, file.name, None
+        stats = process_single_file(file, output_dir, args, manager, local_meta_handler, tmp_hud_dir)
+        return True, file.name, stats
     except Exception as e:
         import traceback
         return False, file.name, f"{e}\n{traceback.format_exc()}"
@@ -590,6 +666,7 @@ def main():
     parser.add_argument("output", type=Path, nargs='?', help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
     parser.add_argument("--color", nargs='?', const='default', default=None, help="Apply color correction with selected profile (e.g. default, vivid, subtle). Defaults to 'default' if specified without a profile name.")
+    parser.add_argument("--color-legacy", action="store_true", default=False, help="Force legacy per-frame Python color correction instead of fast LUT path")
     parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--end-time", help="End time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--hw-accel", action="store_true", default=False, help="Enable hardware acceleration")
@@ -602,6 +679,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
     parser.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
+    parser.add_argument("--summary", action="store_true", default=False, help="Show detailed summary of the activity at the end, including stage timings and FPS")
     parser.add_argument("--move-original", type=Path, help="Directory to move original source file to after successful processing (only when running --color or --layout)")
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
@@ -894,6 +972,7 @@ def main():
         
         # Process all files in directory
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
+        stats_list = []
         if len(files) > 1:
             from concurrent.futures import ProcessPoolExecutor, as_completed
             import multiprocessing
@@ -907,9 +986,12 @@ def main():
             try:
                 futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
                 for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file"):
-                    success, filename, error_msg = future.result()
+                    success, filename, result = future.result()
                     if not success:
-                        print(f"Error processing {filename}: {error_msg}")
+                        print(f"Error processing {filename}: {result}")
+                        stats_list.append({"file": filename, "error": result})
+                    else:
+                        stats_list.append(result)
             except KeyboardInterrupt:
                 print("\n[!] KeyboardInterrupt received. Terminating all worker processes...")
                 shutdown_wait = False
@@ -924,7 +1006,9 @@ def main():
                 executor.shutdown(wait=shutdown_wait)
         else:
             for file in tqdm(files, desc="Batch Processing", unit="file"):
-                process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
+                res = process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
+                if res:
+                    stats_list.append(res)
     else:
         # Single file source
         forced_filename = None
@@ -939,13 +1023,69 @@ def main():
             if not args.filename_format:
                 forced_filename = args.output.name
 
-        process_single_file(args.source, output_dir, args, manager, meta_handler, tmp_hud_dir, forced_filename=forced_filename)
+        stats = process_single_file(args.source, output_dir, args, manager, meta_handler, tmp_hud_dir, forced_filename=forced_filename)
+        stats_list = [stats] if stats else []
 
     print("\nAll tasks complete.")
+    
+    # Print detailed activity summary if requested
+    if args.summary and stats_list:
+        print_summary(stats_list)
     
     # Cleanup temp HUD files if used
     if tmp_hud_dir:
         shutil.rmtree(tmp_hud_dir)
+
+def print_summary(stats_list):
+    CYAN = "\033[1;36m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    MAGENTA = "\033[35m"
+    RED = "\033[1;31m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    WHITE = "\033[1;37m"
+    
+    print("\n" + "=" * 60)
+    print(f"{WHITE}{BOLD}                 UWMedia Activity Summary                 {RESET}")
+    print("=" * 60)
+    
+    for s in stats_list:
+        if not s:
+            continue
+        
+        filename = s.get("file", "Unknown")
+        if s.get("skipped"):
+            print(f"{CYAN}{BOLD}File: {filename}{RESET} - {YELLOW}Skipped (Target exists){RESET}")
+            print("-" * 60)
+            continue
+            
+        if s.get("error"):
+            print(f"{CYAN}{BOLD}File: {filename}{RESET} - {RED}Failed: {s['error']}{RESET}")
+            print("-" * 60)
+            continue
+            
+        file_type = s.get("type", "unknown").capitalize()
+        print(f"{CYAN}{BOLD}File: {filename} ({file_type}){RESET}")
+        
+        stages = s.get("stages", [])
+        for stage in stages:
+            name = stage.get("name", "Unknown")
+            t = stage.get("time", 0.0)
+            fps = stage.get("fps")
+            
+            fps_str = f" ({MAGENTA}{fps:.1f} fps{RESET})" if fps is not None and fps > 0 else ""
+            print(f"  {GREEN}{name:<25}{RESET} - Time: {YELLOW}{t:.2f}s{RESET}{fps_str}")
+            
+        total_time = s.get("total_time", 0.0)
+        overall_fps = s.get("overall_fps")
+        
+        print("  " + "-" * 40)
+        fps_summary = f" | Overall FPS: {MAGENTA}{overall_fps:.1f} fps{RESET}" if overall_fps is not None and overall_fps > 0 else ""
+        print(f"  {BOLD}Total Time:{RESET} {YELLOW}{total_time:.2f}s{RESET}{fps_summary}")
+        print("-" * 60)
+    
+    print("=" * 60 + "\n")
 
 if __name__ == "__main__":
     main()
