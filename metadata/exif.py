@@ -73,11 +73,10 @@ class MetadataHandler:
 
         if not any(key.startswith("XML:") for key in meta):
             # meta = exif._get_metadata(Path(file))
-            self.set_xmp_data(meta, dest)
+            if self.set_xmp_data(meta, dest):
+                print("Set XMP data")
 
-            print("Set XMP data")
-
-    def set_xmp_data(self, data, dest: Path):
+    def set_xmp_data(self, data, dest: Path) -> bool:
         """
         exiftool "-XMP:CreateDate=2025-09-15T14:41:00+07:00" file.jpg
 
@@ -132,8 +131,9 @@ class MetadataHandler:
             with ExifTool() as et:
                 status = et.execute(*cmd)
                 print(et.last_stderr)
+            return True
         else:
-            print("No XMP data to write")
+            return False
 
     def _date_str_to_datetime(self, date_str:str)->Optional[datetime]:
         try:

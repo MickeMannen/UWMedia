@@ -19,6 +19,9 @@ from models.dive import Dive, Waypoint
 # Constants for analysis
 SAMPLE_SECONDS = 2
 
+# Option 2: Adaptive Highlight Damping to prevent spotlight/flashlight oversaturation
+ENABLE_ADAPTIVE_DAMPING = True
+
 class ColorCorrectionEngine:
     """
     Underwater Color Correction Engine.
@@ -392,8 +395,23 @@ class ColorCorrectionEngine:
         original_values = values.copy()
 
         # Channel Restoration
-        values[..., 0] = values[..., 0] + cfval[0] * (1.0 - values[..., 0]) * values[..., 1]
-        values[..., 2] = values[..., 2] + cfval[1] * (1.0 - values[..., 2]) * values[..., 1]
+        if ENABLE_ADAPTIVE_DAMPING:
+            # Calculate pixel brightness (Luma) using standard Rec709 coefficients.
+            # This identifies bright regions (e.g. spotlight illuminated zones).
+            luma = 0.299 * values[..., 0] + 0.587 * values[..., 1] + 0.114 * values[..., 2]
+            
+            # Compute a damping factor. We smoothly transition from 1.0 (fully active color restoration
+            # in darker/normal regions below 40% brightness) down to 0.0 (no color restoration
+            # in highlights above 80% brightness).
+            damping = np.clip((0.8 - luma) / 0.4, 0.0, 1.0)
+            
+            # Apply the color restoration, scaled down in bright regions to prevent spotlight oversaturation
+            values[..., 0] = values[..., 0] + cfval[0] * (1.0 - values[..., 0]) * values[..., 1] * damping
+            values[..., 2] = values[..., 2] + cfval[1] * (1.0 - values[..., 2]) * values[..., 1] * damping
+        else:
+            # Old/legacy channel restoration (global application)
+            values[..., 0] = values[..., 0] + cfval[0] * (1.0 - values[..., 0]) * values[..., 1]
+            values[..., 2] = values[..., 2] + cfval[1] * (1.0 - values[..., 2]) * values[..., 1]
 
         # Black floor optimization & balance
         values = values - np.array(bpval)
