@@ -8,7 +8,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
 RESULTS_DIR = BASE_DIR / "test_data" / "test_results"
-LAYOUT_PATH = BASE_DIR / "computers" / "Shearwater_Perdix2_simple" / "hud_layout.json"
+LAYOUT_PATH = BASE_DIR / "computers"
 LOGS_DIR = BASE_DIR / "test_data" / "logs" / "uddf"
 
 @pytest.fixture(scope="module", autouse=True)
@@ -38,7 +38,8 @@ def test_color_only_video():
         "--color", "default",
         "--start-time", "00:00",
         "--end-time", "00:05",
-        "--filename-format", "test_color_only_video_result"
+        "--filename-format", "test_color_only_video_result",
+        "--hw-accel"
     ]
     
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -50,27 +51,31 @@ def test_color_only_video():
 def test_color_and_layout_video():
     """Scenario 2: Test --color combined with --layout overlay on a video. This executes the threaded python path."""
     source_video = TEST_DATA_DIR / "20251019_M0284.MP4"
+
     assert source_video.exists()
     assert LAYOUT_PATH.exists()
     assert LOGS_DIR.exists()
 
-    cmd = [
-        "python3", "cli_main.py",
-        str(source_video),
-        str(RESULTS_DIR),
-        "--color", "vivid",
-        "--layout", str(LAYOUT_PATH),
-        "--logs", str(LOGS_DIR),
-        "--start-time", "00:00",
-        "--end-time", "00:05",
-        "--filename-format", "test_color_layout_video_result"
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    assert result.returncode == 0, f"Command failed: {result.stderr}"
-    
-    expected_output = RESULTS_DIR / "test_color_layout_video_result.mp4"
-    assert expected_output.exists(), "Output video file with overlay was not created"
+    for file in LAYOUT_PATH.glob("*.zip"):
+
+        cmd = [
+            "python3", "cli_main.py",
+            str(source_video),
+            str(RESULTS_DIR),
+            "--color", "vivid",
+            "--layout", str(file),
+            "--logs", str(LOGS_DIR),
+            "--start-time", "00:00",
+            "--end-time", "00:05",
+            "--filename-format", f"test_color_layout_video_result_{file.stem}",
+            "--hw-accel"
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        assert result.returncode == 0, f"Command failed: {result.stderr}"
+
+        expected_output = RESULTS_DIR / f"test_color_layout_video_result_{file.stem}.mp4"
+        assert expected_output.exists(), "Output video file with overlay was not created"
 
 def test_color_clipping_options():
     """Scenario 3: Test --color with precise start/end clipping parameters and custom filename format."""
@@ -84,7 +89,8 @@ def test_color_clipping_options():
         "--color", "subtle",
         "--start-time", "00:02",
         "--end-time", "00:07",
-        "--filename-format", "test_color_clipped_result"
+        "--filename-format", "test_color_clipped_result",
+        "--hw-accel"
     ]
     
     result = subprocess.run(cmd, capture_output=True, text=True)
