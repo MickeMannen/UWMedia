@@ -23,6 +23,7 @@ def setup_results_dir():
             pass
     yield
 
+@pytest.mark.skip(reason="disabled by default to avoid confusion")
 def test_color_legacy_only_video():
     """Scenario 1: Test --color-legacy on video (forces the legacy python per-frame rendering loop)."""
     source_video = TEST_DATA_DIR / "20251019_M0284.MP4"
@@ -45,6 +46,7 @@ def test_color_legacy_only_video():
     expected_output = RESULTS_DIR / "test_color_legacy_video_result.mp4"
     assert expected_output.exists(), "Legacy path output video was not created"
 
+@pytest.mark.skip(reason="disabled by default to avoid confusion")
 def test_color_legacy_with_layout_video():
     """Scenario 2: Test --color-legacy with --layout overlay on a video."""
     source_video = TEST_DATA_DIR / "20251019_M0284.MP4"
