@@ -9,7 +9,7 @@ from models.dive import Waypoint, Dive, TankData
 class TestGarmin:
 
     def test_load(self):
-        file = Path(__file__).parent.parent / "test_data" / "release_test" / "fit" / "488 Phuket, Camera Bay.fit"
+        file = Path(__file__).parent.parent / "test_data" / "logs" / "fit" / "488 Phuket, Camera Bay.fit"
         dives = GarminParser().parse(file_path=file)
 
         assert len(dives) > 0

@@ -6,6 +6,8 @@ import json
 import re
 import time
 import sys
+import threading
+from queue import Queue
 import tempfile
 from io import StringIO
 import yaml
@@ -20,7 +22,7 @@ from models.dive import Dive, Waypoint
 SAMPLE_SECONDS = 2
 
 # Option 2: Adaptive Highlight Damping to prevent spotlight/flashlight oversaturation
-ENABLE_ADAPTIVE_DAMPING = True
+ENABLE_ADAPTIVE_DAMPING = False
 
 class ColorCorrectionEngine:
     """
@@ -381,7 +383,7 @@ class ColorCorrectionEngine:
         return np.stack([r, g, b], axis=-1)
 
     def apply_filter(self, mat: np.ndarray, filt: np.ndarray) -> np.ndarray:
-        """Applies the rendering sequence on a given frame."""
+        """Applies the rendering sequence on a given RGB frame. Returns RGB uint8."""
         cfval = (filt[0], filt[1])
         bpval = (filt[2], filt[3], filt[4])
         gwfval = (filt[5], filt[6], filt[7])
@@ -458,6 +460,15 @@ class ColorCorrectionEngine:
             final_rgb = cv2.addWeighted(final_rgb, 1.0 + self.sharpness, blurred, -self.sharpness, 0)
 
         return final_rgb
+
+    def apply_filter_bgr(self, bgr_frame: np.ndarray, filt: np.ndarray) -> np.ndarray:
+        """Color-correct a BGR frame in-place, returning BGR.
+        Eliminates 2 redundant cvtColor calls vs doing BGR->RGB + apply_filter + RGB->BGR separately."""
+        # Single BGR->RGB conversion
+        rgb = bgr_frame[:, :, ::-1]
+        corrected_rgb = self.apply_filter(rgb, filt)
+        # Single RGB->BGR conversion via slice flip (no copy)
+        return corrected_rgb[:, :, ::-1].copy()
 
     def generate_3d_lut(self, filt: np.ndarray, size: int = 64) -> np.ndarray:
         """Takes a filter parameter array (11 floats) and generates a 3D LUT."""
@@ -865,44 +876,105 @@ class ColorCorrectionEngine:
             for x in range(num_params):
                 interpolated_filters[:, x] = np.interp(all_counts, filter_indices, filter_matrices[:, x])
 
-        t_start_render = time.time()
-        count = 0
-        try:
-            if s_frame > 0:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, s_frame)
-                count = s_frame
+        # =====================================================================
+        # Phase 2: Threaded Pipeline (Decode → Process → Encode)
+        # Uses 3 threads with bounded queues to overlap I/O with computation.
+        # - Decode thread: reads frames from OpenCV VideoCapture
+        # - Process thread: applies color correction + HUD overlay
+        # - Main thread: writes processed frames to FFmpeg stdin
+        # =====================================================================
+        QUEUE_SIZE = 4  # Bounded queue depth to limit memory usage
+        _SENTINEL = None  # Signals end-of-stream between threads
 
-            with tqdm(total=total_to_process, desc="Processing", unit="frame") as pbar:
-                while cap.isOpened() and count <= e_frame:
+        decode_q = Queue(maxsize=QUEUE_SIZE)   # (frame_index, bgr_frame) or _SENTINEL
+        process_q = Queue(maxsize=QUEUE_SIZE)  # (bgr_frame_bytes) or _SENTINEL
+        decode_error = [None]  # Shared error slot for decode thread
+        process_error = [None]  # Shared error slot for process thread
+
+        # Pre-import HUD renderer once (avoid per-frame import overhead)
+        hud_draw_func = None
+        if layout and dive:
+            from gui.hud_renderer import draw_hud
+            hud_draw_func = draw_hud
+
+        # --- Decode Thread ---
+        def _decode_worker():
+            """Reads frames from VideoCapture and pushes to decode_q."""
+            try:
+                local_count = s_frame
+                if s_frame > 0:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, s_frame)
+                while cap.isOpened() and local_count <= e_frame:
                     ret, frame = cap.read()
-                    if not ret: break
-                    
-                    if color_correct:
-                        # Fetch precomputed filter for current frame index
-                        idx_filter = min(count, len(interpolated_filters) - 1)
-                        current_filter = interpolated_filters[idx_filter]
-                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        corrected_rgb = self.apply_filter(rgb, current_filter)
-                        frame = cv2.cvtColor(corrected_rgb, cv2.COLOR_RGB2BGR)
+                    if not ret:
+                        break
+                    decode_q.put((local_count, frame))
+                    local_count += 1
+            except Exception as e:
+                decode_error[0] = e
+            finally:
+                decode_q.put(_SENTINEL)
 
-                    if layout and dive:
-                        elapsed_total = count / fps
+        # --- Process Thread ---
+        def _process_worker():
+            """Applies color correction and HUD overlay, pushes bytes to process_q."""
+            try:
+                while True:
+                    item = decode_q.get()
+                    if item is _SENTINEL:
+                        break
+                    frame_idx, frame = item
+
+                    # Color correction (BGR throughout - eliminates 2 redundant conversions)
+                    if color_correct and interpolated_filters is not None:
+                        idx_filter = min(frame_idx, len(interpolated_filters) - 1)
+                        current_filter = interpolated_filters[idx_filter]
+                        frame = self.apply_filter_bgr(frame, current_filter)
+
+                    # HUD overlay (operates on BGR frame directly)
+                    if hud_draw_func and dive:
+                        elapsed_total = frame_idx / fps
                         current_time = creation_date + timedelta(seconds=elapsed_total)
                         wp = dive.get_waypoint_at(current_time)
-                        
                         if wp:
-                            from gui.hud_renderer import draw_hud
-                            draw_hud(frame, layout, wp, preloaded_skin=preloaded_skin, waypoints=dive.waypoints)
+                            hud_draw_func(frame, layout, wp,
+                                          preloaded_skin=preloaded_skin,
+                                          waypoints=dive.waypoints)
 
-                    process.stdin.write(frame.tobytes())
+                    # Pre-serialize to bytes (avoids doing it in the write thread)
+                    process_q.put(frame.tobytes())
+            except Exception as e:
+                process_error[0] = e
+            finally:
+                process_q.put(_SENTINEL)
+
+        # --- Start worker threads ---
+        t_start_render = time.time()
+        decode_thread = threading.Thread(target=_decode_worker, name="decode", daemon=True)
+        process_thread = threading.Thread(target=_process_worker, name="process", daemon=True)
+        decode_thread.start()
+        process_thread.start()
+
+        # --- Encode (main thread): write processed frame bytes to FFmpeg stdin ---
+        frames_written = 0
+        try:
+            with tqdm(total=total_to_process, desc="Processing", unit="frame") as pbar:
+                while True:
+                    frame_bytes = process_q.get()
+                    if frame_bytes is _SENTINEL:
+                        break
+                    process.stdin.write(frame_bytes)
                     pbar.update(1)
-                    count += 1
+                    frames_written += 1
             render_duration = time.time() - t_start_render
         except BaseException as e:
             if process.poll() is None:
                 process.kill()
             raise e
         finally:
+            # Ensure threads are joined before cleanup
+            decode_thread.join(timeout=5)
+            process_thread.join(timeout=5)
             cap.release()
             try:
                 process.stdin.close()
@@ -910,6 +982,12 @@ class ColorCorrectionEngine:
                 pass
             process.wait()
             if ass_path and ass_path.exists(): ass_path.unlink()
+
+        # Propagate any thread errors
+        if decode_error[0]:
+            raise decode_error[0]
+        if process_error[0]:
+            raise process_error[0]
         
         print(f"\nProcessing complete: {output_path.name}")
         return {

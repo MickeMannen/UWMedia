@@ -272,6 +272,13 @@ class ColorTuningApp(QMainWindow):
         self.combo_profile.currentTextChanged.connect(self.change_profile)
         toolbar.addWidget(self.combo_profile)
         
+        toolbar.addSpacing(20)
+        from PySide6.QtWidgets import QCheckBox
+        self.chk_legacy = QCheckBox("Use Legacy Pipeline")
+        self.chk_legacy.stateChanged.connect(self.trigger_pipeline_update)
+        self.chk_legacy.setStyleSheet("color: #e2e2e7; font-weight: bold;")
+        toolbar.addWidget(self.chk_legacy)
+        
         toolbar.addStretch()
 
         self.btn_save_new = QPushButton("Save as New Profile")
@@ -675,6 +682,9 @@ class ColorTuningApp(QMainWindow):
         if getattr(self, 'block_updates', False) or self.resized_orig is None:
             return
             
+        import ffmpeg.color as color_module
+        color_module.ENABLE_ADAPTIVE_DAMPING = not self.chk_legacy.isChecked()
+
         self.engine.cifval = float(self.slider_cifval.value() / 100.0)
         self.engine.red_threshold = float(self.slider_red_threshold.value() / 100.0)
         self.engine.red_scale = float(self.slider_red_scale.value() / 100.0)

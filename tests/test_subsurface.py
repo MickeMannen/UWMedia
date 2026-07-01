@@ -10,7 +10,7 @@ def test_missing_file():
 
 def test_parse_494_ssrf():
     parser = SubsurfaceParser()
-    path = Path("test_data/ssrf/494.ssrf")
+    path = Path("test_data/logs/ssrf/494.ssrf")
     dives = parser.parse(path)
     
     assert len(dives) == 1
@@ -52,7 +52,7 @@ def test_parse_494_ssrf():
 
 def test_parse_495_ssrf():
     parser = SubsurfaceParser()
-    path = Path("test_data/ssrf/495.ssrf")
+    path = Path("test_data/logs/ssrf/495.ssrf")
     dives = parser.parse(path)
     
     assert len(dives) == 1

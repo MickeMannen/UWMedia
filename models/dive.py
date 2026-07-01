@@ -109,15 +109,23 @@ class Dive(BaseModel):
     def duration(self) -> int:
         return int((self.end_time - self.start_time).total_seconds())
 
+    def invalidate_timestamp_cache(self):
+        """Call after mutating waypoints (slicing, tz adjustments, etc.)."""
+        self._ts_cache = None
+
     def get_waypoint_at(self, target_time: datetime) -> Optional[Waypoint]:
-        """Finds the waypoint closest to the given timestamp."""
+        """Finds the waypoint closest to the given timestamp.
+        Uses a cached timestamps list to avoid O(N) allocation per call."""
         if not self.waypoints:
             return None
         
-        # Binary search for the insertion point
-        # self.waypoints should be sorted by timestamp
-        timestamps = [w.timestamp for w in self.waypoints]
-        idx = bisect.bisect_left(timestamps, target_time)
+        # Build / reuse cached timestamp list for binary search
+        ts = getattr(self, '_ts_cache', None)
+        if ts is None or len(ts) != len(self.waypoints):
+            ts = [w.timestamp for w in self.waypoints]
+            self._ts_cache = ts
+
+        idx = bisect.bisect_left(ts, target_time)
         
         if idx == 0:
             return self.waypoints[0]

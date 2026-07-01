@@ -79,6 +79,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 d.end_time += timedelta(hours=args.tz_adjust)
                 for wp in d.waypoints:
                     wp.timestamp += timedelta(hours=args.tz_adjust)
+                d.invalidate_timestamp_cache()
     elif suffix == ".fit":
         parser = GarminParser()
         dives = parser.parse(log_path)
@@ -91,6 +92,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 d.end_time += timedelta(hours=args.tz_adjust)
                 for wp in d.waypoints:
                     wp.timestamp += timedelta(hours=args.tz_adjust)
+                d.invalidate_timestamp_cache()
     else:
         print(f"Error: Unsupported log format {suffix}")
         sys.exit(1)
@@ -107,6 +109,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     if limit_waypoints is not None and len(dive.waypoints) > 0:
         dive.waypoints = dive.waypoints[:limit_waypoints]
         dive.end_time = dive.waypoints[-1].timestamp
+        dive.invalidate_timestamp_cache()
         
     duration = dive.duration
     if duration <= 0:
@@ -182,15 +185,44 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     print(f"Generating video frames ({total_frames} frames)...")
     import subprocess as sp
     from gui.hud_renderer import draw_hud
+    import threading
+    from queue import Queue
     
     process = sp.Popen(cmd, stdin=sp.PIPE)
     
-    cached_frame = None
+    # Pre-allocate a reusable frame buffer (avoids np.zeros allocation per waypoint change)
+    frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
+    cached_bytes = None
     last_wp = None
     
     # Create a dummy waypoint for when current_wp is None
     # This allows draw_hud to still render something (which will show "--" due to format_telemetry_value)
     dummy_wp = Waypoint(timestamp=dive.start_time, depth=None, temp=None, time_since_start=0)
+
+    # =====================================================================
+    # Threaded Pipeline: Render → Write
+    # - Main thread: renders HUD frames (CPU-bound, Pillow text drawing)
+    # - Write thread: writes bytes to FFmpeg stdin (I/O-bound)
+    # Bounded queue prevents memory blowup while overlapping render + encode.
+    # =====================================================================
+    WRITE_QUEUE_SIZE = 8
+    write_q = Queue(maxsize=WRITE_QUEUE_SIZE)
+    write_error = [None]
+    _SENTINEL = None
+
+    def _write_worker():
+        """Writes pre-serialized frame bytes to FFmpeg stdin."""
+        try:
+            while True:
+                data = write_q.get()
+                if data is _SENTINEL:
+                    break
+                process.stdin.write(data)
+        except Exception as e:
+            write_error[0] = e
+
+    write_thread = threading.Thread(target=_write_worker, name="ffmpeg-write", daemon=True)
+    write_thread.start()
 
     try:
         # Use rate_noinv_fmt (string) instead of rate_noinv (float/None) to avoid crash at t=0
@@ -206,22 +238,61 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 wp_timestamp = wp.timestamp if wp else None
                 last_wp_timestamp = last_wp.timestamp if last_wp else None
                 
-                if cached_frame is None or wp_timestamp != last_wp_timestamp:
-                    # Redraw
-                    frame = np.zeros((height, width, 3), dtype=np.uint8)
-                    from gui.hud_renderer import draw_hud
-                    draw_hud(frame, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True, waypoints=dive.waypoints)
-                    cached_frame = frame
+                if cached_bytes is None or wp_timestamp != last_wp_timestamp:
+                    # Clear and redraw on the pre-allocated buffer
+                    frame_buffer[:] = 0
+                    draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True, waypoints=dive.waypoints)
+                    # Cache the serialized bytes so identical frames don't re-serialize
+                    cached_bytes = frame_buffer.tobytes()
                     last_wp = wp
                 
-                process.stdin.write(cached_frame.tobytes())
+                write_q.put(cached_bytes)
                 pbar.update(1)
     finally:
+        write_q.put(_SENTINEL)
+        write_thread.join(timeout=10)
         process.stdin.close()
         process.wait()
 
+    # Propagate any write thread errors
+    if write_error[0]:
+        raise write_error[0]
+
     # 5. Generate FCPXML
     generate_fcpxml(target_path, duration, fps=fps, width=width, height=height)
+
+    # 6. Write Date Taken / Creation Date metadata to matching Log Time
+    print("Writing creation date metadata...")
+    try:
+        from metadata.exif import MetadataHandler
+        meta_handler = MetadataHandler()
+        
+        # Calculate timezone adjust
+        tz_offset_mins = int(args.tz_adjust * 60) if getattr(args, 'tz_adjust', None) is not None else 0
+        sign = "+" if tz_offset_mins >= 0 else "-"
+        hours = abs(tz_offset_mins) // 60
+        mins = abs(tz_offset_mins) % 60
+        tz_iso = f"{sign}{hours:02}:{mins:02}"
+        
+        local_dt = dive.start_time
+        utc_dt = local_dt - timedelta(minutes=tz_offset_mins)
+        
+        utc_str = utc_dt.strftime("%Y:%m:%d %H:%M:%S")
+        local_with_tz_str = local_dt.strftime("%Y:%m:%d %H:%M:%S") + tz_iso
+        
+        tags = {
+            "QuickTime:CreateDate": utc_str,
+            "QuickTime:CreationDate": local_with_tz_str,
+            "QuickTime:TrackCreateDate": utc_str,
+            "QuickTime:MediaCreateDate": utc_str,
+            "QuickTime:Timezone": tz_iso,
+            "QuickTime:TimeZone": tz_iso,
+            "EXIF:DateTimeOriginal": local_dt.strftime("%Y:%m:%d %H:%M:%S"),
+            "EXIF:CreateDate": local_dt.strftime("%Y:%m:%d %H:%M:%S")
+        }
+        meta_handler.set_tags(target_path, tags)
+    except Exception as e:
+        print(f"Warning: Failed to write creation date metadata: {e}")
 
     print(f"\nDone: {target_path.name}")
 
@@ -362,7 +433,10 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         return {"file": source.name, "error": f"Error extracting metadata: {e}"}
 
     # Determine Output Path
-    if forced_filename:
+    if args.render_video_log:
+        layout_name = args.original_layout_stem or "default"
+        filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
+    elif forced_filename:
         # If forced, still ensure extension is lower case if it has one
         p = Path(forced_filename)
         filename = p.stem + p.suffix.lower()
@@ -383,15 +457,15 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
     # Add milliseconds to photo filenames (limit to 3 digits)
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
-    if not is_video and creation_date.microsecond > 0:
+    if not args.render_video_log and not is_video and creation_date.microsecond > 0:
         ms = creation_date.microsecond // 1000
         p = Path(filename)
         filename = f"{p.stem}_{ms:03d}{p.suffix}"
     
     target_path = output_dir / filename
 
-    # Check no-overwrite option (only when running --color or --layout)
-    if (args.color or args.layout) and args.no_overwrite:
+    # Check no-overwrite option
+    if (args.color or args.layout or args.render_video_log) and args.no_overwrite:
         if target_path.exists():
             print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
             return {"file": source.name, "skipped": True}
@@ -440,6 +514,205 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
     # Determine if it's a video
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
+
+    if args.render_video_log:
+        t_proc_start = time.time()
+        # Load layout to determine output video resolution
+        with open(args.layout, 'r') as f:
+            layout = json.load(f)
+
+        hud_skin = layout.get("hud_skin", {})
+        skin_path = hud_skin.get("path")
+        skin_type = hud_skin.get("type", "image")
+        user_scale = hud_skin.get("scale", 1.0)
+
+        if skin_type == "shape":
+            width = int(hud_skin.get("width", 400))
+            height = int(hud_skin.get("height", 200))
+        else:
+            if skin_path:
+                img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+                if img_temp is not None:
+                    width = int(img_temp.shape[1] * user_scale)
+                    height = int(img_temp.shape[0] * user_scale)
+                else:
+                    width, height = 1920, 1080
+            else:
+                width, height = 1920, 1080
+
+        if width % 2 != 0: width += 1
+        if height % 2 != 0: height += 1
+
+        if is_video:
+            # Probe original video properties (for fps and duration)
+            cap = cv2.VideoCapture(str(source))
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+
+            ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
+            cmd = [
+                str(ff.get_path()), '-y',
+                '-f', 'rawvideo', '-vcodec', 'rawvideo',
+                '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
+                '-i', '-', 
+                '-vcodec', ff.get_encoder(),
+                '-pix_fmt', 'yuv420p',
+                '-tag:v', 'hvc1',
+                '-crf', '20',
+                str(target_path)
+            ]
+            if not args.debug:
+                cmd.extend(["-nostats", "-loglevel", "error"])
+
+            import subprocess as sp
+            import threading
+            from queue import Queue
+            from gui.hud_renderer import draw_hud
+
+            process = sp.Popen(cmd, stdin=sp.PIPE)
+
+            frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
+            cached_bytes = None
+            last_wp = None
+
+            # Load layout has been moved earlier to determine resolution
+            preloaded_skin = None
+            if skin_path:
+                img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+                if img_skin is not None:
+                    skin_opacity = hud_skin.get("opacity", 1.0)
+                    preloaded_skin = cv2.resize(img_skin, (width, height), interpolation=cv2.INTER_AREA)
+                    if preloaded_skin.shape[2] == 4:
+                        preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+
+            WRITE_QUEUE_SIZE = 8
+            write_q = Queue(maxsize=WRITE_QUEUE_SIZE)
+            write_error = [None]
+            _SENTINEL = None
+
+            def _write_worker():
+                try:
+                    while True:
+                        data = write_q.get()
+                        if data is _SENTINEL:
+                            break
+                        process.stdin.write(data)
+                except Exception as e:
+                    write_error[0] = e
+
+            write_thread = threading.Thread(target=_write_worker, name="ffmpeg-write", daemon=True)
+            write_thread.start()
+
+            try:
+                with tqdm(total=total_frames, desc=f"Rendering {source.name}", unit="frame") as pbar:
+                    for i in range(total_frames):
+                        elapsed = i / fps
+                        current_time = creation_date + timedelta(seconds=elapsed)
+                        wp = dive.get_waypoint_at(current_time) if dive else None
+
+                        wp_timestamp = wp.timestamp if wp else None
+                        last_wp_timestamp = last_wp.timestamp if last_wp else None
+
+                        if cached_bytes is None or wp_timestamp != last_wp_timestamp:
+                            frame_buffer[:] = 0
+                            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0, time_since_start=0), render_log=True, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+                            cached_bytes = frame_buffer.tobytes()
+                            last_wp = wp
+
+                        write_q.put(cached_bytes)
+                        pbar.update(1)
+            finally:
+                write_q.put(_SENTINEL)
+                write_thread.join(timeout=10)
+                process.stdin.close()
+                process.wait()
+
+            if write_error[0]:
+                raise write_error[0]
+
+            proc_time = time.time() - t_proc_start
+            stats["stages"].append({"name": "Telemetry Video Render", "time": proc_time})
+        else:
+            # Load layout to determine output photo resolution
+            with open(args.layout, 'r') as f:
+                layout = json.load(f)
+
+            hud_skin = layout.get("hud_skin", {})
+            skin_path = hud_skin.get("path")
+            skin_type = hud_skin.get("type", "image")
+            user_scale = hud_skin.get("scale", 1.0)
+
+            if skin_type == "shape":
+                width = int(hud_skin.get("width", 400))
+                height = int(hud_skin.get("height", 200))
+            else:
+                if skin_path:
+                    img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+                    if img_temp is not None:
+                        width = int(img_temp.shape[1] * user_scale)
+                        height = int(img_temp.shape[0] * user_scale)
+                    else:
+                        width, height = 1920, 1080
+                else:
+                    width, height = 1920, 1080
+
+            if width % 2 != 0: width += 1
+            if height % 2 != 0: height += 1
+
+            frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
+
+            preloaded_skin = None
+            if skin_path:
+                img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+                if img_skin is not None:
+                    skin_opacity = hud_skin.get("opacity", 1.0)
+                    preloaded_skin = cv2.resize(img_skin, (width, height), interpolation=cv2.INTER_AREA)
+                    if preloaded_skin.shape[2] == 4:
+                        preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+
+            from gui.hud_renderer import draw_hud
+            wp = dive.get_waypoint_at(creation_date) if dive else None
+            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0), render_log=True, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+
+            subsampling = -1
+            qtables = None
+            if source.suffix.lower() in ('.jpg', '.jpeg'):
+                try:
+                    from PIL import Image, JpegImagePlugin
+                    with Image.open(source) as img:
+                        subsampling = JpegImagePlugin.get_sampling(img)
+                        qtables = img.quantization
+                except Exception as e:
+                    pass
+
+            try:
+                from PIL import Image
+                rgb_frame = cv2.cvtColor(frame_buffer, cv2.COLOR_BGR2RGB)
+                pil_img = Image.fromarray(rgb_frame)
+                if qtables is not None:
+                    pil_img.save(target_path, qtables=qtables, subsampling=subsampling, optimize=True)
+                else:
+                    pil_img.save(target_path, quality=100, subsampling=subsampling, optimize=True)
+            except Exception as e:
+                cv2.imwrite(str(target_path), frame_buffer)
+
+            proc_time = time.time() - t_proc_start
+            stats["stages"].append({"name": "Telemetry Photo Render", "time": proc_time})
+
+        # Post-process metadata to preserve QuickTime date taken / Exif
+        print("Post-processing metadata...")
+        t_meta_start = time.time()
+        try:
+            forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
+            meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
+            meta_time = time.time() - t_meta_start
+            stats["stages"].append({"name": "Metadata Copying", "time": meta_time})
+        except Exception as e:
+            print(f"Warning: Failed to copy metadata: {e}")
+
+        stats["total_time"] = time.time() - t_file_start
+        return stats
     
     if is_video and args.convert:
         # Multi-resolution conversion mode
@@ -684,6 +957,7 @@ def main():
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
     parser.add_argument("--export-json", type=Path, help="Read logs from a directory and create a JSON file for each log file using same filename but json extension.")
+    parser.add_argument("--render-video-log", action="store_true", default=False, help="Create a telemetry-only video/photo on a black background for all files in the input folder (requires --layout and --logs).")
 
     args = parser.parse_args()
 
@@ -717,6 +991,16 @@ def main():
         # If no output is specified at all, default to current directory
         if not args.output:
             args.output = Path.cwd()
+    elif args.render_video_log:
+        if not args.layout:
+            print("Error: --render-video-log requires --layout to be specified.")
+            sys.exit(1)
+        if not args.logs:
+            print("Error: --render-video-log requires --logs to be specified.")
+            sys.exit(1)
+        if not args.source or not args.output:
+            print("Error: Source (input folder) and output (output folder) are required when using --render-video-log.")
+            sys.exit(2)
     elif args.export_json:
         args.export_json = args.export_json.resolve()
     else:
@@ -777,6 +1061,7 @@ def main():
                             d.end_time += timedelta(hours=args.tz_adjust)
                             for wp in d.waypoints:
                                 wp.timestamp += timedelta(hours=args.tz_adjust)
+                            d.invalidate_timestamp_cache()
                 elif suffix == ".fit":
                     dives = garmin.parse(path)
                     if args.tz_adjust:
@@ -785,6 +1070,7 @@ def main():
                             d.end_time += timedelta(hours=args.tz_adjust)
                             for wp in d.waypoints:
                                 wp.timestamp += timedelta(hours=args.tz_adjust)
+                            d.invalidate_timestamp_cache()
                 elif suffix in (".ssrf", ".xml"):
                     dives = subsurface.parse(path)
                     if args.tz_adjust:
@@ -793,6 +1079,7 @@ def main():
                             d.end_time += timedelta(hours=args.tz_adjust)
                             for wp in d.waypoints:
                                 wp.timestamp += timedelta(hours=args.tz_adjust)
+                            d.invalidate_timestamp_cache()
             except Exception as e:
                 print(f"Error parsing {path.name}: {e}")
                 continue
@@ -927,6 +1214,7 @@ def main():
                         d.end_time += timedelta(hours=args.tz_adjust)
                         for wp in d.waypoints:
                             wp.timestamp += timedelta(hours=args.tz_adjust)
+                        d.invalidate_timestamp_cache()
                 manager.add_dives(dives)
             elif path.suffix == ".fit":
                 found_garmin = True
@@ -939,6 +1227,7 @@ def main():
                         d.end_time += timedelta(hours=args.tz_adjust)
                         for wp in d.waypoints:
                             wp.timestamp += timedelta(hours=args.tz_adjust)
+                        d.invalidate_timestamp_cache()
                 manager.add_dives(dives)
 
     # Warning for Garmin logs without config
