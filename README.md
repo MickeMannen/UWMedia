@@ -1,5 +1,11 @@
 # UWMedia (Underwater Media Processor)
 
+<p align="center">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=python,bash,qt,yaml,git,md,gemini,claude" alt="Tech Stack" />
+  </a>
+</p>
+
 UWMedia is a fun tool for processing underwater videos and photos. It can use telemetry information from divecomputers to generate an overlay on photos and videos. There is also support for color correction so you dont have to do every photo / video one by one.
 
 When i started the project 2025 I wanted the overlay data from the dive computer on my videos. At the same time I added a basic color correction but it wasnt very good.
@@ -10,12 +16,14 @@ Since then I started to use Gemini and Antigravity to be able to test alternativ
 ## Key Features
 
 - **Batch Processing**: Process entire directories of videos and photos in one command.
-- **Advanced Color Correction**: Intelligent underwater color restoration based on frame-by-frame analysis.
-- **Telemetry Overlay (HUD)**: Synchronize dive logs from Garmin (.FIT) and Shearwater (.UDDF) to create dynamic telemetry overlays.
+- **Fast 3D LUT Color Pipeline**: Dynamic 3D LUT (`.cube`) generation from profile settings, executing color correction natively in FFmpeg to bypass Python overhead and achieve up to 10x speedups.
+- **Advanced Color Correction**: Intelligent underwater color restoration with custom profiles (vivid, subtle, default) saved in `color.yaml`.
+- **Telemetry Overlay (HUD)**: Synchronize dive logs from Garmin (.FIT), Subsurface (.XML), and Shearwater (.UDDF) to create dynamic telemetry overlays.
+- **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration.
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
 - **Dynamic Naming**: Automatically rename files based on the "Date Taken" metadata (`YYYYMMDD_HHMMSS`).
 - **HUD Packaging**: Support for portable HUD designs via `.zip` packages containing layouts and skins.
-- **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background.
+- **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background, with size automatically adjusted to layout dimensions.
 - **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 
@@ -60,22 +68,29 @@ If you want to package the applications into standalone binaries yourself, use t
 The CLI is the primary way to process media batches.
 
 ```bash
-# Basic color correction
-python main.py ./raw_videos/ ./output/ --color
+# Basic color correction (utilizing the fast 3D LUT pipeline)
+python cli_main.py ./raw_videos/ ./output/ --color
+
+# Force legacy per-frame Python pipeline for color correction
+python cli_main.py ./raw_videos/ ./output/ --color default --color-legacy
 
 # Complete processing with dive logs and telemetry overlay
-python main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --color
+python cli_main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --color
 
-# Generate telemetry video directly from a log file
-python main.py --render-log dive_log.fit --layout perdix_layout.json
+# Generate telemetry video directly from a log file (size matches layout dimensions)
+python cli_main.py --render-log dive_log.fit --layout perdix_layout.json
 
 # Generate telemetry video directly from a log file, limiting to the first 100 waypoints (useful for testing)
-python main.py --render-log dive_log.fit 100 --layout perdix_layout.json
+python cli_main.py --render-log dive_log.fit 100 --layout perdix_layout.json
+
+# Batch generate telemetry overlay files for all photos/videos in a folder (matched to log times)
+python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --logs ./dive_logs/
 ```
 
 #### Key Arguments:
-- `--color`: Apply underwater color correction.
-- `--logs <dir>`: Path to directory containing `.uddf` or `.fit` logs.
+- `--color`: Apply underwater color correction. Uses high-performance 3D LUT mapping by default.
+- `--color-legacy`: Bypass 3D LUT and force raw CPU frame-by-frame color rendering.
+- `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs.
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
 - `--render-log <file> [num_waypoints]`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`). You can optionally specify a second argument for the number of waypoints to render (e.g., `100`) to limit processing time during testing.
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
@@ -122,11 +137,14 @@ python color_tuning_gui.py
 
 ## Technical Highlights
 
-### Color Correction Algorithm
-The initial project used the logic found in [bornfree/dive-color-corrector](https://github.com/bornfree/dive-color-corrector). But now it is rewritten using Gemini.
+### 3D LUT Color Correction
+For standalone video color correction, UWMedia generates a 3D Lookup Table (`.cube` file) dynamically from the parameter configurations in `color.yaml` and executes the color grading natively inside FFmpeg using the `lut3d` filter. This bypasses the Python interpreter's frame-by-frame decoding and matrix math, achieving up to 10x speedups with high rendering throughput.
+
+### Threaded Python Processing
+When drawing telemetry layouts onto videos, the application employs a 3-thread concurrent pipeline (decoding, processing/drawing, and encoding running in parallel) with native BGR in-place frame processing to prevent redundant color-space conversions and maximize GUI/CPU core utilization.
 
 ### Metadata Handling
-Powered by **PyExifTool**, UWMedia ensures that your processed files are not "blank" videos. It copies all vendor-specific tags and correctly handles the complex timezone offsets found in DJI, Sony, and GoPro files.
+Powered by **PyExifTool**, UWMedia ensures that your processed files are not "blank" videos. It copies all vendor-specific tags and correctly handles the complex timezone offsets found in DJI, Sony, and GoPro files. It also injects location, timezone, and matched dive log dates directly into generated overlays.
 
 
 ### Layout Validation
