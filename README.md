@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=python,bash,qt,yaml,git,md,gemini,claude" alt="Tech Stack" />
+    <img src="https://skillicons.dev/icons?i=python,bash,qt,git,md,gemini,claude" alt="Tech Stack" />
   </a>
 </p>
 
@@ -161,3 +161,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Color Algorithm: [bornfree](https://github.com/bornfree)
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbLTE1MTk3MDE2NzBdfQ==
+-->
