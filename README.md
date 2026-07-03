@@ -93,16 +93,11 @@ python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --
 
 #### Key Arguments:
 - `--color`: Apply underwater color correction. Uses high-performance 3D LUT mapping by default.
-- `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs (Make sure you dont have .
+- `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs (Make sure you don't have duplicates).
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
 - `--render-log <file> [num_waypoints]`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`). You can optionally specify a second argument for the number of waypoints to render (e.g., `100`) to limit processing time during testing.
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
-
-Color Correction:
-
-<img width="6192" height="4128" alt="before_small" src="https://github.com/user-attachments/assets/6eaf0890-834b-4400-a536-8e1c0785c552" />
-<img width="6192" height="4128" alt="after_small" src="https://github.com/user-attachments/assets/3bf2d8a3-e694-478e-ac11-c90236c95f07" />
 
 
 ### Graphical User Interfaces (GUIs)
@@ -165,6 +160,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMzA5NDQyODI2LDE2MDU0NzY0ODgsLTE1OD
-g3NDk2MTIsLTQ1NjYwNjAzN119
+eyJoaXN0b3J5IjpbMTI5NTg3MDQ0MywxNjA1NDc2NDg4LC0xNT
+g4NzQ5NjEyLC00NTY2MDYwMzddfQ==
 -->
