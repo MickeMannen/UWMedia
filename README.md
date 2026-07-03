@@ -29,7 +29,7 @@ Add images with examples of features
 - **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration.
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
 - **Dynamic Naming**: Automatically rename files based on the "Date Taken" metadata (`YYYYMMDD_HHMMSS`).
-- **HUD Packaging**: Support for portable HUD designs via `.zip` packages containing layouts and skins.
+- **HUD Packaging**: Support for portable HUD designs via `.zip` packages containing layouts and skins, the GUI application makes it possible to edit existing HUD or create your own.
 - **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background, with size automatically adjusted to layout dimensions.
 - **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
@@ -169,6 +169,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTExNzYxMjgyNzUsMTYwNTQ3NjQ4OCwtMT
-U4ODc0OTYxMiwtNDU2NjA2MDM3XX0=
+eyJoaXN0b3J5IjpbMTc5NzQwNTcxNywxNjA1NDc2NDg4LC0xNT
+g4NzQ5NjEyLC00NTY2MDYwMzddfQ==
 -->
