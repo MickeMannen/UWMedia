@@ -2,9 +2,11 @@
 
 <p align="center">
   <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=python,bash,qt,git,md,gemini,claude" alt="Tech Stack" />
+    <img src="https://skillicons.dev/icons?i=python,bash,qt,git,md,Gemini,Claude" alt="Tech Stack" />
   </a>
 </p>
+
+![Claude](https://shields.io)
 
 UWMedia is a fun tool for processing underwater videos and photos. It can use telemetry information from divecomputers to generate an overlay on photos and videos. There is also support for color correction so you dont have to do every photo / video one by one.
 
@@ -162,5 +164,5 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1MTk3MDE2NzBdfQ==
+eyJoaXN0b3J5IjpbLTQ1NjYwNjAzN119
 -->
