@@ -6,6 +6,7 @@
   </a>
 </p>
 
+<img src="https://shields.io" alt="Claude AI" />
 
 **Built With:** ![Claude](https://shields.io)  ![Gemini](https://shields.io)
 
@@ -169,5 +170,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1ODg3NDk2MTIsLTQ1NjYwNjAzN119
+eyJoaXN0b3J5IjpbMTYwNTQ3NjQ4OCwtMTU4ODc0OTYxMiwtND
+U2NjA2MDM3XX0=
 -->
