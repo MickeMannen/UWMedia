@@ -78,9 +78,6 @@ The CLI is the primary way to process media batches.
 # Basic color correction (utilizing the fast 3D LUT pipeline)
 python cli_main.py ./raw_videos/ ./output/ --color
 
-# Force legacy per-frame Python pipeline for color correction
-python cli_main.py ./raw_videos/ ./output/ --color default --color-legacy
-
 # Complete processing with dive logs and telemetry overlay
 python cli_main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --color
 
@@ -96,8 +93,7 @@ python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --
 
 #### Key Arguments:
 - `--color`: Apply underwater color correction. Uses high-performance 3D LUT mapping by default.
-- `--color-legacy`: Bypass 3D LUT and force raw CPU frame-by-frame color rendering.
-- `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs.
+- `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs (Make sure you dont have .
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
 - `--render-log <file> [num_waypoints]`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`). You can optionally specify a second argument for the number of waypoints to render (e.g., `100`) to limit processing time during testing.
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
@@ -169,6 +165,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTc5NzQwNTcxNywxNjA1NDc2NDg4LC0xNT
-g4NzQ5NjEyLC00NTY2MDYwMzddfQ==
+eyJoaXN0b3J5IjpbMzA5NDQyODI2LDE2MDU0NzY0ODgsLTE1OD
+g3NDk2MTIsLTQ1NjYwNjAzN119
 -->
