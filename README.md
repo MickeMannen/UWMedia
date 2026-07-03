@@ -10,10 +10,15 @@ Add Gemini and Claude
 
 UWMedia is a tool for processing underwater videos and photos. It can use telemetry information from dive computers to generate an overlay on photos and videos. There is also support for color correction so you don't have to do every photo / video one by one.
 
-When i started the project 2025 I wanted the overlay data from the dive computer on my videos. At the same time I added a basic color correction but it wasnt very good.
+When i started the project 2025 I wanted the overlay data from the dive computer on my videos. At the same time I added a basic color correction but it wasn't very good.
 Since then I started to use Gemini and Antigravity to be able to test alternative solutions and get a better color correction.
 
+(Update)
 [Example (YouTube)](https://youtu.be/5EOqNcAbn4w)
+
+(Update) 
+Add images with examples of features
+
 
 ## Key Features
 
@@ -164,6 +169,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTg0ODkxNzE4NCwxNjA1NDc2NDg4LC0xNT
-g4NzQ5NjEyLC00NTY2MDYwMzddfQ==
+eyJoaXN0b3J5IjpbLTExNzYxMjgyNzUsMTYwNTQ3NjQ4OCwtMT
+U4ODc0OTYxMiwtNDU2NjA2MDM3XX0=
 -->
