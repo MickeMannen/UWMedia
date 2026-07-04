@@ -19,13 +19,13 @@ Since then I started to use Gemini and Antigravity to be able to test alternativ
 
 Example of Photo before and after
 
-![DSC06641_side_by_side.jpg](examples/DSC06641_side_by_side.jpg)
+![DSC06641_side_by_side.jpg](media/DSC06641_side_by_side.jpg)
 
 Photo with Telemetry data
-![DSC06641_color_garmin_overlay.jpg](examples/DSC06641_color_garmin_overlay.jpg)
+![DSC06641_color_garmin_overlay.jpg](media/DSC06641_color_garmin_overlay.jpg)
 
-(Update)
-[Example (YouTube)](https://youtu.be/5EOqNcAbn4w)
+
+## [Example (YouTube)](https://youtu.be/8r8_4H4iOMg)
 
 ## Key Features
 
@@ -133,8 +133,8 @@ Please share if you make a fancy HUD!
 
 HUD Example
 
-![Garmin_Sidemount_image.png](examples/Garmin_Sidemount_image.png)
-![Shearwater_Perdix2.png](examples/Shearwater_Perdix2.png)
+![Garmin_Sidemount_image.png](media/Garmin_Sidemount_image.png)
+![Shearwater_Perdix2.png](media/Shearwater_Perdix2.png)
 
 #### 2. Color Tuning Tool (`color_tuning_gui.py`)
 
