@@ -39,22 +39,32 @@ class ColorCorrectionEngine:
         self.ffmpeg_tool = ffmpeg_tool
         self.color_profile = color_profile or "default"
         
-        # Load parameters from color.yaml
+        # Load parameters from color.yaml in order of priority:
+        # 1. Current working directory (where executable/image was started)
+        # 2. Executable parent directory (if frozen)
+        # 3. PyInstaller bundle directory (sys._MEIPASS)
+        # 4. Source tree directories
         color_name = "color.yaml"
-        cwd_path = Path.cwd() / color_name
+        possible_paths = [
+            Path.cwd() / color_name,
+        ]
         if getattr(sys, 'frozen', False):
-            app_path = Path(sys.executable).parent / color_name
+            possible_paths.append(Path(sys.executable).parent / color_name)
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                possible_paths.append(Path(meipass) / color_name)
         else:
-            app_path = Path(__file__).parent.parent / color_name
+            possible_paths.append(Path(__file__).parent.parent / color_name)
+            possible_paths.append(Path(__file__).parent / color_name)
 
         yaml_path = None
-        if cwd_path.exists():
-            yaml_path = cwd_path
-        elif app_path.exists():
-            yaml_path = app_path
+        for p in possible_paths:
+            if p.exists():
+                yaml_path = p
+                break
 
         if not yaml_path:
-            raise FileNotFoundError(f"Could not find {color_name} in current directory or app directory.")
+            raise FileNotFoundError(f"Could not find {color_name} in current directory, app directory, or bundled assets.")
 
         with open(yaml_path, 'r') as f:
             data = yaml.safe_load(f) or {}

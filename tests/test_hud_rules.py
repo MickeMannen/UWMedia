@@ -25,6 +25,9 @@ def test_rules_loading_and_hierarchical_fallback():
     assert generic_ndl is not None
 
 def test_ndl_dynamic_colors():
+    # 0 seconds (surface / unlimited NDL, displayed as 99+) -> #FFFFFF
+    assert get_dynamic_color("Shearwater", "Perdix2", "ndl", 0, "#FFFFFF") == "#FFFFFF"
+
     # 35 minutes = 2100 seconds (above 30) -> #FFFFFF
     assert get_dynamic_color("Shearwater", "Perdix2", "ndl", 2100, "#BLUE") == "#FFFFFF"
     

@@ -6,29 +6,18 @@ import re
 import platform
 from pathlib import Path
 
-def get_next_revision():
-    """Reads current REVISION from main.py and increments the patch version."""
+def get_current_revision():
+    """Reads current REVISION from main.py without modifying it."""
     main_path = Path(__file__).parent.parent / "main.py"
     if not main_path.exists():
-        return "0.0.1"
+        return "dev"
     
     content = main_path.read_text()
     match = re.search(r'REVISION = "(.*?)"', content)
-    if not match:
-        return "0.0.1"
-    
-    current = match.group(1)
-    parts = current.split('.')
-    try:
-        # Increment the last numeric part
-        parts[-1] = str(int(parts[-1]) + 1)
-        return ".".join(parts)
-    except (ValueError, IndexError):
-        return current + ".1"
+    return match.group(1) if match else "dev"
 
 def update_revision(revision):
     """Updates the REVISION variable in main.py."""
-    # Since we are in pyinstaller/, main.py is in the parent directory
     main_path = Path(__file__).parent.parent / "main.py"
     if not main_path.exists():
         print(f"Error: {main_path} not found")
@@ -36,10 +25,8 @@ def update_revision(revision):
     
     content = main_path.read_text()
     if 'REVISION =' in content:
-        # Replace existing REVISION
         content = re.sub(r'REVISION = ".*"', f'REVISION = "{revision}"', content)
     else:
-        # Add REVISION at top
         content = f'REVISION = "{revision}"\n' + content
     
     main_path.write_text(content)
@@ -94,6 +81,15 @@ def build_app(target, revision, os_name, arch):
         "--hidden-import", "PIL.ImageFont",
         "--hidden-import", "yaml"
     ])
+
+    # Include default color.yaml and hud_rules.json in PyInstaller bundle
+    color_yaml_path = root_dir / "color.yaml"
+    hud_rules_path = root_dir / "hud_rules.json"
+
+    if color_yaml_path.exists():
+        cmd.extend(["--add-data", f"{color_yaml_path}{os.pathsep}."])
+    if hud_rules_path.exists():
+        cmd.extend(["--add-data", f"{hud_rules_path}{os.pathsep}."])
     
     print(f"\n>>> Building {target.upper()}...")
     print(f">>> Command: {' '.join(cmd)}")
@@ -122,7 +118,7 @@ def get_default_arch():
 def main():
     parser = argparse.ArgumentParser(description="UWMedia PyInstaller Build Script")
     parser.add_argument("--target", choices=["cli", "gui", "tag_editor", "tag_editor_main", "both", "all"], default="both", help="Build target (default: both)")
-    parser.add_argument("--revision", help="Revision/Version string (e.g. 1.0.4). If omitted, increments patch version in main.py.")
+    parser.add_argument("--revision", help="Revision/Version string (e.g. 1.0.4). If omitted, keeps existing REVISION in main.py.")
     parser.add_argument("--os", default=get_default_os(), 
                         help="OS label for filename (e.g., windows, macos, linux)")
     parser.add_argument("--arch", default=get_default_arch(), 
@@ -131,11 +127,11 @@ def main():
     args = parser.parse_args()
 
     revision = args.revision
-    if not revision:
-        revision = get_next_revision()
-    
-    # 1. Inject Revision into main.py
-    update_revision(revision)
+    if revision:
+        update_revision(revision)
+    else:
+        revision = get_current_revision()
+        print(f"Local build: Keeping existing REVISION '{revision}' in main.py")
     
     # 2. Perform Builds
     if args.target in ["cli", "both", "all"]:

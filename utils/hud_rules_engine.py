@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -10,12 +11,23 @@ def load_rules_json() -> Dict[str, Any]:
     if _rules_cache is not None:
         return _rules_cache
 
-    # Find the rules JSON file
+    # Find the rules JSON file in order of priority:
+    # 1. Current working directory (from where app was launched)
+    # 2. Executable parent directory (if frozen)
+    # 3. PyInstaller bundle directory (sys._MEIPASS)
+    # 4. Source tree directories
+    rules_name = "hud_rules.json"
     possible_paths = [
-        Path(__file__).parent.parent / "hud_rules.json",
-        Path("hud_rules.json"),
-        Path(__file__).parent / "hud_rules.json"
+        Path.cwd() / rules_name,
     ]
+    if getattr(sys, 'frozen', False):
+        possible_paths.append(Path(sys.executable).parent / rules_name)
+        meipass = getattr(sys, '_MEIPASS', None)
+        if meipass:
+            possible_paths.append(Path(meipass) / rules_name)
+    else:
+        possible_paths.append(Path(__file__).parent.parent / rules_name)
+        possible_paths.append(Path(__file__).parent / rules_name)
     
     for path in possible_paths:
         if path.exists():
@@ -110,6 +122,13 @@ def get_dynamic_color(manufacturer: Optional[str], model: Optional[str], field: 
     if rule_key == "ndl":
         try:
             val_mins = float(value) / 60.0
+            # NDL <= 0 or >= 99 indicates surface or unlimited NDL (displayed as "99+")
+            if val_mins <= 0 or val_mins >= 99:
+                for rule in rules_list:
+                    if rule.get("min", 0) >= 30:
+                        return rule["color"]
+                return default_color
+
             for rule in rules_list:
                 match = True
                 if "min" in rule and val_mins < rule["min"]:

@@ -6,25 +6,32 @@
   </a>
 </p>
 
-Add Gemini and Claude
+<p align="center">
+      <img src="https://img.shields.io/badge/Google_Gemini-8E75C2?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Gemini" />
+      <img src="https://img.shields.io/badge/Claude_AI-D97756?style=for-the-badge&logo=claude&logoColor=white" alt="Claude" />
+    </p>
+
 
 UWMedia is a tool for processing underwater videos and photos. It can use telemetry information from dive computers to generate an overlay on photos and videos. There is also support for color correction so you don't have to do every photo / video one by one.
 
 When i started the project 2025 I wanted the overlay data from the dive computer on my videos. At the same time I added a basic color correction but it wasn't very good.
 Since then I started to use Gemini and Antigravity to be able to test alternative solutions and get a better color correction.
 
+Example of Photo before and after
+
+![DSC06641_side_by_side.jpg](examples/DSC06641_side_by_side.jpg)
+
+Photo with Telemetry data
+![DSC06641_color_garmin_overlay.jpg](examples/DSC06641_color_garmin_overlay.jpg)
+
 (Update)
 [Example (YouTube)](https://youtu.be/5EOqNcAbn4w)
-
-(Update) 
-Add images with examples of features
-
 
 ## Key Features
 
 - **Batch Processing**: Process entire directories of videos and photos in one command.
-- **Fast 3D LUT Color Pipeline**: Dynamic 3D LUT (`.cube`) generation from profile settings, executing color correction natively in FFmpeg to bypass Python overhead and achieve up to 10x speedups.
-- **Advanced Color Correction**: Intelligent underwater color restoration with custom profiles (vivid, subtle, default) saved in `color.yaml`.
+- **Fast 3D LUT Color Pipeline**: Dynamic 3D LUT (`.cube`) generation from profile settings, executing color correction natively in FFmpeg to bypass Python overhead and speed up vs processing frame by frame.
+- **Advanced Color Correction**: Underwater color restoration with custom profiles (vivid, subtle, default) saved in `color.yaml`.
 - **Telemetry Overlay (HUD)**: Synchronize dive logs from Garmin (.FIT), Subsurface (.XML), and Shearwater (.UDDF) to create dynamic telemetry overlays.
 - **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration.
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
@@ -91,12 +98,19 @@ python cli_main.py --render-log dive_log.fit 100 --layout perdix_layout.json
 python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --logs ./dive_logs/
 ```
 
+#### Configuration files
+- color.yaml
+- hud_rules.json
+- config.yaml
+
 #### Key Arguments:
-- `--color`: Apply underwater color correction. Uses high-performance 3D LUT mapping by default.
+- `--color`: Apply underwater color correction. Takes one argument - color profile - if not added default is used.
 - `--logs <dir>`: Path to directory containing `.uddf`, `.fit`, or subsurface `.xml` logs (Make sure you don't have duplicates).
 - `--layout <zip|json>`: Use a ZIP package or JSON layout for telemetry overlay. Automatically enables overlay.
 - `--render-log <file> [num_waypoints]`: Create a telemetry-only HEVC video from a specific dive log (requires `--layout`). You can optionally specify a second argument for the number of waypoints to render (e.g., `100`) to limit processing time during testing.
 - `--filename-format <template>`: Custom naming (e.g., `"%Y%m%d_%H%M%S_Bali"`).
+- `--render-video-log`: Generate a telemetry-only video based on files in input directory
+- `--create-config`: Scan the log directory and generate a config file for TANK names
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
 
 
@@ -115,9 +129,12 @@ python gui_main.py
 - **Features**: Customizing and positioning telemetry fields, shapes, and background skins.
 - **Dynamic Overlays**: Select custom widgets (such as the Depth Graph Overlay) from a dropdown list and click "Add" to overlay them onto the HUD canvas.
 
+Please share if you make a fancy HUD!
+
 HUD Example
-<img width="440" height="282" alt="vlcsnap-2026-05-22-21h12m24s234" src="https://github.com/user-attachments/assets/2bd926a2-2812-4ab9-b152-007a2f69c746" />
-<img width="366" height="302" alt="vlcsnap-2026-05-22-21h12m00s027" src="https://github.com/user-attachments/assets/d7437bbd-9042-4a97-a925-b7ad0bc6e910" />
+
+![Garmin_Sidemount_image.png](examples/Garmin_Sidemount_image.png)
+![Shearwater_Perdix2.png](examples/Shearwater_Perdix2.png)
 
 #### 2. Color Tuning Tool (`color_tuning_gui.py`)
 
@@ -156,10 +173,6 @@ To ensure reliability during batch processing, UWMedia validates HUD layouts aga
 [MIT License](LICENSE)
 
 ## Credits
-- Color Algorithm: [bornfree](https://github.com/bornfree)
+- Color Algorithm: [bornfree](https://github.com/bornfree) - This is not used anymore but gave me the idea!
 - Metadata: [ExifTool by Phil Harvey](https://exiftool.org/)
 - Processing: [FFmpeg](https://ffmpeg.org/)
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbMTI5NTg3MDQ0MywxNjA1NDc2NDg4LC0xNT
-g4NzQ5NjEyLC00NTY2MDYwMzddfQ==
--->

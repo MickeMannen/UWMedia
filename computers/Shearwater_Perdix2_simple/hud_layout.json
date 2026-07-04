@@ -1,0 +1,99 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix2",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 3.2164120181769817,
+    "ref_offset_y": -306.09918271694187,
+    "opacity": 0.75,
+    "x_pct": 0.0016752145928005113,
+    "y_pct": 0.7165748308176464,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.25897012828202653,
+        "rel_y": 0.3037271992147284,
+        "color": "#ffffff",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.35334929491858247,
+        "rel_y": 0.3267141038112017,
+        "color": "#0096ff",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.21541051291130842,
+        "rel_y": 0.404515934753111,
+        "color": "#0096ff",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.24735423084983513,
+        "rel_y": 0.46994020168153455,
+        "color": "#ffffff",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.6684305127667767,
+        "rel_y": 0.4186617221970946,
+        "color": "#0096ff",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.6669785255877524,
+        "rel_y": 0.4805495422645227,
+        "color": "#ffffff",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.4491804487341622,
+        "rel_y": 0.6768223430497945,
+        "color": "#ffffff",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.2586071314872699,
+        "rel_y": 0.6480887123042031,
+        "color": "#ffffff",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "tank_name:1",
+        "rel_x": 0.4891100961573204,
+        "rel_y": 0.6060934058298765,
+        "color": "#ffffff",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.5000000000000001,
+        "rel_y": 0.36517296342453165,
+        "color": "#ffffff",
+        "font_size": 30,
+        "scale": 1.0
+      }
+    ],
+    "path": "/Users/mikael/development/UWMedia/computers/Shearwater_Perdix2_simple/shearwater_perdix2_gold_layout_3.png",
+    "scale": 0.4
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

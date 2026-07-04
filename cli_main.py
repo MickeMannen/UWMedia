@@ -471,6 +471,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             return {"file": source.name, "skipped": True}
 
     target_path = get_unique_path(target_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     
     print(f"Output path: {target_path}")
 
@@ -729,7 +730,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         needs_overlay = True if args.layout else False
         
         # Use fast LUT path for color-only processing (no overlay)
-        use_lut_path = needs_color and not needs_overlay and not args.color_legacy
+        use_lut_path = needs_color and not needs_overlay
         
         t_proc_start = time.time()
         if use_lut_path:
@@ -939,7 +940,6 @@ def main():
     parser.add_argument("output", type=Path, nargs='?', help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
     parser.add_argument("--color", nargs='?', const='default', default=None, help="Apply color correction with selected profile (e.g. default, vivid, subtle). Defaults to 'default' if specified without a profile name.")
-    parser.add_argument("--color-legacy", action="store_true", default=False, help="Force legacy per-frame Python color correction instead of fast LUT path")
     parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--end-time", help="End time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--hw-accel", action="store_true", default=False, help="Enable hardware acceleration")

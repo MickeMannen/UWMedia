@@ -47,7 +47,6 @@ while true; do
             echo -e "\n${GREEN}[*] Running CLI argument unit tests...${NC}"
             PYTHONPATH=. pytest \
                 tests/test_color.py \
-                tests/test_color_legacy.py \
                 tests/test_convert.py \
                 tests/test_render_log.py \
                 tests/test_render_video_log.py -v

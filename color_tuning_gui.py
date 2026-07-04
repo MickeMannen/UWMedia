@@ -53,15 +53,22 @@ class ColorTuningApp(QMainWindow):
         self.auto_load_default_sample()
 
     def locate_yaml(self):
-        cwd_path = Path.cwd() / self.color_name
+        possible_paths = [
+            Path.cwd() / self.color_name,
+        ]
         if getattr(sys, 'frozen', False):
-            app_path = Path(sys.executable).parent / self.color_name
+            possible_paths.append(Path(sys.executable).parent / self.color_name)
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                possible_paths.append(Path(meipass) / self.color_name)
         else:
-            app_path = Path(__file__).parent / self.color_name
-            
-        if cwd_path.exists():
-            return cwd_path
-        return app_path
+            possible_paths.append(Path(__file__).parent / self.color_name)
+            possible_paths.append(Path(__file__).parent.parent / self.color_name)
+
+        for p in possible_paths:
+            if p.exists():
+                return p
+        return Path.cwd() / self.color_name
 
     def load_yaml(self):
         if self.yaml_path.exists():

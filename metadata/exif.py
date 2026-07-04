@@ -311,18 +311,28 @@ class MetadataHandler:
         create_str = meta.get("QuickTime:CreateDate") or meta.get("CreateDate")
         if create_str:
             create_str = str(create_str)
-            utc_dt = datetime.strptime(create_str[:19], "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
-            # Check both 'Timezone' and 'TimeZone' (Sony style)
-            tz_val = meta.get("QuickTime:Timezone") or meta.get("QuickTime:TimeZone") or \
-                     meta.get("Timezone") or meta.get("TimeZone")
-            tz = self._parse_timezone(tz_val)
-            if tz:
-                local_dt = utc_dt.astimezone(tz)
-                return local_dt.replace(tzinfo=None)
-            
-            return utc_dt.replace(tzinfo=None)
+            if not create_str.startswith("0000"):
+                try:
+                    utc_dt = datetime.strptime(create_str[:19], "%Y:%m:%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    # Check both 'Timezone' and 'TimeZone' (Sony style)
+                    tz_val = meta.get("QuickTime:Timezone") or meta.get("QuickTime:TimeZone") or \
+                             meta.get("Timezone") or meta.get("TimeZone")
+                    tz = self._parse_timezone(tz_val)
+                    if tz:
+                        local_dt = utc_dt.astimezone(tz)
+                        return local_dt.replace(tzinfo=None)
+                    
+                    return utc_dt.replace(tzinfo=None)
+                except Exception:
+                    pass
 
-        raise ValueError("No valid creation date found in video metadata")
+        # 3. Fallback to file modification timestamp
+        try:
+            return datetime.fromtimestamp(file_path.stat().st_mtime)
+        except Exception:
+            pass
+
+        raise ValueError(f"No valid creation date found in video metadata for {file_path}")
 
     def get_tags(self, src: Path, tag_names: List[str]) -> Dict[str, str]:
         """Extracts specific tags from a file. Returns values as strings."""
