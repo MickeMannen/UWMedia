@@ -178,11 +178,11 @@ Thumbs.db
 /pyinstaller/dist/
 /pyinstaller/build/
 /pyinstaller/*.spec
+/computers/images/
 *.zip
 *.png
-*.jpg
 *.webp
 !hud.png
 !vlc.png
-!computers/*.png
-!computers/*.webp
+
+
