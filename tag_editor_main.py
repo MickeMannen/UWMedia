@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QColor, QPalette, QIcon
 
 from metadata.exif import MetadataHandler
+from utils.dependency_check import check_dependencies
 
 
 # Tags to manage with metadata guidance
@@ -761,8 +762,12 @@ class MetadataViewerDialog(QDialog):
             match = text in key.lower() or text in val_str.lower()
             self.table.setRowHidden(row_idx, not match)
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
+def main():
+    check_dependencies(is_gui=True)
+    app = QApplication.instance() or QApplication(sys.argv)
     window = TagEditorApp()
     window.show()
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()

@@ -123,8 +123,12 @@ class TestRelease:
 
     def test_06_color_correction_photo(self):
         """Verify photo color correction works on all JPGs in release_test directory."""
+        for f in OUTPUT_DIR.glob("release_test_test06_color_*.jpg"):
+            try: f.unlink()
+            except Exception: pass
+
         i = 0
-        for file in TEST_DATA_DIR.glob("*.JPG"):
+        for file in sorted(TEST_DATA_DIR.glob("*.JPG")):
             i += 1
             cmd = [
                 "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
@@ -138,6 +142,10 @@ class TestRelease:
     def test_06c_color_correction_photo_profiles(self):
         """Verify photo color correction profiles (vivid, subtle) are correctly parsed and run."""
         file = TEST_DATA_DIR / "DSC03491.JPG"
+        for f in OUTPUT_DIR.glob("release_test_test06c_*.jpg"):
+            try: f.unlink()
+            except Exception: pass
+
         for profile in ["vivid", "subtle"]:
             cmd = [
                 "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
@@ -229,6 +237,10 @@ class TestRelease:
         layouts = [COMPUTERS_DIR / "Garmin_x50_simple.zip", COMPUTERS_DIR / "generic_depth_temp.zip"]
         logs = FIT_DIR
         target_list = []
+
+        for f in OUTPUT_DIR.glob("release_test_test08_*.jpg"):
+            try: f.unlink()
+            except Exception: pass
 
         for layout in layouts:
             target_list.append(layout.stem)

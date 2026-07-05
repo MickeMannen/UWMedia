@@ -23,6 +23,7 @@ from models.manager import DiveManager
 from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
 from parsers.subsurface import SubsurfaceParser
+from utils.dependency_check import check_dependencies
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 
@@ -751,7 +752,8 @@ import multiprocessing
 def main():
     if "--multiprocessing-fork" in sys.argv:
         return
-    app = QApplication(sys.argv)
+    check_dependencies(is_gui=True)
+    app = QApplication.instance() or QApplication(sys.argv)
     window = HUDDesignerWindow()
     window.show()
     sys.exit(app.exec())

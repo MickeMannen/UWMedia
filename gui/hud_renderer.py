@@ -4,9 +4,25 @@ import math
 from datetime import timedelta
 from PIL import Image, ImageDraw, ImageFont
 import os
+from pathlib import Path
+import platform
 
-# Font path for macOS (Standard Arial)
-ARIAL_FONT_PATH = "/System/Library/Fonts/Supplemental/Arial.ttf"
+def _get_system_arial_font():
+    sys_name = platform.system()
+    if sys_name == "Windows":
+        win_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf"
+        if win_font.exists():
+            return str(win_font)
+        return "arial.ttf"
+    elif sys_name == "Darwin":
+        for mac_font in ["/System/Library/Fonts/Supplemental/Arial.ttf", "/Library/Fonts/Arial.ttf"]:
+            if os.path.exists(mac_font):
+                return mac_font
+    else:
+        for lin_font in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]:
+            if os.path.exists(lin_font):
+                return lin_font
+    return "arial.ttf"
 
 # Cache for loaded fonts to avoid repeated disk I/O
 _font_cache = {}
@@ -14,11 +30,15 @@ _font_cache = {}
 def get_font(size):
     """Retrieves or loads a TrueType font at the specified size."""
     if size not in _font_cache:
+        font_path = _get_system_arial_font()
         try:
-            _font_cache[size] = ImageFont.truetype(ARIAL_FONT_PATH, size)
+            _font_cache[size] = ImageFont.truetype(font_path, size)
         except Exception as e:
-            print(f"Warning: Could not load Arial font from {ARIAL_FONT_PATH}: {e}")
-            _font_cache[size] = ImageFont.load_default()
+            try:
+                _font_cache[size] = ImageFont.truetype("arial.ttf", size)
+            except Exception:
+                print(f"Warning: Could not load font {font_path}: {e}")
+                _font_cache[size] = ImageFont.load_default()
     return _font_cache[size]
 
 def format_telemetry_value(field, raw_val):

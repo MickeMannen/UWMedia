@@ -16,6 +16,7 @@ from metadata.exif import MetadataHandler
 from models.dive import Waypoint, Dive
 from models.manager import DiveManager
 from ffmpeg import FfmpegClass
+from utils.dependency_check import check_dependencies
 
 import cv2
 import numpy as np
@@ -934,6 +935,8 @@ def main():
     # check if we have any arguments at all.
     if len(sys.argv) == 1 and getattr(sys, 'frozen', False):
         return
+
+    check_dependencies(is_gui=False)
 
     parser = UWMediaParser(description="Underwater Media Processor CLI")
     parser.add_argument("source", type=Path, nargs='?', help="Source video/photo file or directory")

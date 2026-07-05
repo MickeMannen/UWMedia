@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 from ffmpeg.color import ColorCorrectionEngine
+from utils.dependency_check import check_dependencies
 
 class ColorTuningApp(QMainWindow):
     def __init__(self):
@@ -735,7 +736,8 @@ class ColorTuningApp(QMainWindow):
         label.setPixmap(pix)
 
 def main():
-    app = QApplication(sys.argv)
+    check_dependencies(is_gui=True)
+    app = QApplication.instance() or QApplication(sys.argv)
     window = ColorTuningApp()
     window.show()
     sys.exit(app.exec())

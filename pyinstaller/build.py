@@ -74,12 +74,18 @@ def build_app(target, revision, os_name, arch):
         if target in ["gui", "tag_editor", "tag_editor_main"]:
             cmd.append("--noconsole")
             
-    # Add hidden imports if necessary (common with PySide6, Pydantic, and Pillow)
+    # Add hidden imports if necessary (common with PySide6, Pydantic, Pillow, etc.)
     cmd.extend([
-        "--hidden-import", "pydantic_core._pydantic_core",
-        "--hidden-import", "PIL._imaging",
+        "--collect-all", "PIL",
+        "--hidden-import", "PIL",
+        "--hidden-import", "PIL.Image",
+        "--hidden-import", "PIL.ImageDraw",
         "--hidden-import", "PIL.ImageFont",
-        "--hidden-import", "yaml"
+        "--hidden-import", "PIL._imaging",
+        "--hidden-import", "pydantic_core._pydantic_core",
+        "--hidden-import", "exiftool",
+        "--hidden-import", "yaml",
+        "--hidden-import", "garmin_fit_sdk"
     ])
 
     # Include default color.yaml and hud_rules.json in PyInstaller bundle
