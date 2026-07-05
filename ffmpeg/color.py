@@ -504,16 +504,22 @@ class ColorCorrectionEngine:
             buf.write(f'{row[0]:.6f} {row[1]:.6f} {row[2]:.6f}\n')
         path.write_text(buf.getvalue())
 
+    def _open_video_capture(self, input_path: Path) -> cv2.VideoCapture:
+        """Safely open OpenCV VideoCapture without triggering D3D11/DXVA2 hardware decoding errors on 10-bit video streams."""
+        if self.ffmpeg_tool and self.ffmpeg_tool.hw_accel and self.ffmpeg_tool.os_type != "Windows":
+            cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
+                cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
+            ])
+            if cap.isOpened():
+                return cap
+        return cv2.VideoCapture(str(input_path))
+
     def process_video_lut(self, input_path: Path, output_path: Path, creation_date: datetime,
                           start_time: Optional[str] = None, end_time: Optional[str] = None,
                           tz_offset_mins: Optional[int] = None,
                           color_correct: bool = True):
         """Fast path: analyze video, generate 3D LUTs, and process natively via FFmpeg lut3d filter."""
-        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
-            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
-        ])
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(str(input_path))
+        cap = self._open_video_capture(input_path)
 
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -592,7 +598,7 @@ class ColorCorrectionEngine:
             clip_duration = max(0, e_sec - s_sec)
 
             # Build video filter
-            first_lut = str(lut_paths[0]).replace('\\', '/')
+            first_lut = str(lut_paths[0]).replace('\\', '/').replace(':', '\\:')
             if len(lut_paths) == 1:
                 vf = f"lut3d=file='{first_lut}':interp=trilinear"
             else:
@@ -600,9 +606,9 @@ class ColorCorrectionEngine:
                 sendcmd_path = lut_dir / "sendcmd.txt"
                 with open(sendcmd_path, 'w') as f:
                     for i, (lp, ts) in enumerate(zip(lut_paths, lut_timestamps)):
-                        lp_str = str(lp).replace('\\', '/')
+                        lp_str = str(lp).replace('\\', '/').replace(':', '\\:')
                         f.write(f"{ts:.3f} [enter] lut3d file '{lp_str}';\n")
-                sendcmd_str = str(sendcmd_path).replace('\\', '/')
+                sendcmd_str = str(sendcmd_path).replace('\\', '/').replace(':', '\\:')
                 vf = f"sendcmd=f='{sendcmd_str}',lut3d=file='{first_lut}':interp=trilinear"
 
             args = ["-y"]
@@ -691,11 +697,7 @@ class ColorCorrectionEngine:
                       color_correct: bool = True):
         """Analyze video and process frames through OpenCV then pipe to FFmpeg."""
         # Open video capture with hardware acceleration support and safe fallback
-        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
-            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
-        ])
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(str(input_path))
+        cap = self._open_video_capture(input_path)
 
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -798,11 +800,7 @@ class ColorCorrectionEngine:
                         preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
 
         # Re-open video capture for processing phase with hardware decoding and safe fallback
-        cap = cv2.VideoCapture(str(input_path), cv2.CAP_FFMPEG, [
-            cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY
-        ])
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(str(input_path))
+        cap = self._open_video_capture(input_path)
 
         # Build FFmpeg pipe
         filters = []

@@ -9,3 +9,4 @@ pyexiftool
 tqdm
 pyinstaller
 PyYAML
+Pillow
