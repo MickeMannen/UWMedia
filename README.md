@@ -41,6 +41,15 @@ Photo with Telemetry data
 - **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 
+### Workflow (how I do)
+- **Run Color Correction**: Run color correction for all videos and photos
+- **Telemetry Creation**: For each one of the corrected videos I generate the matching telemetry overlay, multiple versions.
+- **Import to Video Editor**: I use Final Cut Pro and import all overlays and videos in to one folder.
+- **Synchronized Clip**: In FCP it I create a sync clip for each video that I want to use and select the overlay that I want for just that video.
+- **Create the Video**: Create the video as normal but since overlay is separated to the overlay it is easier to make adjustments like stabilization.
+
+Maybe I should do a Video of the workflow too but sometime in the future.
+
 ## Installation
 
 ### System Requirements
@@ -130,11 +139,6 @@ python gui_main.py
 - **Dynamic Overlays**: Select custom widgets (such as the Depth Graph Overlay) from a dropdown list and click "Add" to overlay them onto the HUD canvas.
 
 Please share if you make a fancy HUD!
-
-HUD Example
-
-![Garmin_Sidemount_image.png](media/Garmin_Sidemount_image.png)
-![Shearwater_Perdix2.png](media/Shearwater_Perdix2.png)
 
 #### 2. Color Tuning Tool (`color_tuning_gui.py`)
 
