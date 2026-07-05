@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import re
 import time
 import tempfile
 import shutil
@@ -392,7 +393,12 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             continue
             
         target_w, target_h, target_bitrate = resolutions[res_name]
-        filename = f"{source.stem}_{res_name}{source.suffix.lower()}"
+        stem = source.stem
+        if re.search(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', stem):
+            new_stem = re.sub(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', f"_{res_name}", stem)
+        else:
+            new_stem = f"{stem}_{res_name}"
+        filename = f"{new_stem}{source.suffix.lower()}"
         target_path = output_dir / filename
         target_path = get_unique_path(target_path)
         
@@ -403,6 +409,8 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             output_path=target_path,
             creation_date=creation_date,
             tz_offset_mins=tz_offset_mins,
+            start_time=args.start_time,
+            end_time=args.end_time,
             target_resolution=(target_w, target_h),
             bitrate=target_bitrate
         )

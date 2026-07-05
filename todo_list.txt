@@ -1,0 +1,1 @@
+- add splash sceen for application start and terminal start
