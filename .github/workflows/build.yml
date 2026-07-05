@@ -66,7 +66,7 @@ jobs:
 
       - name: Build with build.py
         run: |
-          python pyinstaller/build.py --revision ${{ steps.rev.outputs.REVISION }}
+          python pyinstaller/build.py --target all --revision ${{ steps.rev.outputs.REVISION }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

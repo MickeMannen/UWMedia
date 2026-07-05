@@ -43,7 +43,9 @@ def build_app(target, revision, os_name, arch):
         "cli": root_dir / "main.py",
         "gui": root_dir / "gui_main.py",
         "tag_editor": root_dir / "tag_editor_main.py",
-        "tag_editor_main": root_dir / "tag_editor_main.py"
+        "tag_editor_main": root_dir / "tag_editor_main.py",
+        "color_tuning": root_dir / "color_tuning_gui.py",
+        "color_tuning_gui": root_dir / "color_tuning_gui.py"
     }
     
     if target not in targets:
@@ -67,11 +69,12 @@ def build_app(target, revision, os_name, arch):
     ]
     
     # OS specific flags
+    gui_targets = ["gui", "tag_editor", "tag_editor_main", "color_tuning", "color_tuning_gui"]
     if os_name.lower() == "darwin":
-        if target in ["gui", "tag_editor", "tag_editor_main"]:
+        if target in gui_targets:
             cmd.append("--windowed")
     elif os_name.lower() == "windows" or os_name.lower() == "win32":
-        if target in ["gui", "tag_editor", "tag_editor_main"]:
+        if target in gui_targets:
             cmd.append("--noconsole")
             
     # Add hidden imports if necessary (common with PySide6, Pydantic, Pillow, etc.)
@@ -123,7 +126,7 @@ def get_default_arch():
 
 def main():
     parser = argparse.ArgumentParser(description="UWMedia PyInstaller Build Script")
-    parser.add_argument("--target", choices=["cli", "gui", "tag_editor", "tag_editor_main", "both", "all"], default="both", help="Build target (default: both)")
+    parser.add_argument("--target", choices=["cli", "gui", "tag_editor", "tag_editor_main", "color_tuning", "color_tuning_gui", "both", "all"], default="all", help="Build target (default: all)")
     parser.add_argument("--revision", help="Revision/Version string (e.g. 1.0.4). If omitted, keeps existing REVISION in main.py.")
     parser.add_argument("--os", default=get_default_os(), 
                         help="OS label for filename (e.g., windows, macos, linux)")
@@ -150,6 +153,11 @@ def main():
         build_app("tag_editor", revision, args.os, args.arch)
     elif args.target == "tag_editor_main":
         build_app("tag_editor_main", revision, args.os, args.arch)
+
+    if args.target in ["color_tuning", "all"]:
+        build_app("color_tuning", revision, args.os, args.arch)
+    elif args.target == "color_tuning_gui":
+        build_app("color_tuning_gui", revision, args.os, args.arch)
 
 if __name__ == "__main__":
     main()
