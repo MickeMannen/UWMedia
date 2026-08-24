@@ -1,0 +1,40 @@
+[tool.briefcase]
+project_name = "UWMedia"
+bundle = "com.mikaelchristersson"
+version = "0.0.19"
+license = "MIT"
+author = "Mikael Christersson"
+author_email = "mikael.christersson2@gmail.com"
+
+[tool.briefcase.app.uwmediacli]
+formal_name = "UWMedia CLI"
+description = "Underwater media processor (CLI) - Briefcase packaging spike"
+console_app = true
+sources = [
+    "uwmediacli",
+    "cli_main.py",
+    "computers",
+    "ffmpeg",
+    "metadata",
+    "models",
+    "parsers",
+    "utils",
+    "color.yaml",
+    "hud_rules.json",
+    "config.yaml",
+]
+requires = [
+    "pydantic>=2.0.0",
+    "lxml",
+    "garmin-fit-sdk",
+    "numpy",
+    "opencv-python",
+    "pyexiftool",
+    "tqdm",
+    "PyYAML",
+    "Pillow",
+]
+
+[tool.briefcase.app.uwmediacli.macOS]
+universal_build = false
+requires = []
