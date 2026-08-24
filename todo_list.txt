@@ -1,1 +1,5 @@
 - add splash sceen for application start and terminal start
+agy
+
+
+for all tests in @./tests create a txt file called files.txt which list all files that is used for testing (scripts in ./tests/) and which test case that use it. make the list as a columns
