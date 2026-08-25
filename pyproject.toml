@@ -31,14 +31,16 @@ requires = [
     "Pillow",
 ]
 
-[tool.briefcase.app.uwmediacli]
-formal_name = "UWMedia CLI"
-description = "Underwater media processor (CLI) - Briefcase packaging spike"
+[tool.briefcase.app.uwmedia]
+formal_name = "UWMedia"
+description = "Underwater media processor - unified GUI + shell app"
 console_app = true
-sources = ["uwmediacli", "cli_main.py"]
+sources = ["uwmedia", "cli_main.py"]
+requires = ["toga"]
 
-[tool.briefcase.app.uwmediacli.macOS]
+[tool.briefcase.app.uwmedia.macOS]
 universal_build = false
+requires = ["toga-cocoa"]
 
 [tool.briefcase.app.uwmediagui]
 formal_name = "UWMedia HUD Designer"
