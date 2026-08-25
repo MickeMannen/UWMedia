@@ -5,11 +5,9 @@ from pathlib import Path
 import toga
 import yaml
 from toga.style import Pack
-from toga.style.pack import COLUMN, ROW
+from toga.style.pack import COLUMN, HIDDEN, ROW, VISIBLE
 
 from utils.resource_paths import find_resource
-
-CONVERT_CHOICES = ["1080p", "720p", "480p", "360p"]
 
 
 def load_color_profiles():
@@ -48,10 +46,10 @@ class UWMediaApp(toga.App):
             placeholder="%Y%m%d_%H%M%S_color", style=Pack(flex=1)
         )
 
-        self.convert_switches = {res: toga.Switch(res) for res in CONVERT_CHOICES}
-
+        self.render_output_input = toga.TextInput(style=Pack(flex=1))
         self.render_video_log_switch = toga.Switch(
-            "Render video/photo log overlay batch (requires --layout and Logs dir)"
+            "Render video/photo log overlay batch",
+            on_change=self.on_render_video_log_toggle,
         )
 
         self.log_output = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, height=200))
@@ -84,13 +82,15 @@ class UWMediaApp(toga.App):
             switches_box.add(switch)
         root.add(switches_box)
 
-        convert_box = toga.Box(style=Pack(direction=ROW, margin_bottom=5))
-        convert_box.add(toga.Label("Convert to:", style=Pack(margin_right=10)))
-        for switch in self.convert_switches.values():
-            convert_box.add(switch)
-        root.add(convert_box)
-
         root.add(self.render_video_log_switch)
+        self.render_output_row = self._row(
+            "Render output",
+            self.render_output_input,
+            self._browse_button(self.render_output_input, folder=True),
+        )
+        self.render_output_row.style.visibility = HIDDEN
+        root.add(self.render_output_row)
+
         root.add(self.run_button)
         root.add(toga.Label("Output", style=Pack(margin_top=10)))
         root.add(self.log_output)
@@ -120,10 +120,16 @@ class UWMediaApp(toga.App):
 
         return toga.Button("Browse", on_press=on_press, style=Pack(margin_left=5))
 
+    def on_render_video_log_toggle(self, widget):
+        self.render_output_row.style.visibility = VISIBLE if widget.value else HIDDEN
+
     def build_args(self):
         args = []
         source = self.source_input.value.strip() if self.source_input.value else ""
-        output = self.output_input.value.strip() if self.output_input.value else ""
+        if self.render_video_log_switch.value:
+            output = self.render_output_input.value.strip() if self.render_output_input.value else ""
+        else:
+            output = self.output_input.value.strip() if self.output_input.value else ""
         if source:
             args.append(source)
         if output:
@@ -150,9 +156,6 @@ class UWMediaApp(toga.App):
             args.append("--summary")
         if self.move_original_input.value and self.move_original_input.value.strip():
             args += ["--move-original", self.move_original_input.value.strip()]
-        selected_res = [res for res, switch in self.convert_switches.items() if switch.value]
-        if selected_res:
-            args += ["--convert", *selected_res]
         if self.render_video_log_switch.value:
             args.append("--render-video-log")
         return args
@@ -202,4 +205,7 @@ class UWMediaApp(toga.App):
 
 
 def main():
-    return UWMediaApp()
+    # Packaged (Briefcase) runs pick these up from the app's dist-info metadata
+    # automatically; explicit values here are what make `python -m uwmedia` work
+    # from a plain source checkout too, where that metadata doesn't exist.
+    return UWMediaApp(formal_name="UWMedia", app_id="com.mikaelchristersson.uwmedia")
