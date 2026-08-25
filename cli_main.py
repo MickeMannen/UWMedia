@@ -6,6 +6,7 @@ import time
 import tempfile
 import shutil
 import json
+import multiprocessing
 from pathlib import Path
 from datetime import timedelta, datetime
 import zipfile
@@ -934,9 +935,21 @@ class UWMediaParser(argparse.ArgumentParser):
         sys.exit(2)
 
 def main():
-    # Ignore helper subprocesses spawned by libraries (OpenCV, tqdm, etc.)
-    # These often don't pass the original arguments.
+    # Ignore helper subprocesses spawned by the multiprocessing module itself
+    # (e.g. its resource_tracker, started automatically by some library on
+    # first use of a multiprocessing primitive) as well as library-spawned
+    # helpers that re-invoke this executable without the original arguments.
+    # A properly-bootstrapped multiprocessing child is caught by
+    # parent_process(). A Briefcase-packaged app's launcher is a compiled
+    # stub, not a general-purpose interpreter: when something tries to
+    # relaunch it as `sys.executable -B -I -c "<code>"`, the stub ignores
+    # those flags and reruns this app's entry point from scratch instead of
+    # executing the code, so the argv itself is the only signal available.
+    if multiprocessing.parent_process() is not None:
+        return
     if len(sys.argv) > 1 and ("--multiprocessing-fork" in sys.argv or "spawn" in sys.argv):
+        return
+    if "-c" in sys.argv and any("multiprocessing" in arg for arg in sys.argv):
         return
     
     # If we are in a subprocess but it didn't have the flags, 
@@ -1274,14 +1287,20 @@ def main():
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
         stats_list = []
         if len(files) > 1:
-            from concurrent.futures import ProcessPoolExecutor, as_completed
-            import multiprocessing
-            # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory.
+            # Threads rather than processes: the actual work here is either an
+            # external ffmpeg/exiftool subprocess call or a native cv2/numpy
+            # call, both of which release the GIL, so real parallelism is
+            # preserved without needing a second Python interpreter process
+            # (ProcessPoolExecutor's spawn re-exec of sys.executable does not
+            # work inside a Briefcase-packaged app, whose launcher is a
+            # compiled stub rather than a general-purpose interpreter).
             max_workers = min(4, os.cpu_count() or 4)
             print(f"Starting parallel batch processing with {max_workers} workers...")
-            
+
             tasks = [(file, args.output, args, manager, tmp_hud_dir) for file in files]
-            executor = ProcessPoolExecutor(max_workers=max_workers)
+            executor = ThreadPoolExecutor(max_workers=max_workers)
             shutdown_wait = True
             try:
                 futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
@@ -1293,13 +1312,8 @@ def main():
                     else:
                         stats_list.append(result)
             except KeyboardInterrupt:
-                print("\n[!] KeyboardInterrupt received. Terminating all worker processes...")
+                print("\n[!] KeyboardInterrupt received. Shutting down worker threads...")
                 shutdown_wait = False
-                for proc in multiprocessing.active_children():
-                    try:
-                        proc.terminate()
-                    except Exception:
-                        pass
                 executor.shutdown(wait=False, cancel_futures=True)
                 sys.exit(1)
             finally:

@@ -6,15 +6,11 @@ license = "MIT"
 author = "Mikael Christersson"
 author_email = "mikael.christersson2@gmail.com"
 
-[tool.briefcase.app.uwmediacli]
-formal_name = "UWMedia CLI"
-description = "Underwater media processor (CLI) - Briefcase packaging spike"
-console_app = true
+# Shared across every app below - concatenated with each app's own sources/requires.
 sources = [
-    "uwmediacli",
-    "cli_main.py",
     "computers",
     "ffmpeg",
+    "gui",
     "metadata",
     "models",
     "parsers",
@@ -35,6 +31,41 @@ requires = [
     "Pillow",
 ]
 
+[tool.briefcase.app.uwmediacli]
+formal_name = "UWMedia CLI"
+description = "Underwater media processor (CLI) - Briefcase packaging spike"
+console_app = true
+sources = ["uwmediacli", "cli_main.py"]
+
 [tool.briefcase.app.uwmediacli.macOS]
 universal_build = false
-requires = []
+
+[tool.briefcase.app.uwmediagui]
+formal_name = "UWMedia HUD Designer"
+description = "HUD Designer & Sync tool - Briefcase packaging spike"
+sources = ["uwmediagui", "gui_main.py"]
+requires = ["PySide6"]
+
+[tool.briefcase.app.uwmediagui.macOS]
+universal_build = false
+min_os_version = "13.0"
+
+[tool.briefcase.app.uwmediatageditor]
+formal_name = "UWMedia Tag Editor"
+description = "Metadata tag editor - Briefcase packaging spike"
+sources = ["uwmediatageditor", "tag_editor_main.py"]
+requires = ["PySide6"]
+
+[tool.briefcase.app.uwmediatageditor.macOS]
+universal_build = false
+min_os_version = "13.0"
+
+[tool.briefcase.app.uwmediacolortuning]
+formal_name = "UWMedia Color Tuning"
+description = "Color correction profile editor - Briefcase packaging spike"
+sources = ["uwmediacolortuning", "color_tuning_gui.py"]
+requires = ["PySide6"]
+
+[tool.briefcase.app.uwmediacolortuning.macOS]
+universal_build = false
+min_os_version = "13.0"

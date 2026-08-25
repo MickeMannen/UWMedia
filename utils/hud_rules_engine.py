@@ -1,8 +1,7 @@
 import json
-import os
-import sys
-from pathlib import Path
 from typing import Dict, Any, Optional
+
+from utils.resource_paths import find_resource
 
 _rules_cache = None
 
@@ -11,32 +10,16 @@ def load_rules_json() -> Dict[str, Any]:
     if _rules_cache is not None:
         return _rules_cache
 
-    # Find the rules JSON file in order of priority:
-    # 1. Current working directory (from where app was launched)
-    # 2. Executable parent directory (if frozen)
-    # 3. PyInstaller bundle directory (sys._MEIPASS)
-    # 4. Source tree directories
     rules_name = "hud_rules.json"
-    possible_paths = [
-        Path.cwd() / rules_name,
-    ]
-    if getattr(sys, 'frozen', False):
-        possible_paths.append(Path(sys.executable).parent / rules_name)
-        meipass = getattr(sys, '_MEIPASS', None)
-        if meipass:
-            possible_paths.append(Path(meipass) / rules_name)
-    else:
-        possible_paths.append(Path(__file__).parent.parent / rules_name)
-        possible_paths.append(Path(__file__).parent / rules_name)
-    
-    for path in possible_paths:
-        if path.exists():
-            try:
-                with open(path, 'r') as f:
-                    _rules_cache = json.load(f)
-                    return _rules_cache
-            except Exception as e:
-                print(f"Error loading rules from {path}: {e}")
+    path = find_resource(rules_name, __file__)
+
+    if path is not None:
+        try:
+            with open(path, 'r') as f:
+                _rules_cache = json.load(f)
+                return _rules_cache
+        except Exception as e:
+            print(f"Error loading rules from {path}: {e}")
 
     # Fallback to hardcoded default rules if file is missing
     print("Warning: Could not find hud_rules.json, using hardcoded default rules.")

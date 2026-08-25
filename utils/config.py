@@ -1,8 +1,9 @@
 import os
-import sys
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+
+from utils.resource_paths import find_resource
 
 class ConfigManager:
     _instance = None
@@ -21,22 +22,7 @@ class ConfigManager:
 
     def load_config(self):
         config_name = "config.yaml"
-        
-        # 1. Search in current working directory
-        cwd_path = Path.cwd() / config_name
-        
-        # 2. Search in executable/script directory
-        if getattr(sys, 'frozen', False):
-            # Running as a PyInstaller bundle
-            app_path = Path(sys.executable).parent / config_name
-        else:
-            # Running as a script
-            app_path = Path(__file__).parent.parent / config_name
-
-        if cwd_path.exists():
-            self._config_path = cwd_path
-        elif app_path.exists():
-            self._config_path = app_path
+        self._config_path = find_resource(config_name, __file__)
 
         if self._config_path:
             try:

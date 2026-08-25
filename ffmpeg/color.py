@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 from ffmpeg.ffmpeg_class import FfmpegClass
 from models.dive import Dive, Waypoint
+from utils.resource_paths import find_resource
 
 # Constants for analysis
 SAMPLE_SECONDS = 2
@@ -39,29 +40,8 @@ class ColorCorrectionEngine:
         self.ffmpeg_tool = ffmpeg_tool
         self.color_profile = color_profile or "default"
         
-        # Load parameters from color.yaml in order of priority:
-        # 1. Current working directory (where executable/image was started)
-        # 2. Executable parent directory (if frozen)
-        # 3. PyInstaller bundle directory (sys._MEIPASS)
-        # 4. Source tree directories
         color_name = "color.yaml"
-        possible_paths = [
-            Path.cwd() / color_name,
-        ]
-        if getattr(sys, 'frozen', False):
-            possible_paths.append(Path(sys.executable).parent / color_name)
-            meipass = getattr(sys, '_MEIPASS', None)
-            if meipass:
-                possible_paths.append(Path(meipass) / color_name)
-        else:
-            possible_paths.append(Path(__file__).parent.parent / color_name)
-            possible_paths.append(Path(__file__).parent / color_name)
-
-        yaml_path = None
-        for p in possible_paths:
-            if p.exists():
-                yaml_path = p
-                break
+        yaml_path = find_resource(color_name, __file__)
 
         if not yaml_path:
             raise FileNotFoundError(f"Could not find {color_name} in current directory, app directory, or bundled assets.")

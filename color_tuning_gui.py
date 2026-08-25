@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 from ffmpeg.color import ColorCorrectionEngine
 from utils.dependency_check import check_dependencies
+from utils.resource_paths import find_resource
 
 class ColorTuningApp(QMainWindow):
     def __init__(self):
@@ -54,22 +55,7 @@ class ColorTuningApp(QMainWindow):
         self.auto_load_default_sample()
 
     def locate_yaml(self):
-        possible_paths = [
-            Path.cwd() / self.color_name,
-        ]
-        if getattr(sys, 'frozen', False):
-            possible_paths.append(Path(sys.executable).parent / self.color_name)
-            meipass = getattr(sys, '_MEIPASS', None)
-            if meipass:
-                possible_paths.append(Path(meipass) / self.color_name)
-        else:
-            possible_paths.append(Path(__file__).parent / self.color_name)
-            possible_paths.append(Path(__file__).parent.parent / self.color_name)
-
-        for p in possible_paths:
-            if p.exists():
-                return p
-        return Path.cwd() / self.color_name
+        return find_resource(self.color_name, __file__) or (Path.cwd() / self.color_name)
 
     def load_yaml(self):
         if self.yaml_path.exists():
