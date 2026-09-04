@@ -37,10 +37,12 @@ class UWMediaApp(toga.App):
         self.start_time_input = toga.TextInput(placeholder="HH:MM:SS", style=Pack(flex=1))
         self.end_time_input = toga.TextInput(placeholder="HH:MM:SS", style=Pack(flex=1))
 
-        self.hw_accel_switch = toga.Switch("Hardware acceleration")
-        self.debug_switch = toga.Switch("Debug output")
-        self.summary_switch = toga.Switch("Show summary")
-        self.no_overwrite_switch = toga.Switch("Skip if target exists")
+        self.hw_accel_switch = toga.Switch(
+            "Hardware acceleration", value=True, style=Pack(margin_bottom=8)
+        )
+        self.debug_switch = toga.Switch("Debug output", style=Pack(margin_bottom=8))
+        self.summary_switch = toga.Switch("Show summary", style=Pack(margin_bottom=8))
+        self.no_overwrite_switch = toga.Switch("Skip if target exists", style=Pack(margin_bottom=8))
 
         self.filename_format_input = toga.TextInput(
             placeholder="%Y%m%d_%H%M%S_color", style=Pack(flex=1)
@@ -53,46 +55,76 @@ class UWMediaApp(toga.App):
         )
 
         self.log_output = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, height=200))
+        self.log_output.style.visibility = HIDDEN
+        self.log_label = toga.Label("Terminal output", style=Pack(margin_top=10))
+        self.log_label.style.visibility = HIDDEN
+
         self.run_button = toga.Button("Run", on_press=self.on_run, style=Pack(margin_top=10))
+        self.progress_bar = toga.ProgressBar(max=None, style=Pack(flex=1, margin_top=10))
+        self.progress_bar.style.visibility = HIDDEN
 
-        root = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        self.show_terminal_switch = toga.Switch(
+            "Show terminal output",
+            value=False,
+            on_change=self.on_show_terminal_toggle,
+            style=Pack(margin_top=10),
+        )
 
-        root.add(self._row("Source", self.source_input, self._browse_button(self.source_input, folder=None)))
-        root.add(self._row("Output", self.output_input, self._browse_button(self.output_input, folder=True)))
-        root.add(self._row("Dive logs", self.logs_input, self._browse_button(self.logs_input, folder=True)))
-        root.add(self._row("Layout / HUD package", self.layout_input, self._browse_button(self.layout_input, folder=None)))
-        root.add(self._row("Move original to", self.move_original_input, self._browse_button(self.move_original_input, folder=True)))
+        self.is_running = False
+        self.current_process = None
+
+        process_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        process_box.add(self._row("Source", self.source_input, self._file_or_folder_buttons(self.source_input)))
+        process_box.add(self._row("Output", self.output_input, self._browse_button(self.output_input, folder=True)))
+        process_box.add(self._row("Layout / HUD package", self.layout_input, self._file_or_folder_buttons(self.layout_input)))
 
         color_box = toga.Box(style=Pack(direction=ROW, margin_bottom=5))
         color_box.add(self.color_switch)
         color_box.add(self.color_profile)
-        root.add(color_box)
+        process_box.add(color_box)
 
-        root.add(self._row("Start time", self.start_time_input, None))
-        root.add(self._row("End time", self.end_time_input, None))
-        root.add(self._row("Filename format", self.filename_format_input, None))
+        process_box.add(self._row("Dive logs", self.logs_input, self._browse_button(self.logs_input, folder=True)))
+        process_box.add(self._row("Filename format", self.filename_format_input, None))
 
-        switches_box = toga.Box(style=Pack(direction=ROW, margin_bottom=5))
-        for switch in (
-            self.hw_accel_switch,
-            self.debug_switch,
-            self.summary_switch,
-            self.no_overwrite_switch,
-        ):
-            switches_box.add(switch)
-        root.add(switches_box)
-
-        root.add(self.render_video_log_switch)
+        batch_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        batch_box.add(self._row("Move original to", self.move_original_input, self._browse_button(self.move_original_input, folder=True)))
+        batch_box.add(self.render_video_log_switch)
         self.render_output_row = self._row(
             "Render output",
             self.render_output_input,
             self._browse_button(self.render_output_input, folder=True),
         )
         self.render_output_row.style.visibility = HIDDEN
-        root.add(self.render_output_row)
+        batch_box.add(self.render_output_row)
 
-        root.add(self.run_button)
-        root.add(toga.Label("Output", style=Pack(margin_top=10)))
+        advanced_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        for switch in (
+            self.hw_accel_switch,
+            self.debug_switch,
+            self.summary_switch,
+            self.no_overwrite_switch,
+        ):
+            advanced_box.add(switch)
+        advanced_box.add(self._row("Start time", self.start_time_input, None))
+        advanced_box.add(self._row("End time", self.end_time_input, None))
+
+        tabs = toga.OptionContainer(
+            content=[
+                ("Process", process_box),
+                ("Batch & Render", batch_box),
+                ("Advanced", advanced_box),
+            ],
+            style=Pack(flex=1),
+        )
+
+        root = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        root.add(tabs)
+        run_row = toga.Box(style=Pack(direction=ROW, align_items="center"))
+        run_row.add(self.run_button)
+        run_row.add(self.progress_bar)
+        root.add(run_row)
+        root.add(self.show_terminal_switch)
+        root.add(self.log_label)
         root.add(self.log_output)
 
         self.main_window = toga.MainWindow(title=self.formal_name)
@@ -120,8 +152,35 @@ class UWMediaApp(toga.App):
 
         return toga.Button("Browse", on_press=on_press, style=Pack(margin_left=5))
 
+    def _file_or_folder_buttons(self, target_input):
+        async def browse_file(widget):
+            path = await self.main_window.dialog(toga.OpenFileDialog("Select file"))
+            if path:
+                target_input.value = str(path)
+
+        async def browse_folder(widget):
+            path = await self.main_window.dialog(toga.SelectFolderDialog("Select folder"))
+            if path:
+                target_input.value = str(path)
+
+        box = toga.Box(style=Pack(direction=ROW))
+        box.add(toga.Button("File…", on_press=browse_file, style=Pack(margin_left=5)))
+        box.add(toga.Button("Folder…", on_press=browse_folder, style=Pack(margin_left=5)))
+        return box
+
     def on_render_video_log_toggle(self, widget):
         self.render_output_row.style.visibility = VISIBLE if widget.value else HIDDEN
+
+    def on_show_terminal_toggle(self, widget):
+        self._set_terminal_visible(widget.value)
+
+    def _set_terminal_visible(self, visible):
+        self.show_terminal_switch.value = visible
+        visibility = VISIBLE if visible else HIDDEN
+        self.log_output.style.visibility = visibility
+        self.log_label.style.visibility = visibility
+        if visible:
+            self.log_output.scroll_to_bottom()
 
     def build_args(self):
         args = []
@@ -174,34 +233,58 @@ class UWMediaApp(toga.App):
 
     def append_log(self, text):
         self.log_output.value += text
+        try:
+            self.log_output.scroll_to_bottom()
+        except Exception:
+            pass
 
     async def on_run(self, widget):
+        if self.is_running:
+            self.append_log("\n[aborting...]\n")
+            if self.current_process is not None:
+                try:
+                    self.current_process.terminate()
+                except ProcessLookupError:
+                    pass
+            return
+
         args = self.build_args()
         if not args:
             self.log_output.value = "Nothing to run: set a source file/directory first.\n"
+            self._set_terminal_visible(True)
             return
 
-        self.run_button.enabled = False
+        self.is_running = True
+        self.run_button.text = "Abort"
+        self.progress_bar.style.visibility = VISIBLE
+        self.progress_bar.start()
         self.log_output.value = ""
         cmd = self.build_command(args)
         self.append_log(f"$ {' '.join(cmd)}\n\n")
         try:
-            process = await asyncio.create_subprocess_exec(
+            self.current_process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
             while True:
-                line = await process.stdout.readline()
+                line = await self.current_process.stdout.readline()
                 if not line:
                     break
                 self.append_log(line.decode(errors="replace"))
-            await process.wait()
-            self.append_log(f"\n[process exited with code {process.returncode}]\n")
+            await self.current_process.wait()
+            self.append_log(f"\n[process exited with code {self.current_process.returncode}]\n")
+            if self.current_process.returncode not in (0, None) and not self.show_terminal_switch.value:
+                self._set_terminal_visible(True)
         except Exception as exc:
             self.append_log(f"\n[error launching process: {exc}]\n")
+            self._set_terminal_visible(True)
         finally:
-            self.run_button.enabled = True
+            self.current_process = None
+            self.is_running = False
+            self.run_button.text = "Run"
+            self.progress_bar.stop()
+            self.progress_bar.style.visibility = HIDDEN
 
 
 def main():
