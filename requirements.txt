@@ -4,7 +4,6 @@ garmin-fit-sdk
 pytest
 numpy
 opencv-python
-PySide6
 toga
 pyexiftool
 tqdm

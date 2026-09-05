@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
@@ -52,7 +52,9 @@ from utils.tag_editor import (
     TARGET_TAGS,
     TZ_MODE_OPTIONS,
     TZ_OFFSETS,
+    apply_batch_timezone_to_file,
     calculate_dji_datetimes,
+    filter_metadata_rows,
     local_tz_offset_string,
     parse_date_from_filename,
 )
@@ -1034,73 +1036,6 @@ class UWMediaApp(toga.App):
                 toga.InfoDialog("Success", f"Successfully updated {updated_count} files.")
             )
 
-    def _batch_tz_worker(self, file_path, mode, tz, tz_iso):
-        local_dt = None
-        if mode == "Keep local time, set offset":
-            try:
-                local_dt = self.tag_meta_handler.get_local_creation_date(file_path)
-            except Exception:
-                pass
-            if not local_dt:
-                local_dt = parse_date_from_filename(file_path)
-            if not local_dt:
-                try:
-                    local_dt = datetime.fromtimestamp(file_path.stat().st_mtime)
-                except Exception:
-                    pass
-        else:  # "Recalculate local time from UTC"
-            utc_dt = None
-            try:
-                utc_dt = self.tag_meta_handler.get_standardized_creation_date(file_path)
-            except Exception:
-                tags_got = self.tag_meta_handler.get_tags(file_path, ["QuickTime:CreateDate", "CreateDate"])
-                create_str = tags_got.get("QuickTime:CreateDate") or tags_got.get("CreateDate")
-                if create_str:
-                    try:
-                        utc_dt = datetime.strptime(str(create_str)[:19], "%Y:%m:%d %H:%M:%S").replace(
-                            tzinfo=timezone.utc
-                        )
-                    except Exception:
-                        pass
-            if utc_dt:
-                local_dt = utc_dt.astimezone(tz).replace(tzinfo=None)
-            else:
-                try:
-                    local_dt = self.tag_meta_handler.get_local_creation_date(file_path)
-                except Exception:
-                    pass
-                if not local_dt:
-                    local_dt = parse_date_from_filename(file_path)
-                if not local_dt:
-                    try:
-                        local_dt = datetime.fromtimestamp(file_path.stat().st_mtime)
-                    except Exception:
-                        pass
-
-        if not local_dt:
-            return False
-
-        local_str = local_dt.strftime("%Y:%m:%d %H:%M:%S")
-        suffix = file_path.suffix.lower()
-        if suffix in (".mp4", ".mov", ".m4v"):
-            updates = {
-                "QuickTime:CreationDate": local_str + tz_iso,
-                "QuickTime:Timezone": tz_iso,
-                "QuickTime:TimeZone": tz_iso,
-                "EXIF:DateTimeOriginal": local_str,
-                "EXIF:CreateDate": local_str,
-            }
-        else:
-            updates = {
-                "EXIF:DateTimeOriginal": local_str,
-                "EXIF:CreateDate": local_str,
-                "EXIF:OffsetTime": tz_iso,
-                "EXIF:OffsetTimeOriginal": tz_iso,
-                "EXIF:OffsetTimeDigitized": tz_iso,
-            }
-        self.tag_meta_handler.set_tags(file_path, updates)
-        return True
-
     async def on_batch_update_timezone(self, widget):
         files = self.tag_editor_files
         if not files:
@@ -1139,7 +1074,9 @@ class UWMediaApp(toga.App):
         for i, file_path in enumerate(files):
             self.tag_editor_status_label.text = f"Updating {i + 1}/{len(files)}: {file_path.name}"
             try:
-                if await asyncio.to_thread(self._batch_tz_worker, file_path, mode, tz, tz_iso):
+                if await asyncio.to_thread(
+                    apply_batch_timezone_to_file, self.tag_meta_handler, file_path, mode, tz, tz_iso
+                ):
                     updated_count += 1
             except Exception as e:
                 error_count += 1
@@ -1190,8 +1127,7 @@ class UWMediaApp(toga.App):
         )
 
         def on_filter(widget):
-            text = (widget.value or "").lower()
-            table.data = [r for r in rows if text in r["tag"].lower() or text in r["value"].lower()]
+            table.data = filter_metadata_rows(rows, widget.value)
 
         search_input = toga.TextInput(
             placeholder="Type to filter tag names or values...", on_change=on_filter, style=Pack(flex=1)

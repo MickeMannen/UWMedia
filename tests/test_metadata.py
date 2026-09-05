@@ -49,109 +49,64 @@ class TestMetadata:
             print(f"ERROR: {file.name} -> {e}")
 
     def test_dji_timezone_calculation(self):
-        from tag_editor_main import TagEditorApp
-        from PySide6.QtWidgets import QApplication
-        import sys
-        
-        # We need a QApplication instance to create/test PySide6 widgets
-        app = QApplication.instance()
-        if not app:
-            app = QApplication(sys.argv)
-            
-        editor = TagEditorApp()
-        
-        # Test case: mock tags
+        from utils.tag_editor import calculate_dji_datetimes
+
         file_path = Path("DJI_20260502110658_0002_D_A001.MP4")
         mock_tags = {
             "QuickTime:OriginalFilePath": "/mnt/media_rw/sd/DCIM/DJI_001/DJI_20260502100659_0002_D_A001.MP4",
             "QuickTime:CreateDate": "2026:05:02 03:06:59",
             "CreateDate": "2026:05:02 03:06:59"
         }
-        
-        calculated = editor.calculate_dji_datetimes(file_path, mock_tags)
+
+        calculated = calculate_dji_datetimes(file_path, mock_tags)
         assert calculated is not None
         assert calculated["QuickTime:CreationDate"] == "2026:05:02 10:06:59+07:00"
         assert calculated["QuickTime:CreateDate"] == "2026:05:02 03:06:59"
         assert calculated["EXIF:DateTimeOriginal"] == "2026:05:02 10:06:59"
         assert calculated["EXIF:CreateDate"] == "2026:05:02 10:06:59"
 
-    def test_batch_timezone_setting(self, tmp_path, monkeypatch):
+    def test_batch_timezone_setting(self, tmp_path):
         import shutil
-        from tag_editor_main import TagEditorApp
-        from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
-        import sys
-        
-        # Ensure QApplication is initialized
-        app = QApplication.instance()
-        if not app:
-            app = QApplication(sys.argv)
-            
+        from utils.tag_editor import apply_batch_timezone_to_file
+
         # Copy a test photo to tmp_path
         src_photo = Path("test_data/release_test/DSC03491.JPG")
         dest_photo = tmp_path / "test_photo.jpg"
         shutil.copy2(src_photo, dest_photo)
-        
-        editor = TagEditorApp()
-        editor.load_files(str(tmp_path))
-        
-        # Verify file is loaded
-        assert editor.file_list.count() == 1
-        
-        # Mock QMessageBox.question to return QMessageBox.Yes
-        monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
-        # Mock QMessageBox.information and QMessageBox.warning to do nothing
-        monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: None)
-        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: None)
-        # Mock QProgressDialog methods
-        monkeypatch.setattr(QProgressDialog, "setValue", lambda *args, **kwargs: None)
-        monkeypatch.setattr(QProgressDialog, "setLabelText", lambda *args, **kwargs: None)
-        monkeypatch.setattr(QProgressDialog, "wasCanceled", lambda *args, **kwargs: False)
-        
-        # Set timezone offset to -05:00
-        editor.tz_combo.setCurrentText("-05:00")
-        editor.tz_mode_combo.setCurrentText("Keep local time, set offset")
-        
-        # Run batch timezone update
-        editor.batch_update_timezone()
-        
-        # Verify metadata is updated with the new offset
+
         meta = MetadataHandler()
+        tz = meta._parse_timezone("-05:00")
+        assert tz is not None
+
+        updated = apply_batch_timezone_to_file(
+            meta, dest_photo, "Keep local time, set offset", tz, "-05:00"
+        )
+        assert updated is True
+
+        # Verify metadata is updated with the new offset
         tags = meta.get_tags(dest_photo, ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"])
         assert tags.get("EXIF:OffsetTimeOriginal") == "-05:00"
         assert tags.get("EXIF:OffsetTime") == "-05:00"
 
-    def test_metadata_viewer_dialog(self):
-        from tag_editor_main import MetadataViewerDialog
-        from PySide6.QtWidgets import QApplication
-        import sys
-        
-        app = QApplication.instance()
-        if not app:
-            app = QApplication(sys.argv)
-            
+    def test_metadata_viewer_filter(self):
+        from utils.tag_editor import filter_metadata_rows
+
         mock_metadata = {
             "EXIF:DateTimeOriginal": "2026:05:21 06:58:22",
             "EXIF:Make": "Sony",
             "EXIF:Model": "ILCE-6700",
             "QuickTime:CreateDate": "2026:05:20 22:58:22"
         }
-        
-        dialog = MetadataViewerDialog("test_file.mp4", mock_metadata)
-        
-        # Verify table has 4 rows
-        assert dialog.table.rowCount() == 4
-        
+        rows = [{"tag": k, "value": str(v)} for k, v in mock_metadata.items()]
+        assert len(rows) == 4
+
         # Filter for "Sony"
-        dialog.filter_table("Sony")
-        
-        # Find which rows are hidden/visible
-        visible_rows = [i for i in range(4) if not dialog.table.isRowHidden(i)]
-        assert len(visible_rows) == 1
-        
-        # Reset filter
-        dialog.filter_table("")
-        visible_rows = [i for i in range(4) if not dialog.table.isRowHidden(i)]
-        assert len(visible_rows) == 4
+        visible = filter_metadata_rows(rows, "Sony")
+        assert len(visible) == 1
+
+        # Empty filter shows everything again
+        visible = filter_metadata_rows(rows, "")
+        assert len(visible) == 4
 
     def test_cli_no_overwrite_and_move_original(self, tmp_path):
         import subprocess

@@ -41,33 +41,3 @@ requires = ["toga"]
 [tool.briefcase.app.uwmedia.macOS]
 universal_build = false
 requires = ["toga-cocoa"]
-
-[tool.briefcase.app.uwmediagui]
-formal_name = "UWMedia HUD Designer"
-description = "HUD Designer & Sync tool - Briefcase packaging spike"
-sources = ["uwmediagui", "gui_main.py"]
-requires = ["PySide6"]
-
-[tool.briefcase.app.uwmediagui.macOS]
-universal_build = false
-min_os_version = "13.0"
-
-[tool.briefcase.app.uwmediatageditor]
-formal_name = "UWMedia Tag Editor"
-description = "Metadata tag editor - Briefcase packaging spike"
-sources = ["uwmediatageditor", "tag_editor_main.py"]
-requires = ["PySide6"]
-
-[tool.briefcase.app.uwmediatageditor.macOS]
-universal_build = false
-min_os_version = "13.0"
-
-[tool.briefcase.app.uwmediacolortuning]
-formal_name = "UWMedia Color Tuning"
-description = "Color correction profile editor - Briefcase packaging spike"
-sources = ["uwmediacolortuning", "color_tuning_gui.py"]
-requires = ["PySide6"]
-
-[tool.briefcase.app.uwmediacolortuning.macOS]
-universal_build = false
-min_os_version = "13.0"

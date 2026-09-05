@@ -1,12 +1,11 @@
 """
-Shared logic for the metadata tag editor - used by both the Qt tool
-(tag_editor_main.py) and the native Toga Tag Editor section (uwmedia/app.py).
-Kept free of any GUI toolkit imports.
+Shared, GUI-toolkit-free logic for the metadata tag editor, used by the native
+Toga Tag Editor section (uwmedia/app.py) and by tests/test_metadata.py.
 """
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # Tags to manage, with metadata guidance shown next to each field.
 TAG_GUIDE = [
@@ -140,3 +139,86 @@ def parse_date_from_filename(file_path: Path) -> Optional[datetime]:
             pass
 
     return None
+
+
+def apply_batch_timezone_to_file(meta_handler, file_path: Path, mode: str, tz, tz_iso: str) -> bool:
+    """
+    Writes a resolved local-time + timezone-offset tag set to one file. `mode` is
+    either "Keep local time, set offset" (use the file's own local time, just
+    stamp the given offset onto it) or "Recalculate local time from UTC" (derive
+    local time by converting the file's UTC creation time into `tz`). `tz` is a
+    datetime.timezone for the offset; `tz_iso` is its "+HH:MM"/"-HH:MM" string form.
+    Returns True if a tag update was written, False if no usable date was found.
+    """
+    local_dt = None
+    if mode == "Keep local time, set offset":
+        try:
+            local_dt = meta_handler.get_local_creation_date(file_path)
+        except Exception:
+            pass
+        if not local_dt:
+            local_dt = parse_date_from_filename(file_path)
+        if not local_dt:
+            try:
+                local_dt = datetime.fromtimestamp(file_path.stat().st_mtime)
+            except Exception:
+                pass
+    else:  # "Recalculate local time from UTC"
+        utc_dt = None
+        try:
+            utc_dt = meta_handler.get_standardized_creation_date(file_path)
+        except Exception:
+            tags_got = meta_handler.get_tags(file_path, ["QuickTime:CreateDate", "CreateDate"])
+            create_str = tags_got.get("QuickTime:CreateDate") or tags_got.get("CreateDate")
+            if create_str:
+                try:
+                    utc_dt = datetime.strptime(str(create_str)[:19], "%Y:%m:%d %H:%M:%S").replace(
+                        tzinfo=timezone.utc
+                    )
+                except Exception:
+                    pass
+        if utc_dt:
+            local_dt = utc_dt.astimezone(tz).replace(tzinfo=None)
+        else:
+            try:
+                local_dt = meta_handler.get_local_creation_date(file_path)
+            except Exception:
+                pass
+            if not local_dt:
+                local_dt = parse_date_from_filename(file_path)
+            if not local_dt:
+                try:
+                    local_dt = datetime.fromtimestamp(file_path.stat().st_mtime)
+                except Exception:
+                    pass
+
+    if not local_dt:
+        return False
+
+    local_str = local_dt.strftime("%Y:%m:%d %H:%M:%S")
+    suffix = file_path.suffix.lower()
+    if suffix in (".mp4", ".mov", ".m4v"):
+        updates = {
+            "QuickTime:CreationDate": local_str + tz_iso,
+            "QuickTime:Timezone": tz_iso,
+            "QuickTime:TimeZone": tz_iso,
+            "EXIF:DateTimeOriginal": local_str,
+            "EXIF:CreateDate": local_str,
+        }
+    else:
+        updates = {
+            "EXIF:DateTimeOriginal": local_str,
+            "EXIF:CreateDate": local_str,
+            "EXIF:OffsetTime": tz_iso,
+            "EXIF:OffsetTimeOriginal": tz_iso,
+            "EXIF:OffsetTimeDigitized": tz_iso,
+        }
+    meta_handler.set_tags(file_path, updates)
+    return True
+
+
+def filter_metadata_rows(rows: List[Dict[str, Any]], text: str) -> List[Dict[str, Any]]:
+    """Rows (each a {'tag': ..., 'value': ...} dict) whose tag or value contains
+    `text` (case-insensitive) - the filter behind the Tag Editor's metadata viewer."""
+    text = (text or "").lower()
+    return [r for r in rows if text in r["tag"].lower() or text in str(r["value"]).lower()]
