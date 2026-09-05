@@ -10,7 +10,7 @@ from metadata.exif import MetadataHandler
 BASE_DIR = Path(__file__).parent.parent
 TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
 RESULTS_DIR = BASE_DIR / "test_data" / "test_results"
-LAYOUT_PATH = BASE_DIR / "computers" / "Shearwater_Perdix2_simple.zip"
+LAYOUT_PATH = BASE_DIR / "overlays" / "Shearwater_Perdix2_simple.zip"
 LOGS_DIR = BASE_DIR / "test_data" / "logs" / "uddf"
 
 @pytest.fixture(scope="module", autouse=True)

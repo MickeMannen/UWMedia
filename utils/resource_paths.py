@@ -1,6 +1,28 @@
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Union
+
+
+def user_data_dir(app_name: str = "UWMedia") -> Path:
+    """
+    Per-OS, per-user writable data directory for the app - the same location
+    Toga's `app.paths.data` reports, computed standalone so non-GUI code
+    (cli_main.py, ffmpeg/color.py) can use it without a toga.App instance.
+
+    User-editable resources (custom HUD layouts, custom color profiles,
+    settings) live here so they survive app reinstalls/updates, unlike
+    anything under the bundled, effectively read-only install location.
+    """
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    elif sys.platform.startswith("win"):
+        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+    path = base / app_name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def find_resource(filename: str, start: Union[str, Path], max_depth: int = 3) -> Optional[Path]:

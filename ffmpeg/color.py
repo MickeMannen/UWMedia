@@ -10,14 +10,13 @@ import threading
 from queue import Queue
 import tempfile
 from io import StringIO
-import yaml
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from tqdm import tqdm
 from ffmpeg.ffmpeg_class import FfmpegClass
 from models.dive import Dive, Waypoint
-from utils.resource_paths import find_resource
+from utils.color_profiles import load_merged_color_profiles
 
 # Constants for analysis
 SAMPLE_SECONDS = 2
@@ -39,22 +38,17 @@ class ColorCorrectionEngine:
     def __init__(self, ffmpeg_tool: Optional[FfmpegClass], color_profile: Optional[str] = "default"):
         self.ffmpeg_tool = ffmpeg_tool
         self.color_profile = color_profile or "default"
-        
-        color_name = "color.yaml"
-        yaml_path = find_resource(color_name, __file__)
 
-        if not yaml_path:
-            raise FileNotFoundError(f"Could not find {color_name} in current directory, app directory, or bundled assets.")
-
-        with open(yaml_path, 'r') as f:
-            data = yaml.safe_load(f) or {}
+        data = load_merged_color_profiles()
+        if not data:
+            raise FileNotFoundError("Could not find color.yaml in current directory, app directory, user data directory, or bundled assets.")
 
         if self.color_profile not in data:
             if "default" in data:
-                print(f"Warning: Profile '{self.color_profile}' not found in {color_name}. Falling back to 'default'.")
+                print(f"Warning: Profile '{self.color_profile}' not found. Falling back to 'default'.")
                 self.color_profile = "default"
             else:
-                raise ValueError(f"Profile '{self.color_profile}' not found and no 'default' profile exists in {color_name}.")
+                raise ValueError(f"Profile '{self.color_profile}' not found and no 'default' profile exists.")
 
         profile = data[self.color_profile]
         

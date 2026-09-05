@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QImage
 from ffmpeg.color import ColorCorrectionEngine
 from utils.dependency_check import check_dependencies
-from utils.resource_paths import find_resource
+from utils.color_profiles import bundled_color_yaml_path, user_color_yaml_path
 
 class ColorTuningApp(QMainWindow):
     def __init__(self):
@@ -22,8 +22,14 @@ class ColorTuningApp(QMainWindow):
         self.resize(1200, 800)
         
         # Paths & Configurations
-        self.color_name = "color.yaml"
-        self.yaml_path = self.locate_yaml()
+        # Bundled color.yaml is the (effectively read-only) app default; a
+        # profile is only ever written to the user's own color.yaml in their
+        # data directory, where it persists across app updates/reinstalls
+        # and overrides a bundled profile of the same name.
+        self.bundled_path = bundled_color_yaml_path()
+        self.yaml_path = user_color_yaml_path()
+        self.bundled_data = {}
+        self.user_data = {}
         self.config_data = {}
         self.default_profile_data = {}
         self.current_profile = "default"
@@ -54,18 +60,23 @@ class ColorTuningApp(QMainWindow):
         # Try loading default sample if it exists in release_test
         self.auto_load_default_sample()
 
-    def locate_yaml(self):
-        return find_resource(self.color_name, __file__) or (Path.cwd() / self.color_name)
-
     def load_yaml(self):
+        if self.bundled_path and self.bundled_path.exists():
+            with open(self.bundled_path, 'r') as f:
+                self.bundled_data = yaml.safe_load(f) or {}
+            print(f"Loaded bundled defaults from: {self.bundled_path}")
+        else:
+            print("Warning: bundled color.yaml not found.")
+
         if self.yaml_path.exists():
             with open(self.yaml_path, 'r') as f:
-                self.config_data = yaml.safe_load(f) or {}
-            print(f"Loaded config from: {self.yaml_path}")
-        else:
-            print(f"Warning: {self.color_name} not found. Starting with empty configuration.")
+                self.user_data = yaml.safe_load(f) or {}
+            print(f"Loaded user profiles from: {self.yaml_path}")
+
+        self.config_data = {**self.bundled_data, **self.user_data}
+        if not self.config_data:
             self.config_data = {"default": {}}
-        
+
         self.default_profile_data = self.config_data.get("default", {})
 
     def save_yaml(self):
@@ -100,11 +111,12 @@ class ColorTuningApp(QMainWindow):
         profile["darkness"] = float(self.slider_darkness.value() / 100.0)
         
         self.config_data[self.current_profile] = profile
-        
+        self.user_data[self.current_profile] = profile
+
         try:
             with open(self.yaml_path, 'w') as f:
-                yaml.dump(self.config_data, f, default_flow_style=False, sort_keys=False)
-            print(f"Saved configuration to: {self.yaml_path}")
+                yaml.dump(self.user_data, f, default_flow_style=False, sort_keys=False)
+            print(f"Saved profile '{self.current_profile}' to: {self.yaml_path}")
             if self.current_profile == "default":
                 self.default_profile_data = self.config_data.get("default", {})
         except Exception as e:
@@ -148,10 +160,11 @@ class ColorTuningApp(QMainWindow):
             profile["darkness"] = float(self.slider_darkness.value() / 100.0)
             
             self.config_data[new_name] = profile
-            
+            self.user_data[new_name] = profile
+
             try:
                 with open(self.yaml_path, 'w') as f:
-                    yaml.dump(self.config_data, f, default_flow_style=False, sort_keys=False)
+                    yaml.dump(self.user_data, f, default_flow_style=False, sort_keys=False)
                 print(f"Saved new profile '{new_name}' to: {self.yaml_path}")
                 
                 # Refresh profiles combo box and select the new one
@@ -280,7 +293,7 @@ class ColorTuningApp(QMainWindow):
         self.btn_save_new.clicked.connect(self.save_new_profile)
         toolbar.addWidget(self.btn_save_new)
         
-        self.btn_save = QPushButton("Save to color.yaml")
+        self.btn_save = QPushButton("Save Profile")
         self.btn_save.setStyleSheet("background-color: #10b981;") # Emerald Green
         self.btn_save.clicked.connect(self.save_yaml)
         toolbar.addWidget(self.btn_save)

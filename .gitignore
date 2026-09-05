@@ -181,7 +181,7 @@ Thumbs.db
 /pyinstaller/dist/
 /pyinstaller/build/
 /pyinstaller/*.spec
-/computers/images/
+/overlays/images/
 *.zip
 *.png
 *.webp

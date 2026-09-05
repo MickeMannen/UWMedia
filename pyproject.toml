@@ -8,7 +8,7 @@ author_email = "mikael.christersson2@gmail.com"
 
 # Shared across every app below - concatenated with each app's own sources/requires.
 sources = [
-    "computers",
+    "overlays",
     "ffmpeg",
     "gui",
     "metadata",

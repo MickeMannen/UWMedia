@@ -20,7 +20,7 @@ except ImportError:
 BASE_DIR = Path(__file__).parent.parent
 TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
 LOGS_DIR = BASE_DIR / "test_data" / "logs" / "fit"
-COMPUTERS_DIR = BASE_DIR / "computers"
+OVERLAYS_DIR = BASE_DIR / "overlays"
 DEFAULT_OUTPUT_DIR = BASE_DIR / "test_data" / "show"
 
 # Project root configuration files
@@ -28,9 +28,9 @@ COLOR_YAML = BASE_DIR / "color.yaml"
 CONFIG_YAML = BASE_DIR / "config.yaml"
 
 # Default layouts and inputs
-GARMIN_SINGLE_LAYOUT = COMPUTERS_DIR / "Garmin_x50_simple.zip"
-GARMIN_SIDEMOUNT_LAYOUT = COMPUTERS_DIR / "Garmin_x50_sidemount.zip"
-PERDIX2_LAYOUT = COMPUTERS_DIR / "Shearwater_Perdix2_simple.zip"
+GARMIN_SINGLE_LAYOUT = OVERLAYS_DIR / "Garmin_x50_simple.zip"
+GARMIN_SIDEMOUNT_LAYOUT = OVERLAYS_DIR / "Garmin_x50_sidemount.zip"
+PERDIX2_LAYOUT = OVERLAYS_DIR / "Shearwater_Perdix2_simple.zip"
 DEFAULT_PHOTO = BASE_DIR / "test_data" / "color_correction" / "DSC06641.JPG"
 DEFAULT_VIDEO = TEST_DATA_DIR / "20251019_M0284.MP4"
 SIDEMOUNT_VIDEO = BASE_DIR / "test_data" / "videos_original" / "DJI_20260502110658_0002_D_A001.MP4"

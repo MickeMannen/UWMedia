@@ -8,7 +8,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
 RESULTS_DIR = BASE_DIR / "test_data" / "test_results"
-LAYOUT_PATH = BASE_DIR / "computers" / "Shearwater_Perdix2_simple.zip"
+LAYOUT_PATH = BASE_DIR / "overlays" / "Shearwater_Perdix2_simple.zip"
 UDDF_LOG = BASE_DIR / "test_data" / "logs" / "uddf" / "Perdix 2 453 2025-10-19 16-44-12.uddf"
 FIT_LOG = BASE_DIR / "test_data" / "logs" / "fit" / "488 Phuket, Camera Bay.fit"
 

@@ -445,7 +445,13 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     # Determine Output Path
     if args.render_video_log:
         layout_name = args.original_layout_stem or "default"
-        filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
+        try:
+            filename = args.render_log_filename_format.format(
+                filename=source.stem, hud=layout_name, datetaken=creation_date
+            ) + source.suffix.lower()
+        except Exception as e:
+            print(f"Error formatting render-log filename with pattern '{args.render_log_filename_format}': {e}")
+            filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
     elif forced_filename:
         # If forced, still ensure extension is lower case if it has one
         p = Path(forced_filename)
@@ -982,6 +988,13 @@ def main():
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
     parser.add_argument("--export-json", type=Path, help="Read logs from a directory and create a JSON file for each log file using same filename but json extension.")
     parser.add_argument("--render-video-log", action="store_true", default=False, help="Create a telemetry-only video/photo on a black background for all files in the input folder (requires --layout and --logs).")
+    parser.add_argument(
+        "--render-log-filename-format",
+        default="{filename}_{hud}",
+        help='Template for --render-video-log output filenames. Tokens: {filename} (source stem), '
+             '{hud} (layout/HUD package name), {datetaken} (a datetime, e.g. "{datetaken:%%Y%%m%%d_%%H%%M%%S}"). '
+             'Default: "{filename}_{hud}"',
+    )
 
     args = parser.parse_args()
 

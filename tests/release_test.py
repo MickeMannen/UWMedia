@@ -17,7 +17,7 @@ FIT_DIR = BASE_DIR / "test_data" / "logs" / "fit"
 UDDF_DIR = BASE_DIR / "test_data" / "logs" / "uddf"
 SSRF_DIR = BASE_DIR / "test_data" / "logs" / "ssrf"
 OUTPUT_DIR = BASE_DIR / "test_data" / "test_results"  # Unified test output target
-COMPUTERS_DIR = BASE_DIR / "computers"
+OVERLAYS_DIR = BASE_DIR / "overlays"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -214,7 +214,7 @@ class TestRelease:
         src = TEST_DATA_DIR / "DJI_20260502110658_0002_D_A001.MP4"
         logs = FIT_DIR
 
-        layouts = [COMPUTERS_DIR / "Garmin_x50_simple.zip", COMPUTERS_DIR / "generic_depth_temp.zip"]
+        layouts = [OVERLAYS_DIR / "Garmin_x50_simple.zip", OVERLAYS_DIR / "generic_depth_temp.zip"]
 
         target_list = []
         for layout in layouts:
@@ -234,7 +234,7 @@ class TestRelease:
     def test_08_overlay_photo(self):
         """Verify photo layout overlays work for different layout styles."""
         src = TEST_DATA_DIR / "DSC03491.JPG"
-        layouts = [COMPUTERS_DIR / "Garmin_x50_simple.zip", COMPUTERS_DIR / "generic_depth_temp.zip"]
+        layouts = [OVERLAYS_DIR / "Garmin_x50_simple.zip", OVERLAYS_DIR / "generic_depth_temp.zip"]
         logs = FIT_DIR
         target_list = []
 
@@ -260,7 +260,7 @@ class TestRelease:
         """Verify standalone telemetry video generation from Garmin FIT log files."""
         log = FIT_DIR / "488 Phuket, Camera Bay.fit"
 
-        for file in COMPUTERS_DIR.glob("*.zip"):
+        for file in OVERLAYS_DIR.glob("*.zip"):
             output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_{file.stem}.mp4"
 
             cmd = [
@@ -274,7 +274,7 @@ class TestRelease:
     def test_10_render_log_uddf(self):
         """Verify standalone telemetry video generation from UDDF log files."""
         log = UDDF_DIR / "Perdix 2 453 2025-10-19 16-44-12.uddf"
-        layout = COMPUTERS_DIR / "generic_depth_temp.zip"
+        layout = OVERLAYS_DIR / "generic_depth_temp.zip"
         output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_generic.mp4"
 
         cmd = [
@@ -288,7 +288,7 @@ class TestRelease:
     def test_11_overlay_photo(self):
         """Verify photo overlays with SSRF logs."""
         src = TEST_DATA_DIR / "DSC06422.JPG"
-        layout = COMPUTERS_DIR / "generic_depth_temp.zip"
+        layout = OVERLAYS_DIR / "generic_depth_temp.zip"
         logs = SSRF_DIR
         cmd = [
             "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
