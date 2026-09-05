@@ -19,18 +19,23 @@ fi
 
 echo "Using Python: $($PYTHON --version 2>&1) from $PYTHON"
 
-# Run the build script for all targets
-echo "Building all apps using PyInstaller..."
-"$PYTHON" pyinstaller/build.py --target all "$@"
+# Build and package the UWMedia app (GUI + CLI in one) with Briefcase.
+# --adhoc-sign produces an unsigned .app/.dmg - fine for personal use and
+# GitHub Releases, but macOS Gatekeeper will flag it as from an unidentified
+# developer (right-click > Open on first launch) since there's no paid
+# Apple Developer ID configured.
+echo "Building UWMedia with Briefcase..."
+"$PYTHON" -m briefcase build macOS
+"$PYTHON" -m briefcase package macOS --adhoc-sign "$@"
 
-# Copy created PyInstaller onefile executables to releases folder if directory exists
+# Copy the packaged app/installer to the releases folder if it exists
 RELEASE_DIR="/Users/mikael/syncthing/AppReleases"
 
 if [ -d "$RELEASE_DIR" ]; then
-    if [ -d "pyinstaller/dist" ] && [ "$(ls -A pyinstaller/dist 2>/dev/null)" ]; then
-        echo "Copying built executables from pyinstaller/dist to $RELEASE_DIR..."
-        cp -f pyinstaller/dist/* "$RELEASE_DIR/"
-        echo "Successfully copied executables to $RELEASE_DIR"
+    if [ -d "dist" ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+        echo "Copying built package from dist to $RELEASE_DIR..."
+        cp -f dist/* "$RELEASE_DIR/"
+        echo "Successfully copied package to $RELEASE_DIR"
     fi
 else
     echo "Release directory $RELEASE_DIR does not exist. Skipping copy."

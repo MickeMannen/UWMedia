@@ -8,7 +8,7 @@ Set-Location -Path $DIR
 # Determine Python executable
 if (Test-Path ".venv\Scripts\python.exe") {
     $PYTHON = ".venv\Scripts\python.exe"
-} elif (Test-Path "venv\Scripts\python.exe") {
+} elseif (Test-Path "venv\Scripts\python.exe") {
     $PYTHON = "venv\Scripts\python.exe"
 } else {
     $PYTHON = "python"
@@ -17,20 +17,21 @@ if (Test-Path ".venv\Scripts\python.exe") {
 $pyVersion = & $PYTHON --version 2>&1
 Write-Host "Using Python: $pyVersion from $PYTHON"
 
-# Run the build script for all targets
-Write-Host "Building all apps using PyInstaller..."
-& $PYTHON pyinstaller/build.py --target all $args
+# Build and package the UWMedia app (GUI + CLI in one) with Briefcase.
+Write-Host "Building UWMedia with Briefcase..."
+& $PYTHON -m briefcase build windows
+& $PYTHON -m briefcase package windows --adhoc-sign $args
 
-# Copy created PyInstaller executables to releases folder if directory exists
+# Copy the packaged installer to the releases folder if it exists
 $RELEASE_DIR = "D:\syncthing\AppReleases"
 
 if (Test-Path -Path $RELEASE_DIR) {
-    if (Test-Path -Path "pyinstaller\dist") {
-        $distFiles = Get-ChildItem -Path "pyinstaller\dist" -File
+    if (Test-Path -Path "dist") {
+        $distFiles = Get-ChildItem -Path "dist" -File
         if ($distFiles.Count -gt 0) {
-            Write-Host "Copying built executables from pyinstaller\dist to $RELEASE_DIR..."
-            Copy-Item -Path "pyinstaller\dist\*" -Destination "$RELEASE_DIR\" -Force
-            Write-Host "Successfully copied executables to $RELEASE_DIR"
+            Write-Host "Copying built package from dist to $RELEASE_DIR..."
+            Copy-Item -Path "dist\*" -Destination "$RELEASE_DIR\" -Force
+            Write-Host "Successfully copied package to $RELEASE_DIR"
         }
     }
 } else {

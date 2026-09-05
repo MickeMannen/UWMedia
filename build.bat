@@ -15,17 +15,19 @@ echo Using Python:
 %PYTHON% --version
 echo from %PYTHON%
 
-echo Building all apps using PyInstaller...
-%PYTHON% pyinstaller\build.py --target all %*
+echo Building UWMedia with Briefcase...
+%PYTHON% -m briefcase build windows
+if errorlevel 1 exit /b %errorlevel%
+%PYTHON% -m briefcase package windows --adhoc-sign %*
 if errorlevel 1 exit /b %errorlevel%
 
 set "RELEASE_DIR=D:\syncthing\AppReleases"
 
 if exist "%RELEASE_DIR%\" (
-    if exist "pyinstaller\dist" (
-        echo Copying built executables from pyinstaller\dist to %RELEASE_DIR%...
-        copy /Y "pyinstaller\dist\*" "%RELEASE_DIR%\"
-        echo Successfully copied executables to %RELEASE_DIR%
+    if exist "dist" (
+        echo Copying built package from dist to %RELEASE_DIR%...
+        copy /Y "dist\*" "%RELEASE_DIR%\"
+        echo Successfully copied package to %RELEASE_DIR%
     )
 ) else (
     echo Release directory %RELEASE_DIR% does not exist. Skipping copy.

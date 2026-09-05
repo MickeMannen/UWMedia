@@ -7,6 +7,6 @@ opencv-python
 toga
 pyexiftool
 tqdm
-pyinstaller
+briefcase
 PyYAML
 Pillow

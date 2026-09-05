@@ -1,3 +1,28 @@
+# macOS signing (optional, manual only):
+#
+# Tag pushes always build ad-hoc/unsigned artifacts for all platforms (the
+# macOS one only runs on the machine that built it - see the note below).
+# To produce a real, Apple-notarized macOS build that other people can
+# actually run, trigger this workflow manually ("Run workflow" in the
+# Actions tab) with "Sign and notarize macOS build" checked. This requires
+# five repo secrets, none of which this workflow can set up for you:
+#   APPLE_CERTIFICATE_P12          - base64 of a .p12 containing BOTH your
+#                                     "Developer ID Application" and
+#                                     "Developer ID Installer" certs+keys
+#                                     (export both together from Keychain
+#                                     Access), e.g. `base64 -i cert.p12 | pbcopy`
+#   APPLE_CERTIFICATE_PASSWORD     - the password you set when exporting the .p12
+#   APPLE_TEAM_ID                  - your 10-character Apple Developer Team ID
+#   APPLE_ID                       - your Apple ID email
+#   APPLE_APP_SPECIFIC_PASSWORD    - an app-specific password from
+#                                     appleid.apple.com (Sign-In and Security >
+#                                     App-Specific Passwords) - NOT your real
+#                                     Apple ID password
+#
+# A signed run only uploads a workflow artifact (Actions tab); it does not
+# publish to GitHub Releases automatically - attach it to a release yourself
+# once you've downloaded and checked it.
+
 name: Release Build
 
 on:
@@ -5,10 +30,15 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      sign_macos:
+        description: 'Sign and notarize macOS build (requires Apple secrets, see workflow file comments)'
+        type: boolean
+        default: false
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -16,10 +46,13 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
+            format: appimage
           - os: windows-latest
             platform: windows
+            format: app
           - os: macos-14
-            platform: macos
+            platform: macOS
+            format: app
 
     steps:
       - name: Checkout code
@@ -38,7 +71,7 @@ jobs:
           sudo apt-get install -y ffmpeg libimage-exiftool-perl
 
       - name: Install System Dependencies (macOS)
-        if: matrix.platform == 'macos'
+        if: matrix.platform == 'macOS'
         run: |
           brew install ffmpeg exiftool
 
@@ -52,25 +85,105 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Determine Revision
-        id: rev
+      - name: Set app version from tag
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
+        env:
+          TAG_REF: ${{ github.ref }}
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo "REVISION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            echo "REVISION=dev-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-          fi
+          python -c "
+          import os, re, pathlib
+          tag_version = os.environ['TAG_REF'].removeprefix('refs/tags/v')
+          p = pathlib.Path('pyproject.toml')
+          content = re.sub(r'(?m)^version = \".*\"', f'version = \"{tag_version}\"', p.read_text(), count=1)
+          p.write_text(content)
+          print(f'Set Briefcase app version to {tag_version}')
+          "
 
-      - name: Build with build.py
+      - name: Build app with Briefcase
         run: |
-          python pyinstaller/build.py --target all --revision ${{ steps.rev.outputs.REVISION }}
+          briefcase build ${{ matrix.platform }} ${{ matrix.format }} --no-input
+
+      # --- macOS signing setup (only for a manual, opted-in run) -----------
+      - name: Import Apple signing certificate
+        if: matrix.platform == 'macOS' && inputs.sign_macos
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -e
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/productsign -T /usr/bin/productbuild
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add to the search list without dropping the default keychains
+          EXISTING_KEYCHAINS=$(security list-keychains -d user | sed 's/[[:space:]"]//g')
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
+
+          # Resolve the exact identity names Briefcase needs to pass to
+          # codesign/productsign - read from the keychain rather than
+          # requiring you to type your cert's exact common name as a secret.
+          APP_IDENTITY=$(security find-identity -v "$KEYCHAIN_PATH" | grep 'Developer ID Application' | head -1 | sed -E 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(.*)"$/\1/')
+          INSTALLER_IDENTITY=$(security find-identity -v "$KEYCHAIN_PATH" | grep 'Developer ID Installer' | head -1 | sed -E 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(.*)"$/\1/')
+          if [ -z "$APP_IDENTITY" ] || [ -z "$INSTALLER_IDENTITY" ]; then
+            echo "::error::Could not find both a 'Developer ID Application' and 'Developer ID Installer' identity in the imported certificate."
+            exit 1
+          fi
+          echo "APP_IDENTITY=$APP_IDENTITY" >> "$GITHUB_ENV"
+          echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Register notarization credentials
+        if: matrix.platform == 'macOS' && inputs.sign_macos
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          # Briefcase looks this profile name up itself - it must be exactly
+          # "briefcase-macOS-<team id>" (see SigningIdentity in briefcase's
+          # macOS backend).
+          xcrun notarytool store-credentials "briefcase-macOS-$APPLE_TEAM_ID" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --keychain "$KEYCHAIN_PATH"
+
+      - name: Package app with Briefcase (signed + notarized)
+        if: matrix.platform == 'macOS' && inputs.sign_macos
+        run: |
+          briefcase package macOS app --no-input -i "$APP_IDENTITY" --installer-identity "$INSTALLER_IDENTITY"
+
+      - name: Clean up signing keychain
+        if: always() && matrix.platform == 'macOS' && inputs.sign_macos
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
+
+      # --- Everyone else (and macOS when signing wasn't requested) ---------
+      # NOTE: macOS is a console_app (for the CLI), which Briefcase can only
+      # distribute as a signed .pkg installer. Without the real Apple signing
+      # above, --adhoc-sign is the only option - and Apple's ad-hoc signing
+      # means the resulting PKG will only install/run on the machine that
+      # built it (this CI runner), not on any other Mac.
+      - name: Package app with Briefcase (ad-hoc)
+        if: "!(matrix.platform == 'macOS' && inputs.sign_macos)"
+        run: |
+          briefcase package ${{ matrix.platform }} ${{ matrix.format }} --no-input --adhoc-sign
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: uwmedia-${{ matrix.platform }}
-          path: pyinstaller/dist/*
+          name: uwmedia-${{ matrix.platform }}${{ (matrix.platform == 'macOS' && inputs.sign_macos) && '-signed' || '' }}
+          path: dist/*
 
   release:
     name: Create Release
@@ -91,6 +204,14 @@ jobs:
           files: |
             artifacts/uwmedia-linux/*
             artifacts/uwmedia-windows/*
-            artifacts/uwmedia-macos/*
+            artifacts/uwmedia-macOS/*
+          body: |
+            The macOS package here is ad-hoc signed (this automated tag build
+            never uses real Apple signing) and will only run on the machine
+            it was built on - it's included mainly to confirm the build
+            succeeds, not as a distributable artifact. For a real signed/
+            notarized macOS build, trigger this workflow manually from the
+            Actions tab with signing enabled, then attach it here yourself.
+            Windows and Linux builds are unsigned but otherwise runnable.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

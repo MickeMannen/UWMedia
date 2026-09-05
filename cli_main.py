@@ -1053,8 +1053,14 @@ def main():
     if args.logs:
         args.logs = args.logs.resolve()
 
-    # Try to get revision from __main__
-    revision = getattr(sys.modules['__main__'], 'REVISION', 'dev')
+    # Packaged (Briefcase) runs expose their version via the app's own
+    # dist-info metadata; a plain source checkout has no such distribution
+    # installed, so this just falls back to "dev".
+    try:
+        from importlib.metadata import version as _pkg_version
+        revision = _pkg_version("uwmedia")
+    except Exception:
+        revision = "dev"
     print(f"UWMedia CLI - Revision: {revision}")
 
     if args.export_json:

@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=python,bash,qt,git,md" alt="Tech Stack" />
+    <img src="https://skillicons.dev/icons?i=python,bash,git,md" alt="Tech Stack" />
   </a>
 </p>
 
@@ -67,21 +67,24 @@ cd UWMedia
 pip install -r requirements.txt
 ```
 
-Alternative if you want to use a binary (pyinstaller) - download from releases, make sure to use the latest overlays or edit your own overlay with new gui_main. Please note that it takes one minute for the Pyinstaller image to get started - Numpy has to be unpacked.
+Alternative if you want to use a packaged app - download from releases (Windows/Linux). Note: the macOS release artifact is ad-hoc signed and will only run on the machine it was built on; on macOS, install from source instead until real Apple Developer ID signing is set up.
 
-### Building Executables
+### Building the App
 
-If you want to package the applications into standalone binaries yourself, use the `build.sh` script. It automatically uses the project's virtual environment and builds all apps (CLI, GUI, and Tag Editor) using PyInstaller:
+UWMedia is packaged with [Briefcase](https://briefcase.readthedocs.io/) - one app bundles the GUI and the CLI together. Use the `build.sh` (macOS), `build.bat`, or `build.ps1` (Windows) script; each automatically uses the project's virtual environment:
 
 ```bash
-# Build all apps
-./build.sh
+# Build and package for your platform
+./build.sh          # macOS
+build.bat           # Windows
+```
 
-# Or build a specific target
-./build.sh --target cli
+This runs `briefcase build` then `briefcase package`, producing an installer under `dist/` (a `.pkg` on macOS, `.msi` on Windows). You can also drive Briefcase directly:
 
-# Or specify a custom version/revision
-./build.sh --revision 1.0.0
+```bash
+briefcase dev              # run from source, GUI
+briefcase build macOS      # build the app bundle
+briefcase package macOS --adhoc-sign   # package for distribution
 ```
 
 ## Usage
@@ -123,35 +126,21 @@ python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
 
 
-### Graphical User Interfaces (GUIs)
+### Graphical User Interface
 
-UWMedia includes two interactive GUI applications to design overlays and fine-tune correction profiles.
-
-#### 1. HUD Designer & Sync (`gui_main.py`)
-
-Launch the interactive HUD designer and preview tool:
+UWMedia is a single desktop app (built with [Toga](https://toga.readthedocs.io/)) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
 
 ```bash
-python gui_main.py
+python -m uwmedia      # from source
+briefcase dev          # via Briefcase
 ```
 
-- **Features**: Customizing and positioning telemetry fields, shapes, and background skins.
-- **Dynamic Overlays**: Select custom widgets (such as the Depth Graph Overlay) from a dropdown list and click "Add" to overlay them onto the HUD canvas.
+- **Process / Advanced / Activity**: the GUI front-end for the CLI options above (source/output, color correction, layout, dive logs, flags, run log).
+- **Color Tuning**: side-by-side **Original**/**Adjusted** preview with sliders for restoration weights, white balance, exposure, OKLCh hue shifts, sharpness, and darkness. Save adjustments back to an existing profile or as a new one - saved to your user profile (`color.yaml` in the app's data directory), so bundled defaults are never overwritten.
+- **Tag Editor**: batch-view and edit EXIF/QuickTime date/timezone tags across a directory, with automatic DJI timestamp correction and a full raw-metadata viewer.
+- **HUD Designer**: click-and-drag telemetry fields, shapes, and skins onto a live video/photo preview; save/load `.zip` HUD packages, add custom labels or a depth-graph overlay, align multiple fields, and preview the exact rendered output.
 
 Please share if you make a fancy HUD!
-
-#### 2. Color Tuning Tool (`color_tuning_gui.py`)
-
-Launch the color correction profile editor and preview tool:
-
-```bash
-python color_tuning_gui.py
-```
-
-- **Side-by-Side Preview**: Compare the **Original** raw photo on the left with the corrected **Adjusted** photo on the right in real-time.
-- **Precision Adjustments**: Sliders to tune restoration weights, white balance, exposure, OKLCh hue shifts, plus post-processing adjustments for **Sharpness** (using an unsharp mask) and **Darkness** offset.
-- **Profile Management**: Save adjustments back to existing profiles or **Save as New Profile** directly to `color.yaml`.
-- **Path Memory & Info**: Automatically remembers the folder location of your loaded photos across sessions and displays the absolute path of the original file in a bottom status bar.
 
 
 ## Technical Highlights
