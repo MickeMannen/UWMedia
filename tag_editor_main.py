@@ -17,37 +17,12 @@ from PySide6.QtGui import QFont, QColor, QPalette, QIcon
 
 from metadata.exif import MetadataHandler
 from utils.dependency_check import check_dependencies
-
-
-# Tags to manage with metadata guidance
-TAG_GUIDE = [
-    {
-        "tag": "QuickTime:CreationDate",
-        "tz": "Local Time + Offset",
-        "example": "2026:05:21 06:58:22+08:00",
-        "hint": "Primary date used by Apple Photos for sorting."
-    },
-    {
-        "tag": "QuickTime:CreateDate",
-        "tz": "UTC (Universal Time)",
-        "example": "2026:05:20 22:58:22",
-        "hint": "Technical creation time, usually stored in UTC."
-    },
-    {
-        "tag": "EXIF:DateTimeOriginal",
-        "tz": "Local Time (Naive)",
-        "example": "2026:05:21 06:58:22",
-        "hint": "Original capture time for photos."
-    },
-    {
-        "tag": "EXIF:CreateDate",
-        "tz": "Local Time (Naive)",
-        "example": "2026:05:21 06:58:22",
-        "hint": "Standard digitized creation date for photos."
-    }
-]
-
-TARGET_TAGS = [g["tag"] for g in TAG_GUIDE]
+from utils.tag_editor import (
+    TAG_GUIDE,
+    TARGET_TAGS,
+    calculate_dji_datetimes as _calculate_dji_datetimes,
+    parse_date_from_filename as _parse_date_from_filename,
+)
 
 class TagEditorApp(QMainWindow):
     def __init__(self):
@@ -324,56 +299,7 @@ class TagEditorApp(QMainWindow):
                 self.tag_inputs[tag].setText(self.current_tags.get(tag, ""))
 
     def calculate_dji_datetimes(self, file_path: Path, current_tags: Dict[str, str]) -> Optional[Dict[str, str]]:
-        dji_pattern = re.compile(r'DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})', re.IGNORECASE)
-        original_fp = current_tags.get("QuickTime:OriginalFilePath") or ""
-        match = dji_pattern.search(str(original_fp))
-        if not match:
-            match = dji_pattern.search(file_path.name)
-            
-        if not match:
-            return None
-            
-        # Parse local datetime from DJI filename
-        year, month, day, hour, minute, second = match.groups()
-        try:
-            local_dt = datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-        except ValueError:
-            return None
-            
-        # Get UTC time from CreateDate
-        utc_str = current_tags.get("QuickTime:CreateDate") or current_tags.get("CreateDate")
-        if not utc_str:
-            return None
-            
-        utc_dt = None
-        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-            try:
-                utc_dt = datetime.strptime(str(utc_str)[:19], fmt)
-                break
-            except ValueError:
-                continue
-                
-        if not utc_dt:
-            return None
-            
-        # Calculate timezone offset in minutes
-        diff_seconds = (local_dt - utc_dt).total_seconds()
-        offset_mins = round(diff_seconds / 60 / 15) * 15
-        
-        sign = "+" if offset_mins >= 0 else "-"
-        hours = abs(offset_mins) // 60
-        mins = abs(offset_mins) % 60
-        tz_offset_str = f"{sign}{hours:02}:{mins:02}"
-        
-        # Format correct datetimes
-        local_str = local_dt.strftime("%Y:%m:%d %H:%M:%S")
-        calculated = {
-            "QuickTime:CreationDate": local_str + tz_offset_str,
-            "QuickTime:CreateDate": utc_dt.strftime("%Y:%m:%d %H:%M:%S"),
-            "EXIF:DateTimeOriginal": local_str,
-            "EXIF:CreateDate": local_str
-        }
-        return calculated
+        return _calculate_dji_datetimes(file_path, current_tags)
 
     def revert_changes(self):
         if not self.current_file:
@@ -476,25 +402,7 @@ class TagEditorApp(QMainWindow):
             )
 
     def parse_date_from_filename(self, file_path: Path) -> Optional[datetime]:
-        filename = file_path.name
-        # Check for DJI format: DJI_YYYYMMDD_HHMMSS or DJI_YYYYMMDDHHMMSS
-        dji_match = re.search(r'(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})', filename)
-        if dji_match:
-            try:
-                year, month, day, hour, minute, second = dji_match.groups()
-                return datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            except ValueError:
-                pass
-                
-        # Check for YYYYMMDD_HHMMSS or YYYYMMDD-HHMMSS
-        std_match = re.search(r'(\d{4})[_-]?(\d{2})[_-]?(\d{2})[_-](\d{2})(\d{2})(\d{2})', filename)
-        if std_match:
-            try:
-                year, month, day, hour, minute, second = std_match.groups()
-                return datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            except ValueError:
-                pass
-        return None
+        return _parse_date_from_filename(file_path)
 
     def batch_update_timezone(self):
         count = self.file_list.count()
