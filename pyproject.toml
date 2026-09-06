@@ -92,6 +92,11 @@ cleanup_paths = [
 # Windows has only this one build (no separate GUI-only app like macOS), so
 # there's nothing to disambiguate "Terminal" from - keep the plain name.
 formal_name = "UWMedia"
+# Without this, Briefcase defaults to a per-user install (into the user's
+# profile, not Program Files) since it doesn't know which scope you want.
+# This forces a per-machine install to Program Files - the installer will
+# need admin/UAC elevation as a result.
+system_installer = true
 
 [tool.briefcase.app.uwmedia-terminal.linux]
 # Same reasoning as Windows above.
