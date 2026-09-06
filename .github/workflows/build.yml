@@ -19,9 +19,11 @@
 #                                     App-Specific Passwords) - NOT your real
 #                                     Apple ID password
 #
-# A signed run only uploads workflow artifacts (Actions tab); it does not
-# publish to GitHub Releases automatically - attach them to a release
-# yourself once you've downloaded and checked them.
+# A signed run only uploads workflow artifacts (Actions tab); it never
+# touches the GitHub Release (even if run against a tag) - attach files to
+# a release yourself once you've downloaded and checked them. Check
+# "Only build macOS" too if you just want a signed macOS build and don't
+# need fresh Windows/Linux artifacts alongside it.
 #
 # macOS ships two separate apps (see pyproject.toml): "uwmedia" (plain GUI,
 # .dmg, installs to /Applications - what most users want) and
@@ -42,10 +44,15 @@ on:
         description: 'Sign and notarize macOS build (requires Apple secrets, see workflow file comments)'
         type: boolean
         default: false
+      macos_only:
+        description: 'Only build macOS (skip Windows/Linux) - useful when you just want a signed macOS build'
+        type: boolean
+        default: false
 
 jobs:
   build:
     name: Build (${{ matrix.platform }} - ${{ matrix.app }})
+    if: matrix.platform == 'macOS' || github.event_name != 'workflow_dispatch' || inputs.macos_only != true
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -257,7 +264,11 @@ jobs:
   release:
     name: Create Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    # Only an actual tag push creates/updates the Release page - never a
+    # manual "Run workflow" dispatch, even one run against a tag ref (e.g.
+    # for a signed macOS build), so it never overwrites assets you've
+    # manually attached/replaced.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -276,16 +287,11 @@ jobs:
             artifacts/uwmedia-terminal-macOS/*
             artifacts/uwmedia-macOS/*
           body: |
-            macOS ships two downloads: `UWMedia-*.dmg` (plain GUI app - drag
-            to Applications, recommended for most users) and
-            `UWMedia Terminal-*.pkg` (adds a scriptable `uwmedia` terminal
-            command alongside the same GUI, installs to /Library). Both are
-            ad-hoc signed here (this automated tag build never uses real
-            Apple signing) and will only run on the machine they were built
-            on - included mainly to confirm the build succeeds, not as
-            distributable artifacts. For real signed/notarized macOS builds,
-            trigger this workflow manually from the Actions tab with signing
-            enabled, then attach them here yourself. Windows and Linux
-            builds are unsigned but otherwise runnable.
+            - `UWMedia-*.dmg` - macOS app, drag to Applications. No terminal command.
+            - `UWMedia Terminal-*.pkg` - macOS app + a `uwmedia` terminal command for scripted/batch use.
+            - `UWMedia-*.msi` - Windows installer. Also adds a `uwmedia` terminal command.
+            - `UWMedia-*.deb` - Linux package. Also adds a `uwmedia` terminal command.
+
+            The macOS files here are ad-hoc signed (unsigned in practice) - macOS will refuse to open them until replaced with a signed build from a manually-triggered signing run.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

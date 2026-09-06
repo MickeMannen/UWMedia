@@ -88,7 +88,14 @@ cleanup_paths = [
     "UWMedia Terminal.app/Contents/Frameworks/Python.framework/Versions/*/lib/python*/config-*-darwin",
 ]
 
+[tool.briefcase.app.uwmedia-terminal.windows]
+# Windows has only this one build (no separate GUI-only app like macOS), so
+# there's nothing to disambiguate "Terminal" from - keep the plain name.
+formal_name = "UWMedia"
+
 [tool.briefcase.app.uwmedia-terminal.linux]
+# Same reasoning as Windows above.
+formal_name = "UWMedia"
 requires = ["toga-gtk"]
 
 [tool.briefcase.app.uwmedia-terminal.linux.system.debian]
