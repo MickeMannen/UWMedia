@@ -7,6 +7,12 @@ license-files = ["LICENSE"]
 author = "Mikael Christersson"
 author_email = "mikael.christersson2@gmail.com"
 
+# Shared by both apps. Briefcase expects a base path with no extension, and
+# looks for a platform-specific file next to it: icons/uwmedia_icon.icns
+# (macOS), icons/uwmedia_icon.ico (Windows), and icons/uwmedia_icon-<size>.png
+# for size in 16/32/64/128/256/512 (Linux hicolor icon theme sizes).
+icon = "icons/uwmedia_icon"
+
 # Shared across every app below - concatenated with each app's own sources/requires.
 sources = [
     "overlays",
