@@ -89,6 +89,36 @@ briefcase package macOS --adhoc-sign   # package for distribution
 
 ## Usage
 
+### Graphical User Interface
+
+UWMedia is a single desktop app (built with [Toga](https://toga.readthedocs.io/)) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
+
+<p align="center">
+  <img src="media/main.jpg" alt="Process tab" width="800">
+</p>
+
+```bash
+python -m uwmedia      # from source
+briefcase dev          # via Briefcase
+```
+
+- **Process / Advanced / Activity**: the GUI front-end for the CLI options above (source/output, color correction, layout, dive logs, flags, run log).
+- **Color Tuning**: side-by-side **Original**/**Adjusted** preview with sliders for restoration weights, white balance, exposure, OKLCh hue shifts, sharpness, and darkness. Save adjustments back to an existing profile or as a new one - saved to your user profile (`color.yaml` in the app's data directory), so bundled defaults are never overwritten.
+
+  <p align="center">
+    <img src="media/color_tuning.jpg" alt="Color Tuning tab" width="800">
+  </p>
+
+- **Tag Editor**: batch-view and edit EXIF/QuickTime date/timezone tags across a directory, with automatic DJI timestamp correction and a full raw-metadata viewer.
+
+  <p align="center">
+    <img src="media/tag_editor.jpg" alt="Tag Editor tab" width="800">
+  </p>
+
+- **HUD Designer**: click-and-drag telemetry fields, shapes, and skins onto a live video/photo preview; save/load `.zip` HUD packages, add custom labels or a depth-graph overlay, align multiple fields, and preview the exact rendered output.
+
+Please share if you make a fancy HUD!
+
 ### Command Line Interface (CLI)
 
 The CLI is the primary way to process media batches.
@@ -124,23 +154,6 @@ python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --
 - `--render-video-log`: Generate a telemetry-only video based on files in input directory
 - `--create-config`: Scan the log directory and generate a config file for TANK names
 - `--debug`: Show verbose FFmpeg output for troubleshooting.
-
-
-### Graphical User Interface
-
-UWMedia is a single desktop app (built with [Toga](https://toga.readthedocs.io/)) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
-
-```bash
-python -m uwmedia      # from source
-briefcase dev          # via Briefcase
-```
-
-- **Process / Advanced / Activity**: the GUI front-end for the CLI options above (source/output, color correction, layout, dive logs, flags, run log).
-- **Color Tuning**: side-by-side **Original**/**Adjusted** preview with sliders for restoration weights, white balance, exposure, OKLCh hue shifts, sharpness, and darkness. Save adjustments back to an existing profile or as a new one - saved to your user profile (`color.yaml` in the app's data directory), so bundled defaults are never overwritten.
-- **Tag Editor**: batch-view and edit EXIF/QuickTime date/timezone tags across a directory, with automatic DJI timestamp correction and a full raw-metadata viewer.
-- **HUD Designer**: click-and-drag telemetry fields, shapes, and skins onto a live video/photo preview; save/load `.zip` HUD packages, add custom labels or a depth-graph overlay, align multiple fields, and preview the exact rendered output.
-
-Please share if you make a fancy HUD!
 
 
 ## Technical Highlights
