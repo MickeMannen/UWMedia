@@ -92,6 +92,16 @@ cleanup_paths = [
 # Windows has only this one build (no separate GUI-only app like macOS), so
 # there's nothing to disambiguate "Terminal" from - keep the plain name.
 formal_name = "UWMedia"
+# For a console_app, Briefcase names the actual .exe after the app key
+# (uwmedia-terminal.exe) rather than formal_name. Override just the
+# app_name used for Windows so the exe is uwmedia.exe instead - this only
+# affects this platform's build, so it can't collide with the separate
+# macOS-only "uwmedia" app (which Windows never builds). The "uwmedia"
+# package is already a listed source either way, so Briefcase's
+# module-name-must-be-in-sources check still passes, and running
+# `python -m uwmedia` is equivalent to `python -m uwmedia_terminal` (the
+# latter just delegates to the former).
+app_name = "uwmedia"
 # Without this, Briefcase defaults to a per-user install (into the user's
 # profile, not Program Files) since it doesn't know which scope you want.
 # This forces a per-machine install to Program Files - the installer will
