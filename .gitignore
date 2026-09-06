@@ -187,7 +187,7 @@ Thumbs.db
 *.webp
 !hud.png
 !vlc.png
-!icons/uwmedia_icon*.png
+!icons/*.png
 
 
 /config.yaml
