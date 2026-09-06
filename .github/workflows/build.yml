@@ -84,6 +84,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # A signed build should always correspond to a specific version tag -
+      # if "Run workflow" was triggered with the branch/tag dropdown left on
+      # a branch (e.g. main) instead of a tag, the version-stamping step
+      # below silently no-ops and the artifact ships with whatever stale
+      # version happens to be in pyproject.toml. Fail loudly instead.
+      - name: Require a tag ref for signed builds
+        if: inputs.sign_macos && github.ref_type != 'tag'
+        run: |
+          echo "::error::Signed builds must be run against a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
+          exit 1
+
       - name: Set up Python
         if: matrix.platform != 'linux'
         uses: actions/setup-python@v5
