@@ -19,11 +19,14 @@ fi
 
 echo "Using Python: $($PYTHON --version 2>&1) from $PYTHON"
 
-# Build and package the UWMedia app (GUI + CLI in one) with Briefcase.
-# --adhoc-sign produces an unsigned .app/.dmg - fine for personal use and
-# GitHub Releases, but macOS Gatekeeper will flag it as from an unidentified
-# developer (right-click > Open on first launch) since there's no paid
-# Apple Developer ID configured.
+# Build and package both macOS apps with Briefcase: "uwmedia" (plain GUI,
+# .dmg, /Applications) and "uwmedia-terminal" (CLI + GUI hybrid, .pkg,
+# /Library + a `uwmedia` command on PATH) - omitting -a builds every app
+# defined in pyproject.toml.
+# --adhoc-sign produces unsigned artifacts - fine for personal use and
+# GitHub Releases, but macOS Gatekeeper will flag them as from an
+# unidentified developer (right-click > Open on first launch) since there's
+# no paid Apple Developer ID configured.
 echo "Building UWMedia with Briefcase..."
 "$PYTHON" -m briefcase build macOS
 "$PYTHON" -m briefcase package macOS --adhoc-sign "$@"

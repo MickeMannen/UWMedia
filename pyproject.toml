@@ -31,19 +31,20 @@ requires = [
     "Pillow",
 ]
 
+# Plain GUI app - what most users should download. Installs into
+# /Applications on macOS (.dmg), with no terminal/CLI component.
 [tool.briefcase.app.uwmedia]
 formal_name = "UWMedia"
-description = "Underwater media processor - unified GUI + shell app"
+description = "Underwater media processor - GUI app"
 long_description = """\
 UWMedia processes underwater videos and photos: it applies underwater
 color correction (a fast, FFmpeg-native 3D LUT pipeline) and can overlay
 dive telemetry (depth, temperature, tank pressure, etc.) synced from
-Garmin, Subsurface, or Shearwater dive logs. One app bundles both the
-CLI batch-processing tool and a Toga-based GUI with a color-tuning
-editor, EXIF/QuickTime tag editor, and a HUD layout designer.
+Garmin, Subsurface, or Shearwater dive logs. This is the GUI-only build,
+with a color-tuning editor, EXIF/QuickTime tag editor, and a HUD layout
+designer. For scripted/batch command-line use, see "UWMedia Terminal".
 """
-console_app = true
-sources = ["uwmedia", "cli_main.py"]
+sources = ["uwmedia"]
 requires = ["toga"]
 
 [tool.briefcase.app.uwmedia.macOS]
@@ -57,10 +58,40 @@ cleanup_paths = [
     "UWMedia.app/Contents/Frameworks/Python.framework/Versions/*/lib/python*/config-*-darwin",
 ]
 
-[tool.briefcase.app.uwmedia.linux]
+# CLI + GUI hybrid app, for terminal/scripting users. Installs as a console
+# app: a .pkg on macOS (into /Library/UWMedia Terminal, with a `uwmedia`
+# command symlinked onto PATH), and the same combined CLI+GUI binary on
+# Windows/Linux (those platforms don't have the same "wrong folder" mismatch
+# a macOS console app has with a normal /Applications install, so they only
+# ship this one build).
+[tool.briefcase.app.uwmedia-terminal]
+formal_name = "UWMedia Terminal"
+description = "Underwater media processor - CLI + GUI app"
+long_description = """\
+UWMedia processes underwater videos and photos: it applies underwater
+color correction (a fast, FFmpeg-native 3D LUT pipeline) and can overlay
+dive telemetry (depth, temperature, tank pressure, etc.) synced from
+Garmin, Subsurface, or Shearwater dive logs. This build bundles the
+scriptable CLI batch-processing tool together with the same GUI as
+"UWMedia" (color-tuning editor, tag editor, HUD designer) in one binary -
+run it with no arguments for the GUI, or with CLI arguments for scripted/
+batch use.
+"""
+console_app = true
+sources = ["uwmedia", "cli_main.py"]
+requires = ["toga"]
+
+[tool.briefcase.app.uwmedia-terminal.macOS]
+universal_build = false
+requires = ["toga-cocoa"]
+cleanup_paths = [
+    "UWMedia Terminal.app/Contents/Frameworks/Python.framework/Versions/*/lib/python*/config-*-darwin",
+]
+
+[tool.briefcase.app.uwmedia-terminal.linux]
 requires = ["toga-gtk"]
 
-[tool.briefcase.app.uwmedia.linux.system.debian]
+[tool.briefcase.app.uwmedia-terminal.linux.system.debian]
 system_requires = [
     "libcairo2-dev",
     "libgirepository-2.0-dev",
@@ -71,7 +102,7 @@ system_runtime_requires = [
     "libcanberra-gtk3-module",
 ]
 
-[tool.briefcase.app.uwmedia.linux.system.rhel]
+[tool.briefcase.app.uwmedia-terminal.linux.system.rhel]
 system_requires = [
     "cairo-gobject-devel",
     "gobject-introspection-devel",

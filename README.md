@@ -67,24 +67,31 @@ cd UWMedia
 pip install -r requirements.txt
 ```
 
-Alternative if you want to use a packaged app - download from releases (Windows/Linux). Note: the macOS release artifact is ad-hoc signed and will only run on the machine it was built on; on macOS, install from source instead until real Apple Developer ID signing is set up.
+Alternative if you want to use a packaged app - download from releases (Windows/Linux). Note: the macOS release artifacts are ad-hoc signed and will only run on the machine they were built on; on macOS, install from source instead until real Apple Developer ID signing is set up.
+
+On macOS, two separate downloads are built (see [Building the App](#building-the-app)):
+- **`UWMedia-*.dmg`** - plain GUI app, drag to `/Applications`. Recommended for most users.
+- **`UWMedia Terminal-*.pkg`** - adds a scriptable `uwmedia` terminal command alongside the same GUI; installs to `/Library` instead of `/Applications`. Use this if you want to run batch/scripted processing from the command line.
+
+Windows and Linux only ship the CLI + GUI hybrid build, since neither has the same "wrong folder for a normal app" mismatch a macOS console app has.
 
 ### Building the App
 
-UWMedia is packaged with [Briefcase](https://briefcase.readthedocs.io/) - one app bundles the GUI and the CLI together. Use the `build.sh` (macOS), `build.bat`, or `build.ps1` (Windows) script; each automatically uses the project's virtual environment:
+UWMedia is packaged with [Briefcase](https://briefcase.readthedocs.io/) as two apps sharing one codebase (see `pyproject.toml`): `uwmedia` (plain GUI) and `uwmedia-terminal` (CLI + GUI hybrid). Use the `build.sh` (macOS), `build.bat`, or `build.ps1` (Windows) script; each automatically uses the project's virtual environment:
 
 ```bash
 # Build and package for your platform
-./build.sh          # macOS
-build.bat           # Windows
+./build.sh          # macOS - builds both uwmedia (.dmg) and uwmedia-terminal (.pkg)
+build.bat           # Windows - builds uwmedia-terminal (.msi) only
 ```
 
-This runs `briefcase build` then `briefcase package`, producing an installer under `dist/` (a `.pkg` on macOS, `.msi` on Windows). You can also drive Briefcase directly:
+This runs `briefcase build` then `briefcase package`, producing installers under `dist/`. You can also drive Briefcase directly - omit `-a` to build every app, or target one specifically:
 
 ```bash
-briefcase dev              # run from source, GUI
-briefcase build macOS      # build the app bundle
-briefcase package macOS --adhoc-sign   # package for distribution
+briefcase dev -a uwmedia-terminal              # run from source, GUI or CLI
+briefcase build macOS                          # build every app's bundle
+briefcase package macOS --adhoc-sign           # package every app for distribution
+briefcase package macOS -a uwmedia --adhoc-sign   # ...or just the plain GUI app
 ```
 
 ## Usage

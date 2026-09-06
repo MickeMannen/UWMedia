@@ -1,9 +1,9 @@
 # macOS signing (optional, manual only):
 #
 # Tag pushes always build ad-hoc/unsigned artifacts for all platforms (the
-# macOS one only runs on the machine that built it - see the note below).
-# To produce a real, Apple-notarized macOS build that other people can
-# actually run, trigger this workflow manually ("Run workflow" in the
+# macOS ones only run on the machine they were built on - see the note
+# below). To produce real, Apple-notarized macOS builds that other people
+# can actually run, trigger this workflow manually ("Run workflow" in the
 # Actions tab) with "Sign and notarize macOS build" checked. This requires
 # five repo secrets, none of which this workflow can set up for you:
 #   APPLE_CERTIFICATE_P12          - base64 of a .p12 containing BOTH your
@@ -19,9 +19,16 @@
 #                                     App-Specific Passwords) - NOT your real
 #                                     Apple ID password
 #
-# A signed run only uploads a workflow artifact (Actions tab); it does not
-# publish to GitHub Releases automatically - attach it to a release yourself
-# once you've downloaded and checked it.
+# A signed run only uploads workflow artifacts (Actions tab); it does not
+# publish to GitHub Releases automatically - attach them to a release
+# yourself once you've downloaded and checked them.
+#
+# macOS ships two separate apps (see pyproject.toml): "uwmedia" (plain GUI,
+# .dmg, installs to /Applications - what most users want) and
+# "uwmedia-terminal" (CLI + GUI hybrid, .pkg, installs to /Library and adds
+# a `uwmedia` command to PATH). Windows/Linux only build uwmedia-terminal,
+# since they don't have the same "wrong folder for a normal app" mismatch a
+# macOS console app has.
 
 name: Release Build
 
@@ -38,7 +45,7 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.platform }} - ${{ matrix.app }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -52,14 +59,26 @@ jobs:
             platform: linux
             format: system
             python-version: '3.12'
+            app: uwmedia-terminal
+            needs_installer_identity: false
           - os: windows-latest
             platform: windows
             format: app
             python-version: '3.11'
+            app: uwmedia-terminal
+            needs_installer_identity: false
           - os: macos-14
             platform: macOS
             format: app
             python-version: '3.11'
+            app: uwmedia-terminal
+            needs_installer_identity: true
+          - os: macos-14
+            platform: macOS
+            format: app
+            python-version: '3.11'
+            app: uwmedia
+            needs_installer_identity: false
 
     steps:
       - name: Checkout code
@@ -127,7 +146,7 @@ jobs:
 
       - name: Build app with Briefcase
         run: |
-          briefcase build ${{ matrix.platform }} ${{ matrix.format }} --no-input
+          briefcase build ${{ matrix.platform }} ${{ matrix.format }} -a ${{ matrix.app }} --no-input
 
       # --- macOS signing setup (only for a manual, opted-in run) -----------
       - name: Import Apple signing certificate
@@ -160,13 +179,23 @@ jobs:
           # codesign/productsign - read from the keychain rather than
           # requiring you to type your cert's exact common name as a secret.
           APP_IDENTITY=$(security find-identity -v "$KEYCHAIN_PATH" | grep 'Developer ID Application' | head -1 | sed -E 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(.*)"$/\1/')
-          INSTALLER_IDENTITY=$(security find-identity -v "$KEYCHAIN_PATH" | grep 'Developer ID Installer' | head -1 | sed -E 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(.*)"$/\1/')
-          if [ -z "$APP_IDENTITY" ] || [ -z "$INSTALLER_IDENTITY" ]; then
-            echo "::error::Could not find both a 'Developer ID Application' and 'Developer ID Installer' identity in the imported certificate."
+          if [ -z "$APP_IDENTITY" ]; then
+            echo "::error::Could not find a 'Developer ID Application' identity in the imported certificate."
             exit 1
           fi
           echo "APP_IDENTITY=$APP_IDENTITY" >> "$GITHUB_ENV"
-          echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> "$GITHUB_ENV"
+
+          # Only the .pkg (console app) build needs a separate Installer
+          # identity - the .dmg build just codesigns+notarizes the .app with
+          # the Application identity.
+          if [ "${{ matrix.needs_installer_identity }}" = "true" ]; then
+            INSTALLER_IDENTITY=$(security find-identity -v "$KEYCHAIN_PATH" | grep 'Developer ID Installer' | head -1 | sed -E 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(.*)"$/\1/')
+            if [ -z "$INSTALLER_IDENTITY" ]; then
+              echo "::error::Could not find a 'Developer ID Installer' identity in the imported certificate."
+              exit 1
+            fi
+            echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> "$GITHUB_ENV"
+          fi
 
       - name: Register notarization credentials
         if: matrix.platform == 'macOS' && inputs.sign_macos
@@ -187,27 +216,31 @@ jobs:
       - name: Package app with Briefcase (signed + notarized)
         if: matrix.platform == 'macOS' && inputs.sign_macos
         run: |
-          briefcase package macOS app --no-input -i "$APP_IDENTITY" --installer-identity "$INSTALLER_IDENTITY"
+          if [ "${{ matrix.needs_installer_identity }}" = "true" ]; then
+            briefcase package macOS app -a ${{ matrix.app }} --no-input -i "$APP_IDENTITY" --installer-identity "$INSTALLER_IDENTITY"
+          else
+            briefcase package macOS app -a ${{ matrix.app }} --no-input -i "$APP_IDENTITY"
+          fi
 
       - name: Clean up signing keychain
         if: always() && matrix.platform == 'macOS' && inputs.sign_macos
         run: security delete-keychain "$KEYCHAIN_PATH" || true
 
       # --- Everyone else (and macOS when signing wasn't requested) ---------
-      # NOTE: macOS is a console_app (for the CLI), which Briefcase can only
-      # distribute as a signed .pkg installer. Without the real Apple signing
-      # above, --adhoc-sign is the only option - and Apple's ad-hoc signing
-      # means the resulting PKG will only install/run on the machine that
-      # built it (this CI runner), not on any other Mac.
+      # NOTE: uwmedia-terminal is a console_app, which Briefcase can only
+      # distribute on macOS as a signed .pkg installer. Without the real
+      # Apple signing above, --adhoc-sign is the only option - and Apple's
+      # ad-hoc signing means the resulting package will only install/run on
+      # the machine that built it (this CI runner), not on any other Mac.
       - name: Package app with Briefcase (ad-hoc)
         if: "!(matrix.platform == 'macOS' && inputs.sign_macos)"
         run: |
-          briefcase package ${{ matrix.platform }} ${{ matrix.format }} --no-input --adhoc-sign
+          briefcase package ${{ matrix.platform }} ${{ matrix.format }} -a ${{ matrix.app }} --no-input --adhoc-sign
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: uwmedia-${{ matrix.platform }}${{ (matrix.platform == 'macOS' && inputs.sign_macos) && '-signed' || '' }}
+          name: ${{ matrix.app }}-${{ matrix.platform }}${{ (matrix.platform == 'macOS' && inputs.sign_macos) && '-signed' || '' }}
           path: dist/*
 
   release:
@@ -227,16 +260,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/uwmedia-linux/*
-            artifacts/uwmedia-windows/*
+            artifacts/uwmedia-terminal-linux/*
+            artifacts/uwmedia-terminal-windows/*
+            artifacts/uwmedia-terminal-macOS/*
             artifacts/uwmedia-macOS/*
           body: |
-            The macOS package here is ad-hoc signed (this automated tag build
-            never uses real Apple signing) and will only run on the machine
-            it was built on - it's included mainly to confirm the build
-            succeeds, not as a distributable artifact. For a real signed/
-            notarized macOS build, trigger this workflow manually from the
-            Actions tab with signing enabled, then attach it here yourself.
-            Windows and Linux builds are unsigned but otherwise runnable.
+            macOS ships two downloads: `UWMedia-*.dmg` (plain GUI app - drag
+            to Applications, recommended for most users) and
+            `UWMedia Terminal-*.pkg` (adds a scriptable `uwmedia` terminal
+            command alongside the same GUI, installs to /Library). Both are
+            ad-hoc signed here (this automated tag build never uses real
+            Apple signing) and will only run on the machine they were built
+            on - included mainly to confirm the build succeeds, not as
+            distributable artifacts. For real signed/notarized macOS builds,
+            trigger this workflow manually from the Actions tab with signing
+            enabled, then attach them here yourself. Windows and Linux
+            builds are unsigned but otherwise runnable.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

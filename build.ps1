@@ -17,10 +17,10 @@ if (Test-Path ".venv\Scripts\python.exe") {
 $pyVersion = & $PYTHON --version 2>&1
 Write-Host "Using Python: $pyVersion from $PYTHON"
 
-# Build and package the UWMedia app (GUI + CLI in one) with Briefcase.
+# Build and package the UWMedia Terminal app (GUI + CLI in one) with Briefcase.
 Write-Host "Building UWMedia with Briefcase..."
-& $PYTHON -m briefcase build windows
-& $PYTHON -m briefcase package windows --adhoc-sign $args
+& $PYTHON -m briefcase build windows -a uwmedia-terminal
+& $PYTHON -m briefcase package windows -a uwmedia-terminal --adhoc-sign $args
 
 # Copy the packaged installer to the releases folder if it exists
 $RELEASE_DIR = "D:\syncthing\AppReleases"
