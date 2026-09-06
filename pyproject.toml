@@ -17,7 +17,6 @@ sources = [
     "utils",
     "color.yaml",
     "hud_rules.json",
-    "config.yaml",
 ]
 requires = [
     "pydantic>=2.0.0",
