@@ -49,6 +49,13 @@ requires = ["toga"]
 [tool.briefcase.app.uwmedia.macOS]
 universal_build = false
 requires = ["toga-cocoa"]
+# The bundled Python framework ships a config-*-darwin directory with static
+# build artifacts (python.o, etc.) only needed to compile C extensions from
+# source. They're unsigned Mach-O objects that Apple's notary service
+# rejects, and they're not needed at runtime, so strip them before signing.
+cleanup_paths = [
+    "UWMedia.app/Contents/Frameworks/Python.framework/Versions/*/lib/python*/config-*-darwin",
+]
 
 [tool.briefcase.app.uwmedia.linux]
 requires = ["toga-gtk"]
