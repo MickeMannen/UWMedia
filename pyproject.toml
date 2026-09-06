@@ -34,6 +34,14 @@ requires = [
 [tool.briefcase.app.uwmedia]
 formal_name = "UWMedia"
 description = "Underwater media processor - unified GUI + shell app"
+long_description = """\
+UWMedia processes underwater videos and photos: it applies underwater
+color correction (a fast, FFmpeg-native 3D LUT pipeline) and can overlay
+dive telemetry (depth, temperature, tank pressure, etc.) synced from
+Garmin, Subsurface, or Shearwater dive logs. One app bundles both the
+CLI batch-processing tool and a Toga-based GUI with a color-tuning
+editor, EXIF/QuickTime tag editor, and a HUD layout designer.
+"""
 console_app = true
 sources = ["uwmedia", "cli_main.py"]
 requires = ["toga"]
