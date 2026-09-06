@@ -111,6 +111,12 @@ system_installer = true
 # (Program Files\<author>\UWMedia\); this installs flat instead
 # (Program Files\UWMedia\).
 use_full_install_path = false
+# Explicitly request the Start Menu shortcut. The template's own
+# cookiecutter.json defaults this to true, but Briefcase only forwards
+# template variables it's told about - since it never appeared at all in
+# an installer log (not even a skipped/condition-failed entry), it was
+# reaching the template unset rather than defaulted, so set it ourselves.
+install_launcher = true
 
 [tool.briefcase.app.uwmedia-terminal.linux]
 # Same reasoning as Windows above.
