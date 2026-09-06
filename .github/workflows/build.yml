@@ -50,42 +50,46 @@ on:
         default: false
 
 jobs:
-  build:
-    name: Build (${{ matrix.platform }} - ${{ matrix.app }})
-    if: matrix.platform == 'macOS' || github.event_name != 'workflow_dispatch' || inputs.macos_only != true
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
+  # The matrix context isn't available in a job-level `if:`, so filtering
+  # out Windows/Linux for a "macOS only" manual run has to happen by
+  # computing a different matrix upstream, rather than skipping build's
+  # matrix entries directly.
+  prepare:
+    name: Prepare build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
           # Linux "system" packaging builds against the runner's actual
           # system python3 (no bundled/support-package Python like the other
           # platforms use), so this must track ubuntu-latest's system Python
           # (currently 3.12 on the 24.04 image) or Briefcase refuses to build.
-          - os: ubuntu-latest
-            platform: linux
-            format: system
-            python-version: '3.12'
-            app: uwmedia-terminal
-            needs_installer_identity: false
-          - os: windows-latest
-            platform: windows
-            format: app
-            python-version: '3.11'
-            app: uwmedia-terminal
-            needs_installer_identity: false
-          - os: macos-14
-            platform: macOS
-            format: app
-            python-version: '3.11'
-            app: uwmedia-terminal
-            needs_installer_identity: true
-          - os: macos-14
-            platform: macOS
-            format: app
-            python-version: '3.11'
-            app: uwmedia
-            needs_installer_identity: false
+          FULL='{"include":[
+            {"os":"ubuntu-latest","platform":"linux","format":"system","python-version":"3.12","app":"uwmedia-terminal","needs_installer_identity":false},
+            {"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false},
+            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true},
+            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false}
+          ]}'
+          MACOS_ONLY='{"include":[
+            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true},
+            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false}
+          ]}'
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.macos_only }}" = "true" ]; then
+            MATRIX="$MACOS_ONLY"
+          else
+            MATRIX="$FULL"
+          fi
+          echo "matrix=$(echo "$MATRIX" | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    name: Build (${{ matrix.platform }} - ${{ matrix.app }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     steps:
       - name: Checkout code
