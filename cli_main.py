@@ -480,13 +480,17 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     
     target_path = output_dir / filename
 
-    # Check no-overwrite option
+    # Check no-overwrite/overwrite options
     if (args.color or args.layout or args.render_video_log) and args.no_overwrite:
         if target_path.exists():
             print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
             return {"file": source.name, "skipped": True}
 
-    target_path = get_unique_path(target_path)
+    if (args.color or args.layout or args.render_video_log) and args.overwrite:
+        if target_path.exists():
+            print(f"Overwriting existing target file: {target_path}")
+    else:
+        target_path = get_unique_path(target_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     
     print(f"Output path: {target_path}")
@@ -981,7 +985,9 @@ def main():
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
-    parser.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
+    overwrite_group = parser.add_mutually_exclusive_group()
+    overwrite_group.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
+    overwrite_group.add_argument("--overwrite", action="store_true", help="Replace the target file in place if it already exists, instead of appending _1/_2/etc. (only when running --color or --layout)")
     parser.add_argument("--summary", action="store_true", default=False, help="Show detailed summary of the activity at the end, including stage timings and FPS")
     parser.add_argument("--move-original", type=Path, help="Directory to move original source file to after successful processing (only when running --color or --layout)")
     parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
@@ -1305,6 +1311,7 @@ def main():
         # Process all files in directory
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
         stats_list = []
+        print(f"UWMEDIA_PROGRESS 0/{len(files)} start -", flush=True)
         if len(files) > 1:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory.
@@ -1328,8 +1335,11 @@ def main():
                     if not success:
                         print(f"Error processing {filename}: {result}")
                         stats_list.append({"file": filename, "error": result})
+                        print(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} error {filename}", flush=True)
                     else:
                         stats_list.append(result)
+                        status = "skipped" if result.get("skipped") else "done"
+                        print(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} {status} {filename}", flush=True)
             except KeyboardInterrupt:
                 print("\n[!] KeyboardInterrupt received. Shutting down worker threads...")
                 shutdown_wait = False
@@ -1338,10 +1348,14 @@ def main():
             finally:
                 executor.shutdown(wait=shutdown_wait)
         else:
-            for file in tqdm(files, desc="Batch Processing", unit="file"):
+            for i, file in enumerate(tqdm(files, desc="Batch Processing", unit="file"), start=1):
                 res = process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
                 if res:
                     stats_list.append(res)
+                    status = "skipped" if res.get("skipped") else "done"
+                else:
+                    status = "error"
+                print(f"UWMEDIA_PROGRESS {i}/{len(files)} {status} {file.name}", flush=True)
     else:
         # Single file source
         forced_filename = None

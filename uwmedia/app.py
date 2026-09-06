@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -11,13 +12,14 @@ from pathlib import Path
 import cv2
 import toga
 from PIL import Image as PILImage
+from PIL import ImageDraw
 from toga.sources import AccessorColumn
 from toga.style import Pack
 from toga.style.pack import COLUMN, HIDDEN, ROW, VISIBLE
 
 import ffmpeg.color as color_module
 from ffmpeg.color import ColorCorrectionEngine
-from gui.hud_renderer import draw_hud
+from gui.hud_renderer import draw_hud, get_font
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 from models.manager import DiveManager
@@ -78,6 +80,15 @@ DESIGNER_MANUFACTURER_MODELS = {
 }
 DESIGNER_MARKER_LABELS = {"dot": "Highlight Dot", "cross": "Cross", "bold_cross": "Bold Cross"}
 NEW_PROFILE_NAME_MAX_LEN = 10
+
+# No leading ^ anchor: cli_main.py's tqdm bar writes carriage-return updates
+# with no trailing newline, which readline() then merges onto the front of
+# whatever line comes next - so a UWMEDIA_PROGRESS line can arrive with a
+# stray tqdm fragment glued to its start. Our own print() always ends the
+# blob with its own newline, so the marker is reliably still at the tail end.
+PROGRESS_LINE_RE = re.compile(r"UWMEDIA_PROGRESS (\d+)/(\d+) (\S+) (.*)$")
+PROGRESS_BAR_WIDTH = 720
+PROGRESS_BAR_HEIGHT = 40
 
 # Every Process/Advanced field whose value should survive a restart, grouped
 # by widget kind (each kind reads/restores its `.value` the same way, but
@@ -163,7 +174,7 @@ class UWMediaApp(toga.App):
         root.add(self._build_sidebar())
         root.add(main_column)
 
-        self.main_window = toga.MainWindow(title=self.formal_name, size=(960, 680))
+        self.main_window = toga.MainWindow(title=self.formal_name, size=(1200, 800))
         self.main_window.content = root
         self.main_window.show()
 
@@ -253,11 +264,19 @@ class UWMediaApp(toga.App):
         self.log_label = toga.Label("Terminal output", style=Pack(margin_top=10))
         self.log_label.style.visibility = HIDDEN
 
-        self.run_button = toga.Button("Run", on_press=self.on_run, style=Pack(margin_left=10))
-        self.progress_bar = toga.ProgressBar(max=None, style=Pack(width=120, margin_left=10))
-        self.progress_bar.style.visibility = HIDDEN
+        self.run_button = toga.Button(
+            "Start",
+            on_press=self.on_run,
+            style=Pack(
+                margin=(20, 16, 24, 16),
+                height=44,
+                font_size=15,
+                font_weight="bold",
+                background_color=THEME["nav_active_bg"],
+                color="#FFFFFF",
+            ),
+        )
 
-        self.status_label = toga.Label("Idle", style=Pack(color=THEME["text_muted"]))
         self.activity_status_label = toga.Label(
             "Idle", style=Pack(margin_bottom=8, color=THEME["text_muted"])
         )
@@ -268,6 +287,8 @@ class UWMediaApp(toga.App):
             on_change=self.on_show_terminal_toggle,
             style=Pack(margin_top=10),
         )
+
+        self._build_batch_progress_fields()
 
         self.is_running = False
         self.current_process = None
@@ -481,8 +502,10 @@ class UWMediaApp(toga.App):
 
     def on_layout_select_change(self, widget):
         is_custom = widget.value == LAYOUT_CUSTOM
-        if hasattr(self, "layout_custom_row"):
-            self.layout_custom_row.style.visibility = VISIBLE if is_custom else HIDDEN
+        if hasattr(self, "source_output_card"):
+            self._set_conditional_row(
+                self.layout_custom_row, self.source_output_card, self.layout_select_row, is_custom
+            )
         if not is_custom:
             self.layout_input.value = self.layout_choices.get(widget.value) or ""
 
@@ -497,8 +520,10 @@ class UWMediaApp(toga.App):
 
     def on_filename_format_select_change(self, widget):
         is_custom = widget.value == FORMAT_CUSTOM
-        if hasattr(self, "filename_format_custom_row"):
-            self.filename_format_custom_row.style.visibility = VISIBLE if is_custom else HIDDEN
+        if hasattr(self, "metadata_card"):
+            self._set_conditional_row(
+                self.filename_format_custom_row, self.metadata_card, self.filename_format_row, is_custom
+            )
         if not is_custom:
             self.filename_format_input.value = self.filename_format_choices.get(widget.value, "")
 
@@ -522,9 +547,14 @@ class UWMediaApp(toga.App):
 
     def on_render_log_format_select_change(self, widget):
         is_custom = widget.value == FORMAT_CUSTOM
-        if hasattr(self, "render_log_format_custom_row"):
+        if hasattr(self, "source_output_card"):
             visible = is_custom and getattr(self.render_video_log_switch, "value", False)
-            self.render_log_format_custom_row.style.visibility = VISIBLE if visible else HIDDEN
+            self._set_conditional_row(
+                self.render_log_format_custom_row,
+                self.source_output_card,
+                self.render_log_format_row,
+                visible,
+            )
         if not is_custom:
             self.render_log_format_input.value = self.render_log_format_choices.get(widget.value, "")
 
@@ -624,16 +654,6 @@ class UWMediaApp(toga.App):
             self.content_box.add(self.sections[name])
             self.main_content_area.add(self.content_scroll)
 
-        # The Run/Idle controls drive the CLI subprocess pipeline (Process/
-        # Advanced/Batch); Color Tuning, Tag Editor and HUD Designer are
-        # self-contained in-app tools that never touch that pipeline, so
-        # they're just clutter there.
-        run_controls_visible = (
-            HIDDEN if name in ("Color Tuning", "Tag Editor", "HUD Designer") else VISIBLE
-        )
-        self.status_label.style.visibility = run_controls_visible
-        self.run_button.style.visibility = run_controls_visible
-
         for section_name, button in self.nav_buttons.items():
             selected = section_name == name
             button.style.background_color = (
@@ -651,9 +671,6 @@ class UWMediaApp(toga.App):
             style=Pack(direction=ROW, align_items="center", margin=(14, 16))
         )
         topbar.add(self.section_title_label)
-        topbar.add(self.status_label)
-        topbar.add(self.progress_bar)
-        topbar.add(self.run_button)
         return topbar
 
     def _card(self, title, *widgets):
@@ -677,6 +694,168 @@ class UWMediaApp(toga.App):
             card.add(widget)
         return card
 
+    # ------------------------------------------------------------------
+    # Batch progress display (bottom of Process tab)
+    # ------------------------------------------------------------------
+
+    def _build_progress_stat_chip(self, caption, color):
+        box = toga.Box(
+            style=Pack(
+                direction=COLUMN,
+                align_items="center",
+                background_color=THEME["sidebar_bg"],
+                margin_right=10,
+            )
+        )
+        value_label = toga.Label(
+            "0",
+            style=Pack(
+                margin=(10, 10, 2, 10),
+                width=110,
+                color=color,
+                font_size=22,
+                font_weight="bold",
+                text_align="center",
+                background_color=THEME["sidebar_bg"],
+            ),
+        )
+        caption_label = toga.Label(
+            caption.upper(),
+            style=Pack(
+                margin=(0, 10, 10, 10),
+                width=110,
+                color=THEME["text_muted"],
+                font_size=10,
+                text_align="center",
+                background_color=THEME["sidebar_bg"],
+            ),
+        )
+        box.add(value_label)
+        box.add(caption_label)
+        return value_label, box
+
+    def _build_batch_progress_fields(self):
+        self.batch_progress_done = 0
+        self.batch_progress_total = 0
+        self.batch_progress_failed = 0
+        self.batch_progress_skipped = 0
+
+        self.progress_canvas = toga.Canvas(
+            style=Pack(height=PROGRESS_BAR_HEIGHT, width=PROGRESS_BAR_WIDTH, margin_bottom=12)
+        )
+        self.progress_current_file_label = toga.Label(
+            "No batch running", style=Pack(color=THEME["text_muted"])
+        )
+
+        self.progress_done_value, done_chip = self._build_progress_stat_chip("Done", "#22C55E")
+        self.progress_remaining_value, remaining_chip = self._build_progress_stat_chip(
+            "Remaining", THEME["nav_active_bg"]
+        )
+        self.progress_failed_value, failed_chip = self._build_progress_stat_chip("Failed", "#EF4444")
+        self.progress_total_value, total_chip = self._build_progress_stat_chip(
+            "Total", THEME["sidebar_text"]
+        )
+
+        stats_row = toga.Box(style=Pack(direction=ROW, margin_bottom=10))
+        stats_row.add(done_chip)
+        stats_row.add(remaining_chip)
+        stats_row.add(failed_chip)
+        stats_row.add(total_chip)
+
+        self.progress_box = toga.Box(style=Pack(direction=COLUMN))
+        self.progress_box.add(self.progress_canvas)
+        self.progress_box.add(stats_row)
+        self.progress_box.add(self.progress_current_file_label)
+
+        self._redraw_progress_bar()
+
+    def _reset_batch_progress(self):
+        self.batch_progress_done = 0
+        self.batch_progress_total = 0
+        self.batch_progress_failed = 0
+        self.batch_progress_skipped = 0
+        self.progress_current_file_label.text = "Starting…"
+        self._update_progress_display()
+
+    def _handle_progress_line(self, line):
+        match = PROGRESS_LINE_RE.search(line.strip())
+        if not match:
+            return False
+        done, total, status, filename = match.groups()
+        self.batch_progress_done = int(done)
+        self.batch_progress_total = int(total)
+        if status == "error":
+            self.batch_progress_failed += 1
+        elif status == "skipped":
+            self.batch_progress_skipped += 1
+        if status == "start":
+            self.progress_current_file_label.text = f"Processing 0 of {total} files…"
+        elif self.batch_progress_done >= self.batch_progress_total:
+            self.progress_current_file_label.text = f"Finished — last file: {filename}"
+        else:
+            self.progress_current_file_label.text = f"Processing: {filename}"
+        self._update_progress_display()
+        return True
+
+    def _update_progress_display(self):
+        total = self.batch_progress_total
+        done = min(self.batch_progress_done, total) if total else 0
+        remaining = max(total - done, 0)
+        self.progress_done_value.text = str(done)
+        self.progress_remaining_value.text = str(remaining)
+        self.progress_failed_value.text = str(self.batch_progress_failed)
+        self.progress_total_value.text = str(total)
+        self._redraw_progress_bar()
+
+    def _redraw_progress_bar(self):
+        width, height = PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT
+        img = PILImage.new("RGB", (width, height), THEME["sidebar_bg"])
+        draw = ImageDraw.Draw(img)
+        radius = height // 2
+
+        draw.rounded_rectangle(
+            [0, 0, width - 1, height - 1], radius=radius, fill="#111827", outline="#374151", width=1
+        )
+
+        total = self.batch_progress_total
+        done = min(self.batch_progress_done, total) if total else 0
+        frac = (done / total) if total else 0.0
+        fill_width = int((width - 4) * frac)
+        if fill_width > 4:
+            fill_color = "#EF4444" if self.batch_progress_failed else THEME["nav_active_bg"]
+            fill_radius = min(radius - 2, fill_width / 2, (height - 5) / 2)
+            draw.rounded_rectangle(
+                [2, 2, 2 + fill_width, height - 3], radius=fill_radius, fill=fill_color
+            )
+
+        percent_text = f"{int(round(frac * 100))}%" if total else "—"
+        font = get_font(16)
+        bbox = draw.textbbox((0, 0), percent_text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(
+            ((width - tw) / 2 - bbox[0], (height - th) / 2 - bbox[1]),
+            percent_text,
+            fill="#FFFFFF",
+            font=font,
+        )
+
+        canvas = self.progress_canvas
+        canvas.root_state.drawing_actions.clear()
+        canvas.draw_image(toga.Image(img), 0, 0, width=width, height=height)
+        canvas.redraw()
+
+    def _set_conditional_row(self, row, parent, anchor, visible):
+        # Toga's Pack `visibility` behaves like CSS visibility:hidden - the
+        # widget is invisible but still reserves its layout space. Rows that
+        # are conditionally shown (custom path/pattern overrides, render-log
+        # options) are instead added to/removed from the parent card so a
+        # hidden row leaves no dead space behind.
+        present = row in parent.children
+        if visible and not present:
+            parent.insert(parent.children.index(anchor) + 1, row)
+        elif not visible and present:
+            parent.remove(row)
+
     def _build_process_section(self):
         section = toga.Box(style=Pack(direction=COLUMN))
 
@@ -684,35 +863,16 @@ class UWMediaApp(toga.App):
         color_box.add(self.color_switch)
         color_box.add(self.color_profile)
 
+        self.layout_select_row = self._row("Layout / HUD package", self.layout_select, None)
         self.layout_custom_row = self._row(
             "Custom path",
             self.layout_input,
             self._file_or_folder_buttons(self.layout_input),
         )
-        self.layout_custom_row.style.visibility = HIDDEN
 
+        self.filename_format_row = self._row("Filename format", self.filename_format_select, None)
         self.filename_format_custom_row = self._row(
             "Custom pattern", self.filename_format_input, None
-        )
-        self.filename_format_custom_row.style.visibility = HIDDEN
-
-        section.add(
-            self._card(
-                "Source & output",
-                self._row("Source", self.source_input, self._file_or_folder_buttons(self.source_input)),
-                self._row("Output", self.output_input, self._file_or_folder_buttons(self.output_input)),
-                self._row("Layout / HUD package", self.layout_select, None),
-                self.layout_custom_row,
-            )
-        )
-        section.add(self._card("Color correction", color_box))
-        section.add(
-            self._card(
-                "Metadata",
-                self._row("Dive logs", self.logs_input, self._browse_button(self.logs_input, folder=True)),
-                self._row("Filename format", self.filename_format_select, None),
-                self.filename_format_custom_row,
-            )
         )
 
         self.render_output_row = self._row(
@@ -720,32 +880,38 @@ class UWMediaApp(toga.App):
             self.render_output_input,
             self._browse_button(self.render_output_input, folder=True),
         )
-        self.render_output_row.style.visibility = HIDDEN
 
         self.render_log_format_row = self._row(
             "Output filename pattern", self.render_log_format_select, None
         )
-        self.render_log_format_row.style.visibility = HIDDEN
 
         self.render_log_format_custom_row = self._row(
             "Custom pattern", self.render_log_format_input, None
         )
-        self.render_log_format_custom_row.style.visibility = HIDDEN
 
-        section.add(
-            self._card(
-                "Batch & Render",
-                self._row(
-                    "Move original to",
-                    self.move_original_input,
-                    self._browse_button(self.move_original_input, folder=True),
-                ),
-                self.render_video_log_switch,
-                self.render_output_row,
-                self.render_log_format_row,
-                self.render_log_format_custom_row,
-            )
+        section.add(self._card("Color correction", color_box))
+        self.source_output_card = self._card(
+            "Source & output",
+            self._row("Source", self.source_input, self._file_or_folder_buttons(self.source_input)),
+            self._row("Output", self.output_input, self._file_or_folder_buttons(self.output_input)),
+            self.no_overwrite_switch,
+            self.layout_select_row,
+            self._row(
+                "Move original to",
+                self.move_original_input,
+                self._browse_button(self.move_original_input, folder=True),
+            ),
+            self.render_video_log_switch,
         )
+        section.add(self.source_output_card)
+        self.metadata_card = self._card(
+            "Metadata",
+            self._row("Dive logs", self.logs_input, self._browse_button(self.logs_input, folder=True)),
+            self.filename_format_row,
+        )
+        section.add(self.metadata_card)
+        section.add(self.run_button)
+        section.add(self._card("Progress", self.progress_box))
         return section
 
     def _build_color_tuning_section(self):
@@ -2222,7 +2388,6 @@ class UWMediaApp(toga.App):
             self.hw_accel_switch,
             self.debug_switch,
             self.summary_switch,
-            self.no_overwrite_switch,
         ):
             flags_box.add(switch)
 
@@ -2324,11 +2489,18 @@ class UWMediaApp(toga.App):
 
     def on_render_video_log_toggle(self, widget):
         visible = widget.value
-        self.render_output_row.style.visibility = VISIBLE if visible else HIDDEN
-        self.render_log_format_row.style.visibility = VISIBLE if visible else HIDDEN
+        self._set_conditional_row(
+            self.render_output_row, self.source_output_card, self.render_video_log_switch, visible
+        )
+        self._set_conditional_row(
+            self.render_log_format_row, self.source_output_card, self.render_output_row, visible
+        )
         is_custom = self.render_log_format_select.value == FORMAT_CUSTOM
-        self.render_log_format_custom_row.style.visibility = (
-            VISIBLE if (visible and is_custom) else HIDDEN
+        self._set_conditional_row(
+            self.render_log_format_custom_row,
+            self.source_output_card,
+            self.render_log_format_row,
+            visible and is_custom,
         )
 
     def on_show_terminal_toggle(self, widget):
@@ -2343,7 +2515,6 @@ class UWMediaApp(toga.App):
             self.log_output.scroll_to_bottom()
 
     def _set_status(self, text):
-        self.status_label.text = text
         self.activity_status_label.text = text
 
     # ------------------------------------------------------------------
@@ -2430,9 +2601,8 @@ class UWMediaApp(toga.App):
         self.abort_requested = False
         self.run_button.text = "Abort"
         self._set_status("Running…")
-        self.progress_bar.style.visibility = VISIBLE
-        self.progress_bar.start()
         self.log_output.value = ""
+        self._reset_batch_progress()
         cmd = self.build_command(args)
         self.append_log(f"$ {' '.join(cmd)}\n\n")
         returncode = None
@@ -2446,7 +2616,9 @@ class UWMediaApp(toga.App):
                 line = await self.current_process.stdout.readline()
                 if not line:
                     break
-                self.append_log(line.decode(errors="replace"))
+                text = line.decode(errors="replace")
+                if not self._handle_progress_line(text):
+                    self.append_log(text)
             await self.current_process.wait()
             returncode = self.current_process.returncode
             self.append_log(f"\n[process exited with code {returncode}]\n")
@@ -2465,9 +2637,7 @@ class UWMediaApp(toga.App):
                 self._set_status(f"Failed — exit {returncode}")
             self.current_process = None
             self.is_running = False
-            self.run_button.text = "Run"
-            self.progress_bar.stop()
-            self.progress_bar.style.visibility = HIDDEN
+            self.run_button.text = "Start"
 
 
 def main():
