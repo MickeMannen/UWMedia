@@ -1,11 +1,12 @@
 # macOS signing (optional, manual only):
 #
-# Tag pushes always build ad-hoc/unsigned artifacts for all platforms (the
+# Tag pushes always build ad-hoc/unsigned artifacts for every platform (the
 # macOS ones only run on the machine they were built on - see the note
 # below). To produce real, Apple-notarized macOS builds that other people
 # can actually run, trigger this workflow manually ("Run workflow" in the
-# Actions tab) with "Sign and notarize macOS build" checked. This requires
-# five repo secrets, none of which this workflow can set up for you:
+# Actions tab) with "Build macOS (signed + notarized)" checked. This
+# requires five repo secrets, none of which this workflow can set up for
+# you:
 #   APPLE_CERTIFICATE_P12          - base64 of a .p12 containing BOTH your
 #                                     "Developer ID Application" and
 #                                     "Developer ID Installer" certs+keys
@@ -21,9 +22,12 @@
 #
 # A signed run only uploads workflow artifacts (Actions tab); it never
 # touches the GitHub Release (even if run against a tag) - attach files to
-# a release yourself once you've downloaded and checked them. Check
-# "Only build macOS" too if you just want a signed macOS build and don't
-# need fresh Windows/Linux artifacts alongside it.
+# a release yourself once you've downloaded and checked them.
+#
+# A manual "Run workflow" lets you pick exactly which of the four targets to
+# build (macOS unsigned, macOS signed, Windows, Linux) via checkboxes, so you
+# don't have to wait on ones you don't need. A tag push always builds all
+# four (unsigned).
 #
 # macOS ships two separate apps (see pyproject.toml): "uwmedia" (plain GUI,
 # .dmg, installs to /Applications - what most users want) and
@@ -40,20 +44,27 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      sign_macos:
-        description: 'Sign and notarize macOS build (requires Apple secrets, see workflow file comments)'
+      build_macos_unsigned:
+        description: 'Build macOS (ad-hoc/unsigned)'
+        type: boolean
+        default: true
+      build_macos_signed:
+        description: 'Build macOS (signed + notarized, requires Apple secrets)'
         type: boolean
         default: false
-      macos_only:
-        description: 'Only build macOS (skip Windows/Linux) - useful when you just want a signed macOS build'
+      build_windows:
+        description: 'Build Windows'
         type: boolean
-        default: false
+        default: true
+      build_linux:
+        description: 'Build Linux'
+        type: boolean
+        default: true
 
 jobs:
-  # The matrix context isn't available in a job-level `if:`, so filtering
-  # out Windows/Linux for a "macOS only" manual run has to happen by
-  # computing a different matrix upstream, rather than skipping build's
-  # matrix entries directly.
+  # The matrix context isn't available in a job-level `if:`, so which
+  # targets to build for a manual dispatch has to be decided by computing a
+  # matrix upstream, rather than skipping build's matrix entries directly.
   prepare:
     name: Prepare build matrix
     runs-on: ubuntu-latest
@@ -62,30 +73,48 @@ jobs:
     steps:
       - id: set-matrix
         run: |
+          # A tag push always builds everything, unsigned. A manual dispatch
+          # uses whichever of the four checkboxes were selected.
+          BUILD_LINUX="${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}"
+          BUILD_WINDOWS="${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}"
+          BUILD_MACOS_UNSIGNED="${{ github.event_name != 'workflow_dispatch' || inputs.build_macos_unsigned }}"
+          BUILD_MACOS_SIGNED="${{ github.event_name == 'workflow_dispatch' && inputs.build_macos_signed }}"
+
+          ENTRIES=()
+
           # Linux "system" packaging builds against the runner's actual
           # system python3 (no bundled/support-package Python like the other
           # platforms use), so this must track ubuntu-latest's system Python
           # (currently 3.12 on the 24.04 image) or Briefcase refuses to build.
-          FULL='{"include":[
-            {"os":"ubuntu-latest","platform":"linux","format":"system","python-version":"3.12","app":"uwmedia-terminal","needs_installer_identity":false},
-            {"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false},
-            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true},
-            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false}
-          ]}'
-          MACOS_ONLY='{"include":[
-            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true},
-            {"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false}
-          ]}'
-          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.macos_only }}" = "true" ]; then
-            MATRIX="$MACOS_ONLY"
-          else
-            MATRIX="$FULL"
+          if [ "$BUILD_LINUX" = "true" ]; then
+            ENTRIES+=('{"os":"ubuntu-latest","platform":"linux","format":"system","python-version":"3.12","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
           fi
-          echo "matrix=$(echo "$MATRIX" | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+          if [ "$BUILD_WINDOWS" = "true" ]; then
+            ENTRIES+=('{"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+          fi
+
+          if [ "$BUILD_MACOS_UNSIGNED" = "true" ]; then
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
+          fi
+
+          if [ "$BUILD_MACOS_SIGNED" = "true" ]; then
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
+          fi
+
+          if [ ${#ENTRIES[@]} -eq 0 ]; then
+            echo "::error::No build targets selected - check at least one of the four build_* inputs."
+            exit 1
+          fi
+
+          JOINED=$(IFS=,; echo "${ENTRIES[*]}")
+          echo "matrix={\"include\":[$JOINED]}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: prepare
-    name: Build (${{ matrix.platform }} - ${{ matrix.app }})
+    name: Build (${{ matrix.platform }} - ${{ matrix.app }}${{ matrix.sign_macos && ', signed' || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -101,7 +130,7 @@ jobs:
       # below silently no-ops and the artifact ships with whatever stale
       # version happens to be in pyproject.toml. Fail loudly instead.
       - name: Require a tag ref for signed builds
-        if: inputs.sign_macos && github.ref_type != 'tag'
+        if: matrix.sign_macos && github.ref_type != 'tag'
         run: |
           echo "::error::Signed builds must be run against a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
           exit 1
@@ -170,9 +199,9 @@ jobs:
         run: |
           briefcase build ${{ matrix.platform }} ${{ matrix.format }} -a ${{ matrix.app }} --no-input
 
-      # --- macOS signing setup (only for a manual, opted-in run) -----------
+      # --- macOS signing setup (only for matrix entries with sign_macos) ---
       - name: Import Apple signing certificate
-        if: matrix.platform == 'macOS' && inputs.sign_macos
+        if: matrix.sign_macos
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -220,7 +249,7 @@ jobs:
           fi
 
       - name: Register notarization credentials
-        if: matrix.platform == 'macOS' && inputs.sign_macos
+        if: matrix.sign_macos
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -236,7 +265,7 @@ jobs:
             --keychain "$KEYCHAIN_PATH"
 
       - name: Package app with Briefcase (signed + notarized)
-        if: matrix.platform == 'macOS' && inputs.sign_macos
+        if: matrix.sign_macos
         run: |
           if [ "${{ matrix.needs_installer_identity }}" = "true" ]; then
             briefcase package macOS app -a ${{ matrix.app }} --no-input -i "$APP_IDENTITY" --installer-identity "$INSTALLER_IDENTITY"
@@ -245,24 +274,24 @@ jobs:
           fi
 
       - name: Clean up signing keychain
-        if: always() && matrix.platform == 'macOS' && inputs.sign_macos
+        if: always() && matrix.sign_macos
         run: security delete-keychain "$KEYCHAIN_PATH" || true
 
-      # --- Everyone else (and macOS when signing wasn't requested) ---------
+      # --- Everyone else (and macOS entries that weren't the signed ones) --
       # NOTE: uwmedia-terminal is a console_app, which Briefcase can only
       # distribute on macOS as a signed .pkg installer. Without the real
       # Apple signing above, --adhoc-sign is the only option - and Apple's
       # ad-hoc signing means the resulting package will only install/run on
       # the machine that built it (this CI runner), not on any other Mac.
       - name: Package app with Briefcase (ad-hoc)
-        if: "!(matrix.platform == 'macOS' && inputs.sign_macos)"
+        if: "!matrix.sign_macos"
         run: |
           briefcase package ${{ matrix.platform }} ${{ matrix.format }} -a ${{ matrix.app }} --no-input --adhoc-sign
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.app }}-${{ matrix.platform }}${{ (matrix.platform == 'macOS' && inputs.sign_macos) && '-signed' || '' }}
+          name: ${{ matrix.app }}-${{ matrix.platform }}${{ matrix.sign_macos && '-signed' || '' }}
           path: dist/*
 
   release:
