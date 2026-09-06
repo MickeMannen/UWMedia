@@ -78,7 +78,7 @@ run it with no arguments for the GUI, or with CLI arguments for scripted/
 batch use.
 """
 console_app = true
-sources = ["uwmedia", "cli_main.py"]
+sources = ["uwmedia", "cli_main.py", "uwmedia_terminal"]
 requires = ["toga"]
 
 [tool.briefcase.app.uwmedia-terminal.macOS]
