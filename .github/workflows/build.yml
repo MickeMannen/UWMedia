@@ -60,6 +60,10 @@ on:
         description: 'Build Linux'
         type: boolean
         default: true
+      create_release:
+        description: 'Create/update the GitHub Release for the selected tag with whatever gets built (requires picking a tag above, not a branch)'
+        type: boolean
+        default: false
 
 jobs:
   # The matrix context isn't available in a job-level `if:`, so which
@@ -71,6 +75,12 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Require a tag ref when creating a release
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release && github.ref_type != 'tag'
+        run: |
+          echo "::error::create_release requires a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
+          exit 1
+
       - id: set-matrix
         run: |
           # A tag push always builds everything, unsigned. A manual dispatch
@@ -297,11 +307,14 @@ jobs:
   release:
     name: Create Release
     needs: build
-    # Only an actual tag push creates/updates the Release page - never a
-    # manual "Run workflow" dispatch, even one run against a tag ref (e.g.
-    # for a signed macOS build), so it never overwrites assets you've
-    # manually attached/replaced.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    # Two ways to get here: an actual tag push (always releases everything,
+    # unsigned), or a manual "Run workflow" dispatch against a tag with
+    # "Create/update the GitHub Release" checked - which only releases
+    # whatever subset of targets you selected (e.g. just a signed macOS
+    # build). A plain dispatch without create_release never touches the
+    # Release page, so it's safe to test builds without risk of clobbering
+    # anything.
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.event_name == 'workflow_dispatch' && inputs.create_release)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -314,17 +327,16 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/uwmedia-terminal-linux/*
-            artifacts/uwmedia-terminal-windows/*
-            artifacts/uwmedia-terminal-macOS/*
-            artifacts/uwmedia-macOS/*
+          files: artifacts/*/*
           body: |
             - `UWMedia-*.dmg` - macOS app, drag to Applications. No terminal command.
             - `UWMedia Terminal-*.pkg` - macOS app + a `uwmedia` terminal command for scripted/batch use.
             - `UWMedia-*.msi` - Windows installer. Also adds a `uwmedia` terminal command.
             - `UWMedia-*.deb` - Linux package. Also adds a `uwmedia` terminal command.
 
-            The macOS files here are ad-hoc signed (unsigned in practice) - macOS will refuse to open them until replaced with a signed build from a manually-triggered signing run.
+            Only the file(s) attached below are part of this release. macOS
+            files are ad-hoc signed (in practice, unsigned - won't open
+            until replaced) unless this was a manually-triggered signed
+            build.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
