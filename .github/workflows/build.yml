@@ -44,15 +44,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux "system" packaging builds against the runner's actual
+          # system python3 (no bundled/support-package Python like the other
+          # platforms use), so this must track ubuntu-latest's system Python
+          # (currently 3.12 on the 24.04 image) or Briefcase refuses to build.
           - os: ubuntu-latest
             platform: linux
             format: system
+            python-version: '3.12'
           - os: windows-latest
             platform: windows
             format: app
+            python-version: '3.11'
           - os: macos-14
             platform: macOS
             format: app
+            python-version: '3.11'
 
     steps:
       - name: Checkout code
@@ -61,7 +68,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Install System Dependencies (Ubuntu)
