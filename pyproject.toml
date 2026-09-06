@@ -41,3 +41,28 @@ requires = ["toga"]
 [tool.briefcase.app.uwmedia.macOS]
 universal_build = false
 requires = ["toga-cocoa"]
+
+[tool.briefcase.app.uwmedia.linux]
+requires = ["toga-gtk"]
+
+[tool.briefcase.app.uwmedia.linux.system.debian]
+system_requires = [
+    "libcairo2-dev",
+    "libgirepository-2.0-dev",
+]
+system_runtime_requires = [
+    "gir1.2-gtk-3.0",
+    "libgirepository-2.0-0",
+    "libcanberra-gtk3-module",
+]
+
+[tool.briefcase.app.uwmedia.linux.system.rhel]
+system_requires = [
+    "cairo-gobject-devel",
+    "gobject-introspection-devel",
+]
+system_runtime_requires = [
+    "gobject-introspection",
+    "gtk3",
+    "libcanberra-gtk3",
+]
