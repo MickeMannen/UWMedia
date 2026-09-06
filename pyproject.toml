@@ -97,6 +97,10 @@ formal_name = "UWMedia"
 # This forces a per-machine install to Program Files - the installer will
 # need admin/UAC elevation as a result.
 system_installer = true
+# The Windows template defaults to nesting under an author-name folder
+# (Program Files\<author>\UWMedia\); this installs flat instead
+# (Program Files\UWMedia\).
+use_full_install_path = false
 
 [tool.briefcase.app.uwmedia-terminal.linux]
 # Same reasoning as Windows above.
