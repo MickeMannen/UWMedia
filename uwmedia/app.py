@@ -5,6 +5,8 @@ import re
 import shutil
 import sys
 import tempfile
+import urllib.request
+import webbrowser
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -76,7 +78,37 @@ THEME = {
     "text_muted": "#6B7280",
 }
 
-SECTIONS = ("Process", "Convertion", "Color Tuning", "Tag Editor", "HUD Designer", "Advanced", "Activity")
+SECTIONS = (
+    "Process",
+    "Convertion",
+    "Color Tuning",
+    "Tag Editor",
+    "HUD Designer",
+    "Advanced",
+    "Activity",
+    "About",
+)
+
+AUTHOR_NAME = "Mikael Christersson"
+GITHUB_REPO = "MickeMannen/UWMedia"
+GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
+YOUTUBE_URL = "https://www.youtube.com/@MickeMannen8"
+
+ABOUT_DEPENDENCIES = [
+    "Toga (GUI framework)",
+    "Briefcase (packaging)",
+    "FFmpeg (external - video processing)",
+    "ExifTool (external - metadata)",
+    "PyExifTool",
+    "OpenCV (opencv-python)",
+    "NumPy",
+    "Pydantic",
+    "lxml",
+    "Pillow",
+    "PyYAML",
+    "tqdm",
+    "garmin-fit-sdk",
+]
 
 # Order matches cli_main.py's `--convert` choices/resolutions dict, highest first.
 # Height is used to disable any target that would upscale the source.
@@ -164,6 +196,7 @@ class UWMediaApp(toga.App):
             "Tag Editor": self._build_tag_editor_section(),
             "Advanced": self._build_advanced_section(),
             "Activity": self._build_activity_section(),
+            "About": self._build_about_section(),
         }
         self.color_tuning_view = self._build_color_tuning_section()
         # Same reasoning as Color Tuning: the canvas needs to stay put while
@@ -315,6 +348,7 @@ class UWMediaApp(toga.App):
         self.is_running = False
         self.current_process = None
         self.abort_requested = False
+        self._about_update_checked = False
 
         self._wire_field_persistence()
 
@@ -825,6 +859,9 @@ class UWMediaApp(toga.App):
         # widgets into view below the active one. Only ever having one
         # section attached at a time sidesteps that.
         self.active_section = name
+        if name == "About" and not self._about_update_checked:
+            self._about_update_checked = True
+            asyncio.create_task(self._check_for_update())
         self.main_content_area.clear()
         if name == "Color Tuning":
             self.main_content_area.add(self.color_tuning_view)
@@ -2682,6 +2719,114 @@ class UWMediaApp(toga.App):
             )
         )
         return section
+
+    def _build_about_section(self):
+        app_version = self.version or "dev"
+
+        section = toga.Box(style=Pack(direction=COLUMN))
+
+        section.add(
+            self._card(
+                "UWMedia",
+                toga.Label(f"Version {app_version}", style=Pack(font_weight="bold")),
+                toga.Label(
+                    "Underwater media processor - color correction and dive "
+                    "telemetry overlays for videos and photos.",
+                    style=Pack(color=THEME["text_muted"], margin_top=5),
+                ),
+            )
+        )
+
+        self.about_update_label = toga.Label(
+            "", style=Pack(color=THEME["text_muted"], margin_top=8)
+        )
+        section.add(
+            self._card(
+                "Updates",
+                toga.Button(
+                    "Check for updates", on_press=self.on_check_for_update, style=Pack(width=200)
+                ),
+                self.about_update_label,
+            )
+        )
+
+        section.add(
+            self._card(
+                "License",
+                toga.Label("MIT License", style=Pack(font_weight="bold")),
+                toga.Label(
+                    f"Copyright (c) 2025 {AUTHOR_NAME}. See the LICENSE file in the "
+                    "repository for the full text.",
+                    style=Pack(color=THEME["text_muted"], margin_top=5),
+                ),
+            )
+        )
+
+        deps_box = toga.Box(style=Pack(direction=COLUMN))
+        for dep in ABOUT_DEPENDENCIES:
+            deps_box.add(toga.Label(f"- {dep}", style=Pack(color=THEME["text_muted"])))
+        section.add(self._card("Dependencies", deps_box))
+
+        links_box = toga.Box(style=Pack(direction=ROW))
+        links_box.add(
+            toga.Button("GitHub", on_press=lambda w: webbrowser.open(GITHUB_URL), style=Pack(margin_right=8))
+        )
+        links_box.add(
+            toga.Button("YouTube", on_press=lambda w: webbrowser.open(YOUTUBE_URL))
+        )
+        section.add(
+            self._card(
+                "Links",
+                toga.Label(f"By {AUTHOR_NAME}", style=Pack(margin_bottom=8)),
+                links_box,
+            )
+        )
+
+        return section
+
+    def _version_tuple(self, value):
+        parts = []
+        for chunk in re.split(r"[.\-+]", value.lstrip("vV")):
+            try:
+                parts.append(int(chunk))
+            except ValueError:
+                break
+        return tuple(parts)
+
+    async def on_check_for_update(self, widget):
+        await self._check_for_update()
+
+    async def _check_for_update(self):
+        self.about_update_label.text = "Checking for updates…"
+        self.about_update_label.style.color = THEME["text_muted"]
+        current = self.version or "0.0.0"
+        try:
+            loop = asyncio.get_event_loop()
+            tag_name = await loop.run_in_executor(None, self._fetch_latest_release_tag)
+        except Exception:
+            self.about_update_label.text = "Couldn't check for updates (no connection?)."
+            return
+
+        if not tag_name:
+            self.about_update_label.text = "No releases found on GitHub yet."
+            return
+
+        latest = tag_name.lstrip("vV")
+        if self._version_tuple(latest) > self._version_tuple(current):
+            self.about_update_label.text = f"A new version is available: {tag_name} (you have {current})"
+            self.about_update_label.style.color = "#F59E0B"
+        else:
+            self.about_update_label.text = f"You're up to date ({current})."
+            self.about_update_label.style.color = "#22C55E"
+
+    def _fetch_latest_release_tag(self):
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        return data.get("tag_name")
 
     def _row(self, label_text, widget, extra):
         box = toga.Box(style=Pack(direction=ROW, margin_bottom=5))
