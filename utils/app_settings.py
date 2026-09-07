@@ -10,6 +10,9 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     # None means "use the default user_data_dir() location"
     "layouts_dir": None,
     "color_profiles_dir": None,
+    # None means "auto-detect from PATH / common install locations"
+    "ffmpeg_path": None,
+    "exiftool_path": None,
     "filename_formats": [],
     "render_log_filename_formats": [],
     # Last-used value of every persisted Process/Advanced form field, keyed

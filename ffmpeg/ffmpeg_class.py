@@ -1,4 +1,3 @@
-import shutil
 import platform
 import subprocess
 import time
@@ -10,6 +9,7 @@ from datetime import datetime
 from tqdm import tqdm
 from models.dive import Dive, Waypoint
 from ffmpeg.hud_filter import generate_hud_filter_complex
+from utils.tool_paths import get_ffmpeg_path, get_ffprobe_path
 
 # @
 class FfmpegClass:
@@ -21,42 +21,13 @@ class FfmpegClass:
         self.hw_accel = hw_accel
         self.debug = debug
         self.os_type = platform.system()
-        self.executable_path = self._find_ffmpeg()
+        self.executable_path = get_ffmpeg_path()
         if not self.executable_path:
-            raise RuntimeError("FFmpeg executable not found in PATH or common installation locations.")
-
-    def _is_actually_ffmpeg(self, path: Path) -> bool:
-        try:
-            result = subprocess.run([str(path), "-version"], capture_output=True, text=True, timeout=2)
-            return "ffmpeg version" in result.stdout.lower()
-        except:
-            return False
-
-    def _find_ffmpeg(self) -> Optional[Path]:
-        ffmpeg_bin = shutil.which("ffmpeg")
-        if ffmpeg_bin:
-            p = Path(ffmpeg_bin)
-            if self._is_actually_ffmpeg(p):
-                return p
-
-        # Common locations
-        search_paths = []
-        if self.os_type == "Windows":
-            search_paths.extend([
-                Path("C:/ffmpeg/bin/ffmpeg.exe"),
-                Path("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
-                Path(Path.home() / "ffmpeg/bin/ffmpeg.exe"),
-            ])
-        elif self.os_type == "Darwin":
-            search_paths.extend([
-                Path("/usr/local/bin/ffmpeg"),
-                Path("/opt/homebrew/bin/ffmpeg"),
-            ])
-        
-        for p in search_paths:
-            if p.exists() and self._is_actually_ffmpeg(p):
-                return p
-        return None
+            raise RuntimeError(
+                "FFmpeg executable not found. Configure its location on the "
+                "Advanced page, or install FFmpeg and ensure it's on your PATH."
+            )
+        self.ffprobe_path = get_ffprobe_path(self.executable_path)
 
     def get_path(self) -> Path:
         return self.executable_path
@@ -144,14 +115,15 @@ class FfmpegClass:
 
     def get_video_duration(self, input_path: Path) -> float:
         """Uses ffprobe to get video duration."""
-        ffprobe_bin = shutil.which("ffprobe")
-        if not ffprobe_bin:
-            ffprobe_bin = str(self.executable_path).replace("ffmpeg", "ffprobe")
-            if not Path(ffprobe_bin).exists():
-                raise RuntimeError("ffprobe not found.")
+        if not self.ffprobe_path:
+            raise RuntimeError(
+                "ffprobe executable not found. Configure FFmpeg's location on "
+                "the Advanced page (ffprobe is expected alongside it), or "
+                "install FFmpeg and ensure it's on your PATH."
+            )
 
         cmd = [
-            str(ffprobe_bin),
+            str(self.ffprobe_path),
             "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
@@ -162,12 +134,8 @@ class FfmpegClass:
 
     def get_video_bitrate(self, input_path: Path) -> int:
         """Uses ffprobe to get video bitrate."""
-        ffprobe_bin = shutil.which("ffprobe")
-        if not ffprobe_bin:
-            ffprobe_bin = str(self.executable_path).replace("ffmpeg", "ffprobe")
-        
         cmd = [
-            str(ffprobe_bin),
+            str(self.ffprobe_path),
             "-v", "error",
             "-select_streams", "v:0",
             "-show_entries", "stream=bit_rate",
@@ -179,7 +147,7 @@ class FfmpegClass:
         # Fallback if bitrate is not in stream (try format)
         if not out or out == "N/A":
             cmd = [
-                str(ffprobe_bin),
+                str(self.ffprobe_path),
                 "-v", "error",
                 "-show_entries", "format=bit_rate",
                 "-of", "default=noprint_wrappers=1:nokey=1",
@@ -232,9 +200,8 @@ class FfmpegClass:
 
     def get_video_dimensions(self, input_path: Path) -> tuple[int, int]:
         """Uses ffprobe to get video width and height."""
-        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
         cmd = [
-            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            str(self.ffprobe_path), "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0",
             str(input_path)
         ]
@@ -243,9 +210,8 @@ class FfmpegClass:
 
     def get_video_frame_count(self, input_path: Path) -> int:
         """Uses ffprobe to get video frame count."""
-        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
         cmd = [
-            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            str(self.ffprobe_path), "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=nb_frames", "-of", "default=noprint_wrappers=1:nokey=1",
             str(input_path)
         ]
@@ -263,9 +229,8 @@ class FfmpegClass:
 
     def get_video_pix_fmt(self, input_path: Path) -> str:
         """Uses ffprobe to get video pixel format."""
-        ffprobe_bin = shutil.which("ffprobe") or str(self.executable_path).replace("ffmpeg", "ffprobe")
         cmd = [
-            ffprobe_bin, "-v", "error", "-select_streams", "v:0",
+            str(self.ffprobe_path), "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=pix_fmt", "-of", "default=noprint_wrappers=1:nokey=1",
             str(input_path)
         ]

@@ -67,11 +67,11 @@ cd UWMedia
 pip install -r requirements.txt
 ```
 
-Alternative if you want to use a packaged app - download from releases (Windows/Linux). Note: the macOS release artifacts are ad-hoc signed and will only run on the machine they were built on; on macOS, install from source instead until real Apple Developer ID signing is set up.
+Alternative if you want to use a packaged app - download from the [Releases](../../releases) page (Windows/macOS/Linux). Releases are created and attached by hand, not automatically on every push, so check that a macOS download is described as signed/notarized before assuming it'll open without a Gatekeeper warning.
 
 On macOS, two separate downloads are built (see [Building the App](#building-the-app)):
 - **`UWMedia-*.dmg`** - plain GUI app, drag to `/Applications`. Recommended for most users.
-- **`UWMedia Terminal-*.pkg`** - adds a scriptable `uwmedia` terminal command alongside the same GUI; installs to `/Library` instead of `/Applications`. Use this if you want to run batch/scripted processing from the command line.
+- **`UWMedia-Terminal-*.pkg`** - adds a scriptable `uwmedia` terminal command alongside the same GUI; installs to `/Library` instead of `/Applications`. Use this if you want to run batch/scripted processing from the command line.
 
 Windows and Linux only ship the CLI + GUI hybrid build, since neither has the same "wrong folder for a normal app" mismatch a macOS console app has.
 

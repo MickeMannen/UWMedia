@@ -1,12 +1,17 @@
-# macOS signing (optional, manual only):
+# This workflow is manual-only - nothing runs on push (tag or otherwise).
+# Releases are created by hand from the GitHub UI; this workflow's job is
+# only to build artifacts and, if you ask it to, attach them to a release
+# that already exists for the tag you pick.
 #
-# Tag pushes always build ad-hoc/unsigned artifacts for every platform (the
-# macOS ones only run on the machine they were built on - see the note
-# below). To produce real, Apple-notarized macOS builds that other people
-# can actually run, trigger this workflow manually ("Run workflow" in the
-# Actions tab) with "Build macOS (signed + notarized)" checked. This
-# requires five repo secrets, none of which this workflow can set up for
-# you:
+# Typical flow: create the release from the GitHub UI (Releases -> Draft a
+# new release, picking/creating the tag) first, then come here and trigger
+# "Run workflow" - pick that same tag from the "Use workflow from" dropdown,
+# check "Build macOS (signed + notarized)" and "Create/update the GitHub
+# Release", and run it. That builds a real, Apple-notarized macOS build and
+# attaches it straight to the release you just created.
+#
+# Signing requires five repo secrets, none of which this workflow can set
+# up for you:
 #   APPLE_CERTIFICATE_P12          - base64 of a .p12 containing BOTH your
 #                                     "Developer ID Application" and
 #                                     "Developer ID Installer" certs+keys
@@ -20,14 +25,10 @@
 #                                     App-Specific Passwords) - NOT your real
 #                                     Apple ID password
 #
-# A signed run only uploads workflow artifacts (Actions tab); it never
-# touches the GitHub Release (even if run against a tag) - attach files to
-# a release yourself once you've downloaded and checked them.
-#
-# A manual "Run workflow" lets you pick exactly which of the four targets to
-# build (macOS unsigned, macOS signed, Windows, Linux) via checkboxes, so you
-# don't have to wait on ones you don't need. A tag push always builds all
-# four (unsigned).
+# Leaving "Create/update the GitHub Release" unchecked just uploads workflow
+# artifacts (Actions tab) without touching any release - useful for test
+# builds. The four build_* checkboxes let you pick exactly which targets to
+# build, so you're not stuck waiting on ones you don't need.
 #
 # macOS ships two separate apps (see pyproject.toml): "uwmedia" (plain GUI,
 # .dmg, installs to /Applications - what most users want) and
@@ -39,9 +40,6 @@
 name: Release Build
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       build_macos_unsigned:
@@ -76,19 +74,17 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Require a tag ref when creating a release
-        if: github.event_name == 'workflow_dispatch' && inputs.create_release && github.ref_type != 'tag'
+        if: inputs.create_release && github.ref_type != 'tag'
         run: |
           echo "::error::create_release requires a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
           exit 1
 
       - id: set-matrix
         run: |
-          # A tag push always builds everything, unsigned. A manual dispatch
-          # uses whichever of the four checkboxes were selected.
-          BUILD_LINUX="${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}"
-          BUILD_WINDOWS="${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}"
-          BUILD_MACOS_UNSIGNED="${{ github.event_name != 'workflow_dispatch' || inputs.build_macos_unsigned }}"
-          BUILD_MACOS_SIGNED="${{ github.event_name == 'workflow_dispatch' && inputs.build_macos_signed }}"
+          BUILD_LINUX="${{ inputs.build_linux }}"
+          BUILD_WINDOWS="${{ inputs.build_windows }}"
+          BUILD_MACOS_UNSIGNED="${{ inputs.build_macos_unsigned }}"
+          BUILD_MACOS_SIGNED="${{ inputs.build_macos_signed }}"
 
           ENTRIES=()
 
@@ -298,23 +294,32 @@ jobs:
         run: |
           briefcase package ${{ matrix.platform }} ${{ matrix.format }} -a ${{ matrix.app }} --no-input --adhoc-sign
 
+      # Briefcase's Linux "system" .deb filename includes the vendor,
+      # codename, and revision (e.g. uwmedia_0.5.6-1~ubuntu-noble_amd64.deb)
+      # - shorten it to something more presentable for a release asset.
+      - name: Rename Linux package
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          DEB_FILE=$(ls dist/*.deb | head -1)
+          mv "$DEB_FILE" "dist/UWMedia-ubuntu-amd64-${VERSION}.deb"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.app }}-${{ matrix.platform }}${{ matrix.sign_macos && '-signed' || '' }}
+          name: ${{ matrix.app }}-${{ matrix.platform }}
           path: dist/*
 
   release:
     name: Create Release
     needs: build
-    # Two ways to get here: an actual tag push (always releases everything,
-    # unsigned), or a manual "Run workflow" dispatch against a tag with
-    # "Create/update the GitHub Release" checked - which only releases
-    # whatever subset of targets you selected (e.g. just a signed macOS
-    # build). A plain dispatch without create_release never touches the
-    # Release page, so it's safe to test builds without risk of clobbering
-    # anything.
-    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+    # Only runs if you explicitly checked "Create/update the GitHub Release"
+    # on a manual dispatch (against a tag) - releases themselves are always
+    # created by hand from the GitHub UI first. Leaving this unchecked never
+    # touches the Release page, so it's safe to test builds without risk of
+    # clobbering anything already attached.
+    if: inputs.create_release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -330,13 +335,13 @@ jobs:
           files: artifacts/*/*
           body: |
             - `UWMedia-*.dmg` - macOS app, drag to Applications. No terminal command.
-            - `UWMedia Terminal-*.pkg` - macOS app + a `uwmedia` terminal command for scripted/batch use.
+            - `UWMedia-Terminal-*.pkg` - macOS app + a `uwmedia` terminal command for scripted/batch use.
             - `UWMedia-*.msi` - Windows installer. Also adds a `uwmedia` terminal command.
-            - `UWMedia-*.deb` - Linux package. Also adds a `uwmedia` terminal command.
+            - `UWMedia-ubuntu-amd64-*.deb` - Linux package. Also adds a `uwmedia` terminal command.
 
             Only the file(s) attached below are part of this release. macOS
-            files are ad-hoc signed (in practice, unsigned - won't open
-            until replaced) unless this was a manually-triggered signed
-            build.
+            files are only genuinely signed/notarized if "Build macOS
+            (signed + notarized)" was checked for this run - otherwise
+            they're ad-hoc and won't open until replaced.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

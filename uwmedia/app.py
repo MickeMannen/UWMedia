@@ -19,6 +19,7 @@ from toga.style.pack import COLUMN, HIDDEN, ROW, VISIBLE
 
 import ffmpeg.color as color_module
 from ffmpeg.color import ColorCorrectionEngine
+from ffmpeg.ffmpeg_class import FfmpegClass
 from gui.hud_renderer import draw_hud, get_font
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
@@ -48,6 +49,12 @@ from utils.hud_designer import (
     skin_pixel_size,
 )
 from utils.layouts import list_layouts, user_layouts_dir
+from utils.tool_paths import (
+    get_exiftool_path,
+    get_ffmpeg_path,
+    is_valid_exiftool,
+    is_valid_ffmpeg,
+)
 from utils.tag_editor import (
     TAG_EDITOR_EXTENSIONS,
     TAG_GUIDE,
@@ -69,7 +76,17 @@ THEME = {
     "text_muted": "#6B7280",
 }
 
-SECTIONS = ("Process", "Color Tuning", "Tag Editor", "HUD Designer", "Advanced", "Activity")
+SECTIONS = ("Process", "Convertion", "Color Tuning", "Tag Editor", "HUD Designer", "Advanced", "Activity")
+
+# Order matches cli_main.py's `--convert` choices/resolutions dict, highest first.
+# Height is used to disable any target that would upscale the source.
+CONVERT_RESOLUTIONS = [
+    ("1080p", 1920, 1080),
+    ("720p", 1280, 720),
+    ("480p", 854, 480),
+    ("360p", 640, 360),
+]
+CONVERT_RESOLUTION_NAME_RE = re.compile(r"(?i)[ _](4k|2160p|1080p|720p|480p|360p)")
 
 TUNING_PREVIEW_MAX_DIM = 600
 DESIGNER_CANVAS_WIDTH = 900
@@ -143,6 +160,7 @@ class UWMediaApp(toga.App):
         # inside another, unbounded-height ScrollContainer.
         self.sections = {
             "Process": self._build_process_section(),
+            "Convertion": self._build_convertion_section(),
             "Tag Editor": self._build_tag_editor_section(),
             "Advanced": self._build_advanced_section(),
             "Activity": self._build_activity_section(),
@@ -253,8 +271,12 @@ class UWMediaApp(toga.App):
 
         self.layouts_dir_input = toga.TextInput(style=field_style, readonly=True)
         self.color_dir_input = toga.TextInput(style=field_style, readonly=True)
+        self.ffmpeg_path_input = toga.TextInput(style=field_style, readonly=True)
+        self.exiftool_path_input = toga.TextInput(style=field_style, readonly=True)
         self._refresh_location_inputs()
+        self._refresh_tool_paths()
 
+        self._build_convert_fields(field_style)
         self._build_color_tuning_fields(field_style)
         self._build_tag_editor_fields(field_style)
         self._build_hud_designer_fields(field_style)
@@ -339,6 +361,35 @@ class UWMediaApp(toga.App):
         for name in PERSISTED_SWITCH_FIELDS:
             if name in fields:
                 getattr(self, name).value = bool(fields[name])
+
+    def _build_convert_fields(self, field_style):
+        self.convert_source_input = toga.TextInput(style=field_style, readonly=True)
+        self.convert_source_resolution_label = toga.Label(
+            "No file selected", style=Pack(color=THEME["text_muted"], margin_top=5)
+        )
+        self.convert_dest_input = toga.TextInput(style=field_style, readonly=True)
+
+        self.convert_resolution_switches = {}
+        for res_name, _w, _h in CONVERT_RESOLUTIONS:
+            switch = toga.Switch(res_name, on_change=self.on_convert_resolution_toggle)
+            self.convert_resolution_switches[res_name] = switch
+
+        self.convert_output_preview = toga.MultilineTextInput(
+            readonly=True, style=Pack(flex=1, height=100)
+        )
+        self.convert_run_button = toga.Button(
+            "Start",
+            on_press=self.on_run,
+            style=Pack(
+                margin=(20, 16, 24, 16),
+                height=44,
+                font_size=15,
+                font_weight="bold",
+                background_color=THEME["nav_active_bg"],
+                color="#FFFFFF",
+            ),
+        )
+        self._refresh_convert_output_preview()
 
     def _build_color_tuning_fields(self, field_style):
         # One live engine instance backs the whole tuning UI - slider changes
@@ -595,6 +646,136 @@ class UWMediaApp(toga.App):
         update_settings(color_profiles_dir=None)
         self._refresh_location_inputs()
         self.color_profile.items = load_color_profiles()
+
+    def _refresh_tool_paths(self):
+        # Shows the configured override if set, otherwise whatever was
+        # auto-detected from PATH/common install locations - so the field
+        # is never blank as long as the tool is findable at all.
+        ffmpeg_path = get_ffmpeg_path()
+        exiftool_path = get_exiftool_path()
+        self.ffmpeg_path_input.value = str(ffmpeg_path) if ffmpeg_path else "Not found"
+        self.exiftool_path_input.value = str(exiftool_path) if exiftool_path else "Not found"
+
+    async def on_choose_ffmpeg_path(self, widget):
+        path = await self.main_window.dialog(toga.OpenFileDialog("Select ffmpeg executable"))
+        if not path:
+            return
+        if not is_valid_ffmpeg(path):
+            await self.main_window.dialog(
+                toga.ErrorDialog(
+                    "Not a valid ffmpeg executable",
+                    f"Running '{path} -version' didn't succeed, so this doesn't look like "
+                    "a working ffmpeg executable. Please choose a different file.",
+                )
+            )
+            return
+        update_settings(ffmpeg_path=str(path))
+        self._refresh_tool_paths()
+
+    def on_reset_ffmpeg_path(self, widget):
+        update_settings(ffmpeg_path=None)
+        self._refresh_tool_paths()
+
+    async def on_choose_exiftool_path(self, widget):
+        path = await self.main_window.dialog(toga.OpenFileDialog("Select exiftool executable"))
+        if not path:
+            return
+        if not is_valid_exiftool(path):
+            await self.main_window.dialog(
+                toga.ErrorDialog(
+                    "Not a valid exiftool executable",
+                    f"Running '{path} -ver' didn't succeed, so this doesn't look like "
+                    "a working exiftool executable. Please choose a different file.",
+                )
+            )
+            return
+        update_settings(exiftool_path=str(path))
+        self._refresh_tool_paths()
+
+    def on_reset_exiftool_path(self, widget):
+        update_settings(exiftool_path=None)
+        self._refresh_tool_paths()
+
+    # ------------------------------------------------------------------
+    # Convertion (single-file resolution downscale)
+    # ------------------------------------------------------------------
+
+    async def on_choose_convert_source(self, widget):
+        path = await self.main_window.dialog(toga.OpenFileDialog("Select video file to convert"))
+        if not path:
+            return
+        self.convert_source_input.value = str(path)
+        self._refresh_convert_source_resolution(Path(path))
+        self._refresh_convert_output_preview()
+
+    def _refresh_convert_source_resolution(self, path: Path):
+        source_height = None
+        try:
+            ff = FfmpegClass(hw_accel=self.hw_accel_switch.value, debug=False)
+            width, height = ff.get_video_dimensions(path)
+            source_height = height
+            label = f"{width}x{height}"
+            for name, _w, h in CONVERT_RESOLUTIONS:
+                if h <= height:
+                    label = f"{width}x{height} (up to {name})"
+                    break
+            self.convert_source_resolution_label.text = label
+        except Exception as exc:
+            self.convert_source_resolution_label.text = f"Could not detect resolution: {exc}"
+
+        for res_name, _w, h in CONVERT_RESOLUTIONS:
+            switch = self.convert_resolution_switches[res_name]
+            allowed = source_height is None or h <= source_height
+            switch.enabled = allowed
+            if not allowed:
+                switch.value = False
+
+    async def on_choose_convert_dest(self, widget):
+        path = await self.main_window.dialog(toga.SelectFolderDialog("Select destination folder"))
+        if path:
+            self.convert_dest_input.value = str(path)
+            self._refresh_convert_output_preview()
+
+    def on_convert_resolution_toggle(self, widget):
+        self._refresh_convert_output_preview()
+
+    def _convert_output_filename(self, source_path: Path, res_name: str) -> str:
+        stem = source_path.stem
+        if CONVERT_RESOLUTION_NAME_RE.search(stem):
+            new_stem = CONVERT_RESOLUTION_NAME_RE.sub(f"_{res_name}", stem)
+        else:
+            new_stem = f"{stem}_{res_name}"
+        return f"{new_stem}{source_path.suffix.lower()}"
+
+    def _refresh_convert_output_preview(self):
+        source = self.convert_source_input.value.strip() if self.convert_source_input.value else ""
+        dest = self.convert_dest_input.value.strip() if self.convert_dest_input.value else ""
+        selected = [name for name, switch in self.convert_resolution_switches.items() if switch.value]
+
+        if not source or not selected:
+            self.convert_output_preview.value = "(select a source file and at least one output resolution)"
+            return
+
+        source_path = Path(source)
+        lines = []
+        for res_name in selected:
+            filename = self._convert_output_filename(source_path, res_name)
+            lines.append(str(Path(dest) / filename) if dest else filename)
+        self.convert_output_preview.value = "\n".join(lines)
+
+    def build_convert_args(self):
+        source = self.convert_source_input.value.strip() if self.convert_source_input.value else ""
+        dest = self.convert_dest_input.value.strip() if self.convert_dest_input.value else ""
+        selected = [name for name, switch in self.convert_resolution_switches.items() if switch.value]
+        if not source or not dest or not selected:
+            return []
+
+        args = [source, dest, "--convert", *selected]
+        if self.hw_accel_switch.value:
+            args.append("--hw-accel")
+        if self.debug_switch.value:
+            args.append("--debug")
+        return args
 
     def _build_sidebar(self):
         sidebar = toga.Box(
@@ -855,6 +1036,49 @@ class UWMediaApp(toga.App):
             parent.insert(parent.children.index(anchor) + 1, row)
         elif not visible and present:
             parent.remove(row)
+
+    def _build_convertion_section(self):
+        section = toga.Box(style=Pack(direction=COLUMN))
+
+        resolutions_box = toga.Box(style=Pack(direction=COLUMN))
+        for res_name, _w, _h in CONVERT_RESOLUTIONS:
+            resolutions_box.add(self.convert_resolution_switches[res_name])
+
+        section.add(
+            self._card(
+                "Source video",
+                self._row(
+                    "File",
+                    self.convert_source_input,
+                    toga.Button("Browse", on_press=self.on_choose_convert_source, style=Pack(margin_left=5)),
+                ),
+                self.convert_source_resolution_label,
+            )
+        )
+        section.add(
+            self._card(
+                "Output resolutions",
+                resolutions_box,
+                toga.Label(
+                    "Resolutions higher than the source are disabled - upscaling isn't supported.",
+                    style=Pack(color=THEME["text_muted"], margin_top=5, font_size=10),
+                ),
+            )
+        )
+        section.add(
+            self._card(
+                "Destination",
+                self._row(
+                    "Folder",
+                    self.convert_dest_input,
+                    toga.Button("Browse", on_press=self.on_choose_convert_dest, style=Pack(margin_left=5)),
+                ),
+                toga.Label("Output filename(s):", style=Pack(margin_top=8, font_weight="bold")),
+                self.convert_output_preview,
+            )
+        )
+        section.add(self.convert_run_button)
+        return section
 
     def _build_process_section(self):
         section = toga.Box(style=Pack(direction=COLUMN))
@@ -2416,6 +2640,21 @@ class UWMediaApp(toga.App):
         )
         section.add(
             self._card(
+                "External tools",
+                self._row(
+                    "ffmpeg path",
+                    self.ffmpeg_path_input,
+                    self._change_reset_buttons(self.on_choose_ffmpeg_path, self.on_reset_ffmpeg_path),
+                ),
+                self._row(
+                    "exiftool path",
+                    self.exiftool_path_input,
+                    self._change_reset_buttons(self.on_choose_exiftool_path, self.on_reset_exiftool_path),
+                ),
+            )
+        )
+        section.add(
+            self._card(
                 "Custom filename formats",
                 self._row(
                     "New format",
@@ -2591,15 +2830,46 @@ class UWMediaApp(toga.App):
                     pass
             return
 
-        args = self.build_args()
+        is_convert = widget is self.convert_run_button
+        args = self.build_convert_args() if is_convert else self.build_args()
         if not args:
-            self.log_output.value = "Nothing to run: set a source file/directory first.\n"
+            self.log_output.value = (
+                "Nothing to run: select a source file, destination folder, and at "
+                "least one output resolution first.\n"
+                if is_convert
+                else "Nothing to run: set a source file/directory first.\n"
+            )
             self._set_terminal_visible(True)
+            return
+
+        tool_problems = []
+        ffmpeg_path = get_ffmpeg_path()
+        if not is_valid_ffmpeg(ffmpeg_path):
+            tool_problems.append(
+                "ffmpeg — not found" if not ffmpeg_path else f"ffmpeg — not runnable ({ffmpeg_path})"
+            )
+        exiftool_path = get_exiftool_path()
+        if not is_valid_exiftool(exiftool_path):
+            tool_problems.append(
+                "exiftool — not found" if not exiftool_path else f"exiftool — not runnable ({exiftool_path})"
+            )
+        if tool_problems:
+            await self.main_window.dialog(
+                toga.ErrorDialog(
+                    "Missing or invalid external tools",
+                    "Cannot start processing:\n\n"
+                    + "\n".join(tool_problems)
+                    + "\n\nSet the correct location for each on the Advanced page "
+                    "(External tools card), or install the missing tool and ensure "
+                    "it's on your system PATH.",
+                )
+            )
             return
 
         self.is_running = True
         self.abort_requested = False
         self.run_button.text = "Abort"
+        self.convert_run_button.text = "Abort"
         self._set_status("Running…")
         self.log_output.value = ""
         self._reset_batch_progress()
@@ -2638,6 +2908,7 @@ class UWMediaApp(toga.App):
             self.current_process = None
             self.is_running = False
             self.run_button.text = "Start"
+            self.convert_run_button.text = "Start"
 
 
 def main():

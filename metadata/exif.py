@@ -4,6 +4,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 from exiftool import ExifTool, ExifToolHelper
 
+from utils.tool_paths import get_exiftool_path
+
 date_time_formats = [(re.compile(r'^(?P<date>\d+:\d+:\d+) (?P<time>\d+:\d+:\d+.\d+)(?P<zone>[+-]\d+:\d+)$'),
                       "%Y:%m:%d %H:%M:%S.%f%z"),
 
@@ -21,12 +23,13 @@ date_time_formats = [(re.compile(r'^(?P<date>\d+:\d+:\d+) (?P<time>\d+:\d+:\d+.\
 
 class MetadataHandler:
     def __init__(self):
-        pass
+        path = get_exiftool_path()
+        self.exiftool_path = str(path) if path else None
 
     def copy_all(self, src: Path, dest: Path, force_tz_mins: Optional[int] = None, custom_tags: Optional[List[str]] = None):
         """Copies all metadata from source to target and applies overrides."""
 
-        with ExifTool() as et:
+        with ExifTool(executable=self.exiftool_path) as et:
             et.execute(
                 b"-TagsFromFile", str(src).encode('utf-8'),
                 b"-all:all",
@@ -65,7 +68,7 @@ class MetadataHandler:
             cmd = [f"-{tag}".encode('utf-8') for tag in custom_tags]
             cmd.append(b"-overwrite_original")
             cmd.append(str(dest).encode('utf-8'))
-            with ExifTool() as et:
+            with ExifTool(executable=self.exiftool_path) as et:
                 et.execute(*cmd)
 
         # Set xmp date taken if not present
@@ -128,7 +131,7 @@ class MetadataHandler:
             cmd.append(b"-overwrite_original")
             cmd.append(str(dest).encode('utf-8'))
             # print(cmd)
-            with ExifTool() as et:
+            with ExifTool(executable=self.exiftool_path) as et:
                 status = et.execute(*cmd)
                 print(et.last_stderr)
             return True
@@ -166,7 +169,7 @@ class MetadataHandler:
         cmd.append(b"-overwrite_original")
         cmd.append(str(src).encode('utf-8'))
 
-        with ExifTool() as et:
+        with ExifTool(executable=self.exiftool_path) as et:
             stdout = et.execute(*cmd)
             stderr = et.last_stderr
         return stdout, stderr
@@ -174,7 +177,7 @@ class MetadataHandler:
     def get_metadata(self, src: Path) -> Optional[dict]:
         """Extracts all metadata using ExifToolHelper."""
         try:
-            with ExifToolHelper() as et:
+            with ExifToolHelper(executable=self.exiftool_path) as et:
                 metadata = et.get_metadata(str(src))
                 return metadata[0]
         except Exception as e:
@@ -337,7 +340,7 @@ class MetadataHandler:
     def get_tags(self, src: Path, tag_names: List[str]) -> Dict[str, str]:
         """Extracts specific tags from a file. Returns values as strings."""
         try:
-            with ExifToolHelper() as et:
+            with ExifToolHelper(executable=self.exiftool_path) as et:
                 metadata = et.get_tags(str(src), tags=tag_names)
                 result = {}
                 if metadata:
@@ -365,7 +368,7 @@ class MetadataHandler:
             return
             
         try:
-            with ExifToolHelper() as et:
+            with ExifToolHelper(executable=self.exiftool_path) as et:
                 et.set_tags(str(src), tags=tags, params=["-overwrite_original"])
             print(f"Successfully updated tags for {src}")
         except Exception as e:
