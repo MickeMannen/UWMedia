@@ -51,6 +51,12 @@ from utils.hud_designer import (
     skin_pixel_size,
 )
 from utils.layouts import list_layouts, user_layouts_dir
+from utils.resource_paths import (
+    bundled_bin_dir,
+    current_manifest_platform_key,
+    get_binary_manifest,
+    licenses_dir,
+)
 from utils.tool_paths import (
     get_exiftool_path,
     get_ffmpeg_path,
@@ -95,19 +101,31 @@ GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
 YOUTUBE_URL = "https://www.youtube.com/@MickeMannen8"
 
 ABOUT_DEPENDENCIES = [
-    "Toga (GUI framework)",
     "Briefcase (packaging)",
-    "FFmpeg (external - video processing)",
-    "ExifTool (external - metadata)",
-    "PyExifTool",
-    "OpenCV (opencv-python)",
-    "NumPy",
-    "Pydantic",
-    "lxml",
-    "Pillow",
-    "PyYAML",
-    "tqdm",
     "garmin-fit-sdk",
+]
+
+# FFmpeg/ExifTool get their own "Third-Party Licenses" card instead of a
+# plain name in ABOUT_DEPENDENCIES, since a packaged build bundles them and
+# their GPL/Artistic license terms need real attribution - not just "used
+# by this app". (name, BINARY_MANIFEST.json key, license text filename,
+# short license description, the utils.tool_paths getter that resolves
+# which actual binary is in use right now)
+ABOUT_THIRD_PARTY_LICENSES = [
+    (
+        "FFmpeg",
+        "ffmpeg",
+        "FFMPEG_LICENSE.txt",
+        "GPL v3 or later (bundled build includes libx264/libx265 for HEVC)",
+        get_ffmpeg_path,
+    ),
+    (
+        "ExifTool",
+        "exiftool",
+        "EXIFTOOL_LICENSE.txt",
+        "GPL / Perl Artistic License (dual - upstream's choice of terms)",
+        get_exiftool_path,
+    ),
 ]
 
 # Order matches cli_main.py's `--convert` choices/resolutions dict, highest first.
@@ -2720,6 +2738,62 @@ class UWMediaApp(toga.App):
         )
         return section
 
+    def _bundled_dependency_info(self, display_name, manifest_key, license_filename, get_path_fn):
+        """
+        Returns (version_line, license_path) for one dependency, based on
+        what's *actually* resolved right now (get_path_fn - e.g.
+        get_ffmpeg_path), not just whether a bundled copy exists - a user
+        override in Advanced settings, or a bundled binary that failed its
+        validity check, means "bundled" and "in use" aren't the same thing.
+
+        version_line is one of:
+          "FFmpeg n8.1.2 — packaged with this app"    (resolved path is the
+                                                        bundled copy)
+          "FFmpeg — using local install (/path/to/it)" (resolved to
+                                                        something else - a
+                                                        system/PATH install,
+                                                        or a user override)
+          "FFmpeg — not found"                         (get_path_fn() is None)
+
+        license_path is the bundled license text's Path, but only when
+        actually running on the bundled copy - a local install may be a
+        completely different build (e.g. a distro's LGPL-only ffmpeg with
+        no libx264/libx265), so the bundled GPL notice shouldn't be implied
+        for it. None means no "View license text" button should be shown.
+        """
+        resolved_path = get_path_fn()
+        bin_dir = bundled_bin_dir(__file__)
+        is_bundled = bool(resolved_path and bin_dir and resolved_path.parent == bin_dir)
+
+        license_path = None
+        if is_bundled:
+            lic_dir = licenses_dir(__file__)
+            candidate = lic_dir / license_filename if lic_dir else None
+            if candidate and candidate.exists():
+                license_path = candidate
+
+        version = None
+        runtime_note = ""
+        if is_bundled:
+            manifest = get_binary_manifest(__file__)
+            plat_key = current_manifest_platform_key()
+            if manifest and plat_key:
+                entry = manifest.get(manifest_key, {}).get("platforms", {}).get(plat_key)
+                if entry:
+                    version = entry.get("version")
+                    if "system perl" in entry.get("runtime_requirement", ""):
+                        runtime_note = ", via system Perl"
+
+        if is_bundled:
+            version_part = f" {version}" if version else ""
+            line = f"{display_name}{version_part} — packaged with this app{runtime_note}"
+        elif resolved_path:
+            line = f"{display_name} — using local install ({resolved_path})"
+        else:
+            line = f"{display_name} — not found"
+
+        return line, license_path
+
     def _build_about_section(self):
         app_version = self.version or "dev"
 
@@ -2759,6 +2833,39 @@ class UWMediaApp(toga.App):
                     "repository for the full text.",
                     style=Pack(color=THEME["text_muted"], margin_top=5),
                 ),
+            )
+        )
+
+        licenses_box = toga.Box(style=Pack(direction=COLUMN))
+        for display_name, manifest_key, license_filename, license_desc, get_path_fn in ABOUT_THIRD_PARTY_LICENSES:
+            version_line, license_path = self._bundled_dependency_info(
+                display_name, manifest_key, license_filename, get_path_fn
+            )
+            row = toga.Box(style=Pack(direction=COLUMN, margin_top=8))
+            row.add(toga.Label(version_line, style=Pack(font_weight="bold")))
+            if license_path:
+                # Only known/shown when actually running the bundled build -
+                # a local install could be a differently-licensed build.
+                row.add(
+                    toga.Label(license_desc, style=Pack(color=THEME["text_muted"], margin_top=2))
+                )
+                row.add(
+                    toga.Button(
+                        "View license text",
+                        on_press=lambda w, p=license_path: webbrowser.open(f"file://{p}"),
+                        style=Pack(margin_top=4, width=160),
+                    )
+                )
+            licenses_box.add(row)
+        section.add(
+            self._card(
+                "Third-Party Licenses",
+                toga.Label(
+                    "UWMedia invokes these as separate external programs, not linked "
+                    "libraries - this does not affect UWMedia's own MIT license above.",
+                    style=Pack(color=THEME["text_muted"], margin_bottom=4),
+                ),
+                licenses_box,
             )
         )
 

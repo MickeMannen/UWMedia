@@ -192,3 +192,14 @@ Thumbs.db
 
 /config.yaml
 /.antigravitycli/a6153207-ee6c-429b-944f-f5929585b25d.json
+/solve_dependencies.md
+
+# Vendored ffmpeg/ffprobe/exiftool binaries - fetched by
+# scripts/fetch_vendored_binaries.py (from the "deps" GitHub release) right
+# before a Briefcase build, never committed. See solve_dependencies.md.
+/resources/bin_macos/*
+/resources/bin_windows/*
+/resources/bin_linux/*
+!/resources/bin_macos/README.md
+!/resources/bin_windows/README.md
+!/resources/bin_linux/README.md

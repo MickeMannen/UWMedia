@@ -1,0 +1,70 @@
+{
+  "_comment": "Single source of truth for vendored ffmpeg/ffprobe/exiftool binaries: CI verifies sha256 against this file when fetching from the deps release, and the app's About screen reads the version fields. Regenerate by re-running the one-time vendoring steps in solve_dependencies.md.",
+  "deps_release_tag": "deps-2026.09",
+  "deps_release_url": "https://github.com/MickeMannen/UWMedia/releases/tag/deps-2026.09",
+  "vendored_at": "2026-09-08",
+  "ffmpeg": {
+    "license": "GPL-3.0-or-later (built with --enable-gpl --enable-version3, libx264 + libx265)",
+    "platforms": {
+      "macos": {
+        "version": "n8.1.2",
+        "source": "https://github.com/shaka-project/static-ffmpeg-binaries/releases/tag/n8.1.2-1",
+        "asset": "ffmpeg-macos-arm64",
+        "sha256": "e7b9fcd97f95f333512d6e8b8ac24d9dbc08f189f36047695499bd7b57214b22",
+        "ffprobe_asset": "ffprobe-macos-arm64",
+        "ffprobe_sha256": "ded4c698b8ff38d0bc1fd30fcc5e768dc46f58bc15a8dfd61f98615ba49cde5c",
+        "hevc_verified": true,
+        "hevc_verify_note": "ffmpeg -encoders shows libx265 and hevc_videotoolbox; ffmpeg -codecs shows hevc decode+encode"
+      },
+      "windows": {
+        "version": "9.0.1-full_build",
+        "source": "https://www.gyan.dev/ffmpeg/builds/",
+        "asset": "ffmpeg-windows-amd64.exe",
+        "sha256": "57c56e369d5b4873b4d93fc1a1d833cb7cd8bc9325c14b05c34ce60b22842d8a",
+        "ffprobe_asset": "ffprobe-windows-amd64.exe",
+        "ffprobe_sha256": "afe05347caaabe479b3c4eae71992b6ec1e11c57266a1d665deb0f9fe9847208",
+        "hevc_verified": true,
+        "hevc_verify_note": "README.txt encoder list includes libx265"
+      },
+      "linux": {
+        "version": "7.0.2",
+        "source": "https://johnvansickle.com/ffmpeg/",
+        "asset": "ffmpeg-linux-amd64",
+        "sha256": "e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99",
+        "ffprobe_asset": "ffprobe-linux-amd64",
+        "ffprobe_sha256": "4f231a1960d83e403d08f7971e271707bec278a9ae18e21b8b5b03186668450d",
+        "hevc_verified": true,
+        "hevc_verify_note": "readme.txt lists libx264 0.164.3191 and libx265 3.5+1-f0c1022b6"
+      }
+    }
+  },
+  "exiftool": {
+    "license": "Perl Artistic License 1.0 / GPL (dual, upstream's choice of terms); UWMedia redistributes under GPL v3 for the Windows package (as shipped by upstream) and under the same dual terms for the macOS/Linux script",
+    "platforms": {
+      "macos": {
+        "version": "13.59",
+        "source": "https://exiftool.org/",
+        "asset": "exiftool-unix-13.59.tar.gz",
+        "sha256": "668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a",
+        "runtime_requirement": "system perl (present by default on macOS)",
+        "contents": "exiftool script + lib/Image/ExifTool module tree, unmodified upstream"
+      },
+      "windows": {
+        "version": "13.59",
+        "source": "https://exiftool.org/",
+        "asset": "exiftool-windows-13.59.zip",
+        "sha256": "44b512b25af500724ba579d0a53c8fc5851628b692dd5e5d94ae4a15c2cba9ec",
+        "runtime_requirement": "none - self-contained (ships its own bundled Perl interpreter + DLLs in exiftool_files/, not system Perl)",
+        "contents": "exiftool(-k).exe launcher + exiftool_files/ (bundled perl.exe, perl532.dll, exiftool.pl, lib/), unmodified upstream official Windows package"
+      },
+      "linux": {
+        "version": "13.59",
+        "source": "https://exiftool.org/",
+        "asset": "exiftool-unix-13.59.tar.gz",
+        "sha256": "668ea3acececb7235fbd0f4900e72d5f12c9b07e5c778fd36cb1e9b5828fd65a",
+        "runtime_requirement": "system perl (present by default on virtually every Linux distro)",
+        "contents": "exiftool script + lib/Image/ExifTool module tree, unmodified upstream"
+      }
+    }
+  }
+}

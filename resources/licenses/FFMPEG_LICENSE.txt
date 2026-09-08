@@ -1,0 +1,34 @@
+FFmpeg
+https://ffmpeg.org/
+
+UWMedia bundles prebuilt, unmodified static FFmpeg/FFprobe binaries. As
+confirmed by running `ffmpeg -L` against each bundled build, all three
+platform builds are compiled with --enable-gpl --enable-version3 and
+include the GPL-licensed libx264 and libx265 encoders (needed for H.264/
+HEVC output), which makes the combined binary GNU GPL v3 (or, at your
+option, any later version) rather than FFmpeg's default LGPL.
+
+The full GNU General Public License text is provided alongside this file
+in GPLV3_LICENSE.txt.
+
+Because UWMedia invokes FFmpeg/FFprobe as separate, unmodified external
+programs (a subprocess) rather than linking against them, this does not
+affect the license of UWMedia's own source code (see the top-level
+LICENSE file, MIT) - this is mere aggregation, not a combined/derivative
+work.
+
+Per-platform build versions and provenance (exact source and checksum
+for each binary UWMedia actually ships) are recorded in
+resources/licenses/BINARY_MANIFEST.json:
+
+  - macOS (arm64):   FFmpeg n8.1.2, built by shaka-project/static-ffmpeg-binaries
+                      (github.com/shaka-project/static-ffmpeg-binaries)
+  - Windows (amd64):  FFmpeg 9.0.1, "full" build by gyan.dev
+                      (www.gyan.dev/ffmpeg/builds/)
+  - Linux (amd64):    FFmpeg 7.0.2, static build by johnvansickle.com
+                      (johnvansickle.com/ffmpeg/)
+
+Corresponding source for each exact build is the public FFmpeg project
+source tree at the matching version/tag (e.g. https://github.com/FFmpeg/FFmpeg/releases/tag/n8.1.2
+for the macOS build), plus the third-party build scripts linked above,
+which document the exact configure flags used.

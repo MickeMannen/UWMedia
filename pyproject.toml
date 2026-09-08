@@ -24,6 +24,7 @@ sources = [
     "utils",
     "color.yaml",
     "hud_rules.json",
+    "resources/licenses",
 ]
 requires = [
     "pydantic>=2.0.0",
@@ -56,6 +57,9 @@ requires = ["toga"]
 [tool.briefcase.app.uwmedia.macOS]
 universal_build = false
 requires = ["toga-cocoa"]
+# Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
+# and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
+sources = ["resources/bin_macos"]
 # The bundled Python framework ships a config-*-darwin directory with static
 # build artifacts (python.o, etc.) only needed to compile C extensions from
 # source. They're unsigned Mach-O objects that Apple's notary service
@@ -90,11 +94,17 @@ requires = ["toga"]
 [tool.briefcase.app.uwmedia-terminal.macOS]
 universal_build = false
 requires = ["toga-cocoa"]
+# Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
+# and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
+sources = ["resources/bin_macos"]
 cleanup_paths = [
     "UWMedia-Terminal.app/Contents/Frameworks/Python.framework/Versions/*/lib/python*/config-*-darwin",
 ]
 
 [tool.briefcase.app.uwmedia-terminal.windows]
+# Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
+# and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
+sources = ["resources/bin_windows"]
 # Windows has only this one build (no separate GUI-only app like macOS), so
 # there's nothing to disambiguate "Terminal" from - keep the plain name.
 formal_name = "UWMedia"
@@ -128,6 +138,9 @@ install_launcher = true
 # Same reasoning as Windows above.
 formal_name = "UWMedia"
 requires = ["toga-gtk"]
+# Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
+# and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
+sources = ["resources/bin_linux"]
 
 [tool.briefcase.app.uwmedia-terminal.linux.system.debian]
 system_requires = [

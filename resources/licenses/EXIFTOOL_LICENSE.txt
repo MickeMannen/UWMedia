@@ -1,0 +1,27 @@
+ExifTool
+Copyright 2003-2026, Phil Harvey
+https://exiftool.org/
+
+This is free software; you can redistribute it and/or modify it under the
+same terms as Perl itself, i.e. your choice of:
+
+  (a) the Perl "Artistic License" (version 1), or
+  (b) the GNU General Public License, as published by the Free Software
+      Foundation.
+
+UWMedia bundles the unmodified upstream ExifTool distribution (version
+13.59) and elects to redistribute it under option (b) above. The full
+GNU General Public License text is provided alongside this file in
+GPLV3_LICENSE.txt (UWMedia's bundled ExifTool package for Windows already
+ships under GPL v3 from upstream; the same license is used here for
+consistency across platforms).
+
+Because UWMedia invokes ExifTool as a separate, unmodified external
+program (a subprocess) rather than linking against it, this does not
+affect the license of UWMedia's own source code (see the top-level
+LICENSE file, MIT).
+
+Source: the unmodified ExifTool distribution for the exact version
+bundled is available from https://exiftool.org/ and is also mirrored,
+together with its SHA-256 checksum, on this project's own "deps" release:
+see resources/licenses/BINARY_MANIFEST.json for the exact URL and hash.

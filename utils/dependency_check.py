@@ -7,19 +7,43 @@ import multiprocessing
 from pathlib import Path
 from typing import Dict, List, Optional
 
-def _is_valid_executable(cmd: List[str]) -> bool:
+from utils.resource_paths import bundled_bin_dir
+
+def _is_valid_executable(cmd: List[str], timeout: float = 3) -> bool:
     """Runs command with -version or -ver to test if executable works."""
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return res.returncode == 0
     except Exception:
         return False
 
 def _find_tool(tool_name: str, system: str, known_ffmpeg_dir: Optional[Path] = None) -> Optional[Path]:
-    """Finds an executable tool in PATH or common OS installation paths."""
+    """Finds an executable tool, preferring a bundled copy over PATH/OS installs."""
     exec_name = f"{tool_name}.exe" if system == "Windows" else tool_name
-    
-    # 1. Check PATH
+
+    # 1. Prefer the bundled copy from a Briefcase-packaged build, if present.
+    # This guarantees the exact HEVC-capable ffmpeg (and matching exiftool)
+    # this app ships with is what actually gets used, rather than whatever
+    # unrelated version a user happens to already have on PATH. Absent in a
+    # source checkout, in which case this is a no-op and resolution falls
+    # through to PATH/OS installs exactly as it always has.
+    bin_dir = bundled_bin_dir(__file__)
+    if bin_dir:
+        candidate = bin_dir / exec_name
+        if candidate.exists():
+            cmd = [str(candidate), "-ver" if tool_name == "exiftool" else "-version"]
+            # Measured directly: a freshly-installed, never-before-run copy
+            # of a bundled macOS binary can take ~1s for its first launch
+            # (Gatekeeper/XProtect's one-time scan) vs ~15ms once macOS has
+            # seen it - roughly 60x, and that's on an otherwise-idle
+            # machine. A fresh install is exactly when this first-run cost
+            # is paid, so give it real headroom rather than risk silently
+            # falling back to whatever's on PATH (or failing outright) the
+            # first time the app runs after install/update.
+            if _is_valid_executable(cmd, timeout=15):
+                return candidate
+
+    # 2. Check PATH
     found = shutil.which(exec_name)
     if found:
         p = Path(found)
@@ -27,14 +51,14 @@ def _find_tool(tool_name: str, system: str, known_ffmpeg_dir: Optional[Path] = N
         if _is_valid_executable(cmd):
             return p
 
-    # 2. Check known ffmpeg dir if checking ffprobe
+    # 3. Check known ffmpeg dir if checking ffprobe
     if tool_name == "ffprobe" and known_ffmpeg_dir:
         candidate = known_ffmpeg_dir / exec_name
         if candidate.exists():
             if _is_valid_executable([str(candidate), "-version"]):
                 return candidate
 
-    # 3. Check OS specific fallback paths
+    # 4. Check OS specific fallback paths
     search_dirs: List[Path] = []
     home = Path.home()
     
