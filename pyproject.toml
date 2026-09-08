@@ -51,7 +51,20 @@ Garmin, Subsurface, or Shearwater dive logs. This is the GUI-only build,
 with a color-tuning editor, EXIF/QuickTime tag editor, and a HUD layout
 designer. For scripted/batch command-line use, see "UWMedia-Terminal".
 """
-sources = ["uwmedia"]
+# cli_main.py is bundled here too, even though this build has no
+# user-facing CLI (no console_app, no PATH symlink/terminal command,
+# unlike uwmedia-terminal) - the GUI's own Process/Convertion "Run" button
+# relaunches this app's executable with CLI args (see app.py's
+# build_command()/on_run()) so processing runs in a separate, killable
+# subprocess with streamed log output instead of blocking the UI thread.
+# uwmedia/__main__.py's `len(sys.argv) > 1` branch imports cli_main to
+# handle that relaunch, so without it here the Run button would crash
+# with "ModuleNotFoundError: No module named 'cli_main'" on every
+# packaged install of this app (dev/source runs never hit this, since
+# cli_main.py just sits in the checkout either way). cli_main.py only
+# needs modules/packages already in the shared sources/requires above -
+# it doesn't need uwmedia_terminal.
+sources = ["uwmedia", "cli_main.py"]
 requires = ["toga"]
 
 [tool.briefcase.app.uwmedia.macOS]
