@@ -7,6 +7,6 @@ opencv-python
 toga
 pyexiftool
 tqdm
-briefcase
+briefcase==0.4.4
 PyYAML
 Pillow
