@@ -92,22 +92,30 @@ jobs:
           # system python3 (no bundled/support-package Python like the other
           # platforms use), so this must track ubuntu-latest's system Python
           # (currently 3.12 on the 24.04 image) or Briefcase refuses to build.
+          # "app" is the real Briefcase app key (-a flag, artifact naming,
+          # etc.) and must stay "uwmedia-terminal" for linux/windows - that's
+          # the only app briefcase actually builds for those platforms. But
+          # since neither platform has a separate plain "uwmedia" build to
+          # distinguish it from (unlike macOS, which builds both apps),
+          # showing "-terminal" in the job name is just confusing noise -
+          # "display_app" is what the job `name:` uses instead, purely
+          # cosmetic, and never passed to briefcase.
           if [ "$BUILD_LINUX" = "true" ]; then
-            ENTRIES+=('{"os":"ubuntu-latest","platform":"linux","format":"system","python-version":"3.12","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"ubuntu-latest","platform":"linux","format":"system","python-version":"3.12","app":"uwmedia-terminal","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
           fi
 
           if [ "$BUILD_WINDOWS" = "true" ]; then
-            ENTRIES+=('{"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
           fi
 
           if [ "$BUILD_MACOS_UNSIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
           fi
 
           if [ "$BUILD_MACOS_SIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
+            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
           fi
 
           if [ ${#ENTRIES[@]} -eq 0 ]; then
@@ -120,7 +128,7 @@ jobs:
 
   build:
     needs: prepare
-    name: Build (${{ matrix.platform }} - ${{ matrix.app }}${{ matrix.sign_macos && ', signed' || '' }})
+    name: Build (${{ matrix.platform }} - ${{ matrix.display_app }}${{ matrix.sign_macos && ', signed' || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

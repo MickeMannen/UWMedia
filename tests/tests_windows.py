@@ -154,7 +154,7 @@ def test_windows_convert_resolution(tmp_path):
     res = subprocess.run(cmd, capture_output=True, text=True)
     assert res.returncode == 0, f"Resolution conversion failed: {res.stderr}"
     
-    expected_file = out_subfolder / f"{short_vid.stem}_1080p{short_vid.suffix.lower()}"
+    expected_file = out_subfolder / f"{short_vid.stem} 1080p{short_vid.suffix.lower()}"
     assert expected_file.exists(), f"Converted file missing: {expected_file}"
 
 

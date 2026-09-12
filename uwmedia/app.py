@@ -3,6 +3,8 @@ import json
 import os
 import re
 import shutil
+import signal
+import subprocess
 import sys
 import tempfile
 import urllib.request
@@ -136,6 +138,14 @@ CONVERT_RESOLUTIONS = [
     ("480p", 854, 480),
     ("360p", 640, 360),
 ]
+# Device-size metaphor (bigger screen = higher resolution) so the toggles read
+# at a glance instead of as a wall of identical switches.
+CONVERT_RESOLUTION_ICONS = {
+    "1080p": "🖥️",
+    "720p": "💻",
+    "480p": "📱",
+    "360p": "⌚",
+}
 CONVERT_RESOLUTION_NAME_RE = re.compile(r"(?i)[ _](4k|2160p|1080p|720p|480p|360p)")
 
 TUNING_PREVIEW_MAX_DIM = 600
@@ -423,17 +433,22 @@ class UWMediaApp(toga.App):
 
         self.convert_resolution_switches = {}
         for res_name, _w, _h in CONVERT_RESOLUTIONS:
-            switch = toga.Switch(res_name, on_change=self.on_convert_resolution_toggle)
+            icon = CONVERT_RESOLUTION_ICONS.get(res_name, "")
+            switch = toga.Switch(
+                f"{icon}  {res_name}" if icon else res_name,
+                on_change=self.on_convert_resolution_toggle,
+                style=Pack(margin_bottom=4, font_size=13),
+            )
             self.convert_resolution_switches[res_name] = switch
 
         self.convert_output_preview = toga.MultilineTextInput(
-            readonly=True, style=Pack(flex=1, height=100)
+            readonly=True, style=Pack(flex=1, height=60)
         )
         self.convert_run_button = toga.Button(
             "Start",
             on_press=self.on_run,
             style=Pack(
-                margin=(20, 16, 24, 16),
+                margin=(8, 16, 12, 16),
                 height=44,
                 font_size=15,
                 font_weight="bold",
@@ -794,9 +809,9 @@ class UWMediaApp(toga.App):
     def _convert_output_filename(self, source_path: Path, res_name: str) -> str:
         stem = source_path.stem
         if CONVERT_RESOLUTION_NAME_RE.search(stem):
-            new_stem = CONVERT_RESOLUTION_NAME_RE.sub(f"_{res_name}", stem)
+            new_stem = CONVERT_RESOLUTION_NAME_RE.sub(f" {res_name}", stem)
         else:
-            new_stem = f"{stem}_{res_name}"
+            new_stem = f"{stem} {res_name}"
         return f"{new_stem}{source_path.suffix.lower()}"
 
     def _refresh_convert_output_preview(self):
@@ -909,13 +924,14 @@ class UWMediaApp(toga.App):
         topbar.add(self.section_title_label)
         return topbar
 
-    def _card(self, title, *widgets):
+    def _card(self, title, *widgets, compact=False):
         # No filled background here: native controls (TextInput/Switch/
         # Selection) don't reliably take Toga's background/color overrides
         # on macOS, so a card fill would fight the system's light/dark
         # rendering of those controls. Cards are grouped instead with an
         # accent-colored header and generous spacing.
-        card = toga.Box(style=Pack(direction=COLUMN, margin=(0, 16, 24, 16)))
+        bottom_margin = 12 if compact else 24
+        card = toga.Box(style=Pack(direction=COLUMN, margin=(0, 16, bottom_margin, 16)))
         card.add(
             toga.Label(
                 title,
@@ -970,27 +986,21 @@ class UWMediaApp(toga.App):
         box.add(caption_label)
         return value_label, box
 
-    def _build_batch_progress_fields(self):
-        self.batch_progress_done = 0
-        self.batch_progress_total = 0
-        self.batch_progress_failed = 0
-        self.batch_progress_skipped = 0
-
-        self.progress_canvas = toga.Canvas(
+    def _build_progress_widgets(self, noun="files"):
+        # Process and Convertion each run their own subprocess and need their
+        # own progress display - Toga widgets can only live under one parent,
+        # so each gets a fresh set of widgets rather than sharing progress_box.
+        canvas = toga.Canvas(
             style=Pack(height=PROGRESS_BAR_HEIGHT, width=PROGRESS_BAR_WIDTH, margin_bottom=12)
         )
-        self.progress_current_file_label = toga.Label(
-            "No batch running", style=Pack(color=THEME["text_muted"])
-        )
+        current_file_label = toga.Label("No batch running", style=Pack(color=THEME["text_muted"]))
 
-        self.progress_done_value, done_chip = self._build_progress_stat_chip("Done", "#22C55E")
-        self.progress_remaining_value, remaining_chip = self._build_progress_stat_chip(
+        done_value, done_chip = self._build_progress_stat_chip("Done", "#22C55E")
+        remaining_value, remaining_chip = self._build_progress_stat_chip(
             "Remaining", THEME["nav_active_bg"]
         )
-        self.progress_failed_value, failed_chip = self._build_progress_stat_chip("Failed", "#EF4444")
-        self.progress_total_value, total_chip = self._build_progress_stat_chip(
-            "Total", THEME["sidebar_text"]
-        )
+        failed_value, failed_chip = self._build_progress_stat_chip("Failed", "#EF4444")
+        total_value, total_chip = self._build_progress_stat_chip("Total", THEME["sidebar_text"])
 
         stats_row = toga.Box(style=Pack(direction=ROW, margin_bottom=10))
         stats_row.add(done_chip)
@@ -998,52 +1008,77 @@ class UWMediaApp(toga.App):
         stats_row.add(failed_chip)
         stats_row.add(total_chip)
 
-        self.progress_box = toga.Box(style=Pack(direction=COLUMN))
-        self.progress_box.add(self.progress_canvas)
-        self.progress_box.add(stats_row)
-        self.progress_box.add(self.progress_current_file_label)
+        box = toga.Box(style=Pack(direction=COLUMN))
+        box.add(canvas)
+        box.add(stats_row)
+        box.add(current_file_label)
 
-        self._redraw_progress_bar()
+        return {
+            "box": box,
+            "canvas": canvas,
+            "current_file_label": current_file_label,
+            "done_value": done_value,
+            "remaining_value": remaining_value,
+            "failed_value": failed_value,
+            "total_value": total_value,
+            "noun": noun,
+            "done": 0,
+            "total": 0,
+            "failed": 0,
+            "skipped": 0,
+        }
 
-    def _reset_batch_progress(self):
-        self.batch_progress_done = 0
-        self.batch_progress_total = 0
-        self.batch_progress_failed = 0
-        self.batch_progress_skipped = 0
-        self.progress_current_file_label.text = "Starting…"
-        self._update_progress_display()
+    def _build_batch_progress_fields(self):
+        self.progress = {
+            "process": self._build_progress_widgets("files"),
+            "convert": self._build_progress_widgets("outputs"),
+        }
+        self._redraw_progress_bar("process")
+        self._redraw_progress_bar("convert")
 
-    def _handle_progress_line(self, line):
+    def _reset_batch_progress(self, which):
+        state = self.progress[which]
+        state["done"] = 0
+        state["total"] = 0
+        state["failed"] = 0
+        state["skipped"] = 0
+        state["current_file_label"].text = "Starting…"
+        self._update_progress_display(which)
+
+    def _handle_progress_line(self, which, line):
         match = PROGRESS_LINE_RE.search(line.strip())
         if not match:
             return False
+        state = self.progress[which]
         done, total, status, filename = match.groups()
-        self.batch_progress_done = int(done)
-        self.batch_progress_total = int(total)
+        state["done"] = int(done)
+        state["total"] = int(total)
         if status == "error":
-            self.batch_progress_failed += 1
+            state["failed"] += 1
         elif status == "skipped":
-            self.batch_progress_skipped += 1
+            state["skipped"] += 1
         if status == "start":
-            self.progress_current_file_label.text = f"Processing 0 of {total} files…"
-        elif self.batch_progress_done >= self.batch_progress_total:
-            self.progress_current_file_label.text = f"Finished — last file: {filename}"
+            state["current_file_label"].text = f"Processing 0 of {total} {state['noun']}…"
+        elif state["done"] >= state["total"]:
+            state["current_file_label"].text = f"Finished — last file: {filename}"
         else:
-            self.progress_current_file_label.text = f"Processing: {filename}"
-        self._update_progress_display()
+            state["current_file_label"].text = f"Processing: {filename}"
+        self._update_progress_display(which)
         return True
 
-    def _update_progress_display(self):
-        total = self.batch_progress_total
-        done = min(self.batch_progress_done, total) if total else 0
+    def _update_progress_display(self, which):
+        state = self.progress[which]
+        total = state["total"]
+        done = min(state["done"], total) if total else 0
         remaining = max(total - done, 0)
-        self.progress_done_value.text = str(done)
-        self.progress_remaining_value.text = str(remaining)
-        self.progress_failed_value.text = str(self.batch_progress_failed)
-        self.progress_total_value.text = str(total)
-        self._redraw_progress_bar()
+        state["done_value"].text = str(done)
+        state["remaining_value"].text = str(remaining)
+        state["failed_value"].text = str(state["failed"])
+        state["total_value"].text = str(total)
+        self._redraw_progress_bar(which)
 
-    def _redraw_progress_bar(self):
+    def _redraw_progress_bar(self, which):
+        state = self.progress[which]
         width, height = PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT
         img = PILImage.new("RGB", (width, height), THEME["sidebar_bg"])
         draw = ImageDraw.Draw(img)
@@ -1053,12 +1088,12 @@ class UWMediaApp(toga.App):
             [0, 0, width - 1, height - 1], radius=radius, fill="#111827", outline="#374151", width=1
         )
 
-        total = self.batch_progress_total
-        done = min(self.batch_progress_done, total) if total else 0
+        total = state["total"]
+        done = min(state["done"], total) if total else 0
         frac = (done / total) if total else 0.0
         fill_width = int((width - 4) * frac)
         if fill_width > 4:
-            fill_color = "#EF4444" if self.batch_progress_failed else THEME["nav_active_bg"]
+            fill_color = "#EF4444" if state["failed"] else THEME["nav_active_bg"]
             fill_radius = min(radius - 2, fill_width / 2, (height - 5) / 2)
             draw.rounded_rectangle(
                 [2, 2, 2 + fill_width, height - 3], radius=fill_radius, fill=fill_color
@@ -1075,7 +1110,7 @@ class UWMediaApp(toga.App):
             font=font,
         )
 
-        canvas = self.progress_canvas
+        canvas = state["canvas"]
         canvas.root_state.drawing_actions.clear()
         canvas.draw_image(toga.Image(img), 0, 0, width=width, height=height)
         canvas.redraw()
@@ -1108,6 +1143,7 @@ class UWMediaApp(toga.App):
                     toga.Button("Browse", on_press=self.on_choose_convert_source, style=Pack(margin_left=5)),
                 ),
                 self.convert_source_resolution_label,
+                compact=True,
             )
         )
         section.add(
@@ -1118,6 +1154,7 @@ class UWMediaApp(toga.App):
                     "Resolutions higher than the source are disabled - upscaling isn't supported.",
                     style=Pack(color=THEME["text_muted"], margin_top=5, font_size=10),
                 ),
+                compact=True,
             )
         )
         section.add(
@@ -1130,9 +1167,11 @@ class UWMediaApp(toga.App):
                 ),
                 toga.Label("Output filename(s):", style=Pack(margin_top=8, font_weight="bold")),
                 self.convert_output_preview,
+                compact=True,
             )
         )
         section.add(self.convert_run_button)
+        section.add(self._card("Progress", self.progress["convert"]["box"], compact=True))
         return section
 
     def _build_process_section(self):
@@ -1190,7 +1229,7 @@ class UWMediaApp(toga.App):
         )
         section.add(self.metadata_card)
         section.add(self.run_button)
-        section.add(self._card("Progress", self.progress_box))
+        section.add(self._card("Progress", self.progress["process"]["box"]))
         return section
 
     def _build_color_tuning_section(self):
@@ -3070,19 +3109,36 @@ class UWMediaApp(toga.App):
         except Exception:
             pass
 
+    def _terminate_process_tree(self, process):
+        # process is `python -m uwmedia` (or the packaged launcher), which
+        # itself shells out to ffmpeg/exiftool - plain terminate() only kills
+        # that outer process, leaving ffmpeg running as an orphan (with our
+        # stdout pipe closed, so the UI shows "Aborted" while the conversion
+        # actually keeps going in the background). Launched with its own
+        # process group/session below, so killing that group takes the
+        # ffmpeg child down with it.
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
     async def on_run(self, widget):
         if self.is_running:
             self.abort_requested = True
             self._set_status("Aborting…")
             self.append_log("\n[aborting...]\n")
             if self.current_process is not None:
-                try:
-                    self.current_process.terminate()
-                except ProcessLookupError:
-                    pass
+                self._terminate_process_tree(self.current_process)
             return
 
         is_convert = widget is self.convert_run_button
+        which = "convert" if is_convert else "process"
         args = self.build_convert_args() if is_convert else self.build_args()
         if not args:
             self.log_output.value = (
@@ -3124,22 +3180,32 @@ class UWMediaApp(toga.App):
         self.convert_run_button.text = "Abort"
         self._set_status("Running…")
         self.log_output.value = ""
-        self._reset_batch_progress()
+        self._reset_batch_progress(which)
         cmd = self.build_command(args)
         self.append_log(f"$ {' '.join(cmd)}\n\n")
         returncode = None
+        # New process group/session so _terminate_process_tree can kill the
+        # whole tree (uwmedia + the ffmpeg/exiftool children it spawns) on
+        # abort, instead of leaving them running after just the outer
+        # process is signaled.
+        group_kwargs = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if sys.platform == "win32"
+            else {"start_new_session": True}
+        )
         try:
             self.current_process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                **group_kwargs,
             )
             while True:
                 line = await self.current_process.stdout.readline()
                 if not line:
                     break
                 text = line.decode(errors="replace")
-                if not self._handle_progress_line(text):
+                if not self._handle_progress_line(which, text):
                     self.append_log(text)
             await self.current_process.wait()
             returncode = self.current_process.returncode

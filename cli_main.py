@@ -388,40 +388,51 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
     }
 
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
-    
+
+    total = len(args.convert)
+    print(f"UWMEDIA_PROGRESS 0/{total} start -", flush=True)
+    done = 0
     for res_name in args.convert:
         if res_name not in resolutions:
             continue
-            
+
         target_w, target_h, target_bitrate = resolutions[res_name]
         stem = source.stem
         if re.search(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', stem):
-            new_stem = re.sub(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', f"_{res_name}", stem)
+            new_stem = re.sub(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', f" {res_name}", stem)
         else:
-            new_stem = f"{stem}_{res_name}"
+            new_stem = f"{stem} {res_name}"
         filename = f"{new_stem}{source.suffix.lower()}"
         target_path = output_dir / filename
         target_path = get_unique_path(target_path)
-        
+
         print(f"\n--- Converting to {res_name} ({target_bitrate}): {target_path.name} ---")
-        
-        ff.process_video(
-            input_path=source,
-            output_path=target_path,
-            creation_date=creation_date,
-            tz_offset_mins=tz_offset_mins,
-            start_time=args.start_time,
-            end_time=args.end_time,
-            target_resolution=(target_w, target_h),
-            bitrate=target_bitrate
-        )
-        
-        # Post-processing metadata
+
+        status = "done"
         try:
-            forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
-            meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
+            ff.process_video(
+                input_path=source,
+                output_path=target_path,
+                creation_date=creation_date,
+                tz_offset_mins=tz_offset_mins,
+                start_time=args.start_time,
+                end_time=args.end_time,
+                target_resolution=(target_w, target_h),
+                bitrate=target_bitrate
+            )
+
+            # Post-processing metadata
+            try:
+                forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
+                meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
+            except Exception as e:
+                print(f"Warning: Failed to copy metadata: {e}")
         except Exception as e:
-            print(f"Warning: Failed to copy metadata: {e}")
+            status = "error"
+            print(f"Error converting to {res_name}: {e}")
+        finally:
+            done += 1
+            print(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}", flush=True)
 
 def process_single_file(source: Path, output_dir: Path, args, manager, meta_handler, tmp_hud_dir, forced_filename=None):
     """Processes a single video or photo file."""
