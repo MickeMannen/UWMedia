@@ -407,6 +407,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
         target_path = get_unique_path(target_path)
 
         print(f"\n--- Converting to {res_name} ({target_bitrate}): {target_path.name} ---")
+        print(f"UWMEDIA_PROGRESS {done}/{total} converting {target_path.name}", flush=True)
 
         status = "done"
         try:

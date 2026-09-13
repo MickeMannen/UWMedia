@@ -56,23 +56,30 @@ class FfmpegClass:
             bar_fmt = "{desc}: {percentage:3.1f}%|{bar}| {elapsed}<{remaining}"
             pbar = tqdm(total=100, desc="Encoding", disable=not duration, bar_format=bar_fmt)
             last_pct = 0.0
-            
+            last_emitted_pct = 0.0
+
             while True:
                 line = process.stderr.readline()
                 if not line and process.poll() is not None:
                     break
-                
+
                 if line:
                     stderr_content.append(line)
-                
+
                 if duration and "out_time_us=" in line:
                     try:
                         time_us = int(line.split("=")[1])
                         current_secs = time_us / 1000000.0
                         pct = min(100.0, (current_secs / duration) * 100)
-                        
+
                         pbar.update(pct - last_pct)
                         last_pct = pct
+                        # Surfaced to the GUI (uwmedia/app.py parses this to drive
+                        # the Progress bar mid-file) - throttled so a high-fps
+                        # source doesn't flood the pipe with an update per frame.
+                        if pct - last_emitted_pct >= 1.0 or pct >= 100.0:
+                            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                            last_emitted_pct = pct
                     except:
                         pass
             

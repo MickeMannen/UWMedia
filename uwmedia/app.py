@@ -164,6 +164,10 @@ NEW_PROFILE_NAME_MAX_LEN = 10
 # stray tqdm fragment glued to its start. Our own print() always ends the
 # blob with its own newline, so the marker is reliably still at the tail end.
 PROGRESS_LINE_RE = re.compile(r"UWMEDIA_PROGRESS (\d+)/(\d+) (\S+) (.*)$")
+# Sub-progress within the item currently running (ffmpeg's own -progress
+# out_time_us, forwarded by FfmpegClass.run_command) - same no-anchor
+# reasoning as PROGRESS_LINE_RE above.
+FFMPEG_PROGRESS_RE = re.compile(r"UWMEDIA_FFMPEG_PROGRESS (\d+(?:\.\d+)?)")
 PROGRESS_BAR_WIDTH = 720
 PROGRESS_BAR_HEIGHT = 40
 
@@ -990,9 +994,14 @@ class UWMediaApp(toga.App):
         # Process and Convertion each run their own subprocess and need their
         # own progress display - Toga widgets can only live under one parent,
         # so each gets a fresh set of widgets rather than sharing progress_box.
-        canvas = toga.Canvas(
-            style=Pack(height=PROGRESS_BAR_HEIGHT, width=PROGRESS_BAR_WIDTH, margin_bottom=12)
-        )
+        # flex=1 (rather than a fixed width) so the bar stretches to match its
+        # card's width, same as the Start button above it; on_resize below
+        # tracks the actual pixel width so the drawn bar image matches it -
+        # Canvas has no natural size of its own, so its rendered PIL image has
+        # to be told an explicit width or it stays pinned at bar_width's
+        # initial fallback (leaving empty space, or overflowing, when the
+        # window is a different width than that fallback).
+        canvas = toga.Canvas(style=Pack(height=PROGRESS_BAR_HEIGHT, flex=1, margin_bottom=12))
         current_file_label = toga.Label("No batch running", style=Pack(color=THEME["text_muted"]))
 
         done_value, done_chip = self._build_progress_stat_chip("Done", "#22C55E")
@@ -1013,7 +1022,7 @@ class UWMediaApp(toga.App):
         box.add(stats_row)
         box.add(current_file_label)
 
-        return {
+        state = {
             "box": box,
             "canvas": canvas,
             "current_file_label": current_file_label,
@@ -1026,7 +1035,18 @@ class UWMediaApp(toga.App):
             "total": 0,
             "failed": 0,
             "skipped": 0,
+            "current_pct": 0.0,
+            "current_target": None,
+            "bar_width": PROGRESS_BAR_WIDTH,
         }
+
+        def _on_canvas_resize(widget, width=None, height=None, **kwargs):
+            if width:
+                state["bar_width"] = width
+                self._draw_progress_bar(state)
+
+        canvas.on_resize = _on_canvas_resize
+        return state
 
     def _build_batch_progress_fields(self):
         self.progress = {
@@ -1042,29 +1062,54 @@ class UWMediaApp(toga.App):
         state["total"] = 0
         state["failed"] = 0
         state["skipped"] = 0
+        state["current_pct"] = 0.0
+        state["current_target"] = None
         state["current_file_label"].text = "Starting…"
         self._update_progress_display(which)
 
     def _handle_progress_line(self, which, line):
-        match = PROGRESS_LINE_RE.search(line.strip())
-        if not match:
-            return False
-        state = self.progress[which]
-        done, total, status, filename = match.groups()
-        state["done"] = int(done)
-        state["total"] = int(total)
-        if status == "error":
-            state["failed"] += 1
-        elif status == "skipped":
-            state["skipped"] += 1
-        if status == "start":
-            state["current_file_label"].text = f"Processing 0 of {total} {state['noun']}…"
-        elif state["done"] >= state["total"]:
-            state["current_file_label"].text = f"Finished — last file: {filename}"
-        else:
-            state["current_file_label"].text = f"Processing: {filename}"
-        self._update_progress_display(which)
-        return True
+        stripped = line.strip()
+        match = PROGRESS_LINE_RE.search(stripped)
+        if match:
+            state = self.progress[which]
+            done, total, status, filename = match.groups()
+            state["done"] = int(done)
+            state["total"] = int(total)
+            state["current_pct"] = 0.0
+            if status == "error":
+                state["failed"] += 1
+            elif status == "skipped":
+                state["skipped"] += 1
+            if status == "start":
+                state["current_target"] = None
+                state["current_file_label"].text = f"Processing 0 of {total} {state['noun']}…"
+            elif state["done"] >= state["total"]:
+                state["current_target"] = None
+                state["current_file_label"].text = f"Finished — last file: {filename}"
+            else:
+                state["current_target"] = filename
+                state["current_file_label"].text = f"Processing: {filename}"
+            self._update_progress_display(which)
+            return True
+
+        # Sequential-only: skipped for "process", whose multi-file batches run
+        # several ffmpeg encodes in parallel, so a bare percentage can't be
+        # attributed to one file. Convertion always runs one encode at a time.
+        if which == "convert":
+            ffmpeg_match = FFMPEG_PROGRESS_RE.search(stripped)
+            if ffmpeg_match:
+                state = self.progress[which]
+                if state["total"] and state["done"] < state["total"]:
+                    pct = float(ffmpeg_match.group(1))
+                    state["current_pct"] = pct
+                    if state["current_target"]:
+                        state["current_file_label"].text = (
+                            f"Processing: {state['current_target']} — {pct:.0f}%"
+                        )
+                    self._update_progress_display(which)
+                return True
+
+        return False
 
     def _update_progress_display(self, which):
         state = self.progress[which]
@@ -1078,8 +1123,10 @@ class UWMediaApp(toga.App):
         self._redraw_progress_bar(which)
 
     def _redraw_progress_bar(self, which):
-        state = self.progress[which]
-        width, height = PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT
+        self._draw_progress_bar(self.progress[which])
+
+    def _draw_progress_bar(self, state):
+        width, height = state["bar_width"], PROGRESS_BAR_HEIGHT
         img = PILImage.new("RGB", (width, height), THEME["sidebar_bg"])
         draw = ImageDraw.Draw(img)
         radius = height // 2
@@ -1090,7 +1137,8 @@ class UWMediaApp(toga.App):
 
         total = state["total"]
         done = min(state["done"], total) if total else 0
-        frac = (done / total) if total else 0.0
+        sub = (state["current_pct"] / 100.0) if total and done < total else 0.0
+        frac = ((done + sub) / total) if total else 0.0
         fill_width = int((width - 4) * frac)
         if fill_width > 4:
             fill_color = "#EF4444" if state["failed"] else THEME["nav_active_bg"]
