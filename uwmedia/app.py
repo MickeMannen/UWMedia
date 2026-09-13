@@ -38,6 +38,7 @@ from utils.color_profiles import (
     save_user_profile,
     user_color_yaml_path,
 )
+from utils.config import get_config, user_config_yaml_path
 from utils.hud_designer import (
     ANCHORS,
     MARKER_STYLES,
@@ -91,11 +92,26 @@ SECTIONS = (
     "Convertion",
     "Color Tuning",
     "Tag Editor",
+    "Log Viewer",
     "HUD Designer",
     "Advanced",
     "Activity",
     "About",
 )
+
+LOG_VIEWER_EXTENSIONS = {".fit", ".uddf", ".ssrf", ".xml"}
+
+
+def parse_dive_log_file(path):
+    """Parses one dive log file with whichever parser matches its extension."""
+    suffix = path.suffix.lower()
+    if suffix == ".uddf":
+        return UDDFParser().parse(path)
+    if suffix == ".fit":
+        return GarminParser().parse(path)
+    if suffix in (".ssrf", ".xml"):
+        return SubsurfaceParser().parse(path)
+    raise ValueError(f"Unsupported log file type: {suffix}")
 
 AUTHOR_NAME = "Mikael Christersson"
 GITHUB_REPO = "MickeMannen/UWMedia"
@@ -226,6 +242,7 @@ class UWMediaApp(toga.App):
             "Process": self._build_process_section(),
             "Convertion": self._build_convertion_section(),
             "Tag Editor": self._build_tag_editor_section(),
+            "Log Viewer": self._build_log_viewer_section(),
             "Advanced": self._build_advanced_section(),
             "Activity": self._build_activity_section(),
             "About": self._build_about_section(),
@@ -338,12 +355,14 @@ class UWMediaApp(toga.App):
         self.color_dir_input = toga.TextInput(style=field_style, readonly=True)
         self.ffmpeg_path_input = toga.TextInput(style=field_style, readonly=True)
         self.exiftool_path_input = toga.TextInput(style=field_style, readonly=True)
+        self.tank_names_path_input = toga.TextInput(style=field_style, readonly=True)
         self._refresh_location_inputs()
         self._refresh_tool_paths()
 
         self._build_convert_fields(field_style)
         self._build_color_tuning_fields(field_style)
         self._build_tag_editor_fields(field_style)
+        self._build_log_viewer_fields(field_style)
         self._build_hud_designer_fields(field_style)
 
         self.log_output = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, height=200))
@@ -693,6 +712,7 @@ class UWMediaApp(toga.App):
     def _refresh_location_inputs(self):
         self.layouts_dir_input.value = str(user_layouts_dir())
         self.color_dir_input.value = str(user_color_yaml_path().parent)
+        self.tank_names_path_input.value = str(user_config_yaml_path())
 
     async def on_choose_layouts_dir(self, widget):
         path = await self.main_window.dialog(toga.SelectFolderDialog("Select layouts folder"))
@@ -717,6 +737,111 @@ class UWMediaApp(toga.App):
         update_settings(color_profiles_dir=None)
         self._refresh_location_inputs()
         self.color_profile.items = load_color_profiles()
+
+    async def on_edit_tank_names(self, widget):
+        self._show_tank_names_window()
+
+    def _show_tank_names_window(self):
+        mapping = dict(get_config().get_tank_mapping())
+        row_state = {}
+        rows_box = toga.Box(style=Pack(direction=COLUMN))
+
+        def rebuild_rows():
+            rows_box.clear()
+            if not row_state:
+                rows_box.add(
+                    toga.Label(
+                        "No tank sensors yet - scan a logs folder or add one manually below.",
+                        style=Pack(color=THEME["text_muted"]),
+                    )
+                )
+                return
+            for serial in sorted(row_state.keys()):
+
+                def on_remove(w, serial=serial):
+                    del row_state[serial]
+                    rebuild_rows()
+
+                row = toga.Box(style=Pack(direction=ROW, margin_bottom=5, align_items="center"))
+                row.add(toga.Label(serial, style=Pack(width=140)))
+                row.add(row_state[serial])
+                row.add(toga.Button("Remove", on_press=on_remove, style=Pack(margin_left=5)))
+                rows_box.add(row)
+
+        for serial, name in mapping.items():
+            row_state[serial] = toga.TextInput(value=name, style=Pack(flex=1))
+        rebuild_rows()
+
+        status_label = toga.Label("", style=Pack(margin_top=5, color=THEME["text_muted"]))
+        new_serial_input = toga.TextInput(placeholder="Serial number", style=Pack(width=140))
+
+        async def on_scan(w):
+            path = await window.dialog(toga.SelectFolderDialog("Select folder with Garmin .fit logs"))
+            if not path:
+                return
+            folder = Path(path)
+            garmin = GarminParser()
+            found = set()
+            try:
+                for file_path in folder.iterdir():
+                    if file_path.suffix.lower() == ".fit":
+                        found.update(await asyncio.to_thread(garmin.get_unique_tank_serials, file_path))
+            except Exception as e:
+                await window.dialog(toga.ErrorDialog("Error", f"Failed to scan folder: {e}"))
+                return
+            new_serials = [s for s in found if s not in row_state]
+            for serial in new_serials:
+                row_state[serial] = toga.TextInput(value=f"Tank {serial}", style=Pack(flex=1))
+            rebuild_rows()
+            status_label.text = (
+                f"Found {len(found)} sensor(s) in .fit files, added {len(new_serials)} new."
+                if found
+                else "No tank sensors found in that folder."
+            )
+
+        def on_add_manual(w):
+            serial = (new_serial_input.value or "").strip()
+            if not serial or serial in row_state:
+                return
+            row_state[serial] = toga.TextInput(value=f"Tank {serial}", style=Pack(flex=1))
+            new_serial_input.value = ""
+            rebuild_rows()
+
+        async def on_save(w):
+            config = get_config()
+            for serial in list(config.get_tank_mapping().keys()):
+                if serial not in row_state:
+                    config.remove_tank(serial)
+            for serial, entry in row_state.items():
+                config.set_tank_name(serial, (entry.value or "").strip() or f"Tank {serial}")
+            self._refresh_location_inputs()
+            window.close()
+            await self.main_window.dialog(
+                toga.InfoDialog("Saved", f"Sensor names saved to:\n{user_config_yaml_path()}")
+            )
+
+        scroll = toga.ScrollContainer(content=rows_box, style=Pack(flex=1))
+        manual_row = self._row(
+            "Add serial manually",
+            new_serial_input,
+            toga.Button("Add", on_press=on_add_manual, style=Pack(margin_left=5)),
+        )
+        button_row = toga.Box(style=Pack(direction=ROW, margin_top=10))
+        button_row.add(toga.Button("Scan Logs Folder…", on_press=on_scan))
+        button_row.add(toga.Button("Save", on_press=on_save, style=Pack(margin_left=10)))
+
+        box = toga.Box(style=Pack(direction=COLUMN, margin=10, flex=1))
+        box.add(
+            toga.Label('Map Garmin tank sensor serial numbers to friendly names (e.g. "Left", "Micke01").')
+        )
+        box.add(scroll)
+        box.add(manual_row)
+        box.add(status_label)
+        box.add(button_row)
+
+        window = toga.Window(title="Tank Sensor Names", size=(560, 500))
+        window.content = box
+        window.show()
 
     def _refresh_tool_paths(self):
         # Shows the configured override if set, otherwise whatever was
@@ -1676,6 +1801,231 @@ class UWMediaApp(toga.App):
         window = toga.Window(title=f"Metadata Viewer - {file_name}", size=(700, 600))
         window.content = box
         window.show()
+
+    # ------------------------------------------------------------------
+    # Log Viewer (read-only)
+    # ------------------------------------------------------------------
+
+    def _build_log_viewer_fields(self, field_style):
+        self.log_viewer_files = []
+        self.log_viewer_dives = []
+        self.log_viewer_dive_map = {}
+        self.log_viewer_all_rows = []
+
+        self.log_viewer_dir_label = toga.Label(
+            "No directory selected", style=Pack(color=THEME["text_muted"], margin_bottom=8)
+        )
+        self.log_viewer_file_table = toga.Table(
+            columns=[AccessorColumn("File", accessor="name")],
+            on_select=self.on_log_viewer_file_select,
+            style=Pack(flex=1, height=280),
+        )
+
+        self.log_viewer_file_name_label = toga.Label("None", style=Pack(font_weight="bold"))
+        self.log_viewer_dive_select = toga.Selection(
+            items=[], on_change=self.on_log_viewer_dive_change, style=Pack(width=280)
+        )
+
+        self.log_viewer_summary_label = toga.MultilineTextInput(
+            readonly=True, style=Pack(height=140)
+        )
+        self.log_viewer_sensors_label = toga.MultilineTextInput(readonly=True, style=Pack(height=50))
+
+        self.log_viewer_filter_input = toga.TextInput(
+            placeholder="Type to filter waypoints...", on_change=self.on_log_viewer_filter, style=Pack(flex=1)
+        )
+        self.log_viewer_table = toga.Table(
+            columns=[
+                AccessorColumn("Time", accessor="time"),
+                AccessorColumn("Depth (m)", accessor="depth"),
+                AccessorColumn("Temp (°C)", accessor="temp"),
+                AccessorColumn("NDL (s)", accessor="ndl"),
+                AccessorColumn("TTS (s)", accessor="tts"),
+                AccessorColumn("Gas", accessor="gas"),
+                AccessorColumn("Tanks", accessor="tanks"),
+            ],
+            style=Pack(flex=1),
+        )
+        self.log_viewer_status_label = toga.Label("", style=Pack(margin_top=5, color=THEME["text_muted"]))
+
+    def _build_log_viewer_section(self):
+        section = toga.Box(style=Pack(direction=COLUMN, flex=1))
+
+        left = toga.Box(style=Pack(direction=COLUMN, width=260, margin_right=16))
+        left.add(
+            toga.Button(
+                "Select Log Directory", on_press=self.on_log_viewer_select_dir, style=Pack(margin_bottom=8)
+            )
+        )
+        left.add(self.log_viewer_dir_label)
+        left.add(self.log_viewer_file_table)
+
+        right = toga.Box(style=Pack(direction=COLUMN, flex=1))
+
+        file_header = toga.Box(style=Pack(direction=ROW, align_items="center"))
+        file_header.add(self.log_viewer_file_name_label)
+        file_header.add(toga.Box(style=Pack(flex=1)))
+        file_header.add(toga.Label("Dive:", style=Pack(margin_right=5)))
+        file_header.add(self.log_viewer_dive_select)
+        right.add(self._card("Selected file", file_header))
+
+        right.add(self._card("Dive summary", self.log_viewer_summary_label))
+        right.add(
+            self._card(
+                "Tank sensors found",
+                self.log_viewer_sensors_label,
+                toga.Label(
+                    "Use these serial numbers in Advanced → Sensor names to map them to friendly names.",
+                    style=Pack(color=THEME["text_muted"], font_size=10, margin_top=5),
+                ),
+            )
+        )
+
+        filter_row = toga.Box(style=Pack(direction=ROW, margin_bottom=8, align_items="center"))
+        filter_row.add(toga.Label("Filter:", style=Pack(margin_right=5)))
+        filter_row.add(self.log_viewer_filter_input)
+        right.add(filter_row)
+        right.add(self.log_viewer_table)
+        right.add(self.log_viewer_status_label)
+
+        columns = toga.Box(style=Pack(direction=ROW, flex=1))
+        columns.add(left)
+        columns.add(right)
+        section.add(columns)
+        return section
+
+    async def on_log_viewer_select_dir(self, widget):
+        path = await self.main_window.dialog(toga.SelectFolderDialog("Select dive log directory"))
+        if not path:
+            return
+        directory = Path(path)
+        self.log_viewer_dir_label.text = str(directory)
+
+        files = sorted(
+            (f for f in directory.iterdir() if f.is_file() and f.suffix.lower() in LOG_VIEWER_EXTENSIONS),
+            key=lambda f: f.name.lower(),
+        )
+        self.log_viewer_files = files
+        self.log_viewer_file_table.data = [{"name": f.name, "path": str(f)} for f in files]
+        self._log_viewer_clear()
+        if files:
+            await self._display_log_viewer_file(files[0])
+
+    async def on_log_viewer_file_select(self, widget):
+        row = widget.selection
+        if row is None:
+            return
+        await self._display_log_viewer_file(Path(row.path))
+
+    async def _display_log_viewer_file(self, file_path):
+        self.log_viewer_file_name_label.text = file_path.name
+        self.log_viewer_status_label.text = "Loading..."
+        try:
+            dives = await asyncio.to_thread(parse_dive_log_file, file_path)
+        except Exception as e:
+            self._log_viewer_clear()
+            await self.main_window.dialog(
+                toga.ErrorDialog("Error", f"Failed to parse {file_path.name}: {e}")
+            )
+            return
+
+        self.log_viewer_dives = dives
+        if not dives:
+            self._log_viewer_clear()
+            self.log_viewer_status_label.text = "No dives found in this file."
+            return
+
+        labels = [
+            f"Dive {i + 1}: {dive.start_time:%Y-%m-%d %H:%M} ({len(dive.waypoints)} pts)"
+            for i, dive in enumerate(dives)
+        ]
+        self.log_viewer_dive_map = dict(zip(labels, dives))
+        self.log_viewer_dive_select.items = labels
+        self.log_viewer_dive_select.value = labels[0]
+        self._log_viewer_show_dive(dives[0])
+
+    def on_log_viewer_dive_change(self, widget):
+        dive = self.log_viewer_dive_map.get(widget.value)
+        if dive is not None:
+            self._log_viewer_show_dive(dive)
+
+    def _log_viewer_sensor_label(self, key, reverse_map):
+        """Waypoint tank keys are already resolved to the friendly name (see
+        ConfigManager.map_tank_name) - look the raw serial back up so a mapped
+        sensor still shows its ID, not just the name a user gave it."""
+        serial = reverse_map.get(key)
+        return f"{key} ({serial})" if serial and serial != key else key
+
+    def _format_tank_reading(self, key, tank, reverse_map):
+        text = f"{self._log_viewer_sensor_label(key, reverse_map)}: {tank.pressure_bar:.0f} bar"
+        if tank.he_percent:
+            text += f" ({tank.o2_percent:.0f}/{tank.he_percent:.0f})"
+        elif abs(tank.o2_percent - 21.0) > 0.5:
+            text += f" (Nx{tank.o2_percent:.0f})"
+        return text
+
+    def _log_viewer_show_dive(self, dive):
+        lines = [
+            f"Device: {dive.device or 'Unknown'} ({dive.manufactor or 'Unknown'})",
+            f"Start: {dive.start_time:%Y-%m-%d %H:%M:%S}",
+            f"End: {dive.end_time:%Y-%m-%d %H:%M:%S}",
+            f"Duration: {dive.duration // 60}m {dive.duration % 60}s",
+            f"Max depth: {dive.max_depth:.1f} m",
+            f"Waypoints: {len(dive.waypoints)}",
+        ]
+        if dive.start_latitude is not None and dive.start_longitude is not None:
+            lines.append(f"Start GPS: {dive.start_latitude:.5f}, {dive.start_longitude:.5f}")
+        if dive.timezone:
+            lines.append(f"Timezone: {dive.timezone}")
+        self.log_viewer_summary_label.value = "\n".join(lines)
+
+        reverse_map = {name: serial for serial, name in get_config().get_tank_mapping().items()}
+        sensors = sorted({key for wp in dive.waypoints for key in wp.tanks.keys()})
+        sensor_labels = [self._log_viewer_sensor_label(key, reverse_map) for key in sensors]
+        self.log_viewer_sensors_label.value = (
+            ", ".join(sensor_labels) if sensor_labels else "No tank sensor data in this dive."
+        )
+
+        rows = []
+        for wp in dive.waypoints:
+            tanks_text = "; ".join(
+                self._format_tank_reading(key, tank, reverse_map) for key, tank in wp.tanks.items()
+            )
+            rows.append(
+                {
+                    "time": wp.timestamp.strftime("%H:%M:%S"),
+                    "depth": f"{wp.depth:.1f}" if wp.depth is not None else "",
+                    "temp": f"{wp.temp:.1f}" if wp.temp is not None else "",
+                    "ndl": wp.ndl if wp.ndl is not None else "",
+                    "tts": wp.tts if wp.tts is not None else "",
+                    "gas": wp.gasmix,
+                    "tanks": tanks_text,
+                }
+            )
+        self.log_viewer_all_rows = rows
+        self.log_viewer_table.data = rows
+        self.log_viewer_filter_input.value = ""
+        self.log_viewer_status_label.text = f"{len(rows)} waypoints"
+
+    def on_log_viewer_filter(self, widget):
+        text = (widget.value or "").lower()
+        if not text:
+            self.log_viewer_table.data = self.log_viewer_all_rows
+            return
+        self.log_viewer_table.data = [
+            row for row in self.log_viewer_all_rows if any(text in str(v).lower() for v in row.values())
+        ]
+
+    def _log_viewer_clear(self):
+        self.log_viewer_dives = []
+        self.log_viewer_dive_map = {}
+        self.log_viewer_dive_select.items = []
+        self.log_viewer_file_name_label.text = "None"
+        self.log_viewer_summary_label.value = ""
+        self.log_viewer_sensors_label.value = ""
+        self.log_viewer_all_rows = []
+        self.log_viewer_table.data = []
+        self.log_viewer_status_label.text = ""
 
     # ------------------------------------------------------------------
     # HUD Designer
@@ -2777,6 +3127,15 @@ class UWMediaApp(toga.App):
                     "Color profiles folder",
                     self.color_dir_input,
                     self._change_reset_buttons(self.on_choose_color_dir, self.on_reset_color_dir),
+                ),
+            )
+        )
+        section.add(
+            self._card(
+                "Sensor names",
+                self._row("Config file", self.tank_names_path_input, None),
+                toga.Button(
+                    "Edit Tank Sensor Names…", on_press=self.on_edit_tank_names, style=Pack(margin_top=5)
                 ),
             )
         )
