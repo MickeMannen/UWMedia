@@ -199,6 +199,8 @@ uwmedia/**/*_ui.py
 # Overlay template skins are real source data (overlay_rework.md decision
 # Q9) - without them a fresh clone can't render any device template.
 !/overlays/templates/**/*.png
+# README screenshots
+!/media/*.png
 
 
 /config.yaml

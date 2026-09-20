@@ -21,11 +21,11 @@ Example of Photo before and after
 
 ![DSC06641_side_by_side.jpg](media/DSC06641_side_by_side.jpg)
 
-Photo with Telemetry data
+Photo with Telemetry data (old overlay)
 ![DSC06641_color_garmin_overlay.jpg](media/DSC06641_color_garmin_overlay.jpg)
 
 
-## [Example (YouTube)](https://youtu.be/8r8_4H4iOMg)
+## [Example (YouTube)](https://youtu.be/8r8_4H4iOMg) (will be updated)
 
 ## Key Features
 
@@ -36,7 +36,7 @@ Photo with Telemetry data
 - **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration.
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
 - **Dynamic Naming**: Automatically rename files based on the "Date Taken" metadata (`YYYYMMDD_HHMMSS`).
-- **HUD Packaging**: Support for portable HUD designs via `.zip` packages containing layouts and skins, the GUI application makes it possible to edit existing HUD or create your own.
+- **Overlay Templates & Designer**: Built-in overlay templates per dive computer (Garmin x50i/mk3i, Shearwater Perdix 2/3, Petrel, Peregrine, Teric, Tern, generic) with live state badges and colour rules, plus a full designer to modify them or build your own from any background image.
 - **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background, with size automatically adjusted to layout dimensions.
 - **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
@@ -60,7 +60,7 @@ Maybe I should do a Video of the workflow too but sometime in the future.
 ### Setup
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/UWMedia.git
+git clone https://github.com/MickeMannen/UWMedia.git
 cd UWMedia
 
 # Install dependencies
@@ -98,33 +98,55 @@ briefcase package macOS -a uwmedia --adhoc-sign   # ...or just the plain GUI app
 
 ### Graphical User Interface
 
-UWMedia is a single desktop app (built with [PySide6](https://doc.qt.io/qtforpython/)/Qt Quick) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
-
-<p align="center">
-  <img src="media/main.jpg" alt="Process tab" width="800">
-</p>
+UWMedia is a single desktop app (built with [PySide6](https://doc.qt.io/qtforpython/)/Qt Quick) that bundles the CLI's batch-processing controls together with interactive design and tuning tools. Each page is one entry in the sidebar.
 
 ```bash
 python -m uwmedia      # from source
 briefcase dev          # via Briefcase
 ```
 
-- **Process / Advanced / Activity**: the GUI front-end for the CLI options above (source/output, color correction, layout, dive logs, flags, run log).
+- **Color**: batch colour correction. Pick a profile, point it at the source, output and dive-log folders, optionally add one or more overlays and drag them into place on the live preview, choose the output filename pattern and press Start. Progress is shown per file and overall.
+
+  <p align="center">
+    <img src="media/main.png" alt="Color page" width="800">
+  </p>
+
+- **Overlay Generator**: batch-generate telemetry-only overlay videos and photos (black background, sized to the template) for every file in a folder, each matched to its dive by time. Pick brand → dive computer → page and queue as many overlays as you want rendered per file.
+
+  <p align="center">
+    <img src="media/overlay_batch.png" alt="Overlay Generator page" width="800">
+  </p>
+
+- **Convertion**: re-encode a video to one or more resolutions (1080p, 720p, 480p, 360p) with hardware acceleration; the resulting file names are listed before you start.
+
+  <p align="center">
+    <img src="media/convertion.png" alt="Convertion page" width="800">
+  </p>
+
 - **Color Tuning**: side-by-side **Original**/**Adjusted** preview with sliders for restoration weights, white balance, exposure, OKLCh hue shifts, sharpness, and darkness. Save adjustments back to an existing profile or as a new one - saved to your user profile (`color.yaml` in the app's data directory), so bundled defaults are never overwritten.
 
   <p align="center">
-    <img src="media/color_tuning.jpg" alt="Color Tuning tab" width="800">
+    <img src="media/color_tuning.png" alt="Color Tuning page" width="800">
   </p>
 
-- **Tag Editor**: batch-view and edit EXIF/QuickTime date/timezone tags across a directory, with automatic DJI timestamp correction and a full raw-metadata viewer.
+- **Tag Editor**: batch-view and edit EXIF/QuickTime date/timezone tags across a directory, with automatic DJI timestamp correction, a batch timezone tool and a full raw-metadata viewer.
 
   <p align="center">
-    <img src="media/tag_editor.jpg" alt="Tag Editor tab" width="800">
+    <img src="media/tag_editor.png" alt="Tag Editor page" width="800">
   </p>
 
-- **Overlay Designer**: preview any built-in overlay template (brand → dive computer → page) on a live video/photo frame or directly from a dive log, with a scale slider and a raw-waypoint inspector. Full editing (placing and styling telemetry fields, custom backgrounds, saving your own templates) is being restored - see `overlay_rework.md`.
+- **Log Viewer**: browse the parsed dive logs (Garmin FIT, Shearwater UDDF, Subsurface) dive by dive and waypoint by waypoint, to check what the overlays will see.
 
-Please share if you make a fancy HUD!
+- **Overlay Designer**: edit any built-in overlay template or build your own. The canvas renders a synthetic dive by default (no video or log needed), with a Design view at native pixels and a Frame preview of the full 1920x1080 composite. See [Designing your own overlay](#designing-your-own-overlay).
+
+  <p align="center">
+    <img src="media/overlay_designer.png" alt="Overlay Designer page" width="800">
+  </p>
+
+- **Dive Profile Builder**: plan a dive (gases and waypoints, simulated with a Bühlmann model) and write it out as a UDDF log - handy for checking an overlay without a real dive.
+- **Advanced**: folders for your own templates and colour profiles, and the ffmpeg/exiftool paths.
+
+Please share if you make a fancy overlay!
 
 ### Designing your own overlay
 
