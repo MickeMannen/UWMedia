@@ -1,0 +1,36 @@
+/* Qt Design Studio / Qt Creator project file for editing this app's UI.
+   Points at this folder (uwmedia/qml/) only - the Python backends live
+   one level up in uwmedia/backends/, not part of this project.
+
+   Live preview note: pages read their data through context properties
+   set up by uwmedia/app.py (colorBackend, advancedBackend, etc.) - those
+   only exist once the real QQmlApplicationEngine is running via
+   `python -m uwmedia`. Opening a page directly in Design Studio's own
+   preview will show it with no real data bound (blank text, empty
+   lists) - fine for laying out/styling, but run the real app to see it
+   with real behavior/data. */
+import QmlProject 1.1
+
+Project {
+    mainFile: "main.qml"
+
+    /* Include .qml, .js, and image files from this directory */
+    QmlFiles {
+        directory: "."
+    }
+
+    JavaScriptFiles {
+        directory: "."
+    }
+
+    ImageFiles {
+        directory: "."
+    }
+
+    Environment {
+        QT_QUICK_CONTROLS_STYLE: "Material"
+    }
+
+    /* List of plugin directories passed to QML runtime */
+    importPaths: [ "." ]
+}

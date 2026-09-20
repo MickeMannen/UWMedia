@@ -1,0 +1,81 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Teric",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.34742,
+        "rel_y": 0.32948,
+        "color": "#FFFFFF",
+        "font_size": 80,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.59918,
+        "rel_y": 0.40559,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.2101,
+        "rel_y": 0.48169,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.20247,
+        "rel_y": 0.51974,
+        "color": "#FFFFFF",
+        "font_size": 60,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.59918,
+        "rel_y": 0.48169,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.57629,
+        "rel_y": 0.51974,
+        "color": "#FFFFFF",
+        "font_size": 60,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.33216,
+        "rel_y": 0.61215,
+        "color": "#FFFFFF",
+        "font_size": 56,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.36268,
+        "rel_y": 0.68826,
+        "color": "#FFFFFF",
+        "font_size": 36,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

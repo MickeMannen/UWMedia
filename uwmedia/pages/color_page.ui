@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ColorPage</class>
+ <widget class="QWidget" name="ColorPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>934</width>
+    <height>680</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>ColorPage</string>
+  </property>
+  <layout class="QHBoxLayout" name="rootLayout">
+   <item>
+    <layout class="QVBoxLayout" name="leftColumn">
+     <item>
+      <widget class="QLabel" name="preview_heading">
+       <property name="text">
+        <string>Live preview</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="preview_label">
+       <property name="minimumSize">
+        <size>
+         <width>480</width>
+         <height>270</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>480</width>
+         <height>270</height>
+        </size>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::NoFrame</enum>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="scrubRow">
+       <item>
+        <widget class="QSlider" name="scrub_slider"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="scrub_time_label">
+         <property name="minimumSize">
+          <size>
+           <width>70</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>--</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QLabel" name="overlays_heading">
+       <property name="text">
+        <string>HUD overlays</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QListWidget" name="overlay_list">
+       <property name="maximumSize">
+        <size>
+         <width>16777215</width>
+         <height>140</height>
+        </size>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="overlayButtonsRow">
+       <item>
+        <widget class="QPushButton" name="add_hud_button">
+         <property name="text">
+          <string>Add HUD…</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="remove_overlay_button">
+         <property name="text">
+          <string>Remove Selected</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="overlayButtonsSpacer">
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <spacer name="leftColumnSpacer">
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="rightColumn">
+     <item>
+      <widget class="QLabel" name="color_correction_heading">
+       <property name="text">
+        <string>Color correction</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="color_checkbox">
+       <property name="text">
+        <string>Apply color correction</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="color_profile_combo"/>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="grpBoxParameters">
+       <property name="title">
+        <string>Parameters</string>
+       </property>
+       <layout class="QFormLayout" name="sourceOutputForm">
+        <item row="0" column="0" colspan="2">
+         <layout class="QHBoxLayout" name="sourceRow">
+          <item>
+           <widget class="QLabel" name="source_label">
+            <property name="text">
+             <string>Source</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="source_input"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="source_file_button">
+            <property name="text">
+             <string>File…</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="source_folder_button">
+            <property name="text">
+             <string>Folder…</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="2" column="0" colspan="2">
+         <layout class="QHBoxLayout" name="outputRow">
+          <item>
+           <widget class="QLabel" name="output_label">
+            <property name="text">
+             <string>Output</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="output_input"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="output_file_button">
+            <property name="text">
+             <string>File…</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="output_folder_button">
+            <property name="text">
+             <string>Folder…</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="3" column="0" colspan="2">
+         <layout class="QHBoxLayout" name="logsRow">
+          <item>
+           <widget class="QLabel" name="logs_label">
+            <property name="text">
+             <string>Dive logs</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="logs_input"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="logs_browse_button">
+            <property name="text">
+             <string>Browse</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="4" column="0">
+         <layout class="QHBoxLayout" name="outputfileRow">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QLabel" name="filename_label">
+            <property name="text">
+             <string>Output filename</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="filename_format_combo"/>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="progress_heading">
+       <property name="text">
+        <string>Progress</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QProgressBar" name="progress_bar">
+       <property name="value">
+        <number>0</number>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="status_label">
+       <property name="maximumSize">
+        <size>
+         <width>420</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>No batch running</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="start_button">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>44</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>Start</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="rightColumnSpacer">
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

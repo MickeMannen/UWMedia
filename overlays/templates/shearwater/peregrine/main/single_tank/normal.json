@@ -1,0 +1,82 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Peregrine",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.1743,
+        "rel_y": 0.2150,
+        "color": "#FFFFFF",
+        "font_size": 100,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.415,
+        "rel_y": 0.335,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.1743,
+        "rel_y": 0.4746,
+        "color": "#FFFFFF",
+        "font_size": 60,
+        "scale": 1.0
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.4679,
+        "rel_y": 0.2150,
+        "font_size": 38,
+        "value_font_size": 64,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.6586,
+        "rel_y": 0.4720,
+        "color": "#FFFFFF",
+        "font_size": 65,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.19,
+        "rel_y": 0.695,
+        "color": "#FFFFFF",
+        "font_size": 55,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.60,
+        "rel_y": 0.702,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.665,
+        "rel_y": 0.690,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

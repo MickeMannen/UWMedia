@@ -3,7 +3,7 @@ import numpy as np
 import math
 import subprocess as sp
 import json
-import re
+import shutil
 import time
 import sys
 import threading
@@ -445,15 +445,6 @@ class ColorCorrectionEngine:
 
         return final_rgb
 
-    def apply_filter_bgr(self, bgr_frame: np.ndarray, filt: np.ndarray) -> np.ndarray:
-        """Color-correct a BGR frame in-place, returning BGR.
-        Eliminates 2 redundant cvtColor calls vs doing BGR->RGB + apply_filter + RGB->BGR separately."""
-        # Single BGR->RGB conversion
-        rgb = bgr_frame[:, :, ::-1]
-        corrected_rgb = self.apply_filter(rgb, filt)
-        # Single RGB->BGR conversion via slice flip (no copy)
-        return corrected_rgb[:, :, ::-1].copy()
-
     def generate_3d_lut(self, filt: np.ndarray, size: int = 64) -> np.ndarray:
         """Takes a filter parameter array (11 floats) and generates a 3D LUT."""
         # Create grid of all RGB input values (0-255)
@@ -478,6 +469,43 @@ class ColorCorrectionEngine:
             buf.write(f'{row[0]:.6f} {row[1]:.6f} {row[2]:.6f}\n')
         path.write_text(buf.getvalue())
 
+    def _build_lut3d_filter(self, filter_indices, filter_matrices, fps: float, lut_dir: Path) -> str:
+        """Deduplicates consecutive similar filter matrices, writes one .cube LUT
+        file per unique filter into lut_dir, and returns an FFmpeg -vf value that
+        applies them natively (a single lut3d filter, or lut3d + sendcmd for
+        multiple, switching at each filter's timestamp). Shared by
+        process_video_lut and process_video."""
+        unique_filters = [filter_matrices[0]]
+        unique_indices = [filter_indices[0]]
+        for i in range(1, len(filter_matrices)):
+            if not np.allclose(filter_matrices[i], unique_filters[-1], atol=0.01):
+                unique_filters.append(filter_matrices[i])
+                unique_indices.append(filter_indices[i])
+
+        print(f"Generating {len(unique_filters)} 3D LUT(s) (64³)...")
+        lut_paths = []
+        lut_timestamps = []
+        with tqdm(total=len(unique_filters), desc="LUT Generation", unit="lut") as pbar:
+            for i, filt in enumerate(unique_filters):
+                lut = self.generate_3d_lut(filt)
+                lut_path = lut_dir / f"lut_{i:04d}.cube"
+                self.write_cube_file(lut, lut_path)
+                lut_paths.append(lut_path)
+                lut_timestamps.append(unique_indices[i] / fps)
+                pbar.update(1)
+
+        first_lut = str(lut_paths[0]).replace('\\', '/').replace(':', '\\:')
+        if len(lut_paths) == 1:
+            return f"lut3d=file='{first_lut}':interp=trilinear"
+
+        sendcmd_path = lut_dir / "sendcmd.txt"
+        with open(sendcmd_path, 'w') as f:
+            for lp, ts in zip(lut_paths, lut_timestamps):
+                lp_str = str(lp).replace('\\', '/').replace(':', '\\:')
+                f.write(f"{ts:.3f} [enter] lut3d file '{lp_str}';\n")
+        sendcmd_str = str(sendcmd_path).replace('\\', '/').replace(':', '\\:')
+        return f"sendcmd=f='{sendcmd_str}',lut3d=file='{first_lut}':interp=trilinear"
+
     def _open_video_capture(self, input_path: Path) -> cv2.VideoCapture:
         """Safely open OpenCV VideoCapture without triggering D3D11/DXVA2 hardware decoding errors on 10-bit video streams."""
         if self.ffmpeg_tool and self.ffmpeg_tool.hw_accel and self.ffmpeg_tool.os_type != "Windows":
@@ -489,7 +517,6 @@ class ColorCorrectionEngine:
         return cv2.VideoCapture(str(input_path))
 
     def process_video_lut(self, input_path: Path, output_path: Path, creation_date: datetime,
-                          start_time: Optional[str] = None, end_time: Optional[str] = None,
                           tz_offset_mins: Optional[int] = None,
                           color_correct: bool = True):
         """Fast path: analyze video, generate 3D LUTs, and process natively via FFmpeg lut3d filter."""
@@ -566,11 +593,6 @@ class ColorCorrectionEngine:
                     pbar.update(1)
             lut_gen_duration = time.time() - t_start_lut
 
-            # Build FFmpeg command
-            s_sec = self.ffmpeg_tool._parse_time(start_time) or 0.0
-            e_sec = self.ffmpeg_tool._parse_time(end_time) or duration
-            clip_duration = max(0, e_sec - s_sec)
-
             # Build video filter
             first_lut = str(lut_paths[0]).replace('\\', '/').replace(':', '\\:')
             if len(lut_paths) == 1:
@@ -596,11 +618,6 @@ class ColorCorrectionEngine:
                     args.extend(["-hwaccel", "videotoolbox"])
                 else:
                     args.extend(["-hwaccel", "auto"])
-
-            if start_time:
-                args.extend(["-ss", start_time])
-            if end_time:
-                args.extend(["-to", end_time])
 
             args.extend(["-i", str(input_path)])
             args.extend(["-vf", vf])
@@ -639,11 +656,11 @@ class ColorCorrectionEngine:
 
             print(f"Processing {input_path.name} using fast LUT path...")
             t_start_render = time.time()
-            self.ffmpeg_tool.run_command(args, duration=clip_duration)
+            self.ffmpeg_tool.run_command(args, duration=duration, progress_label=input_path.name)
             render_duration = time.time() - t_start_render
             print(f"\nProcessing complete: {output_path.name}")
-            
-            total_to_process = int(clip_duration * fps) if clip_duration > 0 else total_frames
+
+            total_to_process = total_frames
             return {
                 "total_frames": total_frames,
                 "analysis_time": analysis_duration,
@@ -655,18 +672,46 @@ class ColorCorrectionEngine:
 
         finally:
             # Clean up temp LUT files
-            import shutil
             shutil.rmtree(lut_dir, ignore_errors=True)
 
     # =========================================================================
     # 3. VIDEO PROCESSING INTERFACE
     # =========================================================================
 
-    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, 
-                      dive: Optional[Dive] = None, 
-                      overlay: bool = False, 
+    def _preload_hud_skin(self, layout: dict, frame_width: int):
+        """Loads+resizes a resolved layout's hud_skin image once, ahead of
+        the per-frame render loop - shared by process_video's single-layout
+        (layout_path) and multi-overlay (overlay_instances) paths so both
+        get the identical premultiplied-opacity preload draw_hud() expects
+        via its preloaded_skin param. Returns None for shape skins (nothing
+        to preload) or when the skin image can't be read."""
+        hud_skin = layout.get("hud_skin", {})
+        skin_path = hud_skin.get("path")
+        if not skin_path:
+            return None
+        img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
+        if img_skin is None:
+            return None
+        design_w = float(layout.get("design_width", 1920))
+        user_scale = hud_skin.get("scale", 1.0)
+        res_scale = frame_width / design_w
+        final_skin_scale = user_scale * res_scale
+
+        skin_opacity = hud_skin.get("opacity", 1.0)
+        h_orig, w_orig = img_skin.shape[:2]
+        w_scaled = max(1, int(w_orig * final_skin_scale))
+        h_scaled = max(1, int(h_orig * final_skin_scale))
+
+        preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+        if preloaded_skin.shape[2] == 4:
+            preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+        return preloaded_skin
+
+    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime,
+                      dive: Optional[Dive] = None,
+                      overlay: bool = False,
                       layout_path: Optional[Path] = None,
-                      start_time: Optional[str] = None, end_time: Optional[str] = None,
+                      overlay_instances: Optional[list] = None,
                       tz_offset_mins: Optional[int] = None,
                       color_correct: bool = True):
         """Analyze video and process frames through OpenCV then pipe to FFmpeg."""
@@ -722,93 +767,68 @@ class ColorCorrectionEngine:
             filter_matrices = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.67]])
             analysis_duration = 0.0
 
-        # HUD and overlay initialization
-        ass_path = None
-        hud_filter = ""
+        # HUD and overlay initialization - the skin/text are composited per
+        # frame in Python (see _process_worker's draw_hud calls below), not
+        # via a native FFmpeg filter. layout_path is the single-overlay path
+        # (Color page pre-Pass-2 / any other caller); overlay_instances is
+        # Pass 2's multi-overlay path (Color page's own N composited layers)
+        # - the two are independent and both may be given at once.
         layout = {}
-        actual_hud_path = None
-        use_opencv_text = True 
         preloaded_skin = None
 
         if layout_path and dive:
             print(f"Generating telemetry overlay using layout: {layout_path.name}")
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
-            
-            if "hud_skin" in layout:
-                skin_rel_path = layout["hud_skin"].get("path")
-                if skin_rel_path:
-                    actual_hud_path = layout_path.parent / skin_rel_path
-            
-            if "hud_skin" in layout and actual_hud_path and actual_hud_path.exists():
-                print(f"HUD Skin found at: {actual_hud_path}")
-                hud_filter = "" 
-            else:
-                if self.ffmpeg_tool.has_filter("subtitles"):
-                    ass_path = self.ffmpeg_tool._generate_ass_file(dive, creation_date, duration, layout, output_path)
-                else:
-                    use_opencv_text = True
+            preloaded_skin = self._preload_hud_skin(layout, width)
 
-        # Pre-process skin overlay
-        if layout:
-            hud_skin = layout.get("hud_skin", {})
-            skin_path = hud_skin.get("path")
-            if skin_path:
-                img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-                if img_skin is not None:
-                    design_w = float(layout.get("design_width", 1920))
-                    user_scale = hud_skin.get("scale", 1.0)
-                    res_scale = width / design_w
-                    final_skin_scale = user_scale * res_scale
-                    
-                    skin_opacity = hud_skin.get("opacity", 1.0)
-                    h_orig, w_orig = img_skin.shape[:2]
-                    w_scaled = int(w_orig * final_skin_scale)
-                    h_scaled = int(h_orig * final_skin_scale)
-                    
-                    if w_scaled < 1: w_scaled = 1
-                    if h_scaled < 1: h_scaled = 1
-                    
-                    preloaded_skin = cv2.resize(img_skin, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
-                    if preloaded_skin.shape[2] == 4:
-                        preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
+        overlay_layouts = []
+        overlay_skins = []
+        if overlay_instances and dive:
+            from gui.hud_renderer import resolve_overlay_instance_layout
+            print(f"Generating telemetry overlay using {len(overlay_instances)} composited layer(s)")
+            for inst in overlay_instances:
+                with open(Path(inst["layout_path"]), 'r') as f:
+                    raw_layout = json.load(f)
+                resolved = resolve_overlay_instance_layout(
+                    raw_layout, inst.get("x", 0.0), inst.get("y", 0.0), inst.get("scale", 1.0), width, height
+                )
+                overlay_layouts.append(resolved)
+                overlay_skins.append(self._preload_hud_skin(resolved, width))
 
         # Re-open video capture for processing phase with hardware decoding and safe fallback
         cap = self._open_video_capture(input_path)
 
+        total_to_process = total_frames
+
+        # Color correction happens natively in FFmpeg (lut3d) rather than
+        # per-frame in Python - apply_filter's OKLCH pipeline costs ~35x more
+        # per 4K frame than this. Same LUT generation/dedup approach
+        # process_video_lut already uses for its overlay-free fast path, just
+        # applied to the piped (already HUD-composited) frames here instead
+        # of letting FFmpeg read the source file directly.
+        color_vf = None
+        lut_dir = None
+        if color_correct and len(filter_matrices) > 0:
+            lut_dir = Path(tempfile.mkdtemp(prefix='uwmedia_lut_'))
+            color_vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, lut_dir)
+
         # Build FFmpeg pipe
-        filters = []
-        if ass_path:
-            filters.append(f"subtitles='{ass_path}'")
-        
         cmd = [
             str(self.ffmpeg_tool.get_path()), '-y',
             '-f', 'rawvideo', '-vcodec', 'rawvideo',
             '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
-            '-i', '-', 
+            '-i', '-',
             '-i', str(input_path)
         ]
 
         if not self.ffmpeg_tool.debug:
             cmd.extend(["-nostats", "-loglevel", "error"])
 
-        filter_target = "0:v"
-        if hud_filter:
-            cmd.extend(['-i', str(actual_hud_path)])
-            last_label_match = re.findall(r'\[([^\]]+)\]$', hud_filter.split(';')[-1])
-            last_label = f"[{last_label_match[0]}]" if last_label_match else "[v_hud]"
-            if filters:
-                combined_filter = hud_filter + f";{last_label}{','.join(filters)}[v_out]"
-                cmd.extend(['-filter_complex', combined_filter])
-                filter_target = "[v_out]"
-            else:
-                cmd.extend(['-filter_complex', hud_filter])
-                filter_target = last_label
-        elif filters:
-            cmd.extend(['-vf', ",".join(filters)])
-            filter_target = "0:v"
+        if color_vf:
+            cmd.extend(['-vf', color_vf])
 
-        cmd.extend(['-map', filter_target, '-map', '1:a?'])
+        cmd.extend(['-map', '0:v', '-map', '1:a?'])
         
         try:
             bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
@@ -844,25 +864,12 @@ class ColorCorrectionEngine:
 
         process = sp.Popen(cmd, stdin=sp.PIPE)
 
-        s_sec = self.ffmpeg_tool._parse_time(start_time) or 0.0
-        e_sec = self.ffmpeg_tool._parse_time(end_time) or float(duration)
-        s_frame, e_frame = int(s_sec * fps), int(e_sec * fps)
-        total_to_process = e_frame - s_frame + 1
-
-        # Precompute interpolated filters for all frames to avoid slow frame-by-frame interpolation
-        interpolated_filters = None
-        if color_correct and len(filter_matrices) > 0:
-            all_counts = np.arange(total_frames)
-            num_params = filter_matrices.shape[1]
-            interpolated_filters = np.zeros((total_frames, num_params), dtype=np.float32)
-            for x in range(num_params):
-                interpolated_filters[:, x] = np.interp(all_counts, filter_indices, filter_matrices[:, x])
-
         # =====================================================================
         # Phase 2: Threaded Pipeline (Decode → Process → Encode)
         # Uses 3 threads with bounded queues to overlap I/O with computation.
         # - Decode thread: reads frames from OpenCV VideoCapture
-        # - Process thread: applies color correction + HUD overlay
+        # - Process thread: applies HUD overlay (color correction is the
+        #   native FFmpeg lut3d filter built above, not done here)
         # - Main thread: writes processed frames to FFmpeg stdin
         # =====================================================================
         QUEUE_SIZE = 4  # Bounded queue depth to limit memory usage
@@ -875,7 +882,7 @@ class ColorCorrectionEngine:
 
         # Pre-import HUD renderer once (avoid per-frame import overhead)
         hud_draw_func = None
-        if layout and dive:
+        if (layout or overlay_layouts) and dive:
             from gui.hud_renderer import draw_hud
             hud_draw_func = draw_hud
 
@@ -883,10 +890,8 @@ class ColorCorrectionEngine:
         def _decode_worker():
             """Reads frames from VideoCapture and pushes to decode_q."""
             try:
-                local_count = s_frame
-                if s_frame > 0:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, s_frame)
-                while cap.isOpened() and local_count <= e_frame:
+                local_count = 0
+                while cap.isOpened():
                     ret, frame = cap.read()
                     if not ret:
                         break
@@ -899,7 +904,7 @@ class ColorCorrectionEngine:
 
         # --- Process Thread ---
         def _process_worker():
-            """Applies color correction and HUD overlay, pushes bytes to process_q."""
+            """Applies HUD overlay, pushes bytes to process_q."""
             try:
                 while True:
                     item = decode_q.get()
@@ -907,21 +912,23 @@ class ColorCorrectionEngine:
                         break
                     frame_idx, frame = item
 
-                    # Color correction (BGR throughout - eliminates 2 redundant conversions)
-                    if color_correct and interpolated_filters is not None:
-                        idx_filter = min(frame_idx, len(interpolated_filters) - 1)
-                        current_filter = interpolated_filters[idx_filter]
-                        frame = self.apply_filter_bgr(frame, current_filter)
-
-                    # HUD overlay (operates on BGR frame directly)
+                    # HUD overlay (operates on BGR frame directly). Single-
+                    # layout and multi-overlay layers composite onto the
+                    # same frame in order - last in overlay_layouts draws on
+                    # top, matching Pass 2's confirmed z-order rule.
                     if hud_draw_func and dive:
                         elapsed_total = frame_idx / fps
                         current_time = creation_date + timedelta(seconds=elapsed_total)
                         wp = dive.get_waypoint_at(current_time)
                         if wp:
-                            hud_draw_func(frame, layout, wp,
-                                          preloaded_skin=preloaded_skin,
-                                          waypoints=dive.waypoints)
+                            if layout:
+                                hud_draw_func(frame, layout, wp,
+                                              preloaded_skin=preloaded_skin,
+                                              waypoints=dive.waypoints)
+                            for layer_layout, layer_skin in zip(overlay_layouts, overlay_skins):
+                                hud_draw_func(frame, layer_layout, wp,
+                                              preloaded_skin=layer_skin,
+                                              waypoints=dive.waypoints)
 
                     # Pre-serialize to bytes (avoids doing it in the write thread)
                     process_q.put(frame.tobytes())
@@ -963,7 +970,8 @@ class ColorCorrectionEngine:
             except Exception:
                 pass
             process.wait()
-            if ass_path and ass_path.exists(): ass_path.unlink()
+            if lut_dir:
+                shutil.rmtree(lut_dir, ignore_errors=True)
 
         # Propagate any thread errors
         if decode_error[0]:

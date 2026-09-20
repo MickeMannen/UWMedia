@@ -1,0 +1,225 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 2",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "custom:DEPTH",
+        "rel_x": 0.14791,
+        "rel_y": 0.18104,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "depth",
+        "rel_x": 0.14653,
+        "rel_y": 0.25829,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.35868,
+        "rel_y": 0.18104,
+        "color": "#00ADED",
+        "font_size": 32,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.35179,
+        "rel_y": 0.24822,
+        "color": "#FFFFFF",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:STOP",
+        "rel_x": 0.54052,
+        "rel_y": 0.18104,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "deco_stop_depth",
+        "rel_x": 0.58874,
+        "rel_y": 0.25829,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.71548,
+        "rel_y": 0.18104,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "next_stop_time",
+        "rel_x": 0.81742,
+        "rel_y": 0.25662,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:T1",
+        "rel_x": 0.15342,
+        "rel_y": 0.39937,
+        "color": "#00ADED",
+        "font_size": 27,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.22137,
+        "rel_y": 0.40637,
+        "width": 16,
+        "height": 32,
+        "corner_radius": 2,
+        "style": "segments",
+        "segments": 5,
+        "segment_gap": 4,
+        "full_bar": 200,
+        "outline_color": "#9A9A9A",
+        "outline_width": 2,
+        "outline_gap": 3
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.21679,
+        "rel_y": 0.47159,
+        "color": "#FFFFFF",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:BAR",
+        "rel_x": 0.33113,
+        "rel_y": 0.47159,
+        "color": "#00ADED",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:PPO2",
+        "rel_x": 0.39588,
+        "rel_y": 0.39937,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.40277,
+        "rel_y": 0.46823,
+        "color": "#FFFFFF",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF99",
+        "rel_x": 0.67829,
+        "rel_y": 0.39937,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.6962,
+        "rel_y": 0.47159,
+        "color": "#FFFFFF",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:%",
+        "rel_x": 0.82293,
+        "rel_y": 0.50013,
+        "color": "#00ADED",
+        "font_size": 14,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:O2/HE",
+        "rel_x": 0.29944,
+        "rel_y": 0.61266,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "divemode",
+        "rel_x": 0.14102,
+        "rel_y": 0.68488,
+        "color": "#FFFFFF",
+        "font_size": 43,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.28567,
+        "rel_y": 0.67648,
+        "color": "#FFFFFF",
+        "font_size": 45,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.56119,
+        "rel_y": 0.61266,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.62318,
+        "rel_y": 0.68488,
+        "color": "#FFFFFF",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl_before_clear",
+        "rel_x": 0.62318,
+        "rel_y": 0.68488,
+        "color": "#FFFFFF",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.71272,
+        "rel_y": 0.61434,
+        "color": "#00ADED",
+        "font_size": 31,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.6962,
+        "rel_y": 0.68488,
+        "color": "#FFFFFF",
+        "font_size": 43,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

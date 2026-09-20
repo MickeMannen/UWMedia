@@ -1,14 +1,10 @@
 import platform
 import subprocess
 import time
-import json
-import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
 from tqdm import tqdm
-from models.dive import Dive, Waypoint
-from ffmpeg.hud_filter import generate_hud_filter_complex
 from utils.tool_paths import get_ffmpeg_path, get_ffprobe_path
 
 # @
@@ -32,7 +28,9 @@ class FfmpegClass:
     def get_path(self) -> Path:
         return self.executable_path
 
-    def run_command(self, args: List[str], duration: Optional[float] = None) -> subprocess.CompletedProcess:
+    def run_command(
+        self, args: List[str], duration: Optional[float] = None, progress_label: Optional[str] = None
+    ) -> subprocess.CompletedProcess:
         cmd = [str(self.executable_path)] + args
         
         if self.debug:
@@ -74,11 +72,20 @@ class FfmpegClass:
 
                         pbar.update(pct - last_pct)
                         last_pct = pct
-                        # Surfaced to the GUI (uwmedia/app.py parses this to drive
-                        # the Progress bar mid-file) - throttled so a high-fps
-                        # source doesn't flood the pipe with an update per frame.
+                        # Surfaced to the GUI (color_backend.py parses this to
+                        # drive the Progress bar mid-file) - throttled so a
+                        # high-fps source doesn't flood the pipe with an
+                        # update per frame. progress_label (when given -
+                        # ffmpeg/color.py's color-correction path passes the
+                        # source filename) lets the GUI attribute this
+                        # percentage to a specific file even when several
+                        # run concurrently in a real batch, instead of only
+                        # trusting a bare percentage for a single-file run.
                         if pct - last_emitted_pct >= 1.0 or pct >= 100.0:
-                            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                            if progress_label:
+                                print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f} {progress_label}", flush=True)
+                            else:
+                                print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
                             last_emitted_pct = pct
                     except:
                         pass
@@ -110,15 +117,6 @@ class FfmpegClass:
         elif self.os_type == "Windows":
             return "hevc_nvenc"
         return "libx265"
-
-    def has_filter(self, filter_name: str) -> bool:
-        """Check if a specific filter is available in the current FFmpeg build."""
-        try:
-            cmd = [str(self.get_path()), "-filters"]
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
-            return f" {filter_name} " in output or f" {filter_name}\n" in output
-        except:
-            return False
 
     def get_video_duration(self, input_path: Path) -> float:
         """Uses ffprobe to get video duration."""
@@ -165,46 +163,6 @@ class FfmpegClass:
         
         return int(out) if out.isdigit() else 10000000 # Default 10Mbps if unknown
 
-    def _parse_time(self, time_str: Optional[str]) -> Optional[float]:
-        if not time_str: return None
-        try:
-            parts = list(map(int, time_str.split(':')))
-            if len(parts) == 3: return float(parts[0] * 3600 + parts[1] * 60 + parts[2])
-            if len(parts) == 2: return float(parts[0] * 60 + parts[1])
-            return float(time_str)
-        except:
-            return None
-
-    def _generate_ass_file(self, dive: Dive, creation_date: datetime, duration: int, layout: Dict[str, Any], output_path: Path) -> Path:
-        """Generates an Advanced Substation Alpha (ASS) file for high-performance telemetry."""
-        ass_path = output_path.with_suffix(".ass")
-        video_start_offset = (dive.start_time - creation_date).total_seconds()
-        
-        with open(ass_path, "w") as f:
-            f.write("[Script Info]\nPlayResX: 1920\nPlayResY: 1080\n\n")
-            f.write("[V4+ Styles]\n")
-            f.write("Format: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, Alignment, Outline, Shadow, MarginV\n")
-            f.write("Style: Telemetry,Arial,36,&H00FFFFFF,&H80000000,1,0,7,1,1,10\n\n")
-            f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
-            
-            for t in range(duration):
-                start_ts = f"{t//3600:01}:{ (t%3600)//60 :02}:{t%60:02}.00"
-                end_ts = f"{(t+1)//3600:01}:{ ((t+1)%3600)//60 :02}:{(t+1)%60:02}.00"
-                
-                wp_idx = int(t - video_start_offset)
-                if wp_idx < 0: wp = Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0)
-                elif wp_idx >= len(dive.waypoints): wp = dive.waypoints[-1]
-                else: wp = dive.waypoints[wp_idx]
-                
-                for key, config in layout.items():
-                    val = f"Depth: {wp.depth:.1f}m" if key == "depth" else f"Temp: {wp.temp:.1f}C" if key == "temp" else ""
-                    if val:
-                        x = int(config['x'] * 19.2)
-                        y = int(config['y'] * 10.8)
-                        f.write(f"Dialogue: 0,{start_ts},{end_ts},Telemetry,,0,0,0,,{{\\pos({x},{y})}}{val}\n")
-        
-        return ass_path
-
     def get_video_dimensions(self, input_path: Path) -> tuple[int, int]:
         """Uses ffprobe to get video width and height."""
         cmd = [
@@ -243,24 +201,13 @@ class FfmpegClass:
         ]
         return subprocess.check_output(cmd).decode().strip()
 
-    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime, dive: Optional[Dive] = None, 
-                      color_correct: bool = False, overlay: bool = False,
-                      layout_path: Optional[Path] = None,
-                      start_time: Optional[str] = None, end_time: Optional[str] = None,
+    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime,
+                      color_correct: bool = False,
                       tz_offset_mins: Optional[int] = None,
                       target_resolution: Optional[tuple[int, int]] = None,
                       bitrate: Optional[str] = None):
-        
+
         args = ["-y"]
-        s_sec = self._parse_time(start_time) or 0.0
-        e_sec = self._parse_time(end_time) or self.get_video_duration(input_path)
-        clip_duration = max(0, e_sec - s_sec)
-
-        if start_time:
-            args.extend(["-ss", start_time])
-        if end_time:
-            args.extend(["-to", end_time])
-
         duration = int(self.get_video_duration(input_path))
         width, height = self.get_video_dimensions(input_path)
         print(f"Video: {width}x{height} | Duration: {duration}s")
@@ -278,46 +225,8 @@ class FfmpegClass:
 
 
 
-        ass_path = None
-        hud_filter = ""
-        layout = {}
-        actual_hud_path = None
-
-        if overlay and layout_path and dive:
-            print("Generating telemetry overlay...")
-            with open(layout_path, 'r') as f:
-                layout = json.load(f)
-            
-            # Resolve actual_hud_path correctly relative to layout_path
-            if "hud_skin" in layout:
-                skin_rel_path = layout["hud_skin"].get("path")
-                if skin_rel_path:
-                    # Skin path should be relative to the layout file
-                    actual_hud_path = layout_path.parent / Path(skin_rel_path).name
-            
-            # Only generate FFmpeg-based HUD if we aren't using the OpenCV path
-            if not color_correct:
-                if "hud_skin" in layout and actual_hud_path and actual_hud_path.exists():
-                    hud_filter = generate_hud_filter_complex(layout, width, height, actual_hud_path)
-                elif "hud_skin" in layout:
-                    print(f"Warning: HUD skin not found at {actual_hud_path}")
-                else:
-                    ass_path = self._generate_ass_file(dive, creation_date, duration, layout, output_path)
-                    filters.append(f"subtitles='{ass_path}'")
-
         inputs = ["-i", str(input_path)]
-        filter_complex = ""
-        
-        if hud_filter:
-            inputs.extend(["-i", str(actual_hud_path)])
-            if filters:
-                last_label_match = re.findall(r'\[([^\]]+)\]$', hud_filter.split(';')[-1])
-                last_label = f"[{last_label_match[0]}]" if last_label_match else "[v_hud]"
-                filter_complex = hud_filter + f";{last_label}{','.join(filters)}[v_out]"
-            else:
-                filter_complex = hud_filter + "[v_out]"
-        elif filters:
-            filter_complex = ",".join(filters)
+        filter_complex = ",".join(filters) if filters else ""
 
         # 3. Final Assembly
         # Passthrough mode: Use -c copy if no video adjustments are requested
@@ -345,19 +254,12 @@ class FfmpegClass:
             
             if self.debug:
                 print(full_args)
-            try:
-                self.run_command(full_args, duration=float(clip_duration))
-            finally:
-                if ass_path and ass_path.exists(): ass_path.unlink()
+            self.run_command(full_args, duration=float(duration))
             return
 
-        filter_target = "0:v"
         if filter_complex:
             full_args.extend(["-filter_complex", filter_complex])
-            if "[v_out]" in filter_complex:
-                filter_target = "[v_out]"
-                full_args.extend(["-map", "[v_out]", "-map", "0:a?"])
-        
+
         full_args.extend(["-vcodec", self.get_encoder()])
         
         # Quality preservation or override
@@ -401,10 +303,7 @@ class FfmpegClass:
         # if self.debug:
         #     print(full_args)
         t_start = time.time()
-        try:
-            self.run_command(full_args, duration=float(clip_duration))
-        finally:
-            if ass_path and ass_path.exists(): ass_path.unlink()
+        self.run_command(full_args, duration=float(duration))
         render_duration = time.time() - t_start
         
         total_frames = self.get_video_frame_count(input_path)

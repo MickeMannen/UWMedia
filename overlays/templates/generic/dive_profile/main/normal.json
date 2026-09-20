@@ -1,0 +1,31 @@
+{
+  "manufacturer": "Generic",
+  "model": "Dive Profile",
+  "hud_skin": {
+    "type": "shape",
+    "anchor": "BOTTOM_CENTER",
+    "ref_offset_x": 0.0,
+    "ref_offset_y": -30.0,
+    "opacity": 0.0,
+    "width": 900,
+    "height": 220,
+    "color": "#000000",
+    "corner_radius": 0,
+    "linked_elements": [
+      {
+        "field": "depth_graph",
+        "type": "graph",
+        "rel_x": 0.0,
+        "rel_y": 0.0,
+        "width": 900,
+        "height": 220,
+        "color": "#FF0000",
+        "ceiling_color": "#808080",
+        "marker_style": "dot",
+        "marker_size": 6
+      }
+    ]
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

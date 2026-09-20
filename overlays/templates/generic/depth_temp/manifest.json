@@ -1,0 +1,14 @@
+{
+  "manufacturer": "Generic",
+  "model": "",
+  "pages": [
+    {
+      "id": "standard",
+      "name": "Standard"
+    },
+    {
+      "id": "compact",
+      "name": "Compact"
+    }
+  ]
+}

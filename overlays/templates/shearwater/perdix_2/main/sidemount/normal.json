@@ -1,0 +1,182 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 2",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.21541,
+        "rel_y": 0.19112,
+        "color": "#FFFFFF",
+        "font_size": 112,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.34077,
+        "rel_y": 0.32044,
+        "color": "#00ADED",
+        "font_size": 31,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.13965,
+        "rel_y": 0.40273,
+        "color": "#00ADED",
+        "font_size": 36,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.19337,
+        "rel_y": 0.47495,
+        "color": "#FFFFFF",
+        "font_size": 76,
+        "scale": 1.0
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.47853,
+        "rel_y": 0.17936,
+        "font_size": 29,
+        "value_font_size": 63,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.7017,
+        "rel_y": 0.40105,
+        "color": "#00ADED",
+        "font_size": 36,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.7017,
+        "rel_y": 0.45815,
+        "color": "#FFFFFF",
+        "font_size": 83,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:T1",
+        "rel_x": 0.14791,
+        "rel_y": 0.64289,
+        "color": "#00ADED",
+        "font_size": 17,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.15267,
+        "rel_y": 0.64542,
+        "width": 12,
+        "height": 23,
+        "corner_radius": 2,
+        "style": "segments",
+        "segments": 5,
+        "segment_gap": 2,
+        "full_bar": 200,
+        "outline_color": "#9A9A9A",
+        "outline_width": 2,
+        "outline_gap": 3
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.14102,
+        "rel_y": 0.69327,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:BAR",
+        "rel_x": 0.265,
+        "rel_y": 0.69327,
+        "color": "#00ADED",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GTR",
+        "rel_x": 0.43996,
+        "rel_y": 0.62273,
+        "color": "#00ADED",
+        "font_size": 19,
+        "scale": 1.0
+      },
+      {
+        "field": "air_remaining",
+        "rel_x": 0.43996,
+        "rel_y": 0.6664,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:SM",
+        "rel_x": 0.43996,
+        "rel_y": 0.72351,
+        "color": "#00ADED",
+        "font_size": 17,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:T2",
+        "rel_x": 0.75129,
+        "rel_y": 0.64289,
+        "color": "#00ADED",
+        "font_size": 17,
+        "scale": 1.0
+      },
+      {
+        "field": "secondary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.75573,
+        "rel_y": 0.64542,
+        "width": 12,
+        "height": 23,
+        "corner_radius": 2,
+        "style": "segments",
+        "segments": 5,
+        "segment_gap": 2,
+        "full_bar": 200,
+        "outline_color": "#9A9A9A",
+        "outline_width": 2,
+        "outline_gap": 3
+      },
+      {
+        "field": "secondary_tank_pressure",
+        "rel_x": 0.74027,
+        "rel_y": 0.69327,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "type": "tissue_bar",
+        "style": "fill",
+        "rel_x": 0.81461,
+        "rel_y": 0.39973,
+        "width": 35,
+        "height": 145,
+        "marker_size": 3,
+        "outline_color": "#00ADED",
+        "label": "N2 loading"
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

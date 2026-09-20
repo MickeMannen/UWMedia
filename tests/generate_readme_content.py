@@ -3,6 +3,7 @@ import os
 import sys
 import shutil
 import subprocess
+from datetime import timedelta
 from pathlib import Path
 
 # Automatically switch to project .venv Python if dependencies (cv2) are missing
@@ -36,6 +37,71 @@ DEFAULT_VIDEO = TEST_DATA_DIR / "20251019_M0284.MP4"
 SIDEMOUNT_VIDEO = BASE_DIR / "test_data" / "videos_original" / "DJI_20260502110658_0002_D_A001.MP4"
 PERDIX2_VIDEO = BASE_DIR / "test_data" / "videos_original" / "20260527_M0685.MP4"
 DEFAULT_LOG = LOGS_DIR / "461 Sipadan, Turtle Tomb.fit"
+
+
+def _parse_hms(time_str: str) -> int:
+    parts = list(map(int, time_str.split(':')))
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return int(parts[0])
+
+
+def trim_source_video(video_path: Path, start_time: str, duration: int, temp_dir: Path) -> Path:
+    """
+    Cuts a short clip out of a long source video with a direct ffmpeg -ss/-t
+    call (stream copy, no re-encode), then shifts the clip's creation-time
+    metadata forward by start_time.
+
+    cli_main.py no longer supports --start-time/--end-time (removed - it
+    always treats an input's own creation-date metadata as its frame-0
+    timestamp when matching dive waypoints). This replaces that flag for the
+    functions below, which still need a short preview clip out of a much
+    longer recording: without the metadata shift, cli_main.py would match
+    waypoints as if the trimmed clip started at the *original* recording's
+    start, not start_time into it.
+    """
+    from metadata.exif import MetadataHandler
+    meta_handler = MetadataHandler()
+
+    original_creation_date = meta_handler.get_local_creation_date(video_path)
+    tz_offset_mins = meta_handler.get_timezone_offset(video_path) or 0
+    shift = timedelta(seconds=_parse_hms(start_time))
+    shifted_local = original_creation_date + shift
+    shifted_utc = shifted_local - timedelta(minutes=tz_offset_mins)
+
+    sign = "+" if tz_offset_mins >= 0 else "-"
+    hours, mins = abs(tz_offset_mins) // 60, abs(tz_offset_mins) % 60
+    tz_iso = f"{sign}{hours:02}:{mins:02}"
+    creation_date_with_tz = shifted_local.strftime("%Y:%m:%d %H:%M:%S") + tz_iso
+
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    temp_path = temp_dir / f"trimmed_{Path(video_path).stem}.mp4"
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", start_time, "-t", str(duration),
+        "-i", str(video_path),
+        "-c", "copy",
+        "-map_metadata", "0",
+        str(temp_path)
+    ]
+    print(f"[*] Pre-trimming source clip: {' '.join(cmd)}")
+    subprocess.run(cmd, check=True, cwd=str(BASE_DIR))
+
+    # ffmpeg's own -metadata creation_time doesn't reliably land in the tag
+    # get_local_creation_date() actually reads back (QuickTime:CreationDate,
+    # a distinct Apple-specific atom from the standard UTC creation_time atom
+    # ffmpeg writes) - set it directly via exiftool instead, the same way
+    # MetadataHandler.copy_all() does. Also sets the matching UTC CreateDate
+    # so a later get_timezone_offset() call stays consistent.
+    meta_handler.set_quicktime_tags(temp_path, {
+        "QuickTime:CreationDate": creation_date_with_tz,
+        "QuickTime:CreateDate": shifted_utc,
+        "QuickTime:Timezone": tz_iso,
+        "QuickTime:TimeZone": tz_iso,
+    })
+    return temp_path
 
 
 def verify_root_configs():
@@ -186,17 +252,14 @@ def generate_video_side_by_side(
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        end_seconds = duration
-        end_time = f"00:{end_seconds:02d}"
+        trimmed_source = trim_source_video(video_path, start_time, duration, temp_dir)
 
         # 1. Color correct original clip
         cmd_color = [
             sys.executable, "cli_main.py",
-            str(video_path),
+            str(trimmed_source),
             str(temp_dir),
             "--color", color_profile,
-            "--start-time", start_time,
-            "--end-time", end_time,
             "--filename-format", "color_clip",
             "--hw-accel"
         ]
@@ -270,19 +333,16 @@ def generate_video_color_overlay(
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        end_seconds = duration
-        end_time = f"00:{end_seconds:02d}"
+        trimmed_source = trim_source_video(video_path, start_time, duration, temp_dir)
 
         temp_format = "temp_color_overlay"
         cmd = [
             sys.executable, "cli_main.py",
-            str(video_path),
+            str(trimmed_source),
             str(temp_dir),
             "--color", color_profile,
             "--layout", str(layout_path),
             "--logs", str(logs_dir),
-            "--start-time", start_time,
-            "--end-time", end_time,
             "--filename-format", temp_format,
             "--hw-accel"
         ]
@@ -324,16 +384,16 @@ def generate_video_color_overlay_sidemount(
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        trimmed_source = trim_source_video(video_path, start_time, _parse_hms(end_time) - _parse_hms(start_time), temp_dir)
+
         temp_format = "temp_sidemount_color_overlay"
         cmd = [
             sys.executable, "cli_main.py",
-            str(video_path),
+            str(trimmed_source),
             str(temp_dir),
             "--color", color_profile,
             "--layout", str(layout_path),
             "--logs", str(logs_dir),
-            "--start-time", start_time,
-            "--end-time", end_time,
             "--filename-format", temp_format,
             "--hw-accel"
         ]
@@ -375,16 +435,16 @@ def generate_video_color_overlay_shearwater(
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        trimmed_source = trim_source_video(video_path, start_time, _parse_hms(end_time) - _parse_hms(start_time), temp_dir)
+
         temp_format = "temp_shearwater_color_overlay"
         cmd = [
             sys.executable, "cli_main.py",
-            str(video_path),
+            str(trimmed_source),
             str(temp_dir),
             "--color", color_profile,
             "--layout", str(layout_path),
             "--logs", str(logs_dir),
-            "--start-time", start_time,
-            "--end-time", end_time,
             "--filename-format", temp_format,
             "--hw-accel"
         ]

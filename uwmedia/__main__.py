@@ -2,9 +2,13 @@ import sys
 
 
 def main():
-    # No args: launched from Finder/dock, or `uwmedia` with nothing after it -> GUI.
-    # Args present: either a real CLI invocation, or the GUI's own "Run" button
-    # re-invoking this packaged app's launcher with CLI args (see uwmedia/app.py).
+    # No args: launched normally -> GUI. Args present: the GUI's own
+    # "Start" button (ColorPage._build_command) re-invoking this package's
+    # own launcher with CLI args, so processing runs in a separate,
+    # killable subprocess instead of blocking the UI thread - mirrors
+    # uwmedia/__main__.py's own len(sys.argv) > 1 branch exactly, just
+    # rooted in this package instead of the Toga one (this app has no
+    # dependency on uwmedia/toga at all, see pyside6_rework.md).
     if len(sys.argv) > 1:
         import multiprocessing
 
@@ -13,9 +17,9 @@ def main():
 
         run_cli()
     else:
-        from uwmedia.app import main as run_gui
+        from uwmedia.app import main as run_app
 
-        run_gui().main_loop()
+        run_app()
 
 
 if __name__ == "__main__":

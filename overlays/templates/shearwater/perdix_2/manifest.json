@@ -1,0 +1,14 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 2",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    },
+    {
+      "id": "tec",
+      "name": "Tec"
+    }
+  ]
+}

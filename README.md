@@ -98,7 +98,7 @@ briefcase package macOS -a uwmedia --adhoc-sign   # ...or just the plain GUI app
 
 ### Graphical User Interface
 
-UWMedia is a single desktop app (built with [Toga](https://toga.readthedocs.io/)) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
+UWMedia is a single desktop app (built with [PySide6](https://doc.qt.io/qtforpython/)/Qt Quick) that bundles the CLI's batch-processing controls together with interactive design/tuning tools, organized into sections in the sidebar:
 
 <p align="center">
   <img src="media/main.jpg" alt="Process tab" width="800">
@@ -122,9 +122,19 @@ briefcase dev          # via Briefcase
     <img src="media/tag_editor.jpg" alt="Tag Editor tab" width="800">
   </p>
 
-- **HUD Designer**: click-and-drag telemetry fields, shapes, and skins onto a live video/photo preview; save/load `.zip` HUD packages, add custom labels or a depth-graph overlay, align multiple fields, and preview the exact rendered output.
+- **Overlay Designer**: preview any built-in overlay template (brand → dive computer → page) on a live video/photo frame or directly from a dive log, with a scale slider and a raw-waypoint inspector. Full editing (placing and styling telemetry fields, custom backgrounds, saving your own templates) is being restored - see `overlay_rework.md`.
 
 Please share if you make a fancy HUD!
+
+### Designing your own overlay
+
+The Overlay Designer edits templates directly:
+
+- Pick a built-in template (brand → dive computer → page) and modify it: drag fields on the canvas (or nudge with the arrow keys / type X and Y), add telemetry fields, custom labels, the state badge, tank icons or the depth graph, and set font, size, colour, alignment and outline per field. The canvas renders a synthetic dive by default, so no video or dive log is needed; both stay optional.
+- Built-in templates are read-only in the installed app. **Save as…** copies the page into one you own - under the same computer (so it keeps that computer's colour and warning rules), another computer, or a new *Custom* computer.
+- **New custom…** starts an empty page from your own background image (a dive-computer screenshot, a HUD graphic, a transparent PNG) or a plain rounded shape, then you place fields on it.
+- Your templates live in the app's data folder (`~/Library/Application Support/UWMedia/templates/<brand>/<computer>/<page>/normal.json` + `normal.png` on macOS; the equivalent per-user folder on Windows/Linux, overridable under Advanced). They appear in the Overlay Generator and in Color's *Add Overlay* picker immediately, marked "· yours", and the CLI renders them with `--layout <that folder>/normal.json`.
+- Running from a source checkout, saves go straight into the repo's `overlays/templates/` (that is how the built-in templates are authored); set `UWMEDIA_TEMPLATES_TARGET=user` to force the per-user folder instead.
 
 ### Command Line Interface (CLI)
 

@@ -1,0 +1,106 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Tern",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.370,
+        "rel_y": 0.349,
+        "color": "#FFFFFF",
+        "font_size": 94,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.584,
+        "rel_y": 0.411,
+        "color": "#00ADED",
+        "font_size": 26,
+        "scale": 1.0
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.15,
+        "rel_y": 0.445,
+        "font_size": 20,
+        "value_font_size": 34,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.254,
+        "rel_y": 0.472,
+        "color": "#00ADED",
+        "font_size": 24,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.2475,
+        "rel_y": 0.5029,
+        "color": "#FFFFFF",
+        "font_size": 71,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:PO2",
+        "rel_x": 0.584,
+        "rel_y": 0.472,
+        "color": "#00ADED",
+        "font_size": 24,
+        "scale": 1.0
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.564,
+        "rel_y": 0.5029,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.358,
+        "rel_y": 0.577,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.28,
+        "rel_y": 0.645,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.56,
+        "rel_y": 0.650,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.645,
+        "rel_y": 0.640,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

@@ -1,0 +1,14 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    },
+    {
+      "id": "gases",
+      "name": "Gases"
+    }
+  ]
+}

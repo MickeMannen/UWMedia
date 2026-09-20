@@ -1,0 +1,14 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Petrel",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    },
+    {
+      "id": "tec",
+      "name": "Tec"
+    }
+  ]
+}

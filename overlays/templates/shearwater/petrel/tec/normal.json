@@ -1,0 +1,210 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Petrel",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "custom:DEPTH",
+        "rel_x": 0.13723,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "depth",
+        "rel_x": 0.1358,
+        "rel_y": 0.32751,
+        "color": "#FFFFFF",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.35575,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.34861,
+        "rel_y": 0.31816,
+        "color": "#FFFFFF",
+        "font_size": 44,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:STOP",
+        "rel_x": 0.54427,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "deco_stop_depth",
+        "rel_x": 0.59426,
+        "rel_y": 0.32751,
+        "color": "#FFFFFF",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.72566,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "next_stop_time",
+        "rel_x": 0.83134,
+        "rel_y": 0.32596,
+        "color": "#FFFFFF",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:T1",
+        "rel_x": 0.14295,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 29,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.2115,
+        "rel_y": 0.46322,
+        "width": 21,
+        "height": 37,
+        "corner_radius": 4
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.20864,
+        "rel_y": 0.52561,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:BAR",
+        "rel_x": 0.32719,
+        "rel_y": 0.52561,
+        "color": "#00ADED",
+        "font_size": 14,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:PPO2",
+        "rel_x": 0.39432,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.40146,
+        "rel_y": 0.52249,
+        "color": "#FFFFFF",
+        "font_size": 44,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF99",
+        "rel_x": 0.6871,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.70567,
+        "rel_y": 0.52561,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:%",
+        "rel_x": 0.83706,
+        "rel_y": 0.55212,
+        "color": "#00ADED",
+        "font_size": 15,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:O2/HE",
+        "rel_x": 0.29433,
+        "rel_y": 0.65662,
+        "color": "#00ADED",
+        "font_size": 33,
+        "scale": 1.0
+      },
+      {
+        "field": "divemode",
+        "rel_x": 0.13009,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 47,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.28006,
+        "rel_y": 0.71589,
+        "color": "#FFFFFF",
+        "font_size": 49,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.5657,
+        "rel_y": 0.65662,
+        "color": "#00ADED",
+        "font_size": 33,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.62997,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.7228,
+        "rel_y": 0.65818,
+        "color": "#00ADED",
+        "font_size": 34,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.70567,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 47,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

@@ -1,7 +1,7 @@
 [tool.briefcase]
 project_name = "UWMedia"
 bundle = "com.mikaelchristersson"
-version = "0.0.19"
+version = "0.7.0"
 license = "MIT"
 license-files = ["LICENSE"]
 author = "Mikael Christersson"
@@ -25,6 +25,10 @@ sources = [
     "color.yaml",
     "hud_rules.json",
     "resources/licenses",
+    # Bundled overlay fonts (DejaVu Sans, Liberation Sans, Roboto, Roboto
+    # Mono, DSEG7 Classic - Regular + Bold) - see utils/fonts.py and the
+    # *_FONT_LICENSE.txt files under resources/licenses.
+    "resources/fonts",
 ]
 requires = [
     "pydantic>=2.0.0",
@@ -40,6 +44,11 @@ requires = [
 
 # Plain GUI app - what most users should download. Installs into
 # /Applications on macOS (.dmg), with no terminal/CLI component.
+#
+# QML/PySide6 (qml_development.md) - not Toga. Promoted from the former
+# uwmedia-qt-beta side-install at cutover, once every page had a working
+# QML counterpart (qml_development.md's own Phase 1-11 write-ups) - that
+# beta app key is retired, not kept alongside this one.
 [tool.briefcase.app.uwmedia]
 formal_name = "UWMedia"
 description = "Underwater media processor - GUI app"
@@ -53,23 +62,37 @@ designer. For scripted/batch command-line use, see "UWMedia-Terminal".
 """
 # cli_main.py is bundled here too, even though this build has no
 # user-facing CLI (no console_app, no PATH symlink/terminal command,
-# unlike uwmedia-terminal) - the GUI's own Process/Convertion "Run" button
-# relaunches this app's executable with CLI args (see app.py's
-# build_command()/on_run()) so processing runs in a separate, killable
-# subprocess with streamed log output instead of blocking the UI thread.
+# unlike uwmedia-terminal) - the GUI's own Color/Convertion "Start" button
+# relaunches this app's executable with CLI args (see backends/
+# color_backend.py's/convertion_backend.py's own _build_command()/
+# onStartClicked()) so processing runs in a separate, killable subprocess
+# with streamed log output instead of blocking the UI thread.
 # uwmedia/__main__.py's `len(sys.argv) > 1` branch imports cli_main to
-# handle that relaunch, so without it here the Run button would crash
+# handle that relaunch, so without it here the Start button would crash
 # with "ModuleNotFoundError: No module named 'cli_main'" on every
 # packaged install of this app (dev/source runs never hit this, since
 # cli_main.py just sits in the checkout either way). cli_main.py only
 # needs modules/packages already in the shared sources/requires above -
 # it doesn't need uwmedia_terminal.
 sources = ["uwmedia", "cli_main.py"]
-requires = ["toga"]
+# PySide6-Essentials (not plain "PySide6") matches Briefcase's own PySide6
+# bootstrap template default - QtCore/QtGui/QtWidgets/QtQml/QtQuick,
+# everything this app needs; QtWebEngine/Charts/etc. (PySide6-Addons)
+# carry different licensing terms and aren't needed, see qml_development.md's
+# Licensing section.
+requires = ["PySide6-Essentials~=6.8"]
 
 [tool.briefcase.app.uwmedia.macOS]
+# false, not the PySide6 bootstrap template's own "true" default - this
+# project's shared opencv-python requirement (top-level [tool.briefcase]
+# requires) has no x86_64 wheel for this Python/macOS combination, so a
+# universal2 build fails installing binary requirements for x86_64
+# (found live during the QML rework's own Phase 0).
 universal_build = false
-requires = ["toga-cocoa"]
+# Matches Briefcase's own PySide6 bootstrap template default - PySide6
+# 6.10+ (needed for Python 3.14 support) enforces this minimum.
+min_os_version = "13.0"
+requires = ["std-nslog~=2.0.0"]
 # Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
 # and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
 sources = ["resources/bin_macos"]
@@ -102,11 +125,12 @@ batch use.
 """
 console_app = true
 sources = ["uwmedia", "cli_main.py", "uwmedia_terminal"]
-requires = ["toga"]
+requires = ["PySide6-Essentials~=6.8"]
 
 [tool.briefcase.app.uwmedia-terminal.macOS]
 universal_build = false
-requires = ["toga-cocoa"]
+min_os_version = "13.0"
+requires = ["std-nslog~=2.0.0"]
 # Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
 # and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
 sources = ["resources/bin_macos"]
@@ -115,6 +139,8 @@ cleanup_paths = [
 ]
 
 [tool.briefcase.app.uwmedia-terminal.windows]
+# UNVERIFIED, same posture as the .linux block below - the QML/PySide6
+# rework (qml_development.md) was only ever built and live-tested on macOS.
 # Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
 # and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
 sources = ["resources/bin_windows"]
@@ -150,29 +176,23 @@ install_launcher = true
 [tool.briefcase.app.uwmedia-terminal.linux]
 # Same reasoning as Windows above.
 formal_name = "UWMedia"
-requires = ["toga-gtk"]
-# Bundled ffmpeg/ffprobe/exiftool for this platform - see solve_dependencies.md
-# and resources/licenses/BINARY_MANIFEST.json for provenance/versions.
+# UNVERIFIED - see comment below. toga-gtk removed (Toga is gone), no
+# PySide6-on-Linux system_requires/system_runtime_requires added in its
+# place - this codebase's QML/PySide6 rework (qml_development.md) was only
+# ever built and live-tested on macOS; the former uwmedia-qt-beta
+# Briefcase entry itself never had a .linux block either, even after
+# every page was ported. Needs a real Linux build/test pass before
+# shipping - don't assume this block is correct as-is.
 sources = ["resources/bin_linux"]
 
-[tool.briefcase.app.uwmedia-terminal.linux.system.debian]
-system_requires = [
-    "libcairo2-dev",
-    "libgirepository-2.0-dev",
-]
-system_runtime_requires = [
-    "gir1.2-gtk-3.0",
-    "libgirepository-2.0-0",
-    "libcanberra-gtk3-module",
-]
-
-[tool.briefcase.app.uwmedia-terminal.linux.system.rhel]
-system_requires = [
-    "cairo-gobject-devel",
-    "gobject-introspection-devel",
-]
-system_runtime_requires = [
-    "gobject-introspection",
-    "gtk3",
-    "libcanberra-gtk3",
-]
+# PySide6 on Linux needs its own system Qt libraries, not the Toga/GTK
+# ones below (libcairo2-dev/gir1.2-gtk-3.0/etc.) - left commented out
+# rather than guessed at, since nothing in this repo's history has
+# actually built/run the QML app on Linux to verify what's really needed.
+# [tool.briefcase.app.uwmedia-terminal.linux.system.debian]
+# system_requires = [...]
+# system_runtime_requires = [...]
+#
+# [tool.briefcase.app.uwmedia-terminal.linux.system.rhel]
+# system_requires = [...]
+# system_runtime_requires = [...]

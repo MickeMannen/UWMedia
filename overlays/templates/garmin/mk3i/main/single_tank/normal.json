@@ -1,0 +1,114 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "max_depth",
+        "rel_x": 0.41246,
+        "rel_y": 0.21587,
+        "color": "#FFFFFF",
+        "font_size": 48,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.56001,
+        "rel_y": 0.24401,
+        "color": "#FFFFFF",
+        "font_size": 21,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.14944,
+        "rel_y": 0.47326,
+        "color": "#FFFFFF",
+        "font_size": 29,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_name",
+        "rel_x": 0.47994,
+        "rel_y": 0.28222,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.43374,
+        "rel_y": 0.32758,
+        "width": 19,
+        "height": 45,
+        "corner_radius": 4,
+        "draw_outline": true,
+        "outline_color": "#FFFFFF",
+        "outline_width": 2,
+        "outline_gap": 4
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.5049,
+        "rel_y": 0.32329,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0
+      },
+      {
+        "field": "depth",
+        "rel_x": 0.33208,
+        "rel_y": 0.40333,
+        "color": "#FFFFFF",
+        "font_size": 123,
+        "scale": 1.0,
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.67
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.56905,
+        "rel_y": 0.53218,
+        "color": "#FFFFFF",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:N\nD\nL",
+        "rel_x": 0.21593,
+        "rel_y": 0.60608,
+        "color": "#FFFFFF",
+        "font_size": 18,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.26722,
+        "rel_y": 0.58543,
+        "color": "#FFFFFF",
+        "font_size": 101,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.5959,
+        "rel_y": 0.58775,
+        "color": "#FFFFFF",
+        "font_size": 101,
+        "scale": 1.0,
+        "small_suffix": "seconds",
+        "small_suffix_scale": 0.33
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

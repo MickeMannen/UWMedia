@@ -28,7 +28,15 @@ class Waypoint(BaseModel):
     next_stop_time: Optional[int] = None
     air_remaining: Optional[int] = None
     ascent_rate: Optional[float] = None
-    n2: Optional[float] = None
+    n2_tissue_load: Optional[float] = Field(
+        None,
+        description=(
+            "Garmin N2 tissue load, already a percentage (FIT field 'n2_load' is declared "
+            "units=percent/scale=1/offset=0 in garmin_fit_sdk's own profile) - just not "
+            "bounded to 0-100, since tissue supersaturation can legitimately exceed 100% at "
+            "depth (confirmed 0-338 over one real dive)"
+        ),
+    )
     pressure_sac: Optional[float] = None
     volume_sac: Optional[float] = None
     rmv: Optional[float] = None
@@ -39,6 +47,16 @@ class Waypoint(BaseModel):
     gf: Optional[float] = None
     switchmix: Optional[float] = None
     battery: Optional[float] = None
+    cleared_gas_mix: Optional[str] = Field(
+        None, description="Backup/next gas shown during a gas-switch prompt (Shearwater); distinct from the currently-breathed gasmix"
+    )
+    po2_1: Optional[float] = Field(None, description="CCR cell 1 partial pressure of oxygen (bar) - distinct from the single OC po2 reading")
+    po2_2: Optional[float] = Field(None, description="CCR cell 2 partial pressure of oxygen (bar)")
+    po2_3: Optional[float] = Field(None, description="CCR cell 3 partial pressure of oxygen (bar)")
+    dive_alerts: List[str] = Field(
+        default_factory=list,
+        description="Dive-alert event names (Garmin FIT event_mesgs 'dive_alert' field) at/before this waypoint's timestamp, since the previous waypoint - used by hud_rules_engine.resolve_state() as a state signal where available",
+    )
 
     # Reference to parent dive info
     _dive: Optional['Dive'] = None
@@ -55,6 +73,32 @@ class Waypoint(BaseModel):
         # Get the first tank's pressure
         first_tank = next(iter(self.tanks.values()))
         return first_tank.pressure_bar
+
+    @property
+    def primary_tank_name(self) -> Optional[str]:
+        """Display name of the first tank - whatever the diver named it on their own
+        device, falling back to its dict key. Lets a generic template (e.g. Garmin
+        x50i's main page) show a tank's own name without hardcoding a specific diver's
+        naming, unlike the tank_name:<key> field which needs a literal key."""
+        if not self.tanks:
+            return None
+        key, first_tank = next(iter(self.tanks.items()))
+        return first_tank.name or key
+
+    @property
+    def secondary_tank_pressure(self) -> Optional[float]:
+        """Pressure of the second tank (sidemount's second cylinder), if any."""
+        if len(self.tanks) < 2:
+            return None
+        return list(self.tanks.values())[1].pressure_bar
+
+    @property
+    def secondary_tank_name(self) -> Optional[str]:
+        """Display name of the second tank - see primary_tank_name."""
+        if len(self.tanks) < 2:
+            return None
+        key, second_tank = list(self.tanks.items())[1]
+        return second_tank.name or key
 
     @property
     def gasmix(self) -> str:

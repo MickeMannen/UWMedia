@@ -1,0 +1,10 @@
+{
+  "manufacturer": "Generic",
+  "model": "Dive Profile",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main"
+    }
+  ]
+}

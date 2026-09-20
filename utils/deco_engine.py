@@ -23,6 +23,30 @@ class CompartmentState:
     p_n2: float
     p_he: float
 
+def mod_meters(f_o2: float, max_po2: float = 1.4) -> float:
+    """Maximum operating depth for a gas at a given PO2 limit - the same
+    formula already duplicated in parsers/uddf.py and parsers/subsurface.py
+    (`((1.4 / f_o2) - 1.0) * 10.0`), pulled out here so new code (the dive
+    plan builder) doesn't add a third copy."""
+    if f_o2 <= 0:
+        return 0.0
+    return max(0.0, ((max_po2 / f_o2) - 1.0) * 10.0)
+
+
+def ccr_effective_fractions(setpoint: float, ambient_pressure_bar: float, dil_o2: float, dil_he: float) -> Tuple[float, float]:
+    """Effective O2/He fractions breathed from a closed-circuit loop holding
+    PO2 constant at `setpoint` bar via `dil_o2`/`dil_he` diluent (fractions,
+    0-1). The loop's actual O2 fraction varies with depth to hold PO2
+    steady; only O2 is being added/removed by the controller, so the
+    remaining (non-O2) fraction keeps the diluent's own He:N2 ratio."""
+    if ambient_pressure_bar <= 0:
+        return dil_o2, dil_he
+    f_o2 = min(setpoint / ambient_pressure_bar, 1.0)
+    dil_inert = max(1e-9, 1.0 - dil_o2)
+    f_he = (1.0 - f_o2) * (dil_he / dil_inert)
+    return f_o2, f_he
+
+
 class TTSDataPoint(BaseModel):
     """Pydantic model for calculated decompression data at a specific time."""
     timestamp: datetime
@@ -155,6 +179,36 @@ class BuhlmannEngine:
 
     def clone(self) -> 'BuhlmannEngine':
         return copy.deepcopy(self)
+
+    def compute_ndl_seconds(
+        self,
+        depth_meters: float,
+        f_o2: float,
+        f_he: float,
+        gf_low: float,
+        step_seconds: float = 10.0,
+        cap_seconds: int = 99 * 60,
+    ) -> Optional[int]:
+        """Forward-simulates staying at `depth_meters` on this gas until the
+        GF-low ceiling first rises above the surface - the same "time until
+        you owe a stop" definition a dive computer's NDL represents. Uses
+        gf_low as the trigger threshold, matching how
+        DiveDecompressor._simulate_tts already decides an ascent must stop
+        (its own `target_ceiling = sim_engine.get_ceiling(self.gf_low)`).
+        Returns None once `cap_seconds` passes with no ceiling appearing -
+        display as "99+", the convention already used elsewhere in this app
+        for an unbounded NDL. No NDL computation existed anywhere in this
+        codebase before this method (see todo.md's "what-if NDL" gap)."""
+        if self.get_ceiling(gf_low) > 0:
+            return 0
+        sim = self.clone()
+        elapsed = 0.0
+        while elapsed < cap_seconds:
+            sim.update(depth_meters, step_seconds, f_o2, f_he)
+            elapsed += step_seconds
+            if sim.get_ceiling(gf_low) > 0:
+                return int(elapsed)
+        return None
 
 # --- 3. TTS Processor and Look-Ahead Simulation ---
 

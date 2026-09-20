@@ -35,9 +35,7 @@ def test_convert_video_resolution():
         "python3", "cli_main.py",
         str(source_video),
         str(output_subfolder),
-        "--convert", "1080p",
-        "--start-time", "00:00",
-        "--end-time", "00:05"
+        "--convert", "1080p"
     ]
     
     result = subprocess.run(cmd, capture_output=True, text=True)

@@ -9,6 +9,7 @@ SETTINGS_FILENAME = "settings.json"
 DEFAULT_SETTINGS: Dict[str, Any] = {
     # None means "use the default user_data_dir() location"
     "layouts_dir": None,
+    "templates_dir": None,
     "color_profiles_dir": None,
     # None means "auto-detect from PATH / common install locations"
     "ffmpeg_path": None,

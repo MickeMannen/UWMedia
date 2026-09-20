@@ -8,6 +8,17 @@ from utils.config import get_config
 
 FIT_EPOCH_S = 631065600
 
+# garmin_product codes not yet named in the installed garmin_fit_sdk's own
+# profile (garmin_fit_sdk/profile.py's garmin_product enum) - the SDK decodes
+# these as a raw int instead of a string, presumably because it predates the
+# device's registration. Confirmed against real files (product 4518 is the
+# "creator" device on every file in test_data/logs/fit/ numbered 455+, per
+# user confirmation the diver switched to an x50i around then - two brief
+# exceptions at 460/461 still show descent_mk3i, i.e. a temporary swap back).
+_UNMAPPED_GARMIN_PRODUCTS = {
+    4518: "descent_x50i",
+}
+
 def remove_offset(dt: datetime) -> datetime:
     if dt is None:
         return None
@@ -70,6 +81,8 @@ class GarminParser(BaseParser):
         if id_messages:
             product = id_messages[0].get("garmin_product")
             manufacturer = id_messages[0].get("manufacturer")
+            if isinstance(product, int) and product in _UNMAPPED_GARMIN_PRODUCTS:
+                product = _UNMAPPED_GARMIN_PRODUCTS[product]
             dive_meta["device"] = str(product) if product is not None else None
             dive_meta["manufactor"] = str(manufacturer) if manufacturer is not None else None
 
@@ -199,12 +212,29 @@ class GarminParser(BaseParser):
             tank_messages_dict[ts_local][tank_key] = tank_data
             # print(f"DEBUG: Tank update at {ts_local} for {tank_key}")
 
+        # Dive-alert events (e.g. "approaching_first_deco_stop", "safety_stop_started") -
+        # a more direct state signal than depth-band heuristics; see hud_rules_engine.resolve_state()
+        alert_events = []
+        for ev in messages.get("event_mesgs", []):
+            if ev.get("event") != "dive_alert":
+                continue
+            alert = ev.get("dive_alert")
+            ts = ev.get("timestamp")
+            if alert is None or ts is None:
+                continue
+            if isinstance(ts, int):
+                ts = datetime.fromtimestamp(ts + FIT_EPOCH_S, tz=timezone.utc)
+            # Some dive_alert values are undecoded enum ints (unrecognized by the SDK's
+            # profile) rather than the named string - normalize to str either way
+            alert_events.append((remove_offset(ts.astimezone(tz)), str(alert)))
+        alert_events.sort(key=lambda pair: pair[0])
+
         # Process Waypoints (Records)
         waypoints = []
         current_active_tanks = {}
         record_messages = messages.get("record_mesgs", [])
         print(f"DEBUG: Found {len(record_messages)} record messages")
-        
+
         # Sort tank updates by time for efficient merging
         sorted_tank_times = sorted(tank_messages_dict.keys())
         
@@ -222,6 +252,7 @@ class GarminParser(BaseParser):
         
         current_active_tanks = initial_tanks.copy()
         tank_ptr = 0
+        alert_ptr = 0
         current_max_depth = 0.0
 
         for record in record_messages:
@@ -242,6 +273,13 @@ class GarminParser(BaseParser):
             if depth > current_max_depth:
                 current_max_depth = depth
 
+            # Catch up dive-alert events to the current waypoint time (same
+            # sorted-pointer pattern as the tank-update merge above)
+            wp_alerts = []
+            while alert_ptr < len(alert_events) and alert_events[alert_ptr][0] <= ts_local:
+                wp_alerts.append(alert_events[alert_ptr][1])
+                alert_ptr += 1
+
             wp = Waypoint(
                 timestamp=ts_local,
                 depth=depth,
@@ -255,15 +293,17 @@ class GarminParser(BaseParser):
                 tts=int(record.get("time_to_surface", 0)),
                 ndl=int(record.get("ndl_time", 0)),
                 air_remaining=int(record.get("air_time_remaining", 0)),
-                ascent_rate=float(record.get("ascent_rate", 0.0)),
-                n2=float(record.get("n2_load", 0.0)),
+                # FIT logs it in m/s (positive = getting shallower); the HUD works in m/min.
+                ascent_rate=float(record.get("ascent_rate", 0.0)) * 60.0,
+                n2_tissue_load=float(record.get("n2_load", 0.0)),
                 pressure_sac=float(record.get("pressure_sac", 0.0)),
                 volume_sac=float(record.get("volume_sac", 0.0)),
                 rmv=float(record.get("rmv", 0.0)),
                 heart_rate=int(record.get("heart_rate", 0)),
                 cns=int(record.get("cns_load", 0)),
                 po2=float(record.get("po2", 1.2)),
-                tanks=current_active_tanks.copy()
+                tanks=current_active_tanks.copy(),
+                dive_alerts=wp_alerts,
             )
             waypoints.append(wp)
 

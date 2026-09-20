@@ -1,0 +1,118 @@
+{
+  "manufacturer": "Garmin",
+  "model": "x50i",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "n2_tissue_load",
+        "type": "tissue_bar",
+        "rel_x": 0.17759,
+        "rel_y": 0.22924,
+        "width": 12,
+        "height": 33,
+        "marker_size": 4,
+        "label": "Tissue load"
+      },
+      {
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.17125,
+        "rel_y": 0.40864,
+        "width": 16,
+        "height": 47,
+        "up_count": 4,
+        "down_count": 1,
+        "label": "Ascent rate"
+      },
+      {
+        "field": "custom:CURRENT GAS",
+        "rel_x": 0.52642,
+        "rel_y": 0.23178,
+        "color": "#999999",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.55999,
+        "rel_y": 0.28447,
+        "color": "#FFFFFF",
+        "font_size": 27,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GAS PO2",
+        "rel_x": 0.44909,
+        "rel_y": 0.42337,
+        "color": "#999999",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:SURF. GF",
+        "rel_x": 0.66479,
+        "rel_y": 0.42337,
+        "color": "#999999",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.42874,
+        "rel_y": 0.47605,
+        "color": "#FFFFFF",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.6719,
+        "rel_y": 0.47605,
+        "color": "#FFFFFF",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF99",
+        "rel_x": 0.47147,
+        "rel_y": 0.61495,
+        "color": "#999999",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:CNS",
+        "rel_x": 0.69226,
+        "rel_y": 0.61495,
+        "color": "#999999",
+        "font_size": 13,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:--",
+        "rel_x": 0.48673,
+        "rel_y": 0.67562,
+        "color": "#999999",
+        "font_size": 12,
+        "scale": 1.0
+      },
+      {
+        "field": "cns",
+        "rel_x": 0.6719,
+        "rel_y": 0.66764,
+        "color": "#FFFFFF",
+        "font_size": 28,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.6
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

@@ -1,0 +1,10 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Tern",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    }
+  ]
+}

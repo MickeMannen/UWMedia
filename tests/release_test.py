@@ -114,7 +114,7 @@ class TestRelease:
         cmd = [
             "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
             "--color", "--filename-format", "release_test_test05_color",
-            "--start-time", "00:00", "--end-time", "00:15", "--hw-accel"
+            "--hw-accel"
         ]
         subprocess.run(cmd, check=True)
 
@@ -162,7 +162,7 @@ class TestRelease:
             cmd = [
                 "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
                 "--color", profile, "--filename-format", f"release_test_test05_profile_{profile}",
-                "--start-time", "00:00", "--end-time", "00:15", "--hw-accel"
+                "--hw-accel"
             ]
             subprocess.run(cmd, check=True)
             found = list(OUTPUT_DIR.glob(f"release_test_test05_profile_{profile}.mp4"))
@@ -223,7 +223,7 @@ class TestRelease:
                 "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
                 "--color", "--layout", str(layout), "--logs", str(logs),
                 "--filename-format", f"release_test_test07_{layout.stem}",
-                "--start-time", "00:00", "--end-time", "00:15", "--hw-accel"
+                "--hw-accel"
             ]
             subprocess.run(cmd, check=True)
 

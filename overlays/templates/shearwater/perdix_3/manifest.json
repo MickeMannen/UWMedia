@@ -1,0 +1,18 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 3",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    },
+    {
+      "id": "standard",
+      "name": "Standard"
+    },
+    {
+      "id": "tec",
+      "name": "Tec"
+    }
+  ]
+}

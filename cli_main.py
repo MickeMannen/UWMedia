@@ -230,7 +230,12 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     try:
         # Use rate_noinv_fmt (string) instead of rate_noinv (float/None) to avoid crash at t=0
         bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_noinv_fmt}]"
-        with tqdm(total=total_frames, desc="Rendering", unit="frame", bar_format=bar_format) as pbar:
+        # disable when not a real terminal (e.g. piped from the GUI's subprocess reader) -
+        # tqdm's bar redraws with a bare \r, never a newline, so a line-buffered reader
+        # (uwmedia/app.py's readline() loop) buffers the whole render's worth of redraws
+        # unread and then dumps it into the log widget in one huge blob, freezing the UI.
+        with tqdm(total=total_frames, desc="Rendering", unit="frame", bar_format=bar_format, disable=not sys.stdout.isatty()) as pbar:
+            last_emitted_pct = 0.0
             for i in range(total_frames):
                 # Get waypoint
                 current_time = dive.start_time + timedelta(seconds=i/fps)
@@ -251,6 +256,16 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 
                 write_q.put(cached_bytes)
                 pbar.update(1)
+
+                # Surfaced to the GUI (uwmedia/app.py parses this to drive the
+                # Progress bar mid-file, same marker/throttling as ffmpeg_class.py's
+                # own encode progress) - render_log is always a single, sequential
+                # invocation, never part of the parallel multi-file batch, so
+                # attributing this percentage to "the current file" is unambiguous.
+                pct = ((i + 1) / total_frames) * 100 if total_frames else 100.0
+                if pct - last_emitted_pct >= 1.0 or i == total_frames - 1:
+                    print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                    last_emitted_pct = pct
     finally:
         write_q.put(_SENTINEL)
         write_thread.join(timeout=10)
@@ -299,6 +314,22 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
 
     print(f"\nDone: {target_path.name}")
 
+def resolve_layout_relative_skin(layout_json_path: Path):
+    """If layout_json_path's hud_skin.path is relative, rewrites it in place
+    to an absolute path resolved against the layout file's own directory.
+    Shared by the single-overlay --layout path and each --overlays-file
+    entry (Pass 2's multi-overlay path) - same resolution rule, applied to
+    N files instead of one."""
+    with open(layout_json_path, 'r') as f:
+        layout_data = json.load(f)
+
+    skin_path = layout_data.get("hud_skin", {}).get("path")
+    if skin_path and not Path(skin_path).is_absolute():
+        abs_skin_path = str((layout_json_path.parent / skin_path).resolve())
+        layout_data["hud_skin"]["path"] = abs_skin_path
+        with open(layout_json_path, 'w') as f:
+            json.dump(layout_data, f, indent=2)
+
 def validate_layout(layout_path: Path, manager: DiveManager):
     """Validates the HUD layout against loaded dive logs."""
     if not layout_path or not layout_path.exists():
@@ -320,7 +351,16 @@ def validate_layout(layout_path: Path, manager: DiveManager):
 
     # Basic field validation
     # Use Pydantic's model_fields to get valid Waypoint fields
-    valid_fields = set(Waypoint.model_fields.keys()) | {"gasmix", "primary_tank_pressure"}
+    valid_fields = set(Waypoint.model_fields.keys()) | {
+        "gasmix",
+        "primary_tank_pressure",
+        "secondary_tank_pressure",
+        "primary_tank_name",
+        "secondary_tank_name",
+        "safety_stop",
+        "time_of_day",
+        "depth_graph",
+    }
     
     layout_fields = [elem.get("field") for elem in linked_elements if elem.get("field")]
     
@@ -416,8 +456,6 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
                 output_path=target_path,
                 creation_date=creation_date,
                 tz_offset_mins=tz_offset_mins,
-                start_time=args.start_time,
-                end_time=args.end_time,
                 target_resolution=(target_w, target_h),
                 bitrate=target_bitrate
             )
@@ -638,7 +676,10 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             write_thread.start()
 
             try:
-                with tqdm(total=total_frames, desc=f"Rendering {source.name}", unit="frame") as pbar:
+                # disable when piped (see the other render loop's tqdm call for why -
+                # unthrottled \r redraws with no newline freeze the GUI's log widget)
+                with tqdm(total=total_frames, desc=f"Rendering {source.name}", unit="frame", disable=not sys.stdout.isatty()) as pbar:
+                    last_emitted_pct = 0.0
                     for i in range(total_frames):
                         elapsed = i / fps
                         current_time = creation_date + timedelta(seconds=elapsed)
@@ -655,6 +696,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
                         write_q.put(cached_bytes)
                         pbar.update(1)
+
+                        # Surfaced to the GUI, same marker/throttling as
+                        # process_log_only's render loop and ffmpeg_class.py's encode
+                        # progress. Unlike those, this one *can* run concurrently with
+                        # other files' renders (multi-file batches use a thread pool -
+                        # see the ThreadPoolExecutor usage below), so the GUI only
+                        # attributes it to "the current file" when there's exactly one
+                        # file in the batch (see _handle_progress_line's comment).
+                        pct = ((i + 1) / total_frames) * 100 if total_frames else 100.0
+                        if pct - last_emitted_pct >= 1.0 or i == total_frames - 1:
+                            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                            last_emitted_pct = pct
             finally:
                 write_q.put(_SENTINEL)
                 write_thread.join(timeout=10)
@@ -759,8 +812,8 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     if is_video:
         ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
         needs_color = args.color
-        needs_overlay = True if args.layout else False
-        
+        needs_overlay = True if (args.layout or args.overlay_instances) else False
+
         # Use fast LUT path for color-only processing (no overlay)
         use_lut_path = needs_color and not needs_overlay
         
@@ -772,8 +825,6 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 input_path=source,
                 output_path=target_path,
                 creation_date=creation_date,
-                start_time=args.start_time,
-                end_time=args.end_time,
                 tz_offset_mins=tz_offset_mins
             )
             proc_time = time.time() - t_proc_start
@@ -795,8 +846,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 dive=dive,
                 overlay=needs_overlay,
                 layout_path=args.layout,
-                start_time=args.start_time,
-                end_time=args.end_time,
+                overlay_instances=args.overlay_instances,
                 tz_offset_mins=tz_offset_mins,
                 color_correct=needs_color
             )
@@ -813,12 +863,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 input_path=source,
                 output_path=target_path,
                 creation_date=creation_date,
-                dive=dive,
                 color_correct=False,
-                overlay=needs_overlay,
-                layout_path=args.layout,
-                start_time=args.start_time,
-                end_time=args.end_time,
                 tz_offset_mins=tz_offset_mins
             )
             proc_time = time.time() - t_proc_start
@@ -831,7 +876,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     else:
         # Photo Processing with optional Color/Overlay
         needs_color = args.color
-        needs_overlay = True if args.layout else False
+        needs_overlay = True if (args.layout or args.overlay_instances) else False
 
         if needs_color or needs_overlay:
             print(f"Applying processing to photo: {source.name}")
@@ -857,17 +902,29 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     color_time = time.time() - t_color
                     stats["stages"].append({"name": "Color Correction", "time": color_time})
                 
-                # 2. HUD Overlay
+                # 2. HUD Overlay - single layout (--layout) and/or Pass 2's
+                # multi-overlay list (--overlays-file), composited in order.
                 if needs_overlay and dive:
                     t_overlay = time.time()
-                    from gui.hud_renderer import draw_hud
-                    with open(args.layout, 'r') as f:
-                        layout = json.load(f)
-                    
+                    from gui.hud_renderer import draw_hud, resolve_overlay_instance_layout
+
                     # Match waypoint to photo creation time
                     wp = dive.get_waypoint_at(creation_date)
                     if wp:
-                        draw_hud(frame, layout, wp, waypoints=dive.waypoints)
+                        if args.layout:
+                            with open(args.layout, 'r') as f:
+                                layout = json.load(f)
+                            draw_hud(frame, layout, wp, waypoints=dive.waypoints)
+                        if args.overlay_instances:
+                            frame_h, frame_w = frame.shape[:2]
+                            for inst in args.overlay_instances:
+                                with open(Path(inst["layout_path"]), 'r') as f:
+                                    raw_layout = json.load(f)
+                                resolved = resolve_overlay_instance_layout(
+                                    raw_layout, inst.get("x", 0.0), inst.get("y", 0.0),
+                                    inst.get("scale", 1.0), frame_w, frame_h
+                                )
+                                draw_hud(frame, resolved, wp, waypoints=dive.waypoints)
                     else:
                         print("Warning: No dive data matched for this photo's timestamp.")
                     overlay_time = time.time() - t_overlay
@@ -941,6 +998,13 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 def _parallel_worker(task):
     """Worker function for multi-core parallel processing of a single file."""
     file, output_dir, args, manager, tmp_hud_dir = task
+    # Fires the moment a worker thread actually starts this file (not when
+    # it's merely submitted/queued - ThreadPoolExecutor bounds real
+    # concurrency to max_workers, so several submitted tasks can be
+    # waiting). Surfaced to the GUI (color_backend.py's ACTIVE_LINE_RE) so
+    # the Progress card can show how many files are genuinely in flight at
+    # once, not just an indeterminate "something is happening" spinner.
+    print(f"UWMEDIA_PROGRESS_ACTIVE {file.name}", flush=True)
     # Re-initialize MetadataHandler locally inside the subprocess to prevent ExifTool locking/resource conflicts
     local_meta_handler = MetadataHandler()
     try:
@@ -986,10 +1050,15 @@ def main():
     parser.add_argument("output", type=Path, nargs='?', help="Output file or directory")
     parser.add_argument("--logs", type=Path, help="Directory containing dive logs")
     parser.add_argument("--color", nargs='?', const='default', default=None, help="Apply color correction with selected profile (e.g. default, vivid, subtle). Defaults to 'default' if specified without a profile name.")
-    parser.add_argument("--start-time", help="Start time for clipping/processing (HH:MM:SS or MM:SS)")
-    parser.add_argument("--end-time", help="End time for clipping/processing (HH:MM:SS or MM:SS)")
     parser.add_argument("--hw-accel", action="store_true", default=False, help="Enable hardware acceleration")
     parser.add_argument("--layout", type=Path, help="JSON layout file or ZIP HUD package for overlay. Automatically enables overlay.")
+    parser.add_argument(
+        "--overlays-file", type=Path,
+        help="Path to a JSON file listing [{layout_path, x, y, scale}, ...] HUD overlays to "
+             "composite together, in order, onto one color-correction run (Color page's "
+             "multi-overlay Pass 2). Independent of --layout - each layout_path must be a "
+             "plain JSON layout, not a .zip HUD package."
+    )
     parser.add_argument("--tz-adjust", type=int, default=0, help="Timezone adjustment in hours (for Shearwater)")
     parser.add_argument("--force-media-tz", type=float, help="Force a specific timezone offset for media (in hours, e.g. +8 or -5.5)")
     parser.add_argument("--fix-tz", action="store_true", help="Only update the timezone metadata and exit (requires --force-media-tz)")
@@ -1222,20 +1291,27 @@ def main():
 
     # If layout is a direct JSON file, resolve relative skin path
     if args.layout and args.layout.suffix.lower() == ".json":
-        with open(args.layout, 'r') as f:
-            layout_data = json.load(f)
-        
-        skin_path = layout_data.get("hud_skin", {}).get("path")
-        if skin_path and not Path(skin_path).is_absolute():
-            # Resolve relative to the layout file
-            abs_skin_path = str((args.layout.parent / skin_path).resolve())
-            layout_data["hud_skin"]["path"] = abs_skin_path
-            # Write back updated absolute path to temp or handle in memory? 
-            # Easiest to handle in memory if we pass layout object instead of path.
-            # But ffmpeg engine currently takes path. Let's rewrite it to a temp file or update engine.
-            # Actually, the engine loads it later. Let's update the engine to load the object or ensure we write it back.
-            with open(args.layout, 'w') as f:
-                json.dump(layout_data, f, indent=2)
+        resolve_layout_relative_skin(args.layout)
+
+    # --overlays-file: Pass 2's multi-overlay list, independent of --layout.
+    # Each entry's layout_path must be a plain JSON layout (no .zip support
+    # here - every GUI-produced layout_path is always a resolved
+    # normal.json, never a package).
+    args.overlay_instances = None
+    if args.overlays_file:
+        if not args.overlays_file.exists():
+            print(f"Error: --overlays-file {args.overlays_file} not found.")
+            sys.exit(1)
+        with open(args.overlays_file, 'r') as f:
+            overlay_instances = json.load(f)
+        for inst in overlay_instances:
+            inst_path = Path(inst["layout_path"])
+            if not inst_path.exists():
+                print(f"Error: overlay layout '{inst_path}' (from --overlays-file) not found.")
+                sys.exit(1)
+            if inst_path.suffix.lower() == ".json":
+                resolve_layout_relative_skin(inst_path)
+        args.overlay_instances = overlay_instances
 
     # 1. Load Dive Logs
     manager = DiveManager()
@@ -1302,6 +1378,9 @@ def main():
 
     if args.layout:
         validate_layout(args.layout, manager)
+    if args.overlay_instances:
+        for inst in args.overlay_instances:
+            validate_layout(Path(inst["layout_path"]), manager)
 
     if args.render_log:
         process_log_only(args.render_log, args.output, args, manager, tmp_hud_dir)
@@ -1342,7 +1421,7 @@ def main():
             shutdown_wait = True
             try:
                 futures = {executor.submit(_parallel_worker, task): task[0] for task in tasks}
-                for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file"):
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Batch Processing", unit="file", disable=not sys.stdout.isatty()):
                     success, filename, result = future.result()
                     if not success:
                         print(f"Error processing {filename}: {result}")
@@ -1360,7 +1439,7 @@ def main():
             finally:
                 executor.shutdown(wait=shutdown_wait)
         else:
-            for i, file in enumerate(tqdm(files, desc="Batch Processing", unit="file"), start=1):
+            for i, file in enumerate(tqdm(files, desc="Batch Processing", unit="file", disable=not sys.stdout.isatty()), start=1):
                 res = process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
                 if res:
                     stats_list.append(res)

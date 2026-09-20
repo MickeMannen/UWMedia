@@ -99,6 +99,7 @@ class UDDFParser(BaseParser):
             current_max_depth = 0.0
             active_mix_id = None
             last_po2 = None
+            last_divemode = None
             
             # 4. Process waypoints
             for sample in dive_elem.xpath(".//*[local-name()='waypoint']"):
@@ -147,9 +148,34 @@ class UDDFParser(BaseParser):
                         pass
                 po2 = last_po2
 
-                # Dive Mode
+                # Dive Mode - not present on every sample (confirmed against a
+                # real Shearwater CCR export: <divemode> only appears on some
+                # waypoints), so persist the last seen value the same way po2
+                # already does, rather than reading blank in between.
                 divemode = sample.xpath("string(*[local-name()='divemode']/@type)") or \
                            sample.xpath("string(*[local-name()='divemode'])")
+                if divemode:
+                    last_divemode = divemode
+                divemode = last_divemode
+
+                # Deco stop - prefer the file's own logged value (real depth
+                # computers/software use their own tuned algorithm) over our
+                # generic Buhlmann recompute below, which can be materially
+                # off (confirmed: a real log said 6m steady, our recompute
+                # said 5.5m at the same point).
+                decostop_elem = sample.find("{*}decostop")
+                if decostop_elem is not None:
+                    try:
+                        logged_deco_stop_depth = float(decostop_elem.get("decodepth"))
+                    except (TypeError, ValueError):
+                        logged_deco_stop_depth = None
+                    try:
+                        logged_deco_stop_time = int(float(decostop_elem.get("duration")))
+                    except (TypeError, ValueError):
+                        logged_deco_stop_time = None
+                else:
+                    logged_deco_stop_depth = None
+                    logged_deco_stop_time = None
 
                 # GF
                 gf_str = sample.xpath("string(*[local-name()='gradientfactor'])")
@@ -164,25 +190,30 @@ class UDDFParser(BaseParser):
                 if mix_ref:
                     active_mix_id = mix_ref
 
-                # Tank data
+                # Tank data - a sidemount/multi-tank dive reports one
+                # <tankpressure ref="T1">/<tankpressure ref="T2"> element per
+                # tank per sample (confirmed against a real Perdix 2 UDDF
+                # export); string() above only ever read the first one,
+                # silently dropping every tank past the first. Gas info still
+                # comes from whichever mix is currently active - UDDF doesn't
+                # link a tank ref to its own configured mix independent of
+                # that, so a stage/deco bottle with a different gas than the
+                # one being breathed won't get its own o2/he here.
                 tanks = {}
-                pressure_str = sample.xpath("string(*[local-name()='tankpressure'])")
-                if pressure_str:
+                gas_info = gas_mixes.get(active_mix_id, {"o2": 21.0, "he": 0.0, "name": "AIR"})
+                for idx, elem in enumerate(sample.xpath("*[local-name()='tankpressure']"), start=1):
                     try:
-                        pressure_pa = float(pressure_str)
-                        pressure_bar = pressure_pa / 100000.0 if pressure_pa > 5000 else pressure_pa
-                        
-                        # Get gas info from active mix
-                        gas_info = gas_mixes.get(active_mix_id, {"o2": 21.0, "he": 0.0, "name": "AIR"})
-                        
-                        tanks["1"] = TankData(
-                            pressure_bar=pressure_bar,
-                            o2_percent=gas_info["o2"],
-                            he_percent=gas_info["he"],
-                            name=gas_info["name"]
-                        )
+                        pressure_pa = float(elem.text)
                     except (ValueError, TypeError):
-                        pass
+                        continue
+                    pressure_bar = pressure_pa / 100000.0 if pressure_pa > 5000 else pressure_pa
+                    key = elem.get("ref") or str(idx)
+                    tanks[key] = TankData(
+                        pressure_bar=pressure_bar,
+                        o2_percent=gas_info["o2"],
+                        he_percent=gas_info["he"],
+                        name=gas_info["name"],
+                    )
                 
                 waypoints.append(Waypoint(
                     timestamp=timestamp,
@@ -197,7 +228,9 @@ class UDDFParser(BaseParser):
                     battery=battery,
                     time_since_start=seconds,
                     dive_time=seconds,
-                    tanks=tanks
+                    tanks=tanks,
+                    deco_stop_depth=logged_deco_stop_depth,
+                    next_stop_time=logged_deco_stop_time,
                 ))
             
             if waypoints:
@@ -228,25 +261,37 @@ class UDDFParser(BaseParser):
                     
                     deco_results = decompressor.process_waypoints(wp_dicts, deco_gases)
                     
-                    # Map results back to waypoints
+                    # Map results back to waypoints - deco_stop_depth/next_stop_time
+                    # already carry the file's own logged <decostop> where present
+                    # (set above, during the per-sample loop); real
+                    # devices/software use their own tuned algorithm, so prefer
+                    # that over this generic Buhlmann recompute rather than
+                    # overwriting it (confirmed materially different against a
+                    # real log: file said a steady 6m, this recompute said 5.5m
+                    # at the same point).
                     for wp in waypoints:
                         res = deco_results.get(wp.time_since_start)
                         if res:
                             wp.tts = res.tts_seconds
-                            wp.deco_stop_depth = res.ceiling_meters
-                            wp.n2 = res.gf_current 
+                            if wp.deco_stop_depth is None:
+                                wp.deco_stop_depth = res.ceiling_meters
+                            if wp.gf is None:
+                                wp.gf = res.gf_current
                             if wp.po2 is None:
                                 wp.po2 = round(res.po2, 2)
                             wp.cns = int(res.cns)
-                            
-                            # Calculate next stop (next multiple of 3m above current ceiling)
-                            if res.ceiling_meters > 0:
-                                wp.next_stop_depth = math.ceil(res.ceiling_meters / 3.0) * 3.0
+
+                            # Calculate next stop (next multiple of 3m above the
+                            # authoritative ceiling - the file's own logged stop
+                            # depth when we have one, else the recompute above)
+                            ceiling = wp.deco_stop_depth or 0.0
+                            if ceiling > 0:
+                                wp.next_stop_depth = math.ceil(ceiling / 3.0) * 3.0
                             else:
                                 wp.next_stop_depth = 0.0
-                            
-                            # Estimate next stop time (simplified)
-                            wp.next_stop_time = 0 # Placeholder if not explicitly tracked
+
+                            if wp.next_stop_time is None:
+                                wp.next_stop_time = 0  # Placeholder if not explicitly tracked
                 except Exception as e:
                     print(f"Warning: Decompression calculation failed for dive: {e}")
 

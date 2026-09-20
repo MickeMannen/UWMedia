@@ -4,7 +4,7 @@ garmin-fit-sdk
 pytest
 numpy
 opencv-python
-toga
+PySide6-Essentials~=6.8
 pyexiftool
 tqdm
 briefcase==0.4.4

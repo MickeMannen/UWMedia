@@ -1,0 +1,90 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 3",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.2314,
+        "rel_y": 0.2222,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.4241,
+        "rel_y": 0.332,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.44,
+        "rel_y": 0.155,
+        "font_size": 24,
+        "value_font_size": 30,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.2206,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.5543,
+        "rel_y": 0.2937,
+        "color": "#FFFFFF",
+        "font_size": 55,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.5898,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.2239,
+        "rel_y": 0.7024,
+        "color": "#1A1A1A",
+        "font_size": 28,
+        "scale": 1.0
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.3799,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.5275,
+        "rel_y": 0.6944,
+        "color": "#00ADED",
+        "font_size": 28,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

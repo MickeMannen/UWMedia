@@ -1,0 +1,131 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Petrel",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.20721,
+        "rel_y": 0.26513,
+        "color": "#FFFFFF",
+        "font_size": 121,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:m",
+        "rel_x": 0.33718,
+        "rel_y": 0.38523,
+        "color": "#00ADED",
+        "font_size": 34,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.12867,
+        "rel_y": 0.46166,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.18436,
+        "rel_y": 0.52873,
+        "color": "#FFFFFF",
+        "font_size": 82,
+        "scale": 1.0
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.48,
+        "rel_y": 0.25421,
+        "font_size": 31,
+        "value_font_size": 68,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.71137,
+        "rel_y": 0.4601,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.71137,
+        "rel_y": 0.51313,
+        "color": "#FFFFFF",
+        "font_size": 90,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:T1",
+        "rel_x": 0.37147,
+        "rel_y": 0.67067,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.44287,
+        "rel_y": 0.67691,
+        "width": 21,
+        "height": 37,
+        "corner_radius": 4
+      },
+      {
+        "field": "custom:GTR",
+        "rel_x": 0.66139,
+        "rel_y": 0.67067,
+        "color": "#00ADED",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.13009,
+        "rel_y": 0.74397,
+        "color": "#FFFFFF",
+        "font_size": 78,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.42288,
+        "rel_y": 0.74241,
+        "color": "#FFFFFF",
+        "font_size": 80,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:BAR",
+        "rel_x": 0.55856,
+        "rel_y": 0.74085,
+        "color": "#00ADED",
+        "font_size": 14,
+        "scale": 1.0
+      },
+      {
+        "field": "air_remaining",
+        "rel_x": 0.77422,
+        "rel_y": 0.74241,
+        "color": "#FFFFFF",
+        "font_size": 80,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

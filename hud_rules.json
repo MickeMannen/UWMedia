@@ -1,9 +1,26 @@
 {
   "Shearwater": {
     "ndl": [
-      {"max": 10, "color": "#FF0000"},
-      {"min": 10, "max": 30, "color": "#FFFF00"},
-      {"min": 30, "color": "#FFFFFF"}
+      {
+        "max": 10,
+        "color": "#FF0000"
+      },
+      {
+        "min": 10,
+        "max": 30,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 30,
+        "color": "#FFFFFF"
+      }
+    ],
+    "ndl_zero": "#FF0000",
+    "po2": [
+      {
+        "min": 1.6,
+        "color": "#FF0000"
+      }
     ],
     "safety_stop": {
       "text": "SAFETY STOP",
@@ -12,28 +29,122 @@
       "min_depth": 3.0,
       "max_depth": 6.0
     },
-    "Perdix2": {
+    "clear": {
+      "margin": 1.0
+    },
+    "Perdix 2": {
       "tank_pressure": [
-        {"max": 60, "color": "#FF0000"},
-        {"max": 70, "color": "#FFA500"}
+        {
+          "max": 60,
+          "color": "#FF0000"
+        },
+        {
+          "max": 70,
+          "color": "#FFA500"
+        }
       ]
     },
     "Peregrine TX": {
       "tank_pressure": [
-        {"max": 60, "color": "#FF0000"},
-        {"max": 70, "color": "#FFA500"}
+        {
+          "max": 60,
+          "color": "#FF0000"
+        },
+        {
+          "max": 70,
+          "color": "#FFA500"
+        }
       ]
-    }
+    },
+    "badge_states": {
+      "safety_stop": {
+        "label": "SAFETY STOP",
+        "color": "#00ADED"
+      },
+      "deco": {
+        "label": "DECO",
+        "color": "#FF0000"
+      },
+      "clear": {
+        "label": "CLEAR",
+        "color": "#00C800"
+      }
+    },
+    "tissue_load": [
+      {
+        "max": 80,
+        "color": "#00FF00"
+      },
+      {
+        "min": 80,
+        "max": 100,
+        "color": "#FFC000"
+      },
+      {
+        "min": 100,
+        "color": "#FF0000"
+      }
+    ],
+    "tank_pressure_fill": [
+      {
+        "max": 50,
+        "color": "#FF0000"
+      },
+      {
+        "max": 70,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 70,
+        "color": "#FFFFFF"
+      }
+    ]
   },
   "Garmin": {
     "ndl": [
-      {"max": 10, "color": "#FF0000"},
-      {"min": 10, "max": 30, "color": "#FFFF00"},
-      {"min": 30, "color": "#FFFFFF"}
+      {
+        "max": 10,
+        "color": "#FF0000"
+      },
+      {
+        "min": 10,
+        "max": 30,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 30,
+        "color": "#FFFFFF"
+      }
     ],
     "tank_pressure": [
-      {"max": 60, "color": "#FF0000"},
-      {"max": 70, "color": "#FFA500"}
+      {
+        "max": 60,
+        "color": "#FF0000"
+      },
+      {
+        "max": 70,
+        "color": "#FFA500"
+      }
+    ],
+    "tank_pressure_fill": [
+      {
+        "max": 50,
+        "color": "#FF0000"
+      },
+      {
+        "max": 70,
+        "color": "#FFFF00"
+      }
+    ],
+    "po2": [
+      {
+        "min": 1.6,
+        "color": "#FF0000"
+      },
+      {
+        "min": 1.4,
+        "color": "#FFFF00"
+      }
     ],
     "safety_stop": {
       "text": "SAFETY STOP",
@@ -41,17 +152,83 @@
       "trigger_max_depth": 10.0,
       "min_depth": 3.0,
       "max_depth": 6.0
-    }
+    },
+    "badge_states": {
+      "safety_stop": {
+        "label": "STOP",
+        "color": "#00FF00"
+      },
+      "deco": {
+        "label": "DECO",
+        "color": "#FFA500"
+      }
+    },
+    "tissue_load": [
+      {
+        "max": 80,
+        "color": "#00FF00"
+      },
+      {
+        "min": 80,
+        "max": 100,
+        "color": "#FFC000"
+      },
+      {
+        "min": 100,
+        "color": "#FF0000"
+      }
+    ],
+    "ascent_rate": [
+      {
+        "max": 7.9,
+        "color": "#00FF00"
+      },
+      {
+        "min": 7.9,
+        "max": 10.1,
+        "color": "#FFC000"
+      },
+      {
+        "min": 10.1,
+        "color": "#FF0000"
+      }
+    ]
   },
   "default": {
     "ndl": [
-      {"max": 10, "color": "#FF0000"},
-      {"min": 10, "max": 30, "color": "#FFFF00"},
-      {"min": 30, "color": "#FFFFFF"}
+      {
+        "max": 10,
+        "color": "#FF0000"
+      },
+      {
+        "min": 10,
+        "max": 30,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 30,
+        "color": "#FFFFFF"
+      }
     ],
     "tank_pressure": [
-      {"max": 60, "color": "#FF0000"},
-      {"max": 70, "color": "#FFA500"}
+      {
+        "max": 60,
+        "color": "#FF0000"
+      },
+      {
+        "max": 70,
+        "color": "#FFA500"
+      }
+    ],
+    "tank_pressure_fill": [
+      {
+        "max": 50,
+        "color": "#FF0000"
+      },
+      {
+        "max": 70,
+        "color": "#FFFF00"
+      }
     ],
     "safety_stop": {
       "text": "SAFETY STOP",
@@ -59,6 +236,46 @@
       "trigger_max_depth": 10.0,
       "min_depth": 3.0,
       "max_depth": 6.0
-    }
+    },
+    "badge_states": {
+      "safety_stop": {
+        "label": "STOP",
+        "color": "#00FF00"
+      },
+      "deco": {
+        "label": "DECO",
+        "color": "#FFA500"
+      }
+    },
+    "tissue_load": [
+      {
+        "max": 80,
+        "color": "#00FF00"
+      },
+      {
+        "min": 80,
+        "max": 100,
+        "color": "#FFC000"
+      },
+      {
+        "min": 100,
+        "color": "#FF0000"
+      }
+    ],
+    "ascent_rate": [
+      {
+        "max": 7.9,
+        "color": "#00FF00"
+      },
+      {
+        "min": 7.9,
+        "max": 10.1,
+        "color": "#FFC000"
+      },
+      {
+        "min": 10.1,
+        "color": "#FF0000"
+      }
+    ]
   }
 }
