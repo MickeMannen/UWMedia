@@ -2,16 +2,11 @@
   "Shearwater": {
     "ndl": [
       {
-        "max": 10,
-        "color": "#FF0000"
-      },
-      {
-        "min": 10,
-        "max": 30,
+        "max": 5,
         "color": "#FFFF00"
       },
       {
-        "min": 30,
+        "min": 5,
         "color": "#FFFFFF"
       }
     ],
@@ -24,13 +19,21 @@
     ],
     "safety_stop": {
       "text": "SAFETY STOP",
-      "color": "#FFFF00",
-      "trigger_max_depth": 10.0,
-      "min_depth": 3.0,
-      "max_depth": 6.0
-    },
-    "clear": {
-      "margin": 1.0
+      "color": "#00ADED",
+      "trigger_max_depth": 11.0,
+      "duration_sec": 180,
+      "start_below": 6.0,
+      "count_range": [
+        2.4,
+        8.3
+      ],
+      "adapt": {
+        "deep_m": 30.0,
+        "low_ndl_sec": 300,
+        "duration_sec": 300
+      },
+      "min_depth": 2.4,
+      "max_depth": 8.3
     },
     "Perdix 2": {
       "tank_pressure": [
@@ -59,15 +62,33 @@
     "badge_states": {
       "safety_stop": {
         "label": "SAFETY STOP",
-        "color": "#00ADED"
+        "color": "#00ADED",
+        "value_color": "#FFFFFF",
+        "counting_color": "#00C800",
+        "complete_color": "#00C800",
+        "paused_value_color": "#FFFF00",
+        "check_mark": true,
+        "show_depth": false,
+        "timer_format": "m:ss",
+        "value_align": "center"
       },
       "deco": {
-        "label": "DECO",
-        "color": "#FF0000"
+        "label": "DECO STOP",
+        "color": "#FF0000",
+        "value_color": "#FFFFFF",
+        "approach_color": "#FFFF00",
+        "at_stop_color": "#00C800",
+        "violation_color": "#FF0000",
+        "check_mark": true,
+        "inline": true,
+        "timer_format": "min"
       },
       "clear": {
         "label": "CLEAR",
-        "color": "#00C800"
+        "color": "#00C800",
+        "value_color": "#FFFFFF",
+        "show_depth": false,
+        "timer_format": "m:ss"
       }
     },
     "tissue_load": [
@@ -98,7 +119,107 @@
         "min": 70,
         "color": "#FFFFFF"
       }
-    ]
+    ],
+    "deco_stop": {
+      "approach_m": 5.1,
+      "at_stop_m": 1.5
+    },
+    "deco_clear": {
+      "count_up": true
+    },
+    "sidemount_switch": {
+      "threshold_bar": 21.0,
+      "color": "#00C800",
+      "text_color": "#000000"
+    },
+    "Teric": {
+      "badge_states": {
+        "safety_stop": {
+          "label": "SAFETY",
+          "check_mark": null,
+          "counting_color": "#00C800",
+          "counting_value_color": "#00C800",
+          "paused_color": "#FFFF00",
+          "paused_value_color": "#FFFF00",
+          "complete_color": "#00ADED",
+          "complete_value_text": "CLEAR",
+          "complete_value_color": "#00C800"
+        },
+        "deco": {
+          "label": "DECO",
+          "check_mark": null,
+          "approach_color": null,
+          "at_stop_color": null
+        }
+      }
+    },
+    "Tern": {
+      "badge_states": {
+        "safety_stop": {
+          "label": "SAFETY",
+          "check_mark": null,
+          "counting_color": "#00C800",
+          "counting_value_color": "#00C800",
+          "paused_color": "#FFFF00",
+          "paused_value_color": "#FFFF00",
+          "complete_color": "#00ADED",
+          "complete_value_text": "CLEAR",
+          "complete_value_color": "#00C800"
+        },
+        "deco": {
+          "label": "DECO",
+          "check_mark": null,
+          "approach_color": null,
+          "at_stop_color": null
+        }
+      }
+    },
+    "Perdix 3": {
+      "badge_states": {
+        "safety_stop": {
+          "label": "SAFETY",
+          "paused_label": "PAUSED",
+          "title_box": true,
+          "check_mark": null,
+          "counting_color": "#00C800",
+          "counting_value_color": "#00C800",
+          "paused_color": "#FFFF00",
+          "paused_value_color": "#FFFF00",
+          "complete_color": "#00ADED",
+          "complete_value_text": "CLEAR",
+          "complete_value_color": "#00C800"
+        },
+        "deco": {
+          "label": "DECO",
+          "color": "#00ADED",
+          "check_mark": null,
+          "approach_color": null,
+          "at_stop_color": null
+        }
+      }
+    },
+    "ascent_rate": [
+      {
+        "max": 9.0,
+        "color": "#FFFFFF"
+      },
+      {
+        "min": 9.0,
+        "max": 18.0,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 18.0,
+        "color": "#FF0000",
+        "blink": true
+      }
+    ],
+    "ascent_chevrons": {
+      "up_count": 6,
+      "down_count": 0,
+      "bar": false,
+      "m_per_min_per_chevron": 3.0
+    }
   },
   "Garmin": {
     "ndl": [
@@ -165,6 +286,10 @@
       "deco": {
         "label": "DECO",
         "color": "#FFA500"
+      },
+      "clear": {
+        "label": "DECO",
+        "color": "#FFA500"
       }
     },
     "tissue_load": [
@@ -196,7 +321,27 @@
         "min": 10.1,
         "color": "#FF0000"
       }
-    ]
+    ],
+    "ceiling_broken": {
+      "margin": 0.6,
+      "color": "#FF0000"
+    },
+    "mk3i": {
+      "badge_states": {
+        "safety_stop": {
+          "label": "",
+          "color": "#FFFFFF"
+        },
+        "deco": {
+          "label": "",
+          "color": "#FFFFFF"
+        },
+        "clear": {
+          "label": "",
+          "color": "#FFFFFF"
+        }
+      }
+    }
   },
   "default": {
     "ndl": [

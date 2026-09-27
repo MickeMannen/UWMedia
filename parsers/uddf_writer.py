@@ -5,10 +5,12 @@ from typing import List, Optional
 from lxml import etree
 
 from models.dive_plan import DiveProfilePlan, PlannedGas
+from parsers.plan_embed import GENERATOR_NAME, add_uddf_plan
 from utils.dive_computers import dive_computer
 from utils.dive_plan_engine import SimulatedSample
 
 UDDF_NS = "http://www.streit.cc/uddf/3.2/"
+NDL_CAP_SEC = 99 * 60  # "99+" - how an unbounded NDL is logged
 _NSMAP = {None: UDDF_NS}
 
 
@@ -72,7 +74,7 @@ def write_uddf(
     root = etree.Element(_q("uddf"), nsmap=_NSMAP, version="3.2.3")
 
     generator = _el(root, "generator")
-    _el(generator, "name", "UWMedia Dive Profile Builder")
+    _el(generator, "name", GENERATOR_NAME)
     _el(generator, "type", "logbook")
     manufacturer = _el(generator, "manufacturer", id=computer.manufacturer)
     _el(manufacturer, "name", computer.manufacturer)
@@ -154,12 +156,21 @@ def write_uddf(
                 decodepth=round(s.stop_depth_m, 1),
                 duration=s.stop_duration_sec,
             )
-        elif s.ndl_sec is not None:
-            _el(wp, "nodecotime", s.ndl_sec)
+        else:
+            # An unbounded NDL (None) is written as the 99-minute cap, so the
+            # sample still says "no stop owed" - a waypoint with neither
+            # decostop nor nodecotime would leave that open.
+            _el(wp, "nodecotime", s.ndl_sec if s.ndl_sec is not None else NDL_CAP_SEC)
+        # Time to surface - not a UDDF element (Shearwater exports carry none);
+        # UWMedia's own extension, read back by parsers/uddf.py in preference
+        # to its generic recompute.
+        _el(wp, "tts", s.tts_sec)
 
     # Read back as Dive.timezone by UDDFParser (its own update_timezone
     # convention: offset in minutes, a direct child of <dive>).
     _el(dive, "timezone", utc_offset_minutes(start_time))
+    # The plan itself, so the builder can open this file again (plan_embed).
+    add_uddf_plan(dive, plan, UDDF_NS)
 
     tree = etree.ElementTree(root)
     tree.write(str(file_path), pretty_print=True, xml_declaration=True, encoding="utf-8")

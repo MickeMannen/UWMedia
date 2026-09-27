@@ -14,7 +14,7 @@ import QtQuick.Window
 Item {
     id: root
     width: 1060
-    height: 720
+    height: 800
 
     ScrollView {
         anchors.fill: parent
@@ -148,6 +148,9 @@ Item {
             Pane {
                 Layout.fillWidth: true
                 Material.elevation: 1
+                // Hidden (2026-09-28, per the user) - see
+                // utils/filename_formats.py's CUSTOM_FILENAME_FORMATS_ENABLED.
+                visible: advancedBackend.customFilenameFormatsEnabled
                 ColumnLayout {
                     anchors.left: parent.left
                     anchors.right: parent.right

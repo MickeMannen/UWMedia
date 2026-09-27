@@ -5,6 +5,7 @@ from typing import List, Optional
 from garmin_fit_sdk import Encoder, Profile
 
 from models.dive_plan import DiveProfilePlan
+from parsers.plan_embed import fit_plan_messages
 from parsers.uddf_writer import log_start_time
 from utils.dive_computers import dive_computer
 from utils.dive_plan_engine import SimulatedSample
@@ -14,6 +15,11 @@ FIT_EPOCH = datetime(1989, 12, 31)
 # DiveProfilePlan.tank_specs() order - FIT only knows a tank by its
 # transmitter's serial.
 TANK_SENSOR_BASE = 100001
+
+
+# file_creator.software_version of a UWMedia-written FIT (the marker proper is
+# the developer_data_id's application_id - see plan_embed.FIT_APPLICATION_ID).
+PLAN_SOFTWARE_VERSION = 800
 
 
 def _mesg_num(name: str) -> int:
@@ -68,6 +74,14 @@ def write_fit(
 
     write("file_id", type="activity", manufacturer="garmin", product=computer.fit_product,
           serial_number=serial, time_created=start_utc)
+    # UWMedia's mark and the plan itself, as developer data on the
+    # file_creator message, so the builder can open this file again
+    # (parsers/plan_embed.py). The developer_data_id / field_description
+    # messages have to precede the message that carries the fields.
+    plan_messages, plan_fields = fit_plan_messages(encoder, plan, _mesg_num)
+    for mesg in plan_messages:
+        encoder.write_mesg(mesg)
+    write("file_creator", software_version=PLAN_SOFTWARE_VERSION, developer_fields=plan_fields)
     write("device_info", timestamp=start_utc, device_index="creator", manufacturer="garmin",
           product=computer.fit_product, serial_number=serial, source_type="local")
     for i, tank in enumerate(tanks):

@@ -76,7 +76,13 @@ from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickImageProvider
 
 from gui.hud_renderer import (
+    GRAPH_BACKGROUND_OPACITY,
+    GRAPH_BAND_OPACITY,
+    GRAPH_CEILING_OPACITY,
+    GRAPH_FILL_OPACITY,
+    GRAPH_STOPS_OPACITY,
     ALIGN_OPTIONS,
+    TEXT_ORIENTATIONS,
     SMALL_SUFFIX_DEFAULT_SCALE,
     SMALL_SUFFIX_STYLES,
     VALIGN_OPTIONS,
@@ -108,7 +114,7 @@ from utils.hud_designer import (
     hit_test_bounds,
 )
 from utils.hud_rules_engine import load_rules_json, resolve_state, resolve_tank_variant
-from utils.layouts import list_templates, page_display_name, resolve_template_state
+from utils.layouts import list_templates, page_display_name, resolve_template_state, variant_display_name
 from utils.overlay_document import OverlayDocument, TemplateRef
 from utils.template_store import (
     CUSTOM_BRAND,
@@ -161,7 +167,17 @@ _ELEMENT_ATTR_DEFAULTS = {
     "font_weight": "regular",
     "font_family": DEFAULT_FAMILY,
 }
-_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
+# Add-element presets (not telemetry fields) - see addableFields/addElement.
+# name -> (real field, small_suffix style): the field drawn with its
+# decimal part / seconds small and top-aligned, as on Garmin and Shearwater.
+DEPTH_SMALL_DECIMALS = "depth_small_decimals"
+DIVE_TIME_SMALL_SECONDS = "dive_time_small_seconds"
+ADD_ELEMENT_PRESETS = {
+    DEPTH_SMALL_DECIMALS: ("depth", "decimals"),
+    DIVE_TIME_SMALL_SECONDS: ("dive_time", "seconds"),
+}
+
+_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
 _INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
 _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill"}
 # A graph's deco-stop shading colour when the inspector switches it on.
@@ -374,7 +390,7 @@ class OverlayDesignerBackend(QObject):
         Variant combo until the page changes."""
         page_entry = self._page_entry()
         variants = (page_entry.get("variants") or []) if page_entry else []
-        self._variant_choices = {_prettify(v): v for v in variants}
+        self._variant_choices = {variant_display_name(v): v for v in variants}
         if variants:
             resolved = resolve_tank_variant(self.current_dive)
             self._selected_variant = resolved if resolved in variants else variants[0]
@@ -819,13 +835,15 @@ class OverlayDesignerBackend(QObject):
             return {
                 "index": -1, "kind": "", "field": "", "is_custom": False, "custom_text": "",
                 "x_px": 0, "y_px": 0, "font_size": 16, "value_font_size": 16, "scale": 1.0,
-                "color": "#FFFFFF", "align": "left", "valign": "top", "font_family": DEFAULT_FAMILY,
+                "color": "#FFFFFF", "align": "left", "valign": "top", "orientation": "horizontal", "font_family": DEFAULT_FAMILY,
                 "bold": False, "outline": True, "width": 0, "height": 0, "corner_radius": 0,
                 "marker_style": "dot", "marker_size": 6, "ceiling_color": "#808080", "label": "",
                 "deco_stops": False, "stops_color": DEFAULT_STOPS_COLOR, "reveal_profile": False, "stop_label": False,
+                "fill_color": "#00FF00", "fill_opacity": GRAPH_FILL_OPACITY, "stops_opacity": GRAPH_STOPS_OPACITY, "ceiling_opacity": GRAPH_BAND_OPACITY,
+                "background_color": "#000000", "background_opacity": GRAPH_BACKGROUND_OPACITY,
                 "small_suffix": "", "small_suffix_scale": SMALL_SUFFIX_DEFAULT_SCALE,
                 "draw_outline": False, "outline_color": "#FFFFFF", "outline_width": 2, "outline_gap": 4,
-                "up_count": 4, "down_count": 1, "style": "segments",
+                "up_count": 4, "down_count": 1, "bar": True, "style": "segments",
                 "segments": 5, "segment_gap": 2, "full_bar": 200,
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
@@ -844,6 +862,7 @@ class OverlayDesignerBackend(QObject):
             "color": elem.get("color", "#FFFFFF"),
             "align": elem.get("align", "left"),
             "valign": elem.get("valign", "top"),
+            "orientation": elem.get("orientation") or "horizontal",
             "font_family": elem.get("font_family") or DEFAULT_FAMILY,
             "bold": (elem.get("font_weight") or "regular") == "bold",
             "outline": bool(elem.get("outline", True)),
@@ -858,6 +877,13 @@ class OverlayDesignerBackend(QObject):
             # switching it on starts from.
             "deco_stops": bool(elem.get("stops_color")),
             "stops_color": elem.get("stops_color") or DEFAULT_STOPS_COLOR,
+            # graph shading colour/opacity (gui.hud_renderer draw_depth_graph)
+            "background_color": elem.get("background_color") or "#000000",
+            "background_opacity": elem.get("background_opacity", GRAPH_BACKGROUND_OPACITY),
+            "fill_color": elem.get("fill_color") or elem.get("color", "#00FF00"),
+            "fill_opacity": elem.get("fill_opacity", GRAPH_FILL_OPACITY),
+            "stops_opacity": elem.get("stops_opacity", GRAPH_STOPS_OPACITY),
+            "ceiling_opacity": elem.get("ceiling_opacity", GRAPH_CEILING_OPACITY if elem.get("stops_color") else GRAPH_BAND_OPACITY),
             "reveal_profile": bool(elem.get("reveal_profile", False)),
             "stop_label": bool(elem.get("stop_label", False)),
             "label": elem.get("label", ""),
@@ -869,6 +895,7 @@ class OverlayDesignerBackend(QObject):
             "outline_gap": elem.get("outline_gap", 4),
             "up_count": elem.get("up_count", 4),
             "down_count": elem.get("down_count", 1),
+            "bar": elem.get("bar", True) is not False,
             "style": elem.get("style") or _STYLE_DEFAULTS.get(element_kind(elem), "segments"),
             "segments": elem.get("segments", 5),
             "segment_gap": elem.get("segment_gap", 2),
@@ -921,8 +948,10 @@ class OverlayDesignerBackend(QObject):
                 number = max(0.05, number)
             elif key == "small_suffix_scale":
                 number = max(0.1, min(1.0, round(number, 3)))
+            elif key in ("fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"):
+                number = max(0.0, min(1.0, round(number, 3)))
             doc.set_element_attr(index, key, number)
-        elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color"):
+        elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color"):
             if key == "marker_style" and value not in MARKER_STYLES:
                 return
             doc.set_element_attr(index, key, str(value))
@@ -947,6 +976,14 @@ class OverlayDesignerBackend(QObject):
             if style and style not in SMALL_SUFFIX_STYLES:
                 return
             doc.set_element_attr(index, "small_suffix", style or None)
+        elif key == "bar":
+            # the divider bar between up and down chevrons; True is the absent default
+            doc.set_element_attr(index, "bar", None if bool(value) else False)
+        elif key == "orientation":
+            # horizontal is the absent default - see _ELEMENT_ATTR_DEFAULTS
+            if value not in TEXT_ORIENTATIONS:
+                return
+            doc.set_element_attr(index, "orientation", None if value == "horizontal" else str(value))
         else:
             return
         self._after_edit()
@@ -1146,6 +1183,25 @@ class OverlayDesignerBackend(QObject):
                 fields.append(extra)
         return fields
 
+    @Property(list, notify=telemetryChanged)
+    def addableFields(self):
+        """availableFields plus the Add-element presets: entries that are
+        not telemetry fields of their own but a field with a style preset,
+        which addElement() unfolds. Only the Add popup lists these; the
+        inspector's Field combo keeps availableFields, since a saved element
+        always carries the real field ("depth") plus the style attribute.
+
+        ADD_ELEMENT_PRESETS: "depth" drawn Garmin-style as big metres and
+        a small, top-aligned ".d" (small_suffix "decimals"), and "dive_time"
+        as big minutes and small ":ss" (small_suffix "seconds") - the
+        Shearwater readouts too, so its templates get each one right beside
+        the plain field."""
+        fields = self.availableFields
+        for preset, (field, _style) in ADD_ELEMENT_PRESETS.items():
+            if field in fields:
+                fields.insert(fields.index(field) + 1, preset)
+        return fields
+
     @Property(list, constant=True)
     def fontFamilies(self):
         return list_families()
@@ -1188,7 +1244,25 @@ class OverlayDesignerBackend(QObject):
             field = "n2_tissue_load"
         elif kind == "ascent_chevrons":
             field = "ascent_rate"
-        index = doc.add_element(field, kind)
+        attrs = {}
+        if kind == "ascent_chevrons":
+            # The brand's own indicator: hud_rules.json `ascent_chevrons`
+            # (Perdix 2: six arrows, no divider bar) over the Garmin defaults.
+            from utils.hud_rules_engine import get_rule_config
+            rule = get_rule_config(doc.rules_manufacturer, doc.model, "ascent_chevrons")
+            if isinstance(rule, dict):
+                for key in ("up_count", "down_count"):
+                    if key in rule:
+                        attrs[key] = int(rule[key])
+                if rule.get("bar") is False:
+                    attrs["bar"] = False
+        if field in ADD_ELEMENT_PRESETS:
+            # see addableFields - the real field as a text element with its
+            # suffix drawn small, the same way the Garmin templates do it
+            field, style = ADD_ELEMENT_PRESETS[field]
+            if kind == "text":
+                attrs = {"small_suffix": style, "small_suffix_scale": SMALL_SUFFIX_DEFAULT_SCALE}
+        index = doc.add_element(field, kind, **attrs)
         self._hidden = set()
         self._set_primary(index)
         self._skin_selected = False

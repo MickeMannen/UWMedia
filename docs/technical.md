@@ -13,6 +13,24 @@ When telemetry overlays are drawn onto video, three threads run in parallel -
 decoding, drawing and encoding - and frames are processed in place in BGR, so
 there are no extra colour-space conversions and all CPU cores are kept busy.
 
+With colour correction on, the frames are piped to FFmpeg with an alpha
+channel marking every pixel the overlay drew, and the filter graph applies
+the LUT to the footage only, merging the overlay's own pixels back on top
+(`maskedmerge`). The dive computer's bezel and text are therefore never
+colour-corrected.
+
+## Telemetry-only renders
+
+The Overlay Generator's videos (and `--render-log` / `--render-video-log`)
+are rendered frame by frame in Python and piped to FFmpeg as HEVC. Frames
+are only redrawn when the dive log's sample changes, so a long dive with
+one-second samples encodes quickly. Each encoder gets its own
+constant-quality setting (`-q:v` for VideoToolbox, `-cq` for NVENC, `-crf`
+for libx265) rather than a bitrate. The canvas is the template's own size
+in its 1920×1080 design frame, twice that for 4K, or the whole frame with
+the overlay placed as the layout anchors it - see **Overlay size** in the
+[Overlay Generator](overlay-generator.md).
+
 ## Metadata
 
 UWMedia uses **ExifTool** (through PyExifTool) so processed files keep their
@@ -31,7 +49,8 @@ Before a batch starts, UWMedia checks the overlay layout against the dive
 logs:
 
 - **Fields** - every telemetry field the layout uses (depth, temperature, …)
-  exists in the data.
+  exists in the data, or is one the renderer synthesises itself (the stop
+  badge, the depth graph, the held NDL, the tissue-load bar).
 - **Tank sensors** - warns if the layout expects tank data (e.g. from a Garmin
   transmitter) that isn't in the logs.
 - **Files** - the layout JSON is valid and its skin images can be found.

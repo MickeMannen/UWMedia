@@ -160,3 +160,62 @@ def test_overlays_file_composites_two_layers():
         assert region_in.size > 0
         mean_abs_diff = np.mean(np.abs(region_in - region_out))
         assert mean_abs_diff > 2.0, f"Overlay region for {inst['layout_path']} doesn't appear to differ from source"
+
+
+NEUTRAL_LAYOUT_DATA = {
+    "design_width": 1920,
+    "hud_skin": {
+        "type": "shape", "width": 300, "height": 120,
+        "color": "#808080", "opacity": 1.0,
+        "linked_elements": [{"field": "depth", "rel_x": 0.1, "rel_y": 0.3, "font_size": 24, "color": "#ffffff"}],
+    },
+}
+
+
+def test_hud_mask_helpers():
+    from ffmpeg.color import hud_bypass_filter_complex, hud_marked_bgra
+    graph = hud_bypass_filter_complex("lut3d=file='x.cube':interp=trilinear")
+    assert graph.startswith("[0:v]format=rgba,split=2[src][keep];[src]format=gbrp,lut3d=") and graph.endswith("maskedmerge[out]")
+    before = np.zeros((4, 4, 3), dtype=np.uint8)
+    after = before.copy(); after[1, 2] = (10, 20, 30)
+    bgra = hud_marked_bgra(after, before)
+    assert bgra.shape == (4, 4, 4) and bgra[1, 2, 3] == 255 and bgra[:, :, 3].sum() == 255
+    assert tuple(bgra[1, 2, :3]) == (10, 20, 30)
+
+
+def test_colour_correction_leaves_the_hud_uncorrected():
+    # The lut3d colour correction runs in FFmpeg on the composited frame; a
+    # neutral grey HUD skin must still come out neutral (the Garmin X50i's
+    # bezel turned red-tinted before - see process_video's hud_bypass).
+    video_source = TEST_DATA_DIR / "20251019_M0284.MP4"
+    assert video_source.exists()
+    layout_path = RESULTS_DIR / "test_color_neutral_hud_layout.json"
+    layout_path.write_text(json.dumps(NEUTRAL_LAYOUT_DATA))
+    overlays_json = RESULTS_DIR / "test_color_neutral_hud_instances.json"
+    instance = {"layout_path": str(layout_path), "x": 0.6, "y": 0.1, "scale": 1.0}
+    overlays_json.write_text(json.dumps([instance]))
+
+    cmd = ["python3", "cli_main.py", str(video_source), str(RESULTS_DIR), "--logs", str(LOGS_DIR),
+           "--overlays-file", str(overlays_json), "--color", "default",
+           "--filename-format", "test_color_neutral_hud_result", "--tz-adjust", "0"]
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR)
+    assert result.returncode == 0, f"CLI command failed: {result.stderr}\n{result.stdout[-800:]}"
+    output_path = RESULTS_DIR / f"test_color_neutral_hud_result{video_source.suffix.lower()}"
+    assert output_path.exists()
+
+    cap_in = cv2.VideoCapture(str(video_source)); cap_out = cv2.VideoCapture(str(output_path))
+    frame_w, frame_h = int(cap_in.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap_in.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap_in.set(cv2.CAP_PROP_POS_FRAMES, 5); ok_in, frame_in = cap_in.read()
+    cap_out.set(cv2.CAP_PROP_POS_FRAMES, 5); ok_out, frame_out = cap_out.read()
+    cap_in.release(); cap_out.release()
+    assert ok_in and ok_out
+    x0, y0, x1, y1 = overlay_pixel_bbox(NEUTRAL_LAYOUT_DATA, instance["x"], instance["y"], instance["scale"], frame_w, frame_h)
+    # the skin's lower-right quarter holds no text: solid grey
+    patch = frame_out[y0 + (y1 - y0) * 3 // 4:y1 - 4, x0 + (x1 - x0) * 3 // 4:x1 - 4].astype(np.int16)
+    b, g, r = patch.reshape(-1, 3).mean(axis=0)
+    assert abs(r - b) < 6 and abs(g - b) < 6, f"HUD skin got colour-corrected: BGR mean {b:.0f} {g:.0f} {r:.0f}"
+    assert 100 < b < 160, f"unexpected skin brightness {b:.0f}"
+    # ...while the footage around it did get corrected
+    outside_in = frame_in[y1 + 20:y1 + 120, x0:x1].astype(np.int16)
+    outside_out = frame_out[y1 + 20:y1 + 120, x0:x1].astype(np.int16)
+    assert np.mean(np.abs(outside_in - outside_out)) > 2.0

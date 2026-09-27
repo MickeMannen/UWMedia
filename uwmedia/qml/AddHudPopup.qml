@@ -36,6 +36,7 @@ Popup {
                 Layout.preferredHeight: 34
                 font.pixelSize: 15
                 model: colorBackend.addHudBrandList
+                currentIndex: colorBackend.addHudBrandIndex
                 onActivated: (index) => colorBackend.onAddHudBrandSelected(model[index])
             }
 
@@ -50,6 +51,7 @@ Popup {
                 font.pixelSize: 15
                 visible: colorBackend.addHudComputerVisible
                 model: colorBackend.addHudComputerList
+                currentIndex: colorBackend.addHudComputerIndex
                 onActivated: (index) => colorBackend.onAddHudComputerSelected(model[index])
             }
 
@@ -60,7 +62,19 @@ Popup {
                 Layout.preferredHeight: 34
                 font.pixelSize: 15
                 model: colorBackend.addHudPageList
+                currentIndex: colorBackend.addHudPageIndex
                 onActivated: (index) => colorBackend.onAddHudPageSelected(model[index])
+            }
+
+            Label { text: "Tank setup"; visible: colorBackend.addHudVariantVisible }
+            ComboBox {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                font.pixelSize: 15
+                visible: colorBackend.addHudVariantVisible
+                model: colorBackend.addHudVariantList
+                currentIndex: colorBackend.addHudVariantIndex
+                onActivated: (index) => colorBackend.onAddHudVariantSelected(model[index])
             }
         }
 

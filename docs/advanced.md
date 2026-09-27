@@ -40,20 +40,6 @@ The mapping is stored in `config.yaml` (shown under *Config file*). The CLI's
 Paths to **ffmpeg** and **exiftool**. Leave them empty to use the ones found
 on your `PATH` or in the usual install locations.
 
-## Custom filename formats
-
-Save your own output-filename patterns, built from the file's date taken with
-`strftime` codes (`%Y` year, `%m` month, `%d` day, `%H` hour, `%M` minute,
-`%S` second), e.g. `%Y%m%d_%H%M%S_Bali` → `20260905_143000_Bali`.
-
-- Saved patterns are listed with an example name and can be removed again.
-- They appear straight away in the [Color](color.md) page's **Output
-  filename** list, after the built-in choices.
-- A pattern must contain at least one date code (otherwise every file would
-  get the same name) and no `/` or `\`.
-
-The same patterns work with the CLI's `--filename-format`.
-
 ## About
 
 The **About** page shows the version, license, links (GitHub, YouTube), the

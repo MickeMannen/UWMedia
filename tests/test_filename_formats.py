@@ -7,7 +7,7 @@ Application Support file.
 """
 import pytest
 
-from utils import app_settings
+from utils import app_settings, filename_formats
 from utils.filename_formats import custom_filename_formats, example_filename, pattern_error
 from uwmedia.backends.advanced_backend import AdvancedBackend
 from uwmedia.backends.color_backend import FILENAME_FORMAT_PRESETS, ColorBackend
@@ -17,7 +17,19 @@ from uwmedia.backends.color_backend import FILENAME_FORMAT_PRESETS, ColorBackend
 def settings_file(tmp_path, monkeypatch):
     path = tmp_path / "settings.json"
     monkeypatch.setattr(app_settings, "settings_path", lambda: path)
+    # The feature is hidden in the app (CUSTOM_FILENAME_FORMATS_ENABLED is
+    # False since 2026-09-28); these tests cover the code behind the flag.
+    monkeypatch.setattr(filename_formats, "CUSTOM_FILENAME_FORMATS_ENABLED", True)
     return path
+
+
+def test_hidden_flag_keeps_custom_patterns_off_the_color_page(tmp_path, monkeypatch):
+    path = tmp_path / "settings.json"
+    monkeypatch.setattr(app_settings, "settings_path", lambda: path)
+    app_settings.update_settings(filename_formats=["%Y%m%d_%H%M%S_Bali"])
+    assert filename_formats.CUSTOM_FILENAME_FORMATS_ENABLED is False
+    assert ColorBackend().filenameFormatList == [label for label, _ in FILENAME_FORMAT_PRESETS]
+    assert AdvancedBackend().customFilenameFormatsEnabled is False
 
 
 def _add(advanced, pattern):
@@ -83,13 +95,21 @@ def test_color_page_offers_custom_patterns_and_passes_them_to_cli(settings_file)
 
 
 def test_unusable_saved_pattern_is_not_offered(settings_file):
-    app_settings.update_settings(filename_formats=["bad/%Y", "%Y%m%d"])  # "%Y%m%d" is already a preset
+    app_settings.update_settings(filename_formats=["bad/%Y", "%Y%m%d_%H%M%S"])  # the second is already a preset
     labels = ColorBackend().filenameFormatList
     assert labels == [label for label, _ in FILENAME_FORMAT_PRESETS]
 
 
 def test_keep_original_filename_passes_keep_filename(settings_file):
     color = ColorBackend()
-    color.filenameFormat = FILENAME_FORMAT_PRESETS[0][0]  # "Keep original filename"
+    color.filenameFormat = FILENAME_FORMAT_PRESETS[0][0]  # "Original"
     args = color._build_args()
     assert "--keep-filename" in args and "--filename-format" not in args
+
+
+def test_original_plus_color_passes_the_filename_token(settings_file):
+    color = ColorBackend()
+    color.filenameFormat = FILENAME_FORMAT_PRESETS[1][0]  # "Original + color"
+    args = color._build_args()
+    assert "--keep-filename" not in args
+    assert args[args.index("--filename-format") + 1] == "{filename}_color"

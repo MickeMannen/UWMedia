@@ -51,7 +51,7 @@ from parsers.garmin import GarminParser
 from parsers.subsurface import SubsurfaceParser
 from parsers.uddf import UDDFParser
 from utils.hud_rules_engine import resolve_tank_variant
-from utils.layouts import list_templates, resolve_template_state
+from utils.layouts import list_templates, resolve_template_state, load_layout_file, strip_variant_markers
 
 DESIGNER_CANVAS_WIDTH = 900
 SCALE_SLIDER_FACTOR = 100  # QSlider is int-only; 0.20x-4.00x stored as 20-400
@@ -307,8 +307,7 @@ class HudDesignerPage(QtWidgets.QWidget):
             self._redraw_canvas()
             return
 
-        with open(state_path) as f:
-            layout = json.load(f)
+        layout = strip_variant_markers(load_layout_file(state_path))
         hud_skin = layout.setdefault("hud_skin", {})
         skin_path = hud_skin.get("path")
         if skin_path and not Path(skin_path).is_absolute():

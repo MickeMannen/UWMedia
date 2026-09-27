@@ -1,0 +1,117 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.41246,
+        "rel_y": 0.21587,
+        "color": "#FFFFFF",
+        "font_size": 48,
+        "scale": 1.0
+      },
+      {
+        "id": "label_m",
+        "field": "custom:m",
+        "rel_x": 0.56001,
+        "rel_y": 0.24401,
+        "color": "#FFFFFF",
+        "font_size": 21,
+        "scale": 1.0
+      },
+      {
+        "id": "gasmix",
+        "field": "gasmix",
+        "rel_x": 0.14944,
+        "rel_y": 0.47326,
+        "color": "#FFFFFF",
+        "font_size": 29,
+        "scale": 1.0
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.33208,
+        "rel_y": 0.40333,
+        "color": "#FFFFFF",
+        "font_size": 123,
+        "scale": 1.0,
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.67
+      },
+      {
+        "id": "label_m_2",
+        "field": "custom:m",
+        "rel_x": 0.56905,
+        "rel_y": 0.53218,
+        "color": "#FFFFFF",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "id": "label_n_d_l",
+        "field": "custom:N\nD\nL",
+        "rel_x": 0.21593,
+        "rel_y": 0.60608,
+        "color": "#FFFFFF",
+        "font_size": 18,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.26722,
+        "rel_y": 0.58543,
+        "color": "#FFFFFF",
+        "font_size": 101,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.21593,
+        "rel_y": 0.575,
+        "font_size": 30,
+        "value_font_size": 92,
+        "depth_font": "label",
+        "depth_unit": "m",
+        "outline": false,
+        "label": "Stop / deco (↑ceiling + timer)",
+        "timer_format": "m:ss"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.5959,
+        "rel_y": 0.58775,
+        "color": "#FFFFFF",
+        "font_size": 101,
+        "scale": 1.0,
+        "small_suffix": "seconds",
+        "small_suffix_scale": 0.33
+      }
+    ]
+  }
+}

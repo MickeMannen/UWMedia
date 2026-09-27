@@ -161,3 +161,53 @@ def test_uddf_logged_ndl_means_no_deco_stop_yet(tmp_path):
             assert not wp.deco_stop_depth
         if s.ceiling_m > 0:
             assert s.stop_depth_m > 0  # recomputed the moment deco starts
+
+
+# --- after deco clears the log says so: no stop, NDL 99+, TTS a direct ascent --
+
+def _deco_plan_that_clears_on_the_way_up():
+    from utils.dive_plan_engine import plan_ascent
+
+    plan = DiveProfilePlan(
+        gf_low=40, gf_high=85, computer="Garmin Descent X50i", start_time=START,
+        gases=[PlannedGas(id="Air", gas_type="air", o2_percent=21.0)],
+        waypoints=[PlannedWaypoint(runtime_sec=180, depth_m=45.0, gas_id="Air"),
+                   PlannedWaypoint(runtime_sec=1500, depth_m=45.0, gas_id="Air")],
+    )
+    ascent, deco_needed, stops = plan_ascent(plan)
+    assert deco_needed and stops
+    plan.waypoints.extend(ascent)
+    return plan
+
+
+@pytest.mark.parametrize("fmt", WRITERS)
+def test_after_the_last_deco_stop_the_log_reads_as_no_deco_with_a_short_tts(fmt, tmp_path):
+    from utils.hud_rules_engine import resolve_state
+
+    plan = _deco_plan_that_clears_on_the_way_up()
+    samples, dive = _round_trip(plan, fmt, tmp_path)
+    cleared = next(s.time_sec for s in samples if s.time_sec > 1500 and s.ceiling_m <= 0
+                   and samples[samples.index(s) - 1].ceiling_m > 0)
+    at = {wp.time_since_start: wp for wp in dive.waypoints}
+    before, after = at[cleared - 1], at[cleared + 5]
+    assert resolve_state("Garmin", "x50i", before, dive.waypoints) == "deco"
+    assert resolve_state("Garmin", "x50i", after, dive.waypoints) == "normal"
+    assert not after.deco_stop_depth and not after.next_stop_depth
+    # TTS is the direct ascent from here (about 9 m/min), not the stops already done
+    assert after.tts is not None and after.tts <= after.depth / 9.0 * 60 + 15
+    # the sample's own TTS survives the round trip (Garmin FIT keeps it in the record)
+    logged = next(s for s in samples if s.time_sec == cleared + 5)
+    assert after.tts == logged.tts_sec
+    if fmt != "fit":
+        assert after.ndl == 99 * 60  # unbounded NDL logged as the 99+ cap
+
+
+def test_no_deco_tts_includes_the_safety_stop_until_deco_has_been_done():
+    from utils.dive_plan_engine import _no_deco_tts
+
+    plan = DiveProfilePlan(default_ascent_rate=9.0)
+    assert _no_deco_tts(plan, 18.0, 18.0, had_deco=False) == 120 + 180
+    assert _no_deco_tts(plan, 18.0, 18.0, had_deco=True) == 120
+    assert _no_deco_tts(plan, 9.0, 10.0, had_deco=False) == 60  # never past 11 m: no safety stop
+    assert _no_deco_tts(plan, 3.0, 30.0, had_deco=False) == 20  # at the stop: only the ascent is known
+    assert _no_deco_tts(plan, 0.0, 30.0, had_deco=False) == 0

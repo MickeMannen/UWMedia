@@ -19,18 +19,9 @@
       {
         "field": "custom:m",
         "rel_x": 0.4241,
-        "rel_y": 0.3320,
+        "rel_y": 0.332,
         "color": "#00ADED",
         "font_size": 28,
-        "scale": 1.0
-      },
-      {
-        "field": "state_badge",
-        "type": "badge",
-        "rel_x": 0.44,
-        "rel_y": 0.155,
-        "font_size": 24,
-        "value_font_size": 30,
         "scale": 1.0
       },
       {
@@ -42,12 +33,55 @@
         "scale": 1.0
       },
       {
+        "field": "custom:NDL",
+        "rel_x": 0.595,
+        "rel_y": 0.224,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:min",
+        "rel_x": 0.649,
+        "rel_y": 0.342,
+        "color": "#00ADED",
+        "font_size": 34,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.556,
+        "rel_y": 0.23,
+        "font_size": 28,
+        "value_font_size": 38,
+        "scale": 1.0,
+        "depth_unit": "m",
+        "outline": false,
+        "label": "Stop / deco (replaces NDL)"
+      },
+      {
         "field": "ndl",
         "rel_x": 0.5543,
         "rel_y": 0.2937,
         "color": "#FFFFFF",
         "font_size": 75,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "field": "primary_tank_pressure",

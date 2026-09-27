@@ -6,7 +6,8 @@ from typing import List, Optional
 from lxml import etree
 
 from models.dive_plan import DiveProfilePlan
-from parsers.uddf_writer import log_start_time
+from parsers.plan_embed import SUBSURFACE_NOTES_MARK, add_subsurface_plan
+from parsers.uddf_writer import NDL_CAP_SEC, log_start_time
 from utils.dive_computers import dive_computer
 from utils.dive_plan_engine import SimulatedSample
 
@@ -63,7 +64,7 @@ def write_subsurface(
         duration=_mmss(duration),
     )
     notes = etree.SubElement(dive, "notes")
-    notes.text = f"{plan.name} - synthetic profile from the UWMedia Dive Profile Builder, not a real dive"
+    notes.text = f"{plan.name} - synthetic profile from the {SUBSURFACE_NOTES_MARK}, not a real dive"
 
     tanks = plan.tank_specs()
     tank_index = {t.ref: i for i, t in enumerate(tanks)}
@@ -99,6 +100,8 @@ def write_subsurface(
     etree.SubElement(divecomputer, "temperature", water=f"{plan.water_temp_c:.1f} C")
     etree.SubElement(divecomputer, "extradata", key="Serial", value=serial)
     etree.SubElement(divecomputer, "extradata", key="Deco model", value=f"GF {plan.gf_low:g}/{plan.gf_high:g}")
+    # The plan itself, so the builder can open this file again (plan_embed).
+    add_subsurface_plan(divecomputer, plan)
 
     last_tank = None
     last_mode = None
@@ -128,8 +131,8 @@ def write_subsurface(
             attrs["in_deco"] = "1"
             attrs["stopdepth"] = f"{s.stop_depth_m:.1f} m"
             attrs["stoptime"] = _mmss(s.stop_duration_sec)
-        elif s.ndl_sec is not None:
-            attrs["ndl"] = _mmss(s.ndl_sec)
+        else:
+            attrs["ndl"] = _mmss(s.ndl_sec if s.ndl_sec is not None else NDL_CAP_SEC)  # None = unbounded, "99+"
         attrs["tts"] = _mmss(s.tts_sec)
         attrs["cns"] = f"{int(s.cns_pct)}%"
         attrs["po2"] = f"{s.po2:.2f} bar"

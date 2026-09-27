@@ -10,6 +10,10 @@ from typing import List, Optional
 from utils.app_settings import add_unique, load_settings, save_settings
 
 SETTINGS_KEY = "filename_formats"
+# Hidden (2026-09-28, per the user): the Advanced page's section and the
+# Color page's listing of saved patterns are off. The code and settings key
+# stay so it can come back with one flag; the tests enable it explicitly.
+CUSTOM_FILENAME_FORMATS_ENABLED = False
 # Same sample date the Color page's built-in preset labels show.
 EXAMPLE_DATETIME = datetime(2026, 9, 5, 14, 30, 0)
 

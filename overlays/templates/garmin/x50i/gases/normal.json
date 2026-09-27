@@ -13,9 +13,9 @@
         "type": "tissue_bar",
         "rel_x": 0.17759,
         "rel_y": 0.22924,
-        "width": 12,
-        "height": 33,
-        "marker_size": 4,
+        "width": 24,
+        "height": 66,
+        "marker_size": 8,
         "label": "Tissue load"
       },
       {
@@ -23,8 +23,8 @@
         "type": "ascent_chevrons",
         "rel_x": 0.17125,
         "rel_y": 0.40864,
-        "width": 16,
-        "height": 47,
+        "width": 32,
+        "height": 94,
         "up_count": 4,
         "down_count": 1,
         "label": "Ascent rate"
@@ -34,7 +34,7 @@
         "rel_x": 0.52642,
         "rel_y": 0.23178,
         "color": "#999999",
-        "font_size": 13,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -42,7 +42,7 @@
         "rel_x": 0.55999,
         "rel_y": 0.28447,
         "color": "#FFFFFF",
-        "font_size": 27,
+        "font_size": 65,
         "scale": 1.0
       },
       {
@@ -50,7 +50,7 @@
         "rel_x": 0.44909,
         "rel_y": 0.42337,
         "color": "#999999",
-        "font_size": 13,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -58,7 +58,7 @@
         "rel_x": 0.66479,
         "rel_y": 0.42337,
         "color": "#999999",
-        "font_size": 13,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -66,7 +66,7 @@
         "rel_x": 0.42874,
         "rel_y": 0.47605,
         "color": "#FFFFFF",
-        "font_size": 28,
+        "font_size": 67,
         "scale": 1.0
       },
       {
@@ -74,7 +74,7 @@
         "rel_x": 0.6719,
         "rel_y": 0.47605,
         "color": "#FFFFFF",
-        "font_size": 28,
+        "font_size": 67,
         "scale": 1.0
       },
       {
@@ -82,7 +82,7 @@
         "rel_x": 0.47147,
         "rel_y": 0.61495,
         "color": "#999999",
-        "font_size": 13,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -90,7 +90,7 @@
         "rel_x": 0.69226,
         "rel_y": 0.61495,
         "color": "#999999",
-        "font_size": 13,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -98,7 +98,7 @@
         "rel_x": 0.48673,
         "rel_y": 0.67562,
         "color": "#999999",
-        "font_size": 12,
+        "font_size": 32,
         "scale": 1.0
       },
       {
@@ -106,12 +106,12 @@
         "rel_x": 0.6719,
         "rel_y": 0.66764,
         "color": "#FFFFFF",
-        "font_size": 28,
+        "font_size": 67,
         "scale": 1.0
       }
     ],
     "path": "normal.png",
-    "scale": 0.6
+    "scale": 0.3
   },
   "design_width": 1920,
   "design_height": 1080

@@ -193,3 +193,31 @@ def test_unlabeled_ffmpeg_progress_still_falls_back_to_old_single_value_behavior
 
     assert app.progressCurrentFraction == pytest.approx(0.75)
     assert app.progressCurrentDeterminate is True
+
+
+def test_convertion_progress_fraction_counts_files_and_ffmpeg_percent():
+    """The Convertion bar (2026-09-28): files done plus the percent of the
+    one encoding, and the elapsed/remaining line reads the same fraction."""
+    from utils.run_timing import RunTiming
+    app = ConvertionBackend.__new__(ConvertionBackend)
+    QObject.__init__(app)
+    app.process = object()
+    app._progress_total = app._progress_done = 0
+    app._progress_current_target = None
+    app._progress_pct = 0.0
+    app._status_text = ""
+    assert not app.progressKnown and app.progressFraction == 0.0
+    assert app._handle_progress_line("UWMEDIA_PROGRESS 0/4 start -")
+    assert app.progressKnown and app.progressFraction == 0.0
+    assert app._handle_progress_line("UWMEDIA_PROGRESS 1/4 converting b.mp4")
+    assert app._handle_progress_line("UWMEDIA_FFMPEG_PROGRESS 50.0")
+    assert app.progressFraction == pytest.approx(0.375)
+    assert app.progressFractionText == "1/4 · 38%"
+    assert app._handle_progress_line("UWMEDIA_PROGRESS 4/4 done d.mp4")
+    assert app.progressFraction == 1.0
+    timing = RunTiming(lambda: app.progressFraction)
+    assert timing.text == ""
+    timing.start()
+    assert timing.text.startswith("Elapsed 0:00")
+    timing.stop(ok=False)
+    assert timing.text.startswith("Stopped after 0:00")

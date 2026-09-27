@@ -6,8 +6,8 @@
 // Layout (overlay_rework.md §7.1): template cascade + undo/redo/dirty across
 // the top, a zoomable editing canvas (OverlayDesignerCanvas.qml - Design view
 // = skin at native px, Frame preview = 1920x1080 composite) with a telemetry
-// row underneath, the optional "Background and dive logs" tools collapsed by
-// default, and a right-hand column with the element list (+ Add element
+// row underneath, the optional "Background and dive logs" tools in a popup
+// behind the More menu (mediaPopup), and a right-hand column with the element list (+ Add element
 // popup) and the inspector (OverlayElementInspector.qml). Phase 2 made it an
 // editor; Phase 3 added Save / Save as… (SaveTemplateAsPopup.qml) / Revert,
 // the write-target line, and the unsaved-changes guard on the cascade;
@@ -21,8 +21,10 @@ import QtQuick.Window
 Item {
     id: root
     width: 1060
-    height: 720
-    readonly property int rightColumnWidth: 350
+    height: 800
+    // 340 (2026-09-28): the inspector's fields have fixed widths now, so the
+    // column can be narrower and the canvas wider.
+    readonly property int rightColumnWidth: 340
 
     // Unsaved-changes guard: cascade picks go through guardedSelect() so a
     // dirty template asks before being replaced. On Cancel the combo is
@@ -159,14 +161,23 @@ Item {
                 enabled: overlayDesignerBackend.isDirty
                 onClicked: overlayDesignerBackend.revert()
             }
-            ToolButton {
-                text: "⋯"
+            Button {
+                // A labelled button (2026-09-28, per the user): the "⋯"
+                // glyph was too easy to miss now that the Background and
+                // dive logs tools live behind it.
+                text: "More ▾"
+                flat: true
                 onClicked: moreMenu.open()
-                ToolTip.text: "Export / import a page as a zip"
+                ToolTip.text: "Background and dive logs, export / import a page as a zip"
                 ToolTip.visible: hovered
                 Menu {
                     id: moreMenu
                     y: parent.height
+                    MenuItem {
+                        text: "Background and dive logs…"
+                        onTriggered: mediaPopup.open()
+                    }
+                    MenuSeparator {}
                     MenuItem {
                         text: "Export page as zip…"
                         enabled: overlayDesignerBackend.hasDocument
@@ -217,89 +228,99 @@ Item {
                 Layout.fillHeight: true
                 spacing: 8
 
-                // Canvas toolbar
+                // Canvas toolbar - one row (2026-09-28, per the user): view
+                // mode and display toggles as checkable flat buttons instead
+                // of RadioButtons/CheckBoxes. Every control has a fixed,
+                // compact width: the row must stay under the left column's
+                // ~670 px or the RowLayout pushes the right column off the
+                // window (which is what the first cut of this row did).
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 3
 
-                    ButtonGroup { id: viewGroup }
-                    RadioButton {
+                    component ToolBtn: Button {
+                        flat: true
+                        font.pixelSize: 13
+                        leftPadding: 6
+                        rightPadding: 6
+                        Layout.preferredHeight: 34
+                    }
+
+                    ToolBtn {
                         text: "Design view"
-                        ButtonGroup.group: viewGroup
+                        Layout.preferredWidth: 90
+                        checkable: true
                         checked: overlayDesignerBackend.viewMode === "design"
                         onClicked: overlayDesignerBackend.setViewMode("design")
                     }
-                    RadioButton {
+                    ToolBtn {
                         text: "Frame preview"
-                        ButtonGroup.group: viewGroup
+                        Layout.preferredWidth: 104
+                        checkable: true
                         checked: overlayDesignerBackend.viewMode === "frame"
                         onClicked: overlayDesignerBackend.setViewMode("frame")
                     }
 
-                    Item { Layout.fillWidth: true }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 22; Layout.leftMargin: 3; Layout.rightMargin: 3; color: "#3F3F3F" }
 
-                    Label { text: "Zoom" }
-                    ToolButton { text: "−"; onClicked: overlayDesignerBackend.zoomOut() }
-                    Label {
-                        Layout.preferredWidth: 46
-                        horizontalAlignment: Text.AlignHCenter
-                        text: overlayDesignerBackend.zoomPercent + "%"
-                    }
-                    ToolButton { text: "+"; onClicked: overlayDesignerBackend.zoomIn() }
-                    Button {
-                        text: "Fit"
-                        flat: true
-                        highlighted: overlayDesignerBackend.zoomIsFit
-                        onClicked: overlayDesignerBackend.zoomFit()
-                    }
-                    Button {
-                        text: "100%"
-                        flat: true
-                        onClicked: overlayDesignerBackend.setZoomPercent(100)
-                    }
-                }
-
-                // Display toggles (own row so the toolbar fits the 1060 px page)
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-                    CheckBox {
+                    ToolBtn {
                         text: "Bounds"
+                        Layout.preferredWidth: 60
+                        checkable: true
                         checked: overlayDesignerBackend.showBounds
                         onToggled: overlayDesignerBackend.setShowBounds(checked)
                     }
-                    CheckBox {
+                    ToolBtn {
                         text: "Grid"
+                        Layout.preferredWidth: 44
+                        checkable: true
                         checked: overlayDesignerBackend.showGrid
                         onToggled: overlayDesignerBackend.setShowGrid(checked)
                     }
-                    CheckBox {
+                    ToolBtn {
                         text: "Snap"
+                        Layout.preferredWidth: 48
+                        checkable: true
                         checked: overlayDesignerBackend.snapEnabled
                         onToggled: overlayDesignerBackend.setSnapEnabled(checked)
                         ToolTip.text: "Snap dragged elements to the grid and to other elements' edges"
                         ToolTip.visible: hovered
                     }
-                    Label { text: "Grid size"; font.pixelSize: 12 }
                     ComboBox {
                         id: gridSizeCombo
-                        Layout.preferredWidth: 72
+                        Layout.preferredWidth: 64
                         Layout.preferredHeight: 30
                         font.pixelSize: 12
                         model: overlayDesignerBackend.gridSizes
+                        ToolTip.text: "Grid size"
+                        ToolTip.visible: hovered
                         Binding {
                             target: gridSizeCombo; property: "currentIndex"
                             value: Math.max(0, overlayDesignerBackend.gridSizes.indexOf(overlayDesignerBackend.gridSize))
                         }
                         onActivated: (index) => overlayDesignerBackend.setGridSize(model[index])
                     }
+
                     Item { Layout.fillWidth: true }
+
+                    ToolBtn { text: "−"; Layout.preferredWidth: 30; onClicked: overlayDesignerBackend.zoomOut() }
                     Label {
-                        text: overlayDesignerBackend.selectionCount > 1
-                            ? overlayDesignerBackend.selectionCount + " selected"
-                            : (overlayDesignerBackend.hiddenIndices.length > 0 ? overlayDesignerBackend.hiddenIndices.length + " hidden" : "")
-                        color: "#909090"
+                        Layout.preferredWidth: 40
+                        horizontalAlignment: Text.AlignHCenter
                         font.pixelSize: 12
+                        text: overlayDesignerBackend.zoomPercent + "%"
+                    }
+                    ToolBtn { text: "+"; Layout.preferredWidth: 30; onClicked: overlayDesignerBackend.zoomIn() }
+                    ToolBtn {
+                        text: "Fit"
+                        Layout.preferredWidth: 38
+                        highlighted: overlayDesignerBackend.zoomIsFit
+                        onClicked: overlayDesignerBackend.zoomFit()
+                    }
+                    ToolBtn {
+                        text: "100%"
+                        Layout.preferredWidth: 50
+                        onClicked: overlayDesignerBackend.setZoomPercent(100)
                     }
                 }
 
@@ -310,145 +331,103 @@ Item {
                     Layout.minimumHeight: 240
                 }
 
-                // Telemetry row: source, state, time scrub
+                // Telemetry row - source, state and time scrub on one line
+                // (2026-09-28, per the user). The data readout moved to the
+                // status line below.
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 4
 
-                    Label { text: "Telemetry" }
-                    ButtonGroup { id: sourceGroup }
-                    RadioButton {
+                    Label { text: "Telemetry"; font.pixelSize: 12 }
+                    Button {
                         text: "Dummy"
-                        ButtonGroup.group: sourceGroup
+                        flat: true
+                        checkable: true
+                        Layout.preferredHeight: 34
                         checked: overlayDesignerBackend.telemetrySource === "dummy"
                         onClicked: overlayDesignerBackend.setTelemetrySource("dummy")
                     }
-                    RadioButton {
+                    Button {
                         text: "Loaded log"
-                        ButtonGroup.group: sourceGroup
+                        flat: true
+                        checkable: true
+                        Layout.preferredHeight: 34
                         enabled: overlayDesignerBackend.logTelemetryAvailable
                         checked: overlayDesignerBackend.telemetrySource === "log"
                         onClicked: overlayDesignerBackend.setTelemetrySource("log")
                     }
 
-                    Label { text: "State" }
+                    Label { text: "State"; font.pixelSize: 12; Layout.leftMargin: 8 }
                     CascadeCombo {
                         Layout.preferredWidth: 170
                         model: overlayDesignerBackend.stateList
                         backendIndex: overlayDesignerBackend.stateIndex
                         onActivated: (index) => overlayDesignerBackend.onStateSelected(model[index])
                     }
-                    Item { Layout.fillWidth: true }
-                }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label { text: "Time" }
+                    Label { text: "Time"; font.pixelSize: 12; Layout.leftMargin: 8 }
                     Slider {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 80
                         from: overlayDesignerBackend.timeMin
                         to: Math.max(overlayDesignerBackend.timeMin, overlayDesignerBackend.timeMax)
                         value: overlayDesignerBackend.timeValue
                         enabled: overlayDesignerBackend.timeEnabled
                         onMoved: overlayDesignerBackend.onTimeChanged(Math.round(value))
                     }
-                    Label { Layout.preferredWidth: 80; text: overlayDesignerBackend.timeText }
+                    Label { Layout.preferredWidth: 64; font.pixelSize: 12; text: overlayDesignerBackend.timeText }
                 }
 
-                Label {
+                // Status line: data readout left, status right. The
+                // "Background and dive logs" tools live in the More menu
+                // (mediaPopup) since 2026-09-28 so their collapsed header no
+                // longer takes a row here.
+                RowLayout {
                     Layout.fillWidth: true
-                    text: overlayDesignerBackend.dataText
-                    elide: Text.ElideRight
-                }
-
-                // --- Background & dive logs (optional, collapsed) ------------
-                Pane {
-                    id: mediaPane
-                    Layout.fillWidth: true
-                    Material.elevation: 1
-                    padding: 8
-                    property bool expanded: false
-
-                    ColumnLayout {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        spacing: 6
-
-                        ItemDelegate {
-                            Layout.fillWidth: true
-                            text: (mediaPane.expanded ? "▾  " : "▸  ") + "Background and dive logs (optional)"
-                            font.bold: true
-                            onClicked: mediaPane.expanded = !mediaPane.expanded
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            visible: mediaPane.expanded
-                            spacing: 6
-
-                            RowLayout {
-                                spacing: 8
-                                Button { text: "Load video/photo"; onClicked: overlayDesignerBackend.loadBackground() }
-                                Button {
-                                    text: "Clear background"
-                                    enabled: overlayDesignerBackend.hasBackground
-                                    onClicked: overlayDesignerBackend.clearBackground()
-                                }
-                                Button { text: "Select log file"; onClicked: overlayDesignerBackend.loadLogFile() }
-                                Button { text: "Select log directory"; onClicked: overlayDesignerBackend.loadLogs() }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: "TZ offset (log vs media)" }
-                                Slider {
-                                    Layout.fillWidth: true
-                                    from: -24; to: 24
-                                    value: overlayDesignerBackend.tzValue
-                                    onMoved: overlayDesignerBackend.onTzChanged(Math.round(value))
-                                }
-                                Label { Layout.preferredWidth: 40; text: overlayDesignerBackend.tzText }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: "Preview a loaded log directly (no video needed)" }
-                                ComboBox {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 34
-                                    font.pixelSize: 14
-                                    enabled: overlayDesignerBackend.logFileEnabled
-                                    model: overlayDesignerBackend.logFileList
-                                    onActivated: (index) => overlayDesignerBackend.onLogFileSelected(model[index])
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label { text: overlayDesignerBackend.logText; color: "#808080"; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Button { text: "Show raw waypoint data"; onClicked: overlayDesignerBackend.showWaypoint() }
-                            }
-                        }
+                    spacing: 12
+                    Label {
+                        // "3 selected" / "2 hidden" - was on the toolbar row
+                        visible: text.length > 0
+                        text: overlayDesignerBackend.selectionCount > 1
+                            ? overlayDesignerBackend.selectionCount + " selected"
+                            : (overlayDesignerBackend.hiddenIndices.length > 0 ? overlayDesignerBackend.hiddenIndices.length + " hidden" : "")
+                        color: "#909090"
+                        font.pixelSize: 12
                     }
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: overlayDesignerBackend.statusText
-                    color: "#808080"
-                    elide: Text.ElideRight
+                    Label {
+                        Layout.fillWidth: true
+                        text: overlayDesignerBackend.dataText
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignRight
+                        text: overlayDesignerBackend.statusText
+                        color: "#808080"
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
                 }
             }
 
             // --- Right column: template, element list, inspector ------------
             ScrollView {
+                id: rightColumn
+                objectName: "rightColumn"
                 Layout.preferredWidth: root.rightColumnWidth
                 Layout.fillHeight: true
                 clip: true
                 contentWidth: availableWidth
+                // A permanent scroll bar (2026-09-27, per the user): the
+                // inspector is taller than the window and the Material
+                // bar only showed while scrolling, so nothing said more was
+                // below. The content is inset so the bar never covers it.
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOn
+                ScrollBar.vertical.interactive: true
 
                 ColumnLayout {
-                    width: parent.width
+                    width: rightColumn.availableWidth - 14
                     spacing: 12
 
                     Label {
@@ -462,17 +441,28 @@ Item {
                         Layout.fillWidth: true
                         Material.elevation: 1
                         ColumnLayout {
+                            id: elementsColumn
                             anchors.left: parent.left
                             anchors.right: parent.right
                             spacing: 4
 
+                            // The list folds (2026-09-27, per the user) to give
+                            // the inspector below its space; collapsed, the
+                            // header names what is selected.
+                            property bool listOpen: true
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label {
+                                ItemDelegate {
                                     Layout.fillWidth: true
-                                    text: "Elements (" + overlayDesignerBackend.elements.length + ")"
+                                    Layout.preferredHeight: 30
+                                    text: (elementsColumn.listOpen ? "▾  " : "▸  ") + "Elements (" + overlayDesignerBackend.elements.length + ")"
+                                          + (!elementsColumn.listOpen && overlayDesignerBackend.selectionBoxLabel.length > 0 ? "  ·  " + overlayDesignerBackend.selectionBoxLabel : "")
                                     font.bold: true
                                     font.pixelSize: 14
+                                    onClicked: elementsColumn.listOpen = !elementsColumn.listOpen
+                                    ToolTip.text: elementsColumn.listOpen ? "Fold the element list" : "Show the element list"
+                                    ToolTip.visible: hovered
+                                    ToolTip.delay: 400
                                 }
                                 Button {
                                     text: "+ Add"
@@ -485,6 +475,7 @@ Item {
                             ItemDelegate {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 30
+                                visible: elementsColumn.listOpen
                                 text: "Skin and placement"
                                 font.pixelSize: 12
                                 highlighted: overlayDesignerBackend.skinSelected
@@ -496,6 +487,7 @@ Item {
                             ListView {
                                 id: elementListView
                                 Layout.fillWidth: true
+                                visible: elementsColumn.listOpen
                                 Layout.preferredHeight: Math.min(contentHeight, 6 * 28)
                                 clip: true
                                 boundsBehavior: Flickable.StopAtBounds
@@ -534,7 +526,7 @@ Item {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                visible: overlayDesignerBackend.elements.length === 0
+                                visible: elementsColumn.listOpen && overlayDesignerBackend.elements.length === 0
                                 text: "No elements - use + Add"
                                 color: "#808080"
                                 font.pixelSize: 12
@@ -551,6 +543,87 @@ Item {
     }
 
     AddElementPopup { id: addElementPopup }
+
+    // Background and dive logs (optional) - formerly a collapsed Pane under
+    // the canvas; a popup since 2026-09-28 so the canvas keeps its height.
+    Popup {
+        id: mediaPopup
+        modal: true
+        focus: true
+        anchors.centerIn: Overlay.overlay
+        width: 560
+        padding: 16
+        Material.theme: window.Material.theme
+        Material.accent: window.Material.accent
+        background: Rectangle {
+            color: "#2B2B2B"
+            radius: 6
+            border.color: "#3F3F3F"
+            border.width: 1
+        }
+
+        ColumnLayout {
+            width: parent.width
+            spacing: 10
+
+            Label {
+                text: "Background and dive logs (optional)"
+                font.bold: true
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                spacing: 8
+                Button { text: "Load video/photo"; onClicked: overlayDesignerBackend.loadBackground() }
+                Button {
+                    text: "Clear background"
+                    enabled: overlayDesignerBackend.hasBackground
+                    onClicked: overlayDesignerBackend.clearBackground()
+                }
+            }
+            RowLayout {
+                spacing: 8
+                Button { text: "Select log file"; onClicked: overlayDesignerBackend.loadLogFile() }
+                Button { text: "Select log directory"; onClicked: overlayDesignerBackend.loadLogs() }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Label { text: "TZ offset (log vs media)" }
+                Slider {
+                    Layout.fillWidth: true
+                    from: -24; to: 24
+                    value: overlayDesignerBackend.tzValue
+                    onMoved: overlayDesignerBackend.onTzChanged(Math.round(value))
+                }
+                Label { Layout.preferredWidth: 40; text: overlayDesignerBackend.tzText }
+            }
+
+            Label { text: "Preview a loaded log directly (no video needed)" }
+            ComboBox {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                font.pixelSize: 14
+                enabled: overlayDesignerBackend.logFileEnabled
+                model: overlayDesignerBackend.logFileList
+                onActivated: (index) => overlayDesignerBackend.onLogFileSelected(model[index])
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: overlayDesignerBackend.logText
+                color: "#808080"
+                elide: Text.ElideRight
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Button { text: "Show raw waypoint data"; onClicked: overlayDesignerBackend.showWaypoint() }
+                Item { Layout.fillWidth: true }
+                Button { text: "Close"; flat: true; onClicked: mediaPopup.close() }
+            }
+        }
+    }
     SaveTemplateAsPopup { id: saveAsPopup }
     NewCustomTemplatePopup { id: newCustomPopup; objectName: "newCustomPopup" }
 

@@ -1,13 +1,12 @@
 """
-Regression test for a latent bug in FILENAME_FORMAT_PRESETS: "Date taken"
-and "Date + time" used to map to the identical strftime pattern
-("%Y%m%d_%H%M%S"), so picking "Date taken" silently produced a
-date+time-stamped filename instead of a date-only one. See ui_rework.md's
-"Page: Color" section, "Resolved: unified Output filename preset list".
+The Color page's built-in Output filename presets (color_backend.py's
+FILENAME_FORMAT_PRESETS): every pattern distinct, "Original + color" built
+from the source name via the CLI's "{filename}" token, and the labels saved
+by earlier versions ("Keep original filename", "Date taken") still resolve.
 """
 from datetime import datetime
 
-from uwmedia.backends.color_backend import FILENAME_FORMAT_PRESETS
+from uwmedia.backends.color_backend import FILENAME_FORMAT_PRESETS, LEGACY_PRESET_LABELS
 
 
 def test_filename_format_presets_are_pairwise_distinct():
@@ -17,13 +16,18 @@ def test_filename_format_presets_are_pairwise_distinct():
     )
 
 
-def test_date_taken_differs_from_date_plus_time():
+def test_preset_lineup():
+    labels = [label for label, _ in FILENAME_FORMAT_PRESETS]
+    assert [l.split(" (")[0] for l in labels] == ["Original", "Original + color", "Date + time", "Date + time + color"]
     presets = dict(FILENAME_FORMAT_PRESETS)
-    date_taken_pattern = presets["Date taken"]
-    date_time_pattern = next(
-        pattern for label, pattern in FILENAME_FORMAT_PRESETS if label.startswith("Date + time (")
-    )
+    assert presets[labels[0]] == ""  # --keep-filename
+    assert presets[labels[1]] == "{filename}_color"
+    fixed = datetime(2026, 9, 5, 14, 30, 0)
+    assert fixed.strftime(presets[labels[2]]) == "20260905_143000"
+    assert fixed.strftime(presets[labels[3]]) == "20260905_143000_color"
 
-    fixed_date = datetime(2026, 9, 5, 14, 30, 0)
-    assert fixed_date.strftime(date_taken_pattern) != fixed_date.strftime(date_time_pattern)
-    assert fixed_date.strftime(date_taken_pattern) == "20260905"
+
+def test_legacy_labels_map_to_current_presets():
+    presets = dict(FILENAME_FORMAT_PRESETS)
+    for old, new in LEGACY_PRESET_LABELS.items():
+        assert old not in presets and new in presets

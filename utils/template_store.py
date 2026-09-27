@@ -34,7 +34,16 @@ from typing import Any, Dict, Optional, Tuple
 
 from PIL import Image
 
-from utils.layouts import bundled_templates_dir, list_templates, resolve_template_state, user_templates_dir
+from utils.layouts import (
+    LAYOUT_BASE_KEY,
+    VARIANT_BASE_FIELD,
+    bundled_templates_dir,
+    list_templates,
+    resolve_template_state,
+    split_variant_layout,
+    strip_variant_markers,
+    user_templates_dir,
+)
 from utils.overlay_document import REL_DECIMALS, TemplateRef
 
 ENV_TARGET = "UWMEDIA_TEMPLATES_TARGET"
@@ -163,7 +172,7 @@ def _copy_skin(source: Path, dest: Path) -> None:
 def normalized_layout(layout: Dict[str, Any]) -> Dict[str, Any]:
     """The on-disk form: skin path reduced to normal.png for image skins,
     rel_x/rel_y rounded like the hand-authored files."""
-    data = copy.deepcopy(layout)
+    data = strip_variant_markers(layout)
     skin = data.setdefault("hud_skin", {})
     if skin.get("type", "image") == "image":
         skin["path"] = SKIN_FILENAME
@@ -196,11 +205,38 @@ def save_template(ref: TemplateRef, layout: Dict[str, Any], skin_source: Optiona
     state_path = resolve_template_state(ref.brand, ref.computer, ref.page, variant=ref.variant)
     if state_path is None:
         raise TemplateStoreError(f"No state file found for {ref.label}.")
+    base_raw = layout.get(LAYOUT_BASE_KEY)
+    if base_raw:
+        return _save_variant_overlay(state_path, Path(base_raw), layout, skin_source)
     page_dir = state_path.parent
     source = Path(skin_source) if skin_source else _skin_source_from_layout(layout)
     if source is not None and layout.get("hud_skin", {}).get("type", "image") == "image":
         _copy_skin(source, page_dir / SKIN_FILENAME)
     _write_json(state_path, normalized_layout(layout))
+    return state_path
+
+
+def _save_variant_overlay(state_path: Path, base_path: Path, layout: Dict[str, Any], skin_source: Optional[Path]) -> Path:
+    """A merged variant layout goes back to its two files: the shared
+    elements, skin and page-level keys into the base, the variant's own
+    elements (and overrides / removals of base elements) into the overlay
+    (utils.layouts.split_variant_layout). The skin image lives beside the
+    base."""
+    if not base_path.exists():
+        raise TemplateStoreError(f"The shared base {base_path} for this variant is missing.")
+    with open(base_path) as f:
+        base = json.load(f)
+    new_base, overlay = split_variant_layout(layout, base)
+    source = Path(skin_source) if skin_source else _skin_source_from_layout(layout)
+    if source is not None and layout.get("hud_skin", {}).get("type", "image") == "image":
+        _copy_skin(source, base_path.parent / SKIN_FILENAME)
+    _write_json(base_path, normalized_layout(new_base))
+    for elem in overlay.get("linked_elements", []):
+        for key in ("rel_x", "rel_y"):
+            if isinstance(elem.get(key), float):
+                elem[key] = round(elem[key], REL_DECIMALS)
+    data = {VARIANT_BASE_FIELD: os.path.relpath(base_path, state_path.parent).replace(os.sep, "/"), **overlay}
+    _write_json(state_path, data)
     return state_path
 
 

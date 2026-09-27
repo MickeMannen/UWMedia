@@ -6,6 +6,7 @@ from pathlib import Path
 from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
 from utils.deco_engine import DiveDecompressor, GasDefinition
+from utils.gas_consumption import fill_sac_and_gtr
 
 class UDDFParser(BaseParser):
     def update_timezone(self, file_path: Path, offset_minutes: int):
@@ -62,8 +63,24 @@ class UDDFParser(BaseParser):
                 "he": he
             }
 
+        # The file's own deco model settings (Shearwater Cloud and UWMedia's
+        # builder both write <decomodel><buehlmann> GFs): the recompute below
+        # runs with the same GFs, so its TTS/ceiling agree with the log
+        # instead of a fixed 30/70.
+        gf_low = root.xpath("string(.//*[local-name()='decomodel']//*[local-name()='gradientfactorlow'])")
+        gf_high = root.xpath("string(.//*[local-name()='decomodel']//*[local-name()='gradientfactorhigh'])")
+        try:
+            file_gf = (float(gf_low) / 100.0, float(gf_high) / 100.0) if gf_low and gf_high else None
+            if file_gf and not (0 < file_gf[0] <= file_gf[1] <= 1.0):
+                file_gf = None
+        except ValueError:
+            file_gf = None
+
         # 3. UDDF structure: <uddf> <logbook> <dive>
         for dive_elem in root.xpath("//*[local-name()='dive']"):
+            # A log that records its own <decostop>s says "no stop" by leaving
+            # it out - don't let the recompute below invent one there.
+            file_logs_stops = bool(dive_elem.xpath(".//*[local-name()='decostop']"))
             # Extract start time
             start_time = None
             
@@ -135,6 +152,11 @@ class UDDFParser(BaseParser):
                 ndl_str = sample.xpath("string(*[local-name()='nodecotime'])")
                 ndl = int(float(ndl_str)) if ndl_str else None
 
+                # TTS - UWMedia's own per-waypoint extension (parsers/uddf_writer.py);
+                # absent in other software's exports, recomputed below then.
+                tts_str = sample.xpath("string(*[local-name()='tts'])")
+                logged_tts = int(float(tts_str)) if tts_str else None
+
                 # CNS
                 cns_str = sample.xpath("string(*[local-name()='cns'])")
                 cns = int(float(cns_str)) if cns_str else None
@@ -173,9 +195,10 @@ class UDDFParser(BaseParser):
                         logged_deco_stop_time = int(float(decostop_elem.get("duration")))
                     except (TypeError, ValueError):
                         logged_deco_stop_time = None
-                elif ndl is not None and ndl > 0:
-                    # The file's own NDL says no mandatory stop yet - don't
-                    # let the generic recompute below (other GFs) invent one.
+                elif (ndl is not None and ndl > 0) or file_logs_stops:
+                    # The file's own NDL says no mandatory stop yet (or the
+                    # file logs stops and has none here) - don't let the
+                    # generic recompute below (other GFs) invent one.
                     logged_deco_stop_depth = 0.0
                     logged_deco_stop_time = 0
                 else:
@@ -226,6 +249,7 @@ class UDDFParser(BaseParser):
                     max_depth=current_max_depth,
                     temp=temp,
                     ndl=ndl,
+                    tts=logged_tts,
                     cns=cns,
                     po2=po2,
                     divemode=divemode,
@@ -256,8 +280,11 @@ class UDDFParser(BaseParser):
                     if not deco_gases:
                         deco_gases.append(GasDefinition("AIR", 0.21, 0.0, 56.0))
 
-                    # Run decompressor
-                    decompressor = DiveDecompressor(simulation_interval=10)
+                    # Run decompressor (with the file's own GFs where it states them)
+                    decompressor = (
+                        DiveDecompressor(gf_low=file_gf[0], gf_high=file_gf[1], simulation_interval=10)
+                        if file_gf else DiveDecompressor(simulation_interval=10)
+                    )
                     wp_dicts = [wp.model_dump() for wp in waypoints]
                     # Map fields for engine compatibility
                     for d in wp_dicts:
@@ -277,7 +304,8 @@ class UDDFParser(BaseParser):
                     for wp in waypoints:
                         res = deco_results.get(wp.time_since_start)
                         if res:
-                            wp.tts = res.tts_seconds
+                            if wp.tts is None:
+                                wp.tts = res.tts_seconds
                             wp.ceiling = res.ceiling_meters
                             if wp.deco_stop_depth is None:
                                 wp.deco_stop_depth = res.ceiling_meters
@@ -300,6 +328,11 @@ class UDDFParser(BaseParser):
                                 wp.next_stop_time = 0  # Placeholder if not explicitly tracked
                 except Exception as e:
                     print(f"Warning: Decompression calculation failed for dive: {e}")
+
+                # SAC / GTR the way the computer shows them (utils/gas_consumption.py),
+                # for logs that don't record them - a Shearwater logs pressure only.
+                if not any(getattr(wp, "pressure_sac", None) is not None for wp in waypoints):
+                    fill_sac_and_gtr(waypoints)
 
                 end_time = waypoints[-1].timestamp
                 dives.append(Dive(

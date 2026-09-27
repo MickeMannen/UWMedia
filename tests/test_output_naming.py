@@ -49,6 +49,16 @@ def test_filename_format_pattern(tmp_path, photo):
     assert output_filename(photo, tmp_path / "out", args, TAKEN) == "20260905_Bali_123.jpg"
 
 
+def test_filename_token_keeps_source_name_without_milliseconds(tmp_path, photo):
+    """"{filename}_color" (the Color page's Original + color preset): the
+    source name plus the suffix, no photo millisecond suffix - the name is
+    already unique per source, like --keep-filename."""
+    args = _args(photo.parent, filename_format="{filename}_color")
+    assert output_filename(photo, tmp_path / "out", args, TAKEN) == "DSC06641_color.jpg"
+    args = _args(photo.parent, filename_format="%Y%m%d_{filename}")
+    assert output_filename(photo, tmp_path / "out", args, TAKEN) == "20260905_DSC06641.jpg"
+
+
 def test_keep_filename_into_source_folder_never_overwrites_source(photo):
     for overwrite in (False, True):
         args = _args(photo.parent, keep_filename=True, overwrite=overwrite)

@@ -33,7 +33,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets
 
 from utils.app_settings import get_fields, set_field
-from utils.layouts import list_templates, resolve_template_state
+from utils.layouts import list_templates, resolve_template_state, load_layout_file, strip_variant_markers
 
 from uwmedia.pages.overlay_generator_page_ui import Ui_OverlayGeneratorPage
 
@@ -207,8 +207,7 @@ class OverlayGeneratorPage(QtWidgets.QWidget, Ui_OverlayGeneratorPage):
         if state_path is None:
             return None
 
-        with open(state_path) as f:
-            layout = json.load(f)
+        layout = strip_variant_markers(load_layout_file(state_path))
         hud_skin = layout.setdefault("hud_skin", {})
         skin_path = hud_skin.get("path")
         if skin_path and not Path(skin_path).is_absolute():

@@ -241,3 +241,27 @@ isn't tested.
 
 Gases and waypoints are not kept between restarts - save the log when you're
 done. The dive settings are kept.
+
+Every saved log also carries the plan itself (gases, waypoints and all the
+dive settings), tucked into the format's own slot for application data:
+UDDF `<applicationdata>`, a Subsurface `<extradata>` entry, FIT developer
+fields. Other software ignores it; **Open log…** uses it.
+
+## Opening a saved log
+
+**Open log…** loads a log the Dive Profile Builder saved, so you can change
+it and save it again. Only such logs are accepted - a log from a real dive
+computer, or from another program, is refused with a message, since the
+builder can only re-plan a dive it built.
+
+- A log saved with the plan inside comes back exactly as it was saved:
+  waypoints, gases, GF, SAC, PO2 limits, start time, dive computer - everything.
+- A log saved by an earlier UWMedia (before the plan was embedded) is rebuilt
+  from what the file holds: gases and tanks, gas switches, GF and the dive
+  computer come back as saved, the depth profile is reduced to the few dozen
+  waypoints that reproduce it, and settings a log doesn't hold (SAC, ascent
+  and descent rates, gas depth ranges) stay as they are in the pane. Check
+  the waypoints before saving again - the message under the buttons says
+  which of the two happened.
+
+Opening a log replaces the plan in the editor; there is no merge.

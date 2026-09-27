@@ -64,8 +64,10 @@ from parsers.uddf import UDDFParser
 from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
+from utils.run_timing import RunTiming
+from utils import filename_formats
 from utils.filename_formats import custom_filename_formats, example_filename, pattern_error
-from utils.layouts import list_templates, page_display_name, resolve_template_state
+from utils.layouts import list_templates, page_display_name, resolve_template_state, load_layout_file, strip_variant_markers, variant_display_name
 
 from uwmedia.pages.add_hud_dialog import HUD_LOCATION_PRESETS
 
@@ -105,19 +107,31 @@ ACTIVE_LINE_RE = re.compile(r"UWMEDIA_PROGRESS_ACTIVE (.*)$")
 # real batch pipeline's own implicit classification.
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".mkv", ".avi"}
 
+# Output filename presets (2026-09-28, per the user): "Date taken" (date
+# only) is gone, "Keep original filename" is "Original", and "Original +
+# color" is new - its "{filename}" token is the source name (cli_main.py's
+# output_filename). "" means --keep-filename.
 FILENAME_FORMAT_PRESETS = [
-    ("Keep original filename", ""),
-    ("Date taken", "%Y%m%d"),
+    ("Original (DSC06641)", ""),
+    ("Original + color (DSC06641_color)", "{filename}_color"),
     ("Date + time (20260905_143000)", "%Y%m%d_%H%M%S"),
     ("Date + time + color (20260905_143000_color)", "%Y%m%d_%H%M%S_color"),
 ]
+# Labels saved in settings.json by earlier versions -> today's label.
+LEGACY_PRESET_LABELS = {
+    "Keep original filename": FILENAME_FORMAT_PRESETS[0][0],
+    "Date taken": FILENAME_FORMAT_PRESETS[2][0],
+}
 
 
 def _filename_format_choices():
-    """Built-in presets, then the user's own patterns from the Advanced page
-    (settings.json "filename_formats"), labelled with an example name.
-    Unusable saved patterns are skipped."""
+    """Built-in presets, then - while CUSTOM_FILENAME_FORMATS_ENABLED - the
+    user's own patterns from the Advanced page (settings.json
+    "filename_formats"), labelled with an example name. Unusable saved
+    patterns are skipped."""
     choices = dict(FILENAME_FORMAT_PRESETS)
+    if not filename_formats.CUSTOM_FILENAME_FORMATS_ENABLED:
+        return choices
     for pattern in custom_filename_formats():
         if pattern in choices.values() or pattern_error(pattern):
             continue
@@ -185,6 +199,9 @@ class ColorBackend(QObject):
         self._progress_pct = 0.0
         self._active_files = []
         self._file_progress = {}  # filename -> last-known percent (0-100)
+        # Elapsed / estimated-remaining line under the bars (utils/run_timing.py)
+        self.timing = RunTiming(self._batch_fraction, self)
+        self.timing.changed.connect(self.runStateChanged.emit)
 
         self._source_text = ""
         self._output_text = ""
@@ -230,6 +247,7 @@ class ColorBackend(QObject):
         if profile and profile in self._color_profiles:
             self._color_profile = profile
         fmt_label = fields.get("filename_format_select")
+        fmt_label = LEGACY_PRESET_LABELS.get(fmt_label, fmt_label)
         if fmt_label and fmt_label in self._filename_format_by_label:
             self._filename_format = fmt_label
 
@@ -620,13 +638,14 @@ class ColorBackend(QObject):
         page_entry = next((p for p in manifest.get("pages", []) if p["id"] == page), None)
         if page_entry is None:
             return None
-        variant = page_entry["variants"][0] if page_entry.get("variants") else None
+        variants = page_entry.get("variants") or []
+        selected = getattr(self, "_selected_variant", None)
+        variant = selected if selected in variants else (variants[0] if variants else None)
         state_path = resolve_template_state(brand, computer, page, variant=variant)
         if state_path is None:
             return None
 
-        with open(state_path) as f:
-            raw_layout = json.load(f)
+        raw_layout = strip_variant_markers(load_layout_file(state_path))
         hud_skin = raw_layout.setdefault("hud_skin", {})
         skin_path = hud_skin.get("path")
         if skin_path and not Path(skin_path).is_absolute():
@@ -636,6 +655,8 @@ class ColorBackend(QObject):
         if len(self._hud_templates.get(brand, {})) > 1:
             name_parts.append(computer)
         name_parts.append(page)
+        if variant:
+            name_parts.append(variant)
         out_dir = Path(tempfile.mkdtemp(prefix="uwmedia_qt_color_overlay_"))
         layout_path = out_dir / f"{'_'.join(name_parts)}.json"
         with open(layout_path, "w") as f:
@@ -726,6 +747,23 @@ class ColorBackend(QObject):
     def addHudBrandList(self):
         return list(self._brand_choices.keys())
 
+    # Bound to the popup combos' currentIndex - see OverlayGeneratorBackend
+    # .brandIndex for why (a re-emitted list model resets an unbound combo).
+    @Property(int, notify=addHudCascadeChanged)
+    def addHudBrandIndex(self):
+        keys = list(self._brand_choices.values())
+        return keys.index(self._selected_brand_key) if self._selected_brand_key in keys else 0
+
+    @Property(int, notify=addHudCascadeChanged)
+    def addHudComputerIndex(self):
+        keys = list(self._computer_choices.values())
+        return keys.index(self._selected_computer_key) if self._selected_computer_key in keys else 0
+
+    @Property(int, notify=addHudCascadeChanged)
+    def addHudPageIndex(self):
+        keys = list(self._page_choices.values())
+        return keys.index(self._selected_page_id) if self._selected_page_id in keys else 0
+
     @Slot()
     def reloadTemplates(self):
         """Re-read the template tree - wired (app.py) to the Overlay
@@ -749,6 +787,39 @@ class ColorBackend(QObject):
     @Property(list, notify=addHudCascadeChanged)
     def addHudPageList(self):
         return list(self._page_choices.keys())
+
+    # Tank setup of the page (no tank / single tank / sidemount / multi-tank)
+    # - chosen here rather than guessed from the logs.
+    @Property(list, notify=addHudCascadeChanged)
+    def addHudVariantList(self):
+        return list(getattr(self, "_variant_choices", {}).keys())
+
+    @Property(bool, notify=addHudCascadeChanged)
+    def addHudVariantVisible(self):
+        return bool(getattr(self, "_variant_choices", {}))
+
+    @Property(int, notify=addHudCascadeChanged)
+    def addHudVariantIndex(self):
+        for i, v in enumerate(getattr(self, "_variant_choices", {}).values()):
+            if v == getattr(self, "_selected_variant", None):
+                return i
+        return 0
+
+    @Slot(str)
+    def onAddHudVariantSelected(self, variant_display):
+        variant = getattr(self, "_variant_choices", {}).get(variant_display)
+        if variant is not None:
+            self._selected_variant = variant
+            self.addHudCascadeChanged.emit()
+
+    def _refresh_variant_choices(self):
+        brand, computer, page = self._selected_brand_key, self._selected_computer_key, self._selected_page_id
+        manifest = self._hud_templates.get(brand, {}).get(computer) if brand and computer else None
+        entry = next((p for p in (manifest or {}).get("pages", []) if p["id"] == page), None)
+        variants = (entry.get("variants") or []) if entry else []
+        self._variant_choices = {variant_display_name(v): v for v in variants}
+        if getattr(self, "_selected_variant", None) not in variants:
+            self._selected_variant = "single_tank" if "single_tank" in variants else (variants[0] if variants else None)
 
     @Property(str, notify=addHudErrorChanged)
     def addHudError(self):
@@ -778,10 +849,13 @@ class ColorBackend(QObject):
         pages = manifest["pages"] if manifest else []
         self._page_choices = {page_display_name(page): page["id"] for page in pages}
         self._selected_page_id = next(iter(self._page_choices.values()), None)
+        self._refresh_variant_choices()
 
     @Slot(str)
     def onAddHudPageSelected(self, page_display_name):
         self._selected_page_id = self._page_choices.get(page_display_name)
+        self._refresh_variant_choices()
+        self.addHudCascadeChanged.emit()
 
     @Slot()
     def resetAddHudCascade(self):
@@ -1119,8 +1193,8 @@ class ColorBackend(QObject):
         if pattern:
             args += ["--filename-format", pattern]
         else:
-            # "Keep original filename" - without this the CLI names batch
-            # output by date taken.
+            # "Original" - without this the CLI names batch output by
+            # date taken.
             args.append("--keep-filename")
         # --hw-accel defaults to False in cli_main.py's argparse if never
         # passed - this used to never be appended at all (a long-deferred
@@ -1199,6 +1273,18 @@ class ColorBackend(QObject):
     def activeFilesText(self):
         return ", ".join(self._active_files)
 
+    def _batch_fraction(self):
+        """0..1 of the whole batch for the time estimate: the per-file
+        aggregate when the progress lines are attributable, else whole
+        files done."""
+        if self._file_progress and self._progress_total:
+            return self.progressCurrentFraction
+        return self.progressOverallFraction
+
+    @Property(str, notify=runStateChanged)
+    def timingText(self):
+        return self.timing.text
+
     def _set_status(self, text):
         self._status_text = text
         self.runStateChanged.emit()
@@ -1235,6 +1321,7 @@ class ColorBackend(QObject):
         self.process.readyReadStandardOutput.connect(self._on_process_output)
         self.process.finished.connect(self._on_process_finished)
         self.process.start(cmd[0], cmd[1:])
+        self.timing.start()
         self.runStateChanged.emit()
 
     def _on_process_output(self):
@@ -1336,6 +1423,7 @@ class ColorBackend(QObject):
             f"Finished (exit code {exit_code})" if exit_code == 0 else f"Failed (exit code {exit_code})"
         )
         self.process = None
+        self.timing.stop(ok=exit_code == 0)
         self.runStateChanged.emit()
 
     def _kill_process_tree(self):

@@ -25,12 +25,29 @@
         "scale": 1.0
       },
       {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.2025,
+        "rel_y": 0.479,
+        "font_size": 20,
+        "value_font_size": 40,
+        "scale": 1.0,
+        "depth_unit": "m",
+        "outline": false,
+        "label": "Stop / deco (replaces NDL)"
+      },
+      {
         "field": "custom:NDL",
         "rel_x": 0.2101,
         "rel_y": 0.48169,
         "color": "#00ADED",
         "font_size": 20,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "field": "ndl",
@@ -38,7 +55,12 @@
         "rel_y": 0.51974,
         "color": "#FFFFFF",
         "font_size": 60,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "field": "custom:TTS",

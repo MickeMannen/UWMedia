@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
 from parsers.uddf import UDDFParser
@@ -82,3 +83,38 @@ def test_uddf_writes_tank_volume(tmp_path):
     text = out.read_text()
     assert "<tankvolume>0.012</tankvolume>" in text
     assert "<tankpressurebegin>23200000</tankpressurebegin>" in text
+
+
+def test_older_builder_uddf_without_tts_ends_deco_where_the_file_does():
+    # test_data/logs/DecoTest_2.uddf was saved before the builder logged TTS or
+    # kept NDL after the last stop: the sample after the final <decostop> has
+    # neither. The file logs its own stops, so that means "no stop" - not a
+    # ceiling of our own making that kept the DECO box and a 9-minute TTS on
+    # screen down to the surface. The recompute runs with the file's GF 40/85.
+    import io
+    import contextlib
+    from parsers.uddf import UDDFParser
+    from utils.hud_rules_engine import resolve_state
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        dive = UDDFParser().parse(Path("test_data/logs/DecoTest_2.uddf"))[0]
+    at = {wp.time_since_start: wp for wp in dive.waypoints}
+    assert resolve_state("Garmin", "x50i", at[3815], dive.waypoints) == "deco"
+    assert at[3815].next_stop_depth == 3.0
+    for t in (3816, 3830, 3850):
+        assert resolve_state("Garmin", "x50i", at[t], dive.waypoints) == "normal", t
+        assert at[t].deco_stop_depth == 0.0 and at[t].next_stop_depth == 0.0
+        assert at[t].tts is not None and at[t].tts < 60
+
+
+def test_shearwater_uddf_gets_sac_and_gtr_computed_from_its_pressures():
+    import io
+    import contextlib
+    from parsers.uddf import UDDFParser
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        dive = UDDFParser().parse(Path("test_data/logs/submersion_dives/issue_71_perdix_single_tank.uddf"))[0]
+    at = {wp.time_since_start: wp for wp in dive.waypoints}
+    assert at[30].pressure_sac is None                      # "wait" while data is collected
+    assert 0.5 < at[600].pressure_sac < 3.0                 # a plausible bar/min at the surface
+    assert at[600].air_remaining is not None and 0 < at[600].air_remaining < 60 * 60

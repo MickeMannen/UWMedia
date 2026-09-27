@@ -9,7 +9,10 @@ from utils.hud_rules_engine import (
     resolve_blink_color,
     resolve_tank_variant,
     get_tank_fill_color,
-    is_clearing_deco_stop,
+    deco_stop_phase,
+    deco_clear_seconds,
+    stop_phase,
+    safety_stop_phase,
     get_ndl_before_clear,
     safety_stop_status,
     safety_stop_timeline,
@@ -47,14 +50,11 @@ def test_ndl_dynamic_colors():
     # NDL=0 falls back to the same color as unlimited/safe (>=30 min tier)
     assert get_dynamic_color("Garmin", "x50i", "ndl", 0, "#FFFFFF") == "#FFFFFF"
 
-    # 35 minutes = 2100 seconds (above 30, genuinely unlimited/safe) -> #FFFFFF
+    # Perdix 2 manual p.31: the NDL turns yellow below 5 minutes, white otherwise
     assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 2100, "#BLUE") == "#FFFFFF"
-
-    # 20 minutes = 1200 seconds (10 to 30) -> #FFFF00
-    assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 1200, "#BLUE") == "#FFFF00"
-
-    # 5 minutes = 300 seconds (below 10) -> #FF0000
-    assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 300, "#BLUE") == "#FF0000"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 1200, "#BLUE") == "#FFFFFF"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 300, "#BLUE") == "#FFFFFF"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 240, "#BLUE") == "#FFFF00"
 
 def test_po2_dynamic_colors():
     # Standard high-PPO2 alarm threshold (1.6 bar) - Shearwater-configured
@@ -147,61 +147,6 @@ def test_resolve_state_garmin_deco_cleared_and_complete_alerts():
         "Garmin", "x50i", _wp(dive_alerts=["deco_stop_cleared", "deco_complete"])
     ) == "normal"
 
-def test_is_clearing_deco_stop():
-    # 0.5m shallower than the deco stop, within Shearwater's 1.0m margin -> clearing
-    assert is_clearing_deco_stop("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=5.5)) is True
-
-    # Still 2m below the stop - outside the margin, not yet clearing
-    assert is_clearing_deco_stop("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=4.0)) is False
-
-    # Already at or past the stop depth (distance <= 0) - not "clearing", already there
-    assert is_clearing_deco_stop("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=6.0)) is False
-    assert is_clearing_deco_stop("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=7.0)) is False
-
-    # No deco stop active -> never clearing
-    assert is_clearing_deco_stop("Shearwater", "Perdix 2", _wp(deco_stop_depth=0.0, depth=0.5)) is False
-
-    # Garmin has no configured "clear" margin (defaults to 0) -> never clearing
-    assert is_clearing_deco_stop("Garmin", "x50i", _wp(deco_stop_depth=6.0, depth=5.9)) is False
-
-def test_resolve_state_clear_refines_deco():
-    # Within the clear margin of the deco stop -> "clear", not plain "deco"
-    assert resolve_state("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=5.5)) == "clear"
-    # Outside the margin -> still plain "deco"
-    assert resolve_state("Shearwater", "Perdix 2", _wp(deco_stop_depth=6.0, depth=4.0)) == "deco"
-    # Same distinction via the deco alert-event path, not just the depth-band fallback
-    assert resolve_state(
-        "Shearwater", "Perdix 2", _wp(dive_alerts=["deco_ceiling_broken"], deco_stop_depth=6.0, depth=5.5)
-    ) == "clear"
-    # Garmin has no "clear" margin configured -> stays plain "deco"
-    assert resolve_state("Garmin", "x50i", _wp(deco_stop_depth=6.0, depth=5.9)) == "deco"
-
-def test_get_ndl_before_clear():
-    # Waypoints in order: normal NDL countdown, then deco starts (ndl goes
-    # None), then close enough to the stop to be "clearing" it.
-    waypoints = [
-        _wp(time_since_start=0, ndl=1800, depth=20.0),
-        _wp(time_since_start=60, ndl=600, depth=25.0),  # last real NDL: 10 min
-        _wp(time_since_start=120, ndl=None, deco_stop_depth=6.0, depth=15.0),  # deco, not clearing
-        _wp(time_since_start=180, ndl=None, deco_stop_depth=6.0, depth=6.5),  # still deco
-        _wp(time_since_start=240, ndl=None, deco_stop_depth=6.0, depth=5.5),  # now clearing
-        _wp(time_since_start=300, ndl=None, deco_stop_depth=6.0, depth=5.7),  # still clearing
-    ]
-
-    # Frozen at the last real NDL (600s) for every waypoint in the "clear" run
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[4], waypoints) == 600
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[5], waypoints) == 600
-
-    # None while still plain "deco" (not yet clearing) or "normal" - only
-    # meaningful during "clear" itself
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[2], waypoints) is None
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[3], waypoints) is None
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[0], waypoints) is None
-
-    # No waypoint list, or no waypoint at all -> None, doesn't blow up
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", waypoints[4], None) is None
-    assert get_ndl_before_clear("Shearwater", "Perdix 2", None, waypoints) is None
-
 def test_get_badge_config():
     stop_cfg = get_badge_config("Garmin", "x50i", "safety_stop")
     assert stop_cfg == {"label": "STOP", "color": "#00FF00"}
@@ -210,7 +155,7 @@ def test_get_badge_config():
     assert deco_cfg == {"label": "DECO", "color": "#FFA500"}
 
     clear_cfg = get_badge_config("Shearwater", "Perdix 2", "clear")
-    assert clear_cfg == {"label": "CLEAR", "color": "#00C800"}
+    assert (clear_cfg["label"], clear_cfg["color"]) == ("CLEAR", "#00C800")
 
     # Unknown manufacturer/model still falls back to the global default block
     assert get_badge_config("UnknownMfg", "UnknownModel", "safety_stop") is not None
@@ -297,7 +242,8 @@ def test_garmin_safety_stop_resets_below_11m_and_skips_shallow_dives():
 
 def test_safety_stop_timer_only_for_rules_with_a_duration():
     wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5)])
-    assert safety_stop_timeline("Shearwater", "Perdix 2", wps) is None
+    assert safety_stop_timeline("Shearwater", "Perdix 2", wps) is not None  # the Perdix dialect
+    assert safety_stop_timeline("NoSuchBrand", "", wps) is None
 
 def test_garmin_safety_stop_not_shown_after_a_3m_deco_stop():
     # A deco dive whose last stop is at 3 m: once the ceiling clears the diver
@@ -347,3 +293,114 @@ def test_garmin_safety_stop_ends_on_surfacing_without_flicker():
     at = {w.time_since_start: w for w in wps}
     assert resolve_state("Garmin", "x50i", at[750], wps) == "safety_stop"
     assert all(resolve_state("Garmin", "x50i", at[t], wps) == "normal" for t in range(801, 900))
+
+
+# --- Shearwater (Perdix 2 manual p.27-28, p.31-33) -----------------------------
+
+def test_deco_stop_phase_follows_the_perdix_margins():
+    stop = lambda depth: _wp(deco_stop_depth=6.0, next_stop_depth=6.0, depth=depth)
+    assert deco_stop_phase("Shearwater", "Perdix 2", stop(15.0)) == "far"       # > 5.1 m below the stop
+    assert deco_stop_phase("Shearwater", "Perdix 2", stop(10.0)) == "approach"  # within 5.1 m: yellow, flashing arrow
+    assert deco_stop_phase("Shearwater", "Perdix 2", stop(7.4)) == "at_stop"    # up to 1.5 m deeper: green + check
+    assert deco_stop_phase("Shearwater", "Perdix 2", stop(6.0)) == "at_stop"
+    assert deco_stop_phase("Shearwater", "Perdix 2", stop(5.5)) == "violation"  # shallower than the stop
+    assert deco_stop_phase("Shearwater", "Perdix 2", _wp(depth=5.0)) is None
+    assert deco_stop_phase("Garmin", "x50i", stop(7.0)) is None  # no such rule on Garmin
+    assert resolve_state("Shearwater", "Perdix 2", stop(5.5)) == "deco"  # not a state of its own
+
+
+def test_shearwater_safety_stop_counter_appears_at_11m_and_counts_under_6m():
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5), (1060, 0)])
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Shearwater", "Perdix 2", at[30], wps) == "normal"       # not yet past 11 m
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[300], wps) == ("pending", 180)
+    assert resolve_state("Shearwater", "Perdix 2", at[300], wps) == "safety_stop"  # shown at depth, planned 3:00
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[750], wps)[0] == "counting"
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[750], wps)[1] < 180
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[950], wps) == ("complete", 0)
+    assert resolve_state("Shearwater", "Perdix 2", at[950], wps) == "safety_stop"  # complete still shows, with the check
+    assert stop_phase("Shearwater", "Perdix 2", at[750], wps)[3] is None  # a Perdix names no stop depth
+
+
+def test_shearwater_safety_stop_pauses_outside_2_4_to_8_3m_and_adapts_to_5min():
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (760, 5), (800, 1.0), (860, 1.0), (900, 5), (1100, 5)])
+    at = {w.time_since_start: w for w in wps}
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[830], wps)[0] == "paused"  # shallower than 2.4 m
+    left_before = safety_stop_phase("Shearwater", "Perdix 2", at[805], wps)[1]
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[855], wps)[1] == left_before  # paused at 1 m: no countdown
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[950], wps)[0] == "counting"
+    deep = _profile([(0, 0), (60, 32), (300, 32), (600, 5), (1000, 5)])
+    assert safety_stop_phase("Shearwater", "Perdix 2", deep[200], deep) == ("pending", 300)  # Adapt: 5:00 past 30 m
+    low_ndl = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5)])
+    low_ndl[300].ndl = 240
+    assert safety_stop_phase("Shearwater", "Perdix 2", low_ndl[400], low_ndl) == ("pending", 300)
+
+
+def test_shearwater_deco_clear_counts_up_and_replaces_the_safety_stop():
+    wps = _profile([(0, 0), (120, 40), (1500, 40), (1700, 6), (2000, 6), (2100, 3), (2400, 3), (2430, 0)])
+    for w in wps:
+        if 1400 <= w.time_since_start < 2000:
+            w.deco_stop_depth = w.next_stop_depth = 6.0
+            w.next_stop_time = 2000 - w.time_since_start
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Shearwater", "Perdix 2", at[1800], wps) == "deco"
+    assert stop_phase("Shearwater", "Perdix 2", at[1800], wps)[1] == "at_stop"
+    assert resolve_state("Shearwater", "Perdix 2", at[2000], wps) == "clear"
+    assert deco_clear_seconds("Shearwater", "Perdix 2", at[2000], wps) == 0
+    assert deco_clear_seconds("Shearwater", "Perdix 2", at[2300], wps) == 300
+    assert stop_phase("Shearwater", "Perdix 2", at[2300], wps) == ("clear", "clear", 300, None)
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[2300], wps) == (None, 0)  # no safety stop after deco
+    assert resolve_state("Garmin", "x50i", at[2300], wps) == "normal"  # Garmin has no deco-clear counter
+
+
+def test_sidemount_switch_target_follows_the_21_bar_threshold():
+    from utils.hud_rules_engine import sidemount_switch_target
+    from models.dive import TankData
+
+    def wp(p1, p2=None):
+        tanks = {"T1": TankData(pressure_bar=p1, o2_percent=21.0)}
+        if p2 is not None:
+            tanks["T2"] = TankData(pressure_bar=p2, o2_percent=21.0)
+        return _wp(tanks=tanks)
+
+    assert sidemount_switch_target("Shearwater", "Perdix 2", wp(175, 153)) == "primary"    # breathe the fuller T1
+    assert sidemount_switch_target("Shearwater", "Perdix 2", wp(150, 180)) == "secondary"
+    assert sidemount_switch_target("Shearwater", "Perdix 2", wp(170, 160)) is None         # within 21 bar
+    assert sidemount_switch_target("Shearwater", "Perdix 2", wp(170)) is None              # one tank
+    assert sidemount_switch_target("Garmin", "x50i", wp(175, 100)) is None                 # no such rule
+
+
+def test_teric_and_tern_badges_override_only_what_differs_from_the_perdix_family():
+    # Teric manual p.25-26: "SAFETY" / "DECO" titles, no check mark, green
+    # while counting, yellow when paused, "SAFETY / CLEAR" once done.
+    for model in ("Teric", "Tern"):
+        ss = get_badge_config("Shearwater", model, "safety_stop")
+        assert ss["label"] == "SAFETY" and "check_mark" not in ss
+        assert ss["counting_value_color"] == "#00C800" and ss["paused_color"] == "#FFFF00"
+        assert ss["complete_value_text"] == "CLEAR"
+        assert ss["show_depth"] is False and ss["timer_format"] == "m:ss"  # inherited from the brand entry
+        deco = get_badge_config("Shearwater", model, "deco")
+        assert deco["label"] == "DECO" and deco["inline"] is True and "approach_color" not in deco
+    perdix = get_badge_config("Shearwater", "Perdix 2", "safety_stop")
+    assert perdix["label"] == "SAFETY STOP" and perdix["check_mark"] is True
+
+
+def test_shearwater_safety_stop_resets_when_deeper_than_11m_again():
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (760, 5), (820, 15), (900, 15), (1000, 5), (1300, 5)])
+    at = {w.time_since_start: w for w in wps}
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[750], wps)[0] == "counting"
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[850], wps) == ("pending", 180)  # back below 11 m: full 3:00 again
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[1050], wps)[0] == "counting"
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[1050], wps)[1] > 100
+
+
+def test_perdix_3_badge_is_a_boxed_title_that_replaces_the_ndl():
+    # Perdix 3 manual p.58-60: "SAFETY" in a green box with the time in green,
+    # "PAUSED" in yellow, "SAFETY / CLEAR" when done; deco as a blue "DECO"
+    # label over "18m 1min" like the Tec layout's top row.
+    ss = get_badge_config("Shearwater", "Perdix 3", "safety_stop")
+    assert ss["label"] == "SAFETY" and ss["paused_label"] == "PAUSED" and ss["title_box"] is True
+    assert "check_mark" not in ss and ss["complete_value_text"] == "CLEAR"
+    deco = get_badge_config("Shearwater", "Perdix 3", "deco")
+    assert deco["label"] == "DECO" and deco["color"] == "#00ADED" and deco["inline"] is True
+    assert "approach_color" not in deco

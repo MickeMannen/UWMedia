@@ -19,14 +19,15 @@ with optional telemetry overlays burned in.
    dive computer → page). Drag the overlay into place on the **Live preview**.
    You can add several; **Remove Selected** takes one off again. Each file is
    matched to its dive by the time it was taken.
-4. **Output filename** - keep the original name (only the extension is made
-   lower-case, e.g. `DSC06641.JPG` → `DSC06641.jpg`), or name files by the date
-   taken (`20260905`), date + time (`20260905_143000`) or date + time + `_color`.
-   Your own patterns saved on the [Advanced](advanced.md#custom-filename-formats)
-   page are listed after these, e.g. `%Y%m%d_Bali → 20260905_Bali`.
+4. **Output filename** - **Original** keeps the name (only the extension is
+   made lower-case, e.g. `DSC06641.JPG` → `DSC06641.jpg`), **Original +
+   color** adds `_color` to it (`DSC06641_color.jpg`), or name files by the
+   date + time taken (`20260905_143000`) or date + time + `_color`.
 5. **Hardware acceleration** uses the GPU encoder where available.
 6. Press **▶ Start** (it becomes **■ Abort** while running). Progress is
-   shown for the current file and overall.
+   shown for the current file and overall, with the time spent and, once a
+   few percent are done, an estimate of the time left. The line stays after
+   the run ("Finished in 13:41").
 
 Only one batch job (Color, Overlay Generator or Convertion) can run at a time.
 
@@ -36,6 +37,11 @@ Only one batch job (Color, Overlay Generator or Convertion) can run at a time.
   faster than processing frame by frame - see [How it works](technical.md).
 - The original camera metadata (QuickTime, DJI, Sony …) is copied to the
   output, and the date taken is kept.
+- Overlays are drawn at the footage's own resolution and are left out of the
+  colour correction: the correction is applied to the video underneath, so a
+  dive computer's bezel and text keep the colours you see in the
+  [Overlay Designer](overlay-designer.md) instead of picking up the underwater
+  red boost.
 - If you'd rather keep overlays as a separate layer in your editor, use the
   [Overlay Generator](overlay-generator.md) instead of burning them in here.
 - CLI equivalent: `python cli_main.py SRC OUT --color [profile] [--logs DIR --layout …]`

@@ -1,7 +1,10 @@
 // Overlay Designer "Add element" dialog - overlay_rework.md Phase 2. One
 // popup for every element kind: a telemetry field (from the backend's
-// availableFields, which follows the dive currently rendered), a custom
-// text label, the state badge, a tank icon, or the depth graph.
+// addableFields - availableFields, which follows the dive currently
+// rendered, plus presets: "depth_small_decimals" and
+// "dive_time_small_seconds", the field with a small decimal part / small
+// seconds, as on Garmin and Shearwater computers), a custom text label,
+// the state badge, a tank icon, or the depth graph.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -30,7 +33,7 @@ Popup {
     onOpened: {
         kind = "text"
         customText.text = ""
-        fieldCombo.currentIndex = Math.max(0, overlayDesignerBackend.availableFields.indexOf("depth"))
+        fieldCombo.currentIndex = Math.max(0, overlayDesignerBackend.addableFields.indexOf("depth"))
     }
 
     function add() {
@@ -73,7 +76,7 @@ Popup {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
                 font.pixelSize: 14
-                model: overlayDesignerBackend.availableFields
+                model: overlayDesignerBackend.addableFields
             }
         }
 
@@ -98,7 +101,9 @@ Popup {
                 : popup.kind === "graph" ? "Whole-dive depth profile with a playback cursor and deco-ceiling shading."
                 : popup.kind === "tank_icon" ? "Colour fill (red / yellow / green by pressure), optionally with its own drawn outline."
                 : popup.kind === "tissue_bar" ? "Garmin-style vertical nitrogen-loading bar (green / yellow / red) with a marker at the current load."
-                : popup.kind === "ascent_chevrons" ? "Garmin-style ascent-rate indicator: chevrons light up (green / yellow / red) as the ascent gets faster, the lower one on descent."
+                : popup.kind === "ascent_chevrons" ? "Ascent-rate indicator in the template's brand style: Garmin - chevrons over a bar, green / yellow / red, the lower one on descent; Shearwater - six arrows, white / yellow / flashing red, one per 3 m/min (Perdix 2 manual p.12)."
+                : (popup.kind === "text" && fieldCombo.currentText === "depth_small_decimals") ? "Depth with the decimal part in a small font, top-aligned with the metres (e.g. 12 and a small .3) - the way Garmin and Shearwater computers show it. Saved as a depth element with the Small suffix style set; adjust Suffix size in the inspector."
+                : (popup.kind === "text" && fieldCombo.currentText === "dive_time_small_seconds") ? "Dive time with the seconds in a small font, top-aligned with the minutes (e.g. 32 and a small :15) - the way Garmin and Shearwater computers show it. Saved as a dive_time element with the Small suffix style set; adjust Suffix size in the inspector."
                 : "New elements appear at the centre of the skin - drag them into place or type X/Y in the inspector."
         }
 

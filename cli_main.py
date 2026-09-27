@@ -5,6 +5,7 @@ import re
 import time
 import tempfile
 import shutil
+import copy
 import json
 import multiprocessing
 from pathlib import Path
@@ -22,6 +23,55 @@ from utils.dependency_check import check_dependencies
 
 import cv2
 import numpy as np
+
+OVERLAY_SIZES = {"1080p": 1.0, "4k": 2.0}
+
+
+def _even(value: float) -> int:
+    value = max(2, int(round(value)))
+    return value + 1 if value % 2 else value
+
+
+def overlay_canvas(layout: dict, args) -> tuple:
+    """(width, height, render_log, layout) for a telemetry-only render of
+    `layout` - the canvas the frames are drawn on and the draw_hud() mode.
+
+    --overlay-size (1080p | 4k): the template's own size in its 1920×1080
+    design frame, or twice that for 4K footage - fonts, graphs and the skin
+    all scale (through hud_skin.scale, which draw_hud()'s render_log mode
+    sizes everything by), so the overlay drops onto 4K footage 1:1 instead
+    of being upscaled in the editor.
+
+    --overlay-full-frame: the whole design frame (1920×1080, or 3840×2160
+    at 4k) with the skin where the layout anchors it, drawn in draw_hud()'s
+    frame mode - nothing to position in the editor. Without it the skin IS
+    the frame, so the layout's anchor/offsets are neutralised here (the
+    Overlay Generator used to bake that into its temp layout)."""
+    factor = OVERLAY_SIZES.get(str(getattr(args, "overlay_size", None) or "1080p").lower(), 1.0)
+    layout = copy.deepcopy(layout)
+    hud_skin = layout.setdefault("hud_skin", {})
+    if getattr(args, "overlay_full_frame", False):
+        width = _even(float(layout.get("design_width", 1920)) * factor)
+        height = _even(float(layout.get("design_height", 1080)) * factor)
+        return width, height, False, layout
+
+    hud_skin["anchor"] = "CENTER"
+    hud_skin["ref_offset_x"] = 0.0
+    hud_skin["ref_offset_y"] = 0.0
+    user_scale = float(hud_skin.get("scale", 1.0)) * factor
+    hud_skin["scale"] = user_scale
+    if hud_skin.get("type", "image") == "shape":
+        hud_skin["width"] = float(hud_skin.get("width", 400)) * factor
+        hud_skin["height"] = float(hud_skin.get("height", 200)) * factor
+        width, height = _even(hud_skin["width"]), _even(hud_skin["height"])
+    else:
+        img_temp = cv2.imread(hud_skin["path"], cv2.IMREAD_UNCHANGED) if hud_skin.get("path") else None
+        if img_temp is None:
+            width, height = _even(1920 * factor), _even(1080 * factor)
+        else:
+            width, height = _even(img_temp.shape[1] * user_scale), _even(img_temp.shape[0] * user_scale)
+    return width, height, True, layout
+
 
 def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0, width: int = 1920, height: int = 1080):
     """Generates a minimal FCPXML 1.10 file for the given video."""
@@ -134,37 +184,12 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     # 3. Setup FFmpeg and HUD
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
     
-    # Pre-load layout
+    # Pre-load layout; the canvas (and draw mode) follow --overlay-size /
+    # --overlay-full-frame - see overlay_canvas()
     with open(args.layout, 'r') as f:
         layout = json.load(f)
-    
-    hud_skin = layout.get("hud_skin", {})
-    skin_path = hud_skin.get("path")
-    preloaded_skin = None
-    
-    # Determine resolution of standalone telemetry video based on HUD dimensions
-    skin_type = hud_skin.get("type", "image")
-    user_scale = hud_skin.get("scale", 1.0)
-    
-    if skin_type == "shape":
-        width = int(hud_skin.get("width", 400))
-        height = int(hud_skin.get("height", 200))
-    else:
-        if skin_path:
-            img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-            if img_temp is not None:
-                width = int(img_temp.shape[1] * user_scale)
-                height = int(img_temp.shape[0] * user_scale)
-            else:
-                width, height = 1920, 1080
-        else:
-            width, height = 1920, 1080
-
-    # Ensure width and height are divisible by 2 for FFmpeg
-    if width % 2 != 0:
-        width += 1
-    if height % 2 != 0:
-        height += 1
+    width, height, canvas_render_log, layout = overlay_canvas(layout, args)
+    print(f"Overlay canvas: {width}x{height}" + ("" if canvas_render_log else " (full frame)"))
     
     # 4. Processing Phase (Similar to ColorCorrectionEngine.process_video but without source video)
     fps = 30.0
@@ -178,7 +203,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
         '-vcodec', ff.get_encoder(),
         '-pix_fmt', 'yuv420p',
         '-tag:v', 'hvc1', # Force HEVC
-        '-crf', '20',
+        *ff.quality_args(),
         str(target_path)
     ]
 
@@ -249,7 +274,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 if cached_bytes is None or wp_timestamp != last_wp_timestamp:
                     # Clear and redraw on the pre-allocated buffer
                     frame_buffer[:] = 0
-                    draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=True, waypoints=dive.waypoints)
+                    draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=canvas_render_log, waypoints=dive.waypoints)
                     # Cache the serialized bytes so identical frames don't re-serialize
                     cached_bytes = frame_buffer.tobytes()
                     last_wp = wp
@@ -360,6 +385,14 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "safety_stop",
         "time_of_day",
         "depth_graph",
+        # renderer-synthesised fields (gui/hud_renderer.py): the stop/deco
+        # badge, the NDL held from before a deco stop cleared, and the
+        # tissue-load bar's default field. Missing here, every bundled
+        # dive-computer template was refused with "unknown fields:
+        # state_badge" and the Overlay Generator skipped it (2026-09-27).
+        "state_badge",
+        "ndl_before_clear",
+        "n2_tissue_load",
     }
     
     layout_fields = [elem.get("field") for elem in linked_elements if elem.get("field")]
@@ -501,7 +534,10 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
 
         if format_to_use:
             try:
-                filename = creation_date.strftime(format_to_use) + source.suffix.lower()
+                # "{filename}" is the source name (the Color page's
+                # "Original + color" preset: "{filename}_color"), the rest
+                # strftime codes of the date taken.
+                filename = creation_date.strftime(format_to_use).replace("{filename}", source.stem) + source.suffix.lower()
             except Exception as e:
                 print(f"Error formatting filename with pattern '{format_to_use}': {e}")
                 filename = source.stem + source.suffix.lower()
@@ -512,7 +548,10 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
     # date-named photos taken in the same second apart; not wanted when the
     # original name is kept.
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
-    keep_name = getattr(args, "keep_filename", False) and not args.render_video_log and not forced_filename
+    keep_name = (
+        (getattr(args, "keep_filename", False) or "{filename}" in (getattr(args, "filename_format", None) or ""))
+        and not args.render_video_log and not forced_filename
+    )
     if not args.render_video_log and not keep_name and not is_video and creation_date.microsecond > 0:
         ms = creation_date.microsecond // 1000
         p = Path(filename)
@@ -614,31 +653,13 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
     if args.render_video_log:
         t_proc_start = time.time()
-        # Load layout to determine output video resolution
+        # Load layout; the canvas and draw mode follow --overlay-size /
+        # --overlay-full-frame (overlay_canvas())
         with open(args.layout, 'r') as f:
             layout = json.load(f)
-
+        width, height, canvas_render_log, layout = overlay_canvas(layout, args)
         hud_skin = layout.get("hud_skin", {})
         skin_path = hud_skin.get("path")
-        skin_type = hud_skin.get("type", "image")
-        user_scale = hud_skin.get("scale", 1.0)
-
-        if skin_type == "shape":
-            width = int(hud_skin.get("width", 400))
-            height = int(hud_skin.get("height", 200))
-        else:
-            if skin_path:
-                img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-                if img_temp is not None:
-                    width = int(img_temp.shape[1] * user_scale)
-                    height = int(img_temp.shape[0] * user_scale)
-                else:
-                    width, height = 1920, 1080
-            else:
-                width, height = 1920, 1080
-
-        if width % 2 != 0: width += 1
-        if height % 2 != 0: height += 1
 
         if is_video:
             # Probe original video properties (for fps and duration)
@@ -656,7 +677,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 '-vcodec', ff.get_encoder(),
                 '-pix_fmt', 'yuv420p',
                 '-tag:v', 'hvc1',
-                '-crf', '20',
+                *ff.quality_args(),
                 str(target_path)
             ]
             if not args.debug:
@@ -673,9 +694,11 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             cached_bytes = None
             last_wp = None
 
-            # Load layout has been moved earlier to determine resolution
+            # Load layout has been moved earlier to determine resolution.
+            # Only the skin-is-the-frame mode preloads it at canvas size;
+            # a full frame lets draw_hud() place and scale it itself.
             preloaded_skin = None
-            if skin_path:
+            if skin_path and canvas_render_log:
                 img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
                 if img_skin is not None:
                     skin_opacity = hud_skin.get("opacity", 1.0)
@@ -716,7 +739,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
                         if cached_bytes is None or wp_timestamp != last_wp_timestamp:
                             frame_buffer[:] = 0
-                            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0, time_since_start=0), render_log=True, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+                            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0, time_since_start=0), render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
                             cached_bytes = frame_buffer.tobytes()
                             last_wp = wp
 
@@ -746,36 +769,11 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             proc_time = time.time() - t_proc_start
             stats["stages"].append({"name": "Telemetry Video Render", "time": proc_time})
         else:
-            # Load layout to determine output photo resolution
-            with open(args.layout, 'r') as f:
-                layout = json.load(f)
-
-            hud_skin = layout.get("hud_skin", {})
-            skin_path = hud_skin.get("path")
-            skin_type = hud_skin.get("type", "image")
-            user_scale = hud_skin.get("scale", 1.0)
-
-            if skin_type == "shape":
-                width = int(hud_skin.get("width", 400))
-                height = int(hud_skin.get("height", 200))
-            else:
-                if skin_path:
-                    img_temp = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
-                    if img_temp is not None:
-                        width = int(img_temp.shape[1] * user_scale)
-                        height = int(img_temp.shape[0] * user_scale)
-                    else:
-                        width, height = 1920, 1080
-                else:
-                    width, height = 1920, 1080
-
-            if width % 2 != 0: width += 1
-            if height % 2 != 0: height += 1
-
+            # A photo gets the same canvas as a video would (overlay_canvas())
             frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
 
             preloaded_skin = None
-            if skin_path:
+            if skin_path and canvas_render_log:
                 img_skin = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)
                 if img_skin is not None:
                     skin_opacity = hud_skin.get("opacity", 1.0)
@@ -785,7 +783,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
 
             from gui.hud_renderer import draw_hud
             wp = dive.get_waypoint_at(creation_date) if dive else None
-            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0), render_log=True, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0), render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
 
             subsampling = -1
             qtables = None
@@ -1092,7 +1090,7 @@ def main():
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     naming_group = parser.add_mutually_exclusive_group()
-    naming_group.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
+    naming_group.add_argument("--filename-format", help='Template for output filename: strftime codes of the date taken, plus "{filename}" for the source name (e.g. "%%Y%%m%%d_%%H%%M%%S_color", "{filename}_color")')
     naming_group.add_argument("--keep-filename", action="store_true", help="Keep the source file's name for the output (only the extension is lower-cased). Without this or --filename-format, batch runs and runs into another folder name files by date taken (%%Y%%m%%d_%%H%%M%%S).")
     overwrite_group = parser.add_mutually_exclusive_group()
     overwrite_group.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
@@ -1103,6 +1101,12 @@ def main():
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
     parser.add_argument("--export-json", type=Path, help="Read logs from a directory and create a JSON file for each log file using same filename but json extension.")
     parser.add_argument("--render-video-log", action="store_true", default=False, help="Create a telemetry-only video/photo on a black background for all files in the input folder (requires --layout and --logs).")
+    parser.add_argument("--overlay-size", choices=sorted(OVERLAY_SIZES), default="1080p",
+                        help="Size of telemetry-only renders (--render-log / --render-video-log): 1080p = the template's "
+                             "size in its 1920x1080 design frame (default), 4k = twice that, for 4K footage.")
+    parser.add_argument("--overlay-full-frame", action="store_true", default=False,
+                        help="Render telemetry-only videos/photos as the whole frame (1920x1080, or 3840x2160 with "
+                             "--overlay-size 4k) with the overlay placed as the layout anchors it - nothing to position in the editor.")
     parser.add_argument(
         "--render-log-filename-format",
         default="{filename}_{hud}",

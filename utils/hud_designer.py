@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from gui.hud_renderer import (
     ascent_chevron_geometry,
     badge_line_sizes,
+    VERTICAL_ORIENTATIONS,
+    oriented_text_geometry,
     get_font,
     tank_outline_metrics,
     tank_segments_geometry,
@@ -202,7 +204,7 @@ def build_layout_json(
     }
 
 
-TRANSIENT_ELEMENT_KEYS = frozenset({"uid"})
+TRANSIENT_ELEMENT_KEYS = frozenset({"uid", "_origin"})  # _origin: utils.layouts.ELEMENT_ORIGIN_KEY
 
 ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons")
 
@@ -328,6 +330,9 @@ def measure_element_box(elem: Dict[str, Any], skin: Dict[str, Any], text: Option
     font_size = max(1, int(elem.get("font_size", 16) * skin_scale * elem.get("scale", 1.0)))
     font = get_font(font_size, elem.get("font_family"), elem.get("font_weight"))
     text = text or element_display_name(elem["field"]) or "0"
+    if elem.get("orientation") in VERTICAL_ORIENTATIONS:
+        _, _, w, h = oriented_text_geometry(font, text, elem["orientation"], font_size)
+        return float(w) or float(font_size), float(h) or float(font_size)
     left, top, right, bottom = font.getbbox(text)
     return float(right - left) or float(font_size), float(bottom - top) or float(font_size)
 
@@ -383,6 +388,9 @@ def element_native_bounds(
         block_h = sum(int((value_size if is_value else label_size) * 1.2) for _, _, is_value in lines)
         y0 = y - (block_h if valign == "bottom" else block_h // 2 if valign == "middle" else 0)
         x0, x1 = float("inf"), float("-inf")
+        # A badge state's value_align "center" (Shearwater safety stop) is
+        # not mirrored here: the title is the widest line there, so the box
+        # is the same; only a timer wider than its title would poke out.
         for line_text, _, is_value in lines:
             size = value_size if is_value else label_size
             font = get_font(size, family, weight)
@@ -396,6 +404,9 @@ def element_native_bounds(
     size = max(1, int(float(elem.get("font_size", 16)) * float(elem.get("scale", 1.0))))
     font = get_font(size, family, weight)
     value = text if text else (element_display_name(elem.get("field", "")) or "0")
+    if elem.get("orientation") in VERTICAL_ORIENTATIONS:
+        dx, dy, w, h = oriented_text_geometry(font, value, elem["orientation"], size, align, valign)
+        return x + dx, y + dy, x + dx + w, y + dy + h
     main, suffix, suffix_scale = text_parts(elem.get("field", ""), value, elem)
     dx, dy, (left, top, right, bottom) = text_anchor_shift(font, main, align, valign)
     if suffix:

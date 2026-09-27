@@ -118,6 +118,20 @@ class FfmpegClass:
             return "hevc_nvenc"
         return "libx265"
 
+    def quality_args(self) -> list:
+        """Constant-quality flags for get_encoder(), for renders with no
+        source bitrate to preserve (the telemetry-only overlay videos).
+        `-crf` is libx265's knob only: VideoToolbox ignores it and falls
+        back to its own default bitrate (which is what made the overlay
+        videos look starved, 2026-09-27), so it gets `-q:v` (1-100) and
+        NVENC its constant-quality rate control instead."""
+        encoder = self.get_encoder()
+        if encoder == "hevc_videotoolbox":
+            return ["-q:v", "65"]
+        if encoder == "hevc_nvenc":
+            return ["-rc", "vbr", "-cq", "20", "-b:v", "0"]
+        return ["-crf", "18"]
+
     def get_video_duration(self, input_path: Path) -> float:
         """Uses ffprobe to get video duration."""
         if not self.ffprobe_path:

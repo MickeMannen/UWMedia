@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+import utils.app_settings as app_settings
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -36,3 +38,12 @@ def isolated_template_roots(tmp_path, monkeypatch):
 def mark_as_checkout(roots):
     (roots["repo"] / ".git").mkdir(exist_ok=True)
     (roots["repo"] / "pyproject.toml").write_text("[tool.briefcase]\n")
+
+
+@pytest.fixture
+def settings_file(tmp_path, monkeypatch):
+    """A throwaway settings.json for backends that persist form fields
+    (CLAUDE.md rule: never write the real Application Support one)."""
+    path = tmp_path / "settings.json"
+    monkeypatch.setattr(app_settings, "settings_path", lambda: path)
+    return path

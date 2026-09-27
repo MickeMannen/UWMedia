@@ -15,7 +15,7 @@ import QtQuick.Window
 Item {
     id: root
     width: 1060
-    height: 720
+    height: 800
 
     RowLayout {
         anchors.fill: parent

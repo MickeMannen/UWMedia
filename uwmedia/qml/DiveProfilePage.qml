@@ -10,7 +10,7 @@ import QtQuick.Layouts
 Item {
     id: root
     width: 1060
-    height: 720
+    height: 800
 
     readonly property string helpText:
         "<b>1. Set the scale.</b> Enter the deepest depth you plan to reach and roughly how long "
@@ -918,6 +918,14 @@ Item {
 
             RowLayout {
                 spacing: 8
+                Button {
+                    Layout.preferredWidth: 200
+                    text: "Open log…"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: "Open a log saved by the Dive Profile Builder to edit it - other computers' logs are not accepted"
+                    onClicked: diveProfileBackend.openLog()
+                }
                 Button {
                     Layout.preferredWidth: 200
                     text: "End dive"

@@ -33,11 +33,12 @@ Photo with Telemetry data (old overlay)
 - **Fast 3D LUT Color Pipeline**: Dynamic 3D LUT (`.cube`) generation from profile settings, executing color correction natively in FFmpeg to bypass Python overhead and speed up vs processing frame by frame.
 - **Advanced Color Correction**: Underwater color restoration with custom profiles (vivid, subtle, default) saved in `color.yaml`.
 - **Telemetry Overlay (HUD)**: Synchronize dive logs from Garmin (.FIT), Subsurface (.XML), and Shearwater (.UDDF) to create dynamic telemetry overlays.
-- **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration.
+- **Batch Telemetry Overlays (`--render-video-log`)**: Automatically generate matching black-background overlay videos/photos for all raw files in a folder, preserving creation timestamps and duration. Rendered at the template's 1080p size, at 2× for 4K footage, or as a full 1920×1080 / 3840×2160 frame with the overlay already in place (`--overlay-size`, `--overlay-full-frame`); the Overlay Generator page shows progress per overlay and for the whole batch.
 - **Metadata Integrity**: Preserves original camera metadata (QuickTime, DJI, Sony) and injects correct timezone/location information.
 - **Dynamic Naming**: Automatically rename files based on the "Date Taken" metadata (`YYYYMMDD_HHMMSS`).
-- **Overlay Templates & Designer**: Built-in overlay templates per dive computer (Garmin x50i/mk3i, Shearwater Perdix 2/3, Petrel, Peregrine, Teric, Tern, generic) with live state badges and colour rules, plus a full designer to modify them or build your own from any background image.
-- **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background, with size automatically adjusted to layout dimensions.
+- **Overlay Templates & Designer**: Built-in overlay templates per dive computer (Garmin x50i/mk3i, Shearwater Perdix 2/3, Petrel, Peregrine, Teric, Tern, generic) with live state badges, colour rules and each brand's own ascent-rate arrows, plus a full designer to modify them or build your own from any background image - readouts with small decimals or seconds as on the real screens, vertical labels, and adjustable colour and opacity for every shaded area of the dive-profile graph.
+- **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background - for a dive with no footage, e.g. one built in the Dive Profile Builder - at the same 1080p / 4K / full-frame sizes.
+- **Overlays keep their colours**: when overlays are burned in with colour correction, the correction applies to the footage only; the dive computer's bezel and text come out exactly as designed.
 - **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 - **Dive Profile Builder**: Draw a synthetic open circuit, sidemount or CCR dive and save it as a UDDF, Garmin FIT or Subsurface log, to test overlays in situations like deco or gas switches. *Test data only - not for dive planning.*
@@ -78,10 +79,12 @@ The full documentation is in [`docs/`](docs/README.md):
   <img src="media/main.png" alt="Color page" width="800">
 </p>
 
-Quick CLI example - colour-correct a folder and add a telemetry overlay:
+Quick CLI examples - colour-correct a folder and add a telemetry overlay, or
+render separate 4K overlay videos to layer in your editor:
 
 ```bash
 python cli_main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip --color
+python cli_main.py ./raw/ ./overlays/ --logs ./dive_logs/ --layout skins/perdix.zip --render-video-log --overlay-size 4k
 ```
 
 Please share if you make a fancy overlay!

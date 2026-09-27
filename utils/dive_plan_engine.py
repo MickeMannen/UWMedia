@@ -285,6 +285,9 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
     last_tts = 0
     last_stop_depth = 0.0
     last_stop_duration = 0
+    in_deco = False
+    had_deco = False
+    running_max = 0.0
 
     for i, (t, depth, gas_id) in enumerate(timeline):
         gas = plan.gas_by_id(gas_id)
@@ -307,22 +310,31 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
                 breathing_from[gas_id] = other  # from the next second on
 
         ceiling = engine.get_ceiling(gf_high)
+        running_max = max(running_max, depth)
         # Also recompute the moment deco starts or clears, so no sample
         # carries a ceiling with the NDL-mode stop (0 m) or the other way round.
-        if t % RECOMPUTE_INTERVAL_SEC == 0 or i == 0 or (ceiling > 0) != (last_ndl is None):
-            if ceiling <= 0:
+        if t % RECOMPUTE_INTERVAL_SEC == 0 or i == 0 or (ceiling > 0) != in_deco:
+            in_deco = ceiling > 0
+            if not in_deco:
+                # None = unbounded (99+), e.g. at the 3 m stop once deco has cleared.
                 last_ndl = engine.compute_ndl_seconds(depth, f_o2, f_he, gf_high)
-                last_tts, last_stop_depth, last_stop_duration = 0, 0.0, 0
+                last_stop_depth, last_stop_duration = 0.0, 0
             else:
+                had_deco = True
                 last_ndl = None
                 last_tts, last_stop_depth, last_stop_duration = _mandatory_stop_schedule(
                     plan, engine, depth, gas, gf_low, gf_high
                 )
-        elif ceiling <= 0:
+        elif not in_deco:
             last_ndl = max(0, last_ndl - 1) if last_ndl is not None else None
         else:
             last_tts = max(0, last_tts - 1)
             last_stop_duration = max(0, last_stop_duration - 1)
+        if not in_deco:
+            # No stops owed: TTS is the direct ascent, plus the safety stop a
+            # computer would still ask for after a dive past 11 m - but not
+            # once deco has been done (a Descent asks for none then).
+            last_tts = _no_deco_tts(plan, depth, running_max, had_deco)
 
         if i % resolution_sec == 0 or i == len(timeline) - 1:
             samples.append(
@@ -351,6 +363,21 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
 STOP_INTERVAL_M = 3.0
 SAFETY_STOP_DEPTH_M = 3.0
 SAFETY_STOP_SEC = 180
+SAFETY_STOP_TRIGGER_M = 11.0  # a computer asks for a safety stop after a dive past this
+
+
+def _no_deco_tts(plan: DiveProfilePlan, depth_m: float, running_max_m: float, had_deco: bool) -> int:
+    """Time to surface when no deco is owed: a direct ascent at the plan's
+    ascent rate, plus the safety stop still to come after a dive past
+    SAFETY_STOP_TRIGGER_M (none after mandatory deco - the stops were it).
+    Shallower than the safety stop, the stop's own remaining time isn't
+    known here, so only the ascent counts."""
+    if depth_m <= 0:
+        return 0
+    ascent = int(math.ceil(depth_m / plan.default_ascent_rate * 60.0))
+    if running_max_m >= SAFETY_STOP_TRIGGER_M and not had_deco and depth_m > SAFETY_STOP_DEPTH_M:
+        ascent += SAFETY_STOP_SEC
+    return ascent
 GAS_SWITCH_HOLD_SEC = 60
 MAX_ASCENT_PLAN_SEC = 6 * 3600
 

@@ -14,16 +14,29 @@ BUNDLED = sorted(glob.glob("overlays/templates/**/normal.json", recursive=True))
 
 @pytest.mark.parametrize("path", BUNDLED)
 def test_every_bundled_template_round_trips_key_for_key(path):
+    from utils.layouts import is_variant_overlay, load_layout_file, strip_variant_markers
+
     doc = OverlayDocument.load(Path(path))
     with open(path) as f:
         original = json.load(f)
-    assert doc.to_layout() == original
+    if is_variant_overlay(original):
+        # A variant overlay loads as its merged layout (base + own elements),
+        # tagged with the transient origin markers; that merged layout is
+        # what round-trips, and it must be a complete layout in its own right.
+        original = load_layout_file(path)
+        assert doc.to_layout() == original
+        assert strip_variant_markers(doc.to_layout()) == strip_variant_markers(original)
+        assert original["hud_skin"]["linked_elements"] and "manufacturer" in original
+    else:
+        assert doc.to_layout() == original
     assert doc.dirty is False
     saved = doc.to_layout(for_save=True)
     # for_save only normalises the skin path to a bare file name (already
     # the case in every bundled file) and rounds rel_x/rel_y to 5 decimals
     # (the generic depth_temp pages carry raw floats) - nothing else moves.
-    assert saved["hud_skin"].get("path") == original["hud_skin"].get("path")
+    original_skin = original["hud_skin"].get("path")
+    # (a merged variant overlay carries "../normal.png" - saving reduces it to the bare name)
+    assert saved["hud_skin"].get("path") == (Path(original_skin).name if original_skin else original_skin)
     for saved_elem, orig_elem in zip(saved["hud_skin"]["linked_elements"], original["hud_skin"]["linked_elements"]):
         for key in ("rel_x", "rel_y"):
             assert saved_elem[key] == round(orig_elem[key], 5)
@@ -37,13 +50,14 @@ def test_image_skin_native_size_and_absolute_path():
     path = Path("overlays/templates/shearwater/perdix_2/main/single_tank/normal.json")
     doc = OverlayDocument.load(path, ref=TemplateRef("shearwater", "perdix_2", "main", "single_tank"))
     assert (doc.native_width, doc.native_height) == (917, 753)
-    assert doc.skin_abs_path == (path.parent / "normal.png").resolve()
+    # a variant overlay's skin lives beside the shared base, one level up
+    assert doc.skin_abs_path == (path.parent.parent / "normal.png").resolve()
     assert doc.skin_native_size() == (917.0, 753.0)
     w, h = doc.skin_scaled_size()
     assert (round(w), round(h)) == (688, 565)  # x 0.75
     assert doc.ref.label == "shearwater/perdix_2/main/single_tank"
     # the layout itself never learns the absolute path or native size
-    assert doc.layout["hud_skin"]["path"] == "normal.png"
+    assert doc.layout["hud_skin"]["path"] == "../normal.png"
     assert "native_width" not in doc.layout["hud_skin"]
     assert doc.render_layout()["hud_skin"]["path"] == str(doc.skin_abs_path)
 
@@ -231,10 +245,10 @@ def test_set_skin_attr_validates_anchor_and_protects_structure():
 
 def test_set_skin_image_replaces_path_and_native_size():
     doc = _perdix()
-    other = Path("overlays/templates/garmin/x50i/main/single_tank/normal.png").resolve()
+    other = Path("overlays/templates/garmin/x50i/main/normal.png").resolve()
     assert doc.set_skin_image(other) is True
     assert doc.skin["path"] == str(other)
-    assert (doc.native_width, doc.native_height) == (473, 301)
+    assert (doc.native_width, doc.native_height) == (946, 602)  # the x50i 2× bezel
     assert doc.to_layout(for_save=True)["hud_skin"]["path"] == "normal.png"
     assert doc.set_skin_image(Path("nope.png")) is False
     assert doc.undo() and (doc.native_width, doc.native_height) == (917, 753)

@@ -21,7 +21,7 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: window
     width: 1280
-    height: 720
+    height: 800
     visible: true
     title: "UWMedia"
 

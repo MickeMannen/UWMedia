@@ -13,7 +13,7 @@ import QtQuick.Layouts
 ScrollView {
     id: root
     width: 1060
-    height: 720
+    height: 800
     clip: true
     contentWidth: availableWidth
 
@@ -174,10 +174,35 @@ ScrollView {
 
                 Label { text: "Progress"; font.bold: true; font.pixelSize: 14 }
 
-                ProgressBar {
+                // A real bar (2026-09-28, per the user): files done plus the
+                // ffmpeg percent of the one encoding, from the CLI's
+                // UWMEDIA_PROGRESS / _FFMPEG_PROGRESS lines. Spins only until
+                // the CLI has said how many encodes there are.
+                RowLayout {
                     Layout.fillWidth: true
-                    indeterminate: true
+                    spacing: 6
                     visible: convertionBackend.isRunning
+                    ProgressBar {
+                        Layout.fillWidth: true
+                        from: 0; to: 1
+                        value: convertionBackend.progressFraction
+                        indeterminate: !convertionBackend.progressKnown
+                    }
+                    Label {
+                        text: convertionBackend.progressFractionText
+                        color: "#9AA0A6"
+                        font.pixelSize: 11
+                        Layout.preferredWidth: 80
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+                // Elapsed / estimated remaining; stays after the run ends.
+                Label {
+                    Layout.fillWidth: true
+                    text: convertionBackend.timingText
+                    color: "#9AA0A6"
+                    font.pixelSize: 11
+                    visible: text.length > 0
                 }
                 Label {
                     Layout.fillWidth: true

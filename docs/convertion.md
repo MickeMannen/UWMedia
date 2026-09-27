@@ -14,7 +14,9 @@ resolutions - handy for proxies or sharing.
 3. **Output files** lists the file names that will be created before you
    start.
 4. **Hardware acceleration** uses the GPU encoder where available.
-5. Press **▶ Start** (**■ Abort** stops it).
+5. Press **▶ Start** (**■ Abort** stops it). The progress bar counts the
+   files converted plus the encode in flight, with the time spent and an
+   estimate of the time left once a few percent are done.
 
 Only one batch job (Color, Overlay Generator or Convertion) can run at a time.
 

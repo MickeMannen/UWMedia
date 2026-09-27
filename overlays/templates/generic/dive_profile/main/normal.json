@@ -15,14 +15,18 @@
       {
         "field": "depth_graph",
         "type": "graph",
-        "rel_x": 0.0,
-        "rel_y": 0.0,
+        "rel_x": -0.00957,
+        "rel_y": -0.02244,
         "width": 900,
         "height": 220,
-        "color": "#FF0000",
+        "color": "#ff2600",
         "ceiling_color": "#808080",
         "marker_style": "dot",
-        "marker_size": 6
+        "marker_size": 6,
+        "fill_opacity": 0.05,
+        "background_color": "#000000",
+        "background_opacity": 0.05,
+        "fill_color": "#ff6633"
       }
     ]
   },

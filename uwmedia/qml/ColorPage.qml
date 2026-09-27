@@ -17,7 +17,7 @@ import QtQuick.Layouts
 ScrollView {
     id: root
     width: 1060
-    height: 720
+    height: 800
     clip: true
     contentWidth: availableWidth
 
@@ -183,7 +183,7 @@ ScrollView {
         // --- Right column: color correction / source-output / progress -
         // Kept to a tight vertical budget deliberately (spacing/padding
         // below are all a bit smaller than the defaults) - the whole
-        // column has to fit inside the page's fixed 720px height with no
+        // column has to fit inside the page's 800px window height with no
         // scrolling, in both idle and running state (see the Progress
         // card's own note on why running never adds height any more).
         ColumnLayout {
@@ -465,6 +465,19 @@ ScrollView {
                             Layout.preferredWidth: 55
                             horizontalAlignment: Text.AlignRight
                         }
+                    }
+
+                    // Elapsed / estimated remaining (2026-09-28, per the
+                    // user) - blank until the first run, then kept after
+                    // it ("Finished in 13:41"). One reserved line so the
+                    // card never shifts.
+                    Label {
+                        Layout.fillWidth: true
+                        text: colorBackend.timingText
+                        color: "#9AA0A6"
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
                     }
 
                     Label {

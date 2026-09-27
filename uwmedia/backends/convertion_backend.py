@@ -30,6 +30,7 @@ from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 from ffmpeg.ffmpeg_class import FfmpegClass
 from utils.app_settings import get_fields, set_field
 from utils.display_paths import contract_home_path
+from utils.run_timing import RunTiming
 
 CONVERT_RESOLUTIONS = [
     ("1080p", 1920, 1080),
@@ -64,6 +65,10 @@ class ConvertionBackend(QObject):
         self._progress_total = 0
         self._progress_done = 0
         self._progress_current_target = None
+        self._progress_pct = 0.0  # ffmpeg percent of the file in flight
+        # Elapsed / estimated-remaining line under the bar (utils/run_timing.py)
+        self.timing = RunTiming(lambda: self.progressFraction, self)
+        self.timing.changed.connect(self.runStateChanged.emit)
 
         self._refresh_output_preview()
 
@@ -250,6 +255,32 @@ class ConvertionBackend(QObject):
     def isRunning(self):
         return self.process is not None
 
+    @Property(bool, notify=runStateChanged)
+    def progressKnown(self):
+        """False until the CLI has said how many encodes the batch holds."""
+        return self._progress_total > 0
+
+    @Property(float, notify=runStateChanged)
+    def progressFraction(self):
+        """0..1 over the batch: files done plus the ffmpeg percent of the
+        one in flight (Convertion encodes strictly one at a time)."""
+        if self._progress_total <= 0:
+            return 0.0
+        done = self._progress_done
+        if self._progress_current_target and done < self._progress_total:
+            done += self._progress_pct / 100.0
+        return max(0.0, min(1.0, done / self._progress_total))
+
+    @Property(str, notify=runStateChanged)
+    def progressFractionText(self):
+        if self.process is None or self._progress_total <= 0:
+            return ""
+        return f"{self._progress_done}/{self._progress_total} · {self.progressFraction * 100:.0f}%"
+
+    @Property(str, notify=runStateChanged)
+    def timingText(self):
+        return self.timing.text
+
     def _set_status(self, text):
         self._status_text = text
         self.runStateChanged.emit()
@@ -272,6 +303,7 @@ class ConvertionBackend(QObject):
         self._progress_total = 0
         self._progress_done = 0
         self._progress_current_target = None
+        self._progress_pct = 0.0
         self._set_status("Starting…")
 
         self.process = QProcess(self)
@@ -279,6 +311,7 @@ class ConvertionBackend(QObject):
         self.process.readyReadStandardOutput.connect(self._on_process_output)
         self.process.finished.connect(self._on_process_finished)
         self.process.start(cmd[0], cmd[1:])
+        self.timing.start()
         self.runStateChanged.emit()
 
     def _on_process_output(self):
@@ -302,6 +335,7 @@ class ConvertionBackend(QObject):
             done, total, status, filename = match.groups()
             self._progress_done = int(done)
             self._progress_total = int(total)
+            self._progress_pct = 0.0
             if status == "start":
                 self._progress_current_target = None
                 self._set_status(f"Processing 0 of {total}…")
@@ -316,6 +350,7 @@ class ConvertionBackend(QObject):
         ffmpeg_match = FFMPEG_PROGRESS_RE.search(stripped)
         if ffmpeg_match:
             pct = float(ffmpeg_match.group(1))
+            self._progress_pct = max(0.0, min(100.0, pct))
             if self._progress_current_target:
                 self._set_status(f"Processing: {self._progress_current_target} — {pct:.0f}%")
             else:
@@ -329,6 +364,7 @@ class ConvertionBackend(QObject):
             f"Finished (exit code {exit_code})" if exit_code == 0 else f"Failed (exit code {exit_code})"
         )
         self.process = None
+        self.timing.stop(ok=exit_code == 0)
         self.runStateChanged.emit()
 
     def _kill_process_tree(self):

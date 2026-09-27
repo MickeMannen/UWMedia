@@ -25,7 +25,9 @@ from utils.template_store import (
     template_write_root,
 )
 
-PERDIX = TemplateRef("shearwater", "perdix_2", "main", "single_tank")
+# A flat (non-overlay) variant page for the plain save tests; the Perdix 2
+# main page is a shared base + overlays and has its own tests below.
+PERDIX = TemplateRef("shearwater", "peregrine", "main", "single_tank")
 
 
 def _load(roots, ref=PERDIX):
@@ -222,3 +224,61 @@ def test_create_computer(isolated_template_roots):
         create_computer("shearwater", "perdix_2", "Shearwater", "Perdix 2")
     with pytest.raises(TemplateStoreError):
         create_computer("custom", "Bad Id", "Custom", "Bad")
+
+
+# --- variant overlays (utils.layouts) save back into base + overlay ----------
+
+def test_dev_mode_save_of_a_variant_splits_into_base_and_overlay(isolated_template_roots):
+    from utils.layouts import ELEMENT_ORIGIN_KEY, load_layout_file, resolve_template_state, strip_variant_markers
+
+    roots = isolated_template_roots
+    mark_as_checkout(roots)
+    ref = TemplateRef("garmin", "x50i", "main", "sidemount")
+    path = resolve_template_state("garmin", "x50i", "main", variant="sidemount")
+    doc = OverlayDocument.load(path, ref=ref)
+    assert doc.variant_base_path == path.parent.parent / "normal.json"
+    base_before = json.loads(doc.variant_base_path.read_text())
+    overlay_before = json.loads(path.read_text())
+
+    depth = next(e for e in doc.elements if e.get("id") == "depth")
+    tank = next(e for e in doc.elements if e.get("id") == "secondary_tank_pressure")
+    depth["rel_y"] = 0.41111
+    tank["rel_x"] = 0.66666
+    doc.elements.append({"field": "custom:NEW", "rel_x": 0.5, "rel_y": 0.5, "color": "#FFFFFF", "font_size": 12, "scale": 1.0})
+
+    saved_path = save_template(ref, doc.render_layout())
+    assert saved_path == path
+    base_after = json.loads(doc.variant_base_path.read_text())
+    overlay_after = json.loads(path.read_text())
+    # the shared element moved in the base, nothing else there changed
+    assert base_after["hud_skin"]["path"] == "normal.png"
+    assert next(e for e in base_after["hud_skin"]["linked_elements"] if e["id"] == "depth")["rel_y"] == 0.41111
+    assert [e["id"] for e in base_after["hud_skin"]["linked_elements"]] == [e["id"] for e in base_before["hud_skin"]["linked_elements"]]
+    assert {k: v for k, v in base_after.items() if k != "hud_skin"} == {k: v for k, v in base_before.items() if k != "hud_skin"}
+    # the tank element and the new element live in the overlay only
+    assert overlay_after["base"] == "../normal.json"
+    assert next(e for e in overlay_after["linked_elements"] if e["id"] == "secondary_tank_pressure")["rel_x"] == 0.66666
+    assert overlay_after["linked_elements"][-1]["field"] == "custom:NEW"
+    assert len(overlay_after["linked_elements"]) == len(overlay_before["linked_elements"]) + 1
+    assert "overrides" not in overlay_after and "remove" not in overlay_after
+    assert not any(ELEMENT_ORIGIN_KEY in e for e in overlay_after["linked_elements"])
+    # ...and the other variant follows the shared edit
+    single = load_layout_file(resolve_template_state("garmin", "x50i", "main", variant="single_tank"))
+    assert next(e for e in single["hud_skin"]["linked_elements"] if e.get("id") == "depth")["rel_y"] == 0.41111
+    assert not any(e["field"] == "custom:NEW" for e in single["hud_skin"]["linked_elements"])
+    assert not (path.parent / "normal.png").exists() and (path.parent.parent / "normal.png").exists()
+
+
+def test_save_as_of_a_variant_writes_a_flat_self_contained_page(isolated_template_roots):
+    from utils.layouts import ELEMENT_ORIGIN_KEY, LAYOUT_BASE_KEY, resolve_template_state
+
+    roots = isolated_template_roots
+    path = resolve_template_state("garmin", "x50i", "main", variant="sidemount")
+    doc = OverlayDocument.load(path, ref=TemplateRef("garmin", "x50i", "main", "sidemount"))
+    dst = TemplateRef("garmin", "x50i", "my_main")
+    out = save_template_as(doc.render_layout(), dst, "My Main")
+    saved = json.loads(out.read_text())
+    assert "base" not in saved and LAYOUT_BASE_KEY not in saved
+    assert saved["hud_skin"]["path"] == "normal.png" and (out.parent / "normal.png").exists()
+    assert len(saved["hud_skin"]["linked_elements"]) == len(doc.elements)
+    assert not any(ELEMENT_ORIGIN_KEY in e for e in saved["hud_skin"]["linked_elements"])

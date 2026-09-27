@@ -14,6 +14,83 @@ ALIGN_OPTIONS = ("left", "center", "right")
 VALIGN_OPTIONS = ("top", "middle", "bottom")
 SMALL_SUFFIX_STYLES = ("seconds", "decimals")
 SMALL_SUFFIX_DEFAULT_SCALE = 0.35
+# Text element `orientation` (schema v2): "horizontal" (default, absent),
+# "stacked" (upright letters one under the other), "up" (the line turned
+# 90° to read bottom-to-top) or "down" (turned to read top-to-bottom).
+TEXT_ORIENTATIONS = ("horizontal", "stacked", "up", "down")
+VERTICAL_ORIENTATIONS = ("stacked", "up", "down")
+STACKED_LINE_ADVANCE = 1.05  # of the font size, per stacked letter
+# Depth graph shading (schema v2 element keys, 2026-09-27 per the user - the
+# fixed tints read far too strong once composited onto footage):
+#   fill_color / fill_opacity        the area under the profile line
+#   stops_opacity                    the deco-stop steps (Deco stops mode)
+#   ceiling_opacity                  the ceiling area - the smooth one in Deco
+#                                    stops mode, else the plain stop band
+#   background_color / background_opacity   the graph's box (and its 1 px
+#                                    border in the line colour); 0 hides it
+GRAPH_BACKGROUND_OPACITY = 0.4
+GRAPH_FILL_OPACITY = 0.15
+GRAPH_STOPS_OPACITY = 0.5
+GRAPH_CEILING_OPACITY = 0.4
+GRAPH_BAND_OPACITY = 0.45
+
+
+def graph_opacity(elem, key, default):
+    """A graph element's 0..1 shading opacity for `key`, else `default`."""
+    try:
+        return max(0.0, min(1.0, float(elem.get(key, default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def oriented_text_geometry(font, text, orientation, size, align="left", valign="top"):
+    """(dx, dy, w, h) of a vertical text element's ink box relative to its
+    anchor - the box the renderer paints and the Overlay Designer hit-tests.
+    "stacked": one letter per line, each centred in a column as wide as the
+    widest letter; "up"/"down": the horizontal ink box turned on its side.
+    align/valign move the box onto the anchor the way text_anchor_shift()
+    does for a horizontal line."""
+    if orientation == "stacked":
+        letters = list(text)
+        boxes = [font.getbbox(ch) for ch in letters]
+        w = max((r - l for l, _, r, _ in boxes), default=0)
+        h = int(size * STACKED_LINE_ADVANCE) * len(letters)
+    else:
+        left, top, right, bottom = font.getbbox(text)
+        w, h = bottom - top, right - left  # turned on its side
+    dx = -w / 2.0 if align == "center" else -float(w) if align == "right" else 0.0
+    dy = -h / 2.0 if valign == "middle" else -float(h) if valign == "bottom" else 0.0
+    return dx, dy, w, h
+
+
+def draw_oriented_text(pil_img, draw, text, font, orientation, x, y, align, valign, color_rgb, outline, size):
+    """Paint a vertical text element (see oriented_text_geometry) at anchor
+    (x, y). Stacked letters are drawn one per line; a turned line is
+    rendered flat onto a transparent tile, rotated and alpha-pasted."""
+    dx, dy, w, h = oriented_text_geometry(font, text, orientation, size, align, valign)
+    x0, y0 = int(round(x + dx)), int(round(y + dy))
+    o_dist = max(1, int(size / 20))
+    offsets = [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)] if outline else []
+    if orientation == "stacked":
+        advance = int(size * STACKED_LINE_ADVANCE)
+        for index, ch in enumerate(text):
+            left, top, right, _ = font.getbbox(ch)
+            cx = x0 + (w - (right - left)) / 2.0 - left  # centre the letter in the column
+            cy = y0 + index * advance - top  # ink top on the line top
+            for ox, oy in offsets:
+                draw.text((cx + ox, cy + oy), ch, font=font, fill=(0, 0, 0))
+            draw.text((cx, cy), ch, font=font, fill=color_rgb)
+        return
+    left, top, right, bottom = font.getbbox(text)
+    margin = o_dist + 1
+    tile = Image.new("RGBA", (right - left + 2 * margin, bottom - top + 2 * margin), (0, 0, 0, 0))
+    tile_draw = ImageDraw.Draw(tile)
+    tx, ty = margin - left, margin - top
+    for ox, oy in offsets:
+        tile_draw.text((tx + ox, ty + oy), text, font=font, fill=(0, 0, 0, 255))
+    tile_draw.text((tx, ty), text, font=font, fill=(*color_rgb, 255))
+    tile = tile.rotate(90 if orientation == "up" else -90, expand=True)
+    pil_img.paste(tile, (x0 - margin, y0 - margin), tile)
 
 
 def split_small_suffix(val_str, style):
@@ -130,6 +207,9 @@ def format_telemetry_value(field, raw_val):
         return f"{raw_val:.1f}"
     elif field == "volume_sac" and raw_val is not None:
         return str(int(float(raw_val)))
+    elif field == "pressure_sac":
+        # A Perdix shows "wait" until it has two minutes of data (manual p.41).
+        return "wait" if raw_val is None else f"{float(raw_val):.1f}"
     elif raw_val is None:
         return "--"
     elif isinstance(raw_val, float):
@@ -351,17 +431,16 @@ def stop_depth_of(waypoint):
 
 
 def graph_stop_label(waypoint):
-    """(text, in_deco) for a graph's stop label - 'STOP 6m 2:00' in deco,
-    'NDL 12' otherwise - or None when the waypoint has neither."""
+    """(text, in_deco) for a graph's stop label - 'STOP 6m 2:00' while a
+    stop is pending, else None: out of deco the label shows nothing (it used
+    to fall back to 'NDL 12'; dropped 2026-09-27 per the user - the Generic
+    Dive Profile Deco overlay is about the stops, not a second NDL readout)."""
     if waypoint is None:
         return None
     stop = stop_depth_of(waypoint)
     if stop > 0:
         seconds = getattr(waypoint, "next_stop_time", None)
         return f"STOP {stop:g}m" + (f" {seconds // 60}:{seconds % 60:02d}" if seconds else ""), True
-    ndl = getattr(waypoint, "ndl", None)
-    if ndl is not None:
-        return f"NDL {ndl // 60}", False
     return None
 
 
@@ -439,11 +518,14 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
     color_hex = elem.get("color", "#00FF00").lstrip('#')
     color_bgr = tuple(int(color_hex[i:i+2], 16) for i in (4, 2, 0))
 
-    # Background
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), (0, 0, 0), -1)
-    cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), color_bgr, 1)
-    cv2.addWeighted(overlay, 0.4, frame, 0.6, 0, frame)
+    # Background box + border, in background_color at background_opacity
+    background_opacity = graph_opacity(elem, "background_opacity", GRAPH_BACKGROUND_OPACITY)
+    if background_opacity > 0:
+        overlay = frame.copy()
+        background_bgr = _hex_to_bgr(elem["background_color"]) if elem.get("background_color") else (0, 0, 0)
+        cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), background_bgr, -1)
+        cv2.rectangle(overlay, (abs_x, abs_y), (abs_x + graph_w, abs_y + graph_h), color_bgr, 1)
+        cv2.addWeighted(overlay, background_opacity, frame, 1 - background_opacity, 0, frame)
 
     if not waypoints:
         return
@@ -481,31 +563,40 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
     shown = waypoints
     if elem.get("reveal_profile") and reveal_t is not None:
         shown = [wp for wp in waypoints if wp.time_since_start <= reveal_t] or waypoints[:1]
+    # The deco shading (stops / ceiling bands below) follows the same
+    # switch: with reveal_profile the stops appear as the dive reaches them,
+    # without it the whole dive's stops are on the graph from the first
+    # frame and only the cursor moves - the Generic "Dive Profile Deco"
+    # overlay's own posture, like the plain Dive Profile's line.
+    shade_t = reveal_t if elem.get("reveal_profile") else waypoints[-1].time_since_start
 
-    # Fill path
-    fill_overlay = frame.copy()
-    pts = []
-    pts.append([abs_x, abs_y])
-    for wp_i in shown:
-        x = int(x_for_time(wp_i.time_since_start))
-        y = y_for_depth(wp_i.depth)
-        pts.append([x, y])
-    pts.append([int(x_for_time(shown[-1].time_since_start)), abs_y])
+    # Fill path - the area under the line, in fill_color (the line colour
+    # unless set) at fill_opacity
+    fill_opacity = graph_opacity(elem, "fill_opacity", GRAPH_FILL_OPACITY)
+    if fill_opacity > 0:
+        fill_overlay = frame.copy()
+        pts = []
+        pts.append([abs_x, abs_y])
+        for wp_i in shown:
+            x = int(x_for_time(wp_i.time_since_start))
+            y = y_for_depth(wp_i.depth)
+            pts.append([x, y])
+        pts.append([int(x_for_time(shown[-1].time_since_start)), abs_y])
 
-    pts = np.array(pts, dtype=np.int32)
-    cv2.fillPoly(fill_overlay, [pts], color_bgr)
-    cv2.addWeighted(fill_overlay, 0.15, frame, 0.85, 0, frame)
+        pts = np.array(pts, dtype=np.int32)
+        fill_bgr = _hex_to_bgr(elem["fill_color"]) if elem.get("fill_color") else color_bgr
+        cv2.fillPoly(fill_overlay, [pts], fill_bgr)
+        cv2.addWeighted(fill_overlay, fill_opacity, frame, 1 - fill_opacity, 0, frame)
 
     # Deco ceiling - a gray "may not ascend above this" band from the
-    # surface down to each waypoint's own deco_stop_depth, revealed only up
-    # to the current playback position (not the whole dive at once, unlike
-    # the profile line/fill above - see rework_hud.md's dive-profile-graph
-    # planning notes). Since every rectangle is derived straight from that
+    # surface down to each waypoint's own deco_stop_depth, drawn up to
+    # shade_t (the playback position with reveal_profile, else the end of
+    # the dive). Since every rectangle is derived straight from that
     # waypoint's own logged ceiling value and nothing already drawn is ever
     # erased, a stop's shaded patch is permanent once revealed even after it
     # clears and the diver moves on to a shallower one.
     if waypoint is not None and elem.get("stops_color"):
-        _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth, abs_y)
+        _draw_deco_history(frame, elem, waypoints, shade_t, x_for_time, y_for_depth, abs_y)
     elif waypoint is not None:
         ceiling_hex = elem.get("ceiling_color", "#808080").lstrip('#')
         ceiling_bgr = tuple(int(ceiling_hex[i:i + 2], 16) for i in (4, 2, 0))
@@ -513,20 +604,21 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
         any_ceiling = False
         for i in range(n_wps):
             wp_i = waypoints[i]
-            if wp_i.time_since_start > reveal_t:
+            if wp_i.time_since_start > shade_t:
                 break
             ceiling = getattr(wp_i, "deco_stop_depth", None)
             if not ceiling or ceiling <= 0:
                 continue
-            next_t = waypoints[i + 1].time_since_start if i + 1 < n_wps else reveal_t
-            seg_end_t = min(next_t, reveal_t)
+            next_t = waypoints[i + 1].time_since_start if i + 1 < n_wps else shade_t
+            seg_end_t = min(next_t, shade_t)
             x_start = int(x_for_time(wp_i.time_since_start))
             x_end = max(x_start + 1, int(x_for_time(seg_end_t)))
             y_bot = y_for_depth(ceiling)
             cv2.rectangle(ceiling_overlay, (x_start, abs_y), (x_end, y_bot), ceiling_bgr, -1)
             any_ceiling = True
-        if any_ceiling:
-            cv2.addWeighted(ceiling_overlay, 0.45, frame, 0.55, 0, frame)
+        band_opacity = graph_opacity(elem, "ceiling_opacity", GRAPH_BAND_OPACITY)
+        if any_ceiling and band_opacity > 0:
+            cv2.addWeighted(ceiling_overlay, band_opacity, frame, 1 - band_opacity, 0, frame)
 
     # Outline line
     line_pts = []
@@ -568,8 +660,9 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
 
 def _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth, abs_y):
     """A graph with stops_color: the deco stops and the ceiling as two
-    separate shaded areas, both revealed up to the playback position and
-    never erased afterwards - so every stop the dive picked up stays on the
+    separate shaded areas, both drawn up to `reveal_t` (the playback
+    position with reveal_profile, else the end of the dive) and never
+    erased afterwards - so every stop the dive picked up stays on the
     graph once it clears. Stops (stop_depth_of) are a stepped area from the
     surface down to each stop level in stops_color; the recomputed ceiling
     (Waypoint.ceiling, GF high) a smooth area on top in ceiling_color."""
@@ -590,69 +683,149 @@ def _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth
         x_end = max(x_start + 1, int(x_for_time(min(next_t, reveal_t))))
         cv2.rectangle(stops_overlay, (x_start, abs_y), (x_end, y_for_depth(stop)), stops_bgr, -1)
         any_stop = True
-    if any_stop:
-        cv2.addWeighted(stops_overlay, 0.5, frame, 0.5, 0, frame)
+    stops_opacity = graph_opacity(elem, "stops_opacity", GRAPH_STOPS_OPACITY)
+    if any_stop and stops_opacity > 0:
+        cv2.addWeighted(stops_overlay, stops_opacity, frame, 1 - stops_opacity, 0, frame)
 
     if any((wp_i.ceiling or 0) > 0 for wp_i in revealed):
         pts = [[int(x_for_time(revealed[0].time_since_start)), abs_y]]
         pts += [[int(x_for_time(wp_i.time_since_start)), y_for_depth(wp_i.ceiling or 0.0)] for wp_i in revealed]
         pts.append([int(x_for_time(revealed[-1].time_since_start)), abs_y])
-        ceiling_overlay = frame.copy()
-        cv2.fillPoly(ceiling_overlay, [np.array(pts, dtype=np.int32)], ceiling_bgr)
-        cv2.addWeighted(ceiling_overlay, 0.4, frame, 0.6, 0, frame)
+        ceiling_opacity = graph_opacity(elem, "ceiling_opacity", GRAPH_CEILING_OPACITY)
+        if ceiling_opacity > 0:
+            ceiling_overlay = frame.copy()
+            cv2.fillPoly(ceiling_overlay, [np.array(pts, dtype=np.int32)], ceiling_bgr)
+            cv2.addWeighted(ceiling_overlay, ceiling_opacity, frame, 1 - ceiling_opacity, 0, frame)
+
+
+CHECK_MARK = "✓ "  # prefix badge_lines puts on a title shown with the Perdix's check mark
+
+
+def _draw_check_mark(draw, x, y, size, color_rgb, outline=True):
+    """A check mark the height of a `size` px line at (x, y); returns the x
+    where the text after it starts."""
+    w = int(size * 0.9)
+    h = int(size * 0.8)
+    top = y + int(size * 0.15)
+    pts = [(x + int(w * 0.05), top + int(h * 0.55)), (x + int(w * 0.38), top + h), (x + w, top + int(h * 0.05))]
+    stroke = max(2, int(size / 8))
+    if outline:
+        draw.line(pts, fill=(0, 0, 0), width=stroke + 2, joint="curve")
+    draw.line(pts, fill=color_rgb, width=stroke, joint="curve")
+    return x + w + int(size * 0.35)
+
+
+def badge_title_ink_span(font, text, size):
+    """(left, right) of a badge title's ink relative to its draw x - with
+    the check mark _draw_check_mark() strokes in front of a CHECK_MARK
+    title included, so a value line can be centred under the whole title."""
+    if text.startswith(CHECK_MARK):
+        w = int(size * 0.9)
+        _, _, right, _ = font.getbbox(text[len(CHECK_MARK):])
+        return int(w * 0.05), w + int(size * 0.35) + right
+    left, _, right, _ = font.getbbox(text)
+    return left, right
+
+
+def _rgb(hex_color):
+    return tuple(int(hex_color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _format_stop_timer(seconds, fmt):
+    """'2:33' (m:ss), '02:33' (mm:ss) or '2min' (min - whole minutes, rounded
+    up, as a Perdix shows a deco stop's time)."""
+    seconds = max(0, int(seconds))
+    if fmt == "min":
+        return f"{max(1, -(-seconds // 60)) if seconds else 0}min"
+    mins, secs = divmod(seconds, 60)
+    return f"{mins}:{secs:02d}" if fmt == "m:ss" else f"{mins:02d}:{secs:02d}"
 
 
 def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     """The (text, color_rgb, is_value) lines a state badge renders for this
     waypoint - None when nothing is drawn ('normal' state, no badge config,
     no waypoint). Shared by _draw_state_badge and the Overlay Designer's
-    hit-testing. See rework_hud.md's "State rendering" section. `waypoints`
-    (the whole dive) enables the timed safety stop (safety_stop_timeline):
-    its stop depth and countdown instead of the waypoint's deco-stop fields."""
+    hit-testing. See rework_hud.md's "State rendering" section.
+
+    What is shown comes from hud_rules_engine.stop_phase() (state, phase,
+    seconds, stop depth) and is styled by the manufacturer's badge_states
+    entry for the state, plus per-element overrides:
+      label / color          title line (a label of "" draws no title)
+      value_color            colour of the depth/timer lines (default: color)
+      <phase>_color          title colour in that phase (pending, counting,
+                             paused, complete, approach, at_stop, violation)
+      <phase>_value_color    depth/timer colour in that phase
+      <phase>_value_text     text shown instead of the timer in that phase
+      <phase>_label          title text in that phase (Perdix 3: "PAUSED")
+      title_box              the title sits in a filled box of its colour, in black text (Perdix 3)
+      check_mark             "✓ " before the title when at the stop / counting / complete
+      show_depth             False: no stop-depth line (a Shearwater safety stop names none)
+      inline                 depth and timer on one line: "6m↑ 2min" (Perdix deco stop)
+      timer_format           "m:ss" | "mm:ss" | "min"; the element's own key wins
+      value_align            "center": the timer (and depth line) centred under
+                             the title, as a Perdix centres the safety-stop
+                             time under "SAFETY STOP"; the element's key wins
+      blink / blink_depth    time-based red flashing (kept for older rule files)
+    Element keys: depth_unit, depth_font ("label" draws the depth line at
+    the label size), timer_format, style ("box" implies m:ss)."""
     from utils.hud_rules_engine import (
-        resolve_state, get_badge_config, resolve_blink_color, get_rule_config, safety_stop_status,
+        stop_phase, get_badge_config, resolve_blink_color, ceiling_broken, ceiling_broken_color,
     )
 
     if waypoint is None:
         return None
-
-    state = resolve_state(manufacturer, model, waypoint, waypoints)
+    state, phase, seconds, stop_depth = stop_phase(manufacturer, model, waypoint, waypoints)
     if state == "normal":
         return None
-
     badge = get_badge_config(manufacturer, model, state)
     if not badge:
         return None
 
-    label_color_hex = badge.get("color", "#FFFFFF")
+    elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
+    blink_red = lambda hex_color: resolve_blink_color(hex_color, "#FF0000", elapsed)
+    blink_phase = resolve_blink_color("a", "b", elapsed) == "b"  # the "on" half of each second
+
+    title_hex = badge.get("color", "#FFFFFF")
+    if phase and badge.get(f"{phase}_color"):
+        title_hex = badge[f"{phase}_color"]
     if badge.get("blink"):
-        elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
-        label_color_hex = resolve_blink_color(label_color_hex, "#FF0000", elapsed)
-    label_rgb = tuple(int(label_color_hex.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+        title_hex = blink_red(title_hex)
+    value_hex = badge.get("value_color", title_hex)
+    if phase and badge.get(f"{phase}_value_color"):
+        value_hex = badge[f"{phase}_value_color"]
+    value_text = badge.get(f"{phase}_value_text") if phase else None  # e.g. Teric: "CLEAR" once the stop is done
+    violating = phase == "violation" or (state in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint))
+    if violating:
+        red = badge.get("violation_color") or ceiling_broken_color(manufacturer, model)
+        title_hex = resolve_blink_color(badge.get("color", "#FFFFFF"), red, elapsed)
+        value_hex = resolve_blink_color(badge.get("value_color", badge.get("color", "#FFFFFF")), red, elapsed)
 
-    # is_value marks lines that use value_font_size (depth/timer) instead of the
-    # label's own font_size - Shearwater's badge shows a small cyan title above a
-    # much larger white countdown, unlike Garmin's uniformly-sized 3-line badge.
-    lines = [(badge.get("label", state.upper()), label_rgb, False)]
+    label = badge.get("label", state.upper())
+    if phase and badge.get(f"{phase}_label"):
+        label = badge[f"{phase}_label"]  # e.g. Perdix 3: "PAUSED" in place of "SAFETY"
+    if label and badge.get("check_mark") and phase in ("at_stop", "counting", "complete"):
+        label = "✓ " + label
+    lines = [(label, _rgb(title_hex), False)] if label else []
 
-    depth_val = getattr(waypoint, "next_stop_depth", None)
-    timer_val = getattr(waypoint, "next_stop_time", None)
-    status = safety_stop_status(manufacturer, model, waypoint, waypoints) if state == "safety_stop" else None
-    if status is not None:
-        depth_val = (get_rule_config(manufacturer, model, "safety_stop") or {}).get("stop_depth", 5.0)
-        timer_val = status[1]
-    if depth_val:
-        depth_color_hex = label_color_hex
+    timer_format = elem.get("timer_format") or ("m:ss" if elem.get("style") == "box" else badge.get("timer_format", "mm:ss"))
+    unit = elem.get("depth_unit", "")
+    depth_is_value = elem.get("depth_font") != "label"
+    show_depth = badge.get("show_depth", True) and stop_depth
+    if show_depth and badge.get("inline"):
+        # "6m↑ 2min": the arrow flashes while approaching the stop
+        arrow = "↑" if phase != "approach" or blink_phase else " "
+        timer = _format_stop_timer(seconds, timer_format) if seconds is not None else ""
+        lines.append((f"{stop_depth:.0f}{unit}{arrow} {timer}".rstrip(), _rgb(value_hex), True))
+        return lines
+    if show_depth:
+        depth_hex = value_hex
         if badge.get("blink_depth"):
-            elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
-            depth_color_hex = resolve_blink_color(label_color_hex, "#FF0000", elapsed)
-        depth_rgb = tuple(int(depth_color_hex.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
-        lines.append((f"↑{depth_val:.0f}{elem.get('depth_unit', '')}", depth_rgb, True))
-
-    if timer_val is not None:
-        mins, secs = divmod(max(0, int(timer_val)), 60)
-        timer_text = f"{mins}:{secs:02d}" if elem.get("style") == "box" else f"{mins:02d}:{secs:02d}"
-        lines.append((timer_text, label_rgb, True))
+            depth_hex = blink_red(depth_hex)
+        lines.append((f"↑{stop_depth:.0f}{unit}", _rgb(depth_hex), depth_is_value))
+    if value_text:
+        lines.append((value_text, _rgb(value_hex), True))
+    elif seconds is not None:
+        lines.append((_format_stop_timer(seconds, timer_format), _rgb(value_hex), True))
     return lines
 
 
@@ -728,18 +901,47 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
     align = elem.get("align", "left")
     valign = elem.get("valign", "top")
 
+    from utils.hud_rules_engine import get_badge_config, resolve_state
+    badge_cfg = get_badge_config(manufacturer, model, resolve_state(manufacturer, model, waypoint, waypoints)) or {}
+    title_box = bool(elem.get("title_box", badge_cfg.get("title_box")))
+    # "center": value lines sit centred under the title's ink (a Perdix
+    # centres the safety-stop time under "SAFETY STOP") whatever the
+    # element's own anchor alignment is.
+    value_align = elem.get("value_align") or badge_cfg.get("value_align")
+    title_center = None
+
     y = abs_y
     if valign != "top":
         block_h = sum(int((value_size if is_value else label_size) * 1.2) for _, _, is_value in lines)
         y -= block_h if valign == "bottom" else block_h // 2
-    for text, color_rgb, is_value in lines:
+    for index, (text, color_rgb, is_value) in enumerate(lines):
         font = value_font if is_value else label_font
         final_size = value_size if is_value else label_size
         x = abs_x
         if align != "left":
             dx, _, _ = text_anchor_shift(font, text, align, "top")
             x = int(round(abs_x + dx))
+        if is_value and value_align == "center" and title_center is not None:
+            left, _, right, _ = font.getbbox(text)
+            x = int(round(title_center - (left + right) / 2.0))
+        elif not is_value and title_center is None:
+            left, right = badge_title_ink_span(font, text, final_size)
+            title_center = x + (left + right) / 2.0
+        if index == 0 and not is_value and title_box:
+            # Perdix 3 style: the title in a filled box of its colour, black text.
+            left, top, right, bottom = font.getbbox(text)
+            pad = max(1, int(final_size * 0.12))
+            draw.rounded_rectangle([x + left - pad, y + top - pad, x + right + pad, y + bottom + pad],
+                                   radius=max(1, int(final_size * 0.1)), fill=color_rgb)
+            draw.text((x, y), text, font=font, fill=(0, 0, 0))
+            y += int(final_size * 1.2) + pad
+            continue
         o_dist = max(1, int(final_size / 20))
+        if text.startswith(CHECK_MARK):
+            # The bundled fonts have no ✓ glyph - draw the Perdix's check mark
+            # as a stroke in the line's colour, then the text after it.
+            text = text[len(CHECK_MARK):]
+            x = _draw_check_mark(draw, x, y, final_size, color_rgb, outline)
         if outline:
             for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
                 draw.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0))
@@ -917,11 +1119,16 @@ def ascent_chevron_geometry(elem):
     return w, h, up, down
 
 
-def ascent_lit_count(rate, up_count):
+def ascent_lit_count(rate, up_count, per_chevron=None):
     """How many upward chevrons light for `rate` m/min (0 when level or
-    descending): one at the deadband, then linearly to all at full scale."""
+    descending). Garmin (no `per_chevron`): one at the deadband, then
+    linearly to all at full scale. `per_chevron` (hud_rules.json
+    `ascent_chevrons.m_per_min_per_chevron` - the Perdix 2's "1 arrow per
+    3 m/min", manual p.12): one more arrow for every `per_chevron` m/min."""
     if rate is None or rate < ASCENT_DEADBAND_M_PER_MIN or up_count <= 0:
         return 0
+    if per_chevron:
+        return max(1, min(up_count, int(math.ceil(rate / float(per_chevron)))))
     return max(1, min(up_count, int(rate / ASCENT_FULL_SCALE_M_PER_MIN * up_count) + 1))
 
 
@@ -931,8 +1138,16 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
     and `down_count` downward chevrons below it. Unlit chevrons are grey; on
     ascent 1..up_count chevrons light in the hud_rules.json `ascent_rate`
     band colour for the current rate, on descent the downward chevrons light
-    white. Always drawn (all grey when level or without data)."""
-    from utils.hud_rules_engine import get_rule_config
+    white. Always drawn (all grey when level or without data).
+
+    Shearwater style (Perdix 2 manual p.12) is the same element with the
+    brand's hud_rules.json: `ascent_chevrons` {up_count 6, down_count 0,
+    bar false, m_per_min_per_chevron 3} - six arrows and no divider bar -
+    and `ascent_rate` bands white / yellow / flashing red (a band's
+    `blink: true` alternates its colour with the unlit grey every second
+    of dive time). Element keys `bar` (false hides the divider) and the
+    counts override the rule."""
+    from utils.hud_rules_engine import get_rule_config, resolve_blink_color
 
     rel_x = elem.get("rel_x", 0.0)
     rel_y = elem.get("rel_y", 0.0)
@@ -940,17 +1155,20 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
     abs_y = int(skin_y + (rel_y * h_scaled))
     scale = user_scale if render_log else user_scale * res_scale
     w, h, up, down = ascent_chevron_geometry(elem)
+    chevron_rule = get_rule_config(manufacturer, model, "ascent_chevrons")
+    chevron_rule = chevron_rule if isinstance(chevron_rule, dict) else {}
+    show_bar = bool(elem.get("bar", chevron_rule.get("bar", True)))
     w_px = max(4, int(round(w * scale)))
     h_px = max(8, int(round(h * scale)))
-    bar_h = max(2, int(round(h_px * 0.10)))
+    bar_h = max(2, int(round(h_px * 0.10))) if show_bar else 0
     gap = max(1, int(round(1.0 * scale)))
     n = up + down
-    chev_h = max(3, int((h_px - bar_h - gap * (n + 1)) / n)) if n else 0
+    chev_h = max(3, int((h_px - bar_h - gap * (n + (1 if show_bar else -1))) / n)) if n else 0
     arrow = max(1, int(round(w_px * 0.45)))          # apex depth of the "^"
     band_t = max(1, chev_h - arrow)                   # band thickness
 
     rate = ascent_rate_for(waypoint, waypoints)
-    lit_up = ascent_lit_count(rate, up)
+    lit_up = ascent_lit_count(rate, up, chevron_rule.get("m_per_min_per_chevron"))
     lit_down = 1 if (rate is not None and rate <= -ASCENT_DEADBAND_M_PER_MIN and down > 0) else 0
 
     bands = get_rule_config(manufacturer, model, "ascent_rate")
@@ -963,7 +1181,14 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
                 continue
             if "max" in band and rate >= band["max"]:
                 continue
-            hex_color = str(band.get("color", "#00FF00")).lstrip('#')
+            hex_color = str(band.get("color", "#00FF00"))
+            if band.get("blink"):
+                # The band colour is the "blink" (first-half) colour, like the
+                # badges' flashing red, so whole-second waypoints show it.
+                elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
+                unlit_hex = "#%02X%02X%02X" % CHEVRON_UNLIT
+                hex_color = resolve_blink_color(unlit_hex, hex_color, elapsed)
+            hex_color = hex_color.lstrip('#')
             lit_color = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
             break
 
@@ -982,8 +1207,9 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
         index_from_bar = up - 1 - i
         chevron(y, True, lit_color if index_from_bar < lit_up else CHEVRON_UNLIT)
         y += chev_h + gap
-    draw.rectangle([abs_x, y, abs_x + w_px, y + bar_h], fill=(255, 255, 255))
-    y += bar_h + gap
+    if show_bar:
+        draw.rectangle([abs_x, y, abs_x + w_px, y + bar_h], fill=(255, 255, 255))
+        y += bar_h + gap
     for i in range(down):
         chevron(y, False, (255, 255, 255) if i < lit_down else CHEVRON_UNLIT)
         y += chev_h + gap
@@ -1237,6 +1463,14 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
 
         val, raw_val = resolve_element_text(layout, field, waypoint, waypoints)
 
+        if field == "ndl" and (raw_val is None or (isinstance(raw_val, (int, float)) and raw_val <= 0)):
+            # In deco a Perdix shows NDL "0" in red (manual p.33) - for
+            # manufacturers with an ndl_zero colour, rather than "99+"/"--".
+            from utils.hud_rules_engine import get_rule_config, resolve_state
+            if get_rule_config(rules_manufacturer(layout), layout.get("model", "Perdix2"), "ndl_zero") and \
+                    resolve_state(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints) == "deco":
+                val, raw_val = "0", 0
+
         if val is None or str(val) == "":
             continue
 
@@ -1252,7 +1486,15 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         manufacturer = rules_manufacturer(layout)
         model = layout.get("model", "Perdix2")
         default_color = elem.get("color", "#FFFFFF")
-        color_hex = get_dynamic_color(manufacturer, model, field, raw_val, default_color).lstrip('#')
+        color_hex = get_dynamic_color(manufacturer, model, field, raw_val, default_color)
+        if field == "depth":
+            # Above a deco ceiling by more than the margin: the depth flashes
+            # red along with the badge's ceiling line (Descent Mk3 manual p.10).
+            from utils.hud_rules_engine import ceiling_broken, ceiling_broken_color, resolve_blink_color, resolve_state
+            if resolve_state(manufacturer, model, waypoint, waypoints) in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint):
+                elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
+                color_hex = resolve_blink_color(color_hex, ceiling_broken_color(manufacturer, model), elapsed)
+        color_hex = color_hex.lstrip('#')
         color_rgb = tuple(int(color_hex[i:i+2], 16) for i in (0, 2, 4))
 
         base_font_size = elem.get("font_size", 16)
@@ -1278,6 +1520,12 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         # element asks for it, so default templates render exactly as before.
         align = elem.get("align", "left")
         valign = elem.get("valign", "top")
+        orientation = elem.get("orientation")
+        if orientation in VERTICAL_ORIENTATIONS:
+            # A small_suffix / NDL "+" is not split for vertical text: the
+            # whole string is stacked or turned as one.
+            draw_oriented_text(pil_img, draw, val_str, font, orientation, abs_x, abs_y, align, valign, color_rgb, outline, final_size)
+            continue
         if align != "left" or valign != "top":
             dx, dy, (left, top, right, bottom) = text_anchor_shift(font, main_str, align, valign)
             if suffix_font is not None:
@@ -1314,6 +1562,24 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                     draw.text((suffix_x + dx, suffix_y + dy), suffix_str, font=suffix_font, fill=(0, 0, 0))
             draw.text((suffix_x, suffix_y), suffix_str, font=suffix_font, fill=color_rgb)
             continue
+
+        highlight = elem.get("tank_switch_highlight")
+        if highlight:
+            # Sidemount tank-switch notification (Perdix 2 manual p.42): a
+            # filled box behind this tank's label when it is the one to
+            # breathe from - the rule's colour, text in its text_color.
+            from utils.hud_rules_engine import get_rule_config, sidemount_switch_target
+            if sidemount_switch_target(manufacturer, model, waypoint) == highlight:
+                rule = get_rule_config(manufacturer, model, "sidemount_switch") or {}
+                box_rgb = tuple(int(str(rule.get("color", "#00C800")).lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+                color_rgb = tuple(int(str(rule.get("text_color", "#000000")).lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+                left, top, right, bottom = font.getbbox(val_str)
+                pad = max(1, int(final_size * 0.15))
+                draw.rounded_rectangle(
+                    [abs_x + left - pad, abs_y + top - pad, abs_x + right + pad, abs_y + bottom + pad],
+                    radius=max(1, int(final_size * 0.15)), fill=box_rgb,
+                )
+                outline = False
 
         o_dist = max(1, int(final_size / 20))
         if outline:

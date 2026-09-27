@@ -33,7 +33,11 @@ computer included. Gases, waypoints and the start time start fresh each
 launch.
 
 Save log writes the profile as UDDF, Garmin FIT or Subsurface XML
-(LOG_FORMATS), posing as the chosen dive computer.
+(LOG_FORMATS), posing as the chosen dive computer, with the plan itself
+embedded (parsers/plan_embed.py). Open log takes such a file back: only
+logs the builder wrote are accepted (read_log_origin), the embedded plan
+is restored as saved, and an older file without one is rebuilt from its
+own gases, switches and samples (utils/dive_plan_import.py).
 """
 from datetime import datetime
 from pathlib import Path
@@ -57,7 +61,11 @@ from gui.dive_profile_view import (
 )
 from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
 from parsers.fit_writer import write_fit
+from parsers.garmin import GarminParser
+from parsers.plan_embed import read_log_origin
+from parsers.subsurface import SubsurfaceParser
 from parsers.subsurface_writer import write_subsurface
+from parsers.uddf import UDDFParser
 from parsers.uddf_writer import write_uddf
 from utils.app_settings import get_fields, set_field
 from utils.dive_computers import DIVE_COMPUTERS
@@ -70,6 +78,7 @@ from utils.dive_plan_engine import (
     waypoint_phases,
 )
 from utils.dive_plan_engine import simulate as simulate_dive_plan
+from utils.dive_plan_import import plan_from_log
 
 DIVE_PLAN_GAS_TYPES = ("Air", "Nitrox", "Trimix")
 # DiveProfilePlan.dive_type <-> display label
@@ -82,6 +91,9 @@ LOG_FORMATS = {
     "Subsurface XML (*.ssrf)": (".ssrf", write_subsurface),
 }
 LOG_FORMAT_FIELD = "dive_profile_log_format"
+# Open dialog filter and the parser each extension is read back with.
+LOG_OPEN_FILTER = "Dive logs (*.uddf *.fit *.ssrf *.xml);;UDDF (*.uddf);;Garmin FIT (*.fit);;Subsurface XML (*.ssrf *.xml)"
+LOG_PARSERS = {".uddf": UDDFParser, ".fit": GarminParser, ".ssrf": SubsurfaceParser, ".xml": SubsurfaceParser}
 START_TIME_FORMATS = ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 # settings.json "fields" keys the last-used gradient factors are kept under.
 GF_LOW_FIELD = "dive_profile_gf_low"
@@ -237,33 +249,8 @@ class DiveProfileBackend(QObject):
 
         self._load_persisted_plan_fields()
         self._apply_dive_type_defaults()
-        self._name_text = self.dive_plan.name
         self._load_persisted_gf()
-        self._gf_low_text = f"{self.dive_plan.gf_low:g}"
-        self._gf_high_text = f"{self.dive_plan.gf_high:g}"
-        self._gf_error_text = ""
-        self._descent_rate_text = str(self.dive_plan.default_descent_rate)
-        self._ascent_rate_text = str(self.dive_plan.default_ascent_rate)
-        self._water_temp_text = str(self.dive_plan.water_temp_c)
-        self._sac_text = f"{self.dive_plan.sac_lpm:g}"
-        self._max_depth_text = f"{self.dive_plan.max_depth_m:g}" if self.dive_plan.max_depth_m else ""
-        self._bottom_po2_text = f"{self.dive_plan.max_po2_bottom:g}"
-        self._deco_po2_text = f"{self.dive_plan.max_po2_deco:g}"
-        self._runtime_text = (
-            _format_minutes(self.dive_plan.planned_runtime_sec) if self.dive_plan.planned_runtime_sec else ""
-        )
-        if self.dive_plan.ccr_low_setpoint > self.dive_plan.ccr_high_setpoint:
-            self.dive_plan.ccr_low_setpoint = self.dive_plan.ccr_high_setpoint
-        self._ccr_low_text = f"{self.dive_plan.ccr_low_setpoint:g}"
-        self._ccr_high_text = f"{self.dive_plan.ccr_high_setpoint:g}"
-        self._ccr_error_text = ""
-        self._ccr_switch_depth_text = f"{self.dive_plan.ccr_setpoint_switch_depth_m:g}"
-        self._ccr_o2_size_text = f"{self.dive_plan.ccr_o2_tank_size_l:g}"
-        self._ccr_o2_start_text = f"{self.dive_plan.ccr_o2_start_pressure_bar:g}"
-        self._sidemount_switch_text = f"{self.dive_plan.sidemount_switch_bar:g}"
-        self._serial_text = self.dive_plan.computer_serial
-        self._start_time_text = ""
-        self._log_error_text = ""
+        self._sync_texts_from_plan()
 
         self._gas_name_text = ""
         self._gas_type = "Air"
@@ -296,6 +283,98 @@ class DiveProfileBackend(QObject):
         self._status_is_error = False
 
         self._redraw()
+
+    def _sync_texts_from_plan(self):
+        """The Dive settings texts as the plan has them - on start-up and
+        after Open log replaces the plan."""
+        plan = self.dive_plan
+        self._name_text = plan.name
+        self._gf_low_text = f"{plan.gf_low:g}"
+        self._gf_high_text = f"{plan.gf_high:g}"
+        self._gf_error_text = ""
+        self._descent_rate_text = str(plan.default_descent_rate)
+        self._ascent_rate_text = str(plan.default_ascent_rate)
+        self._water_temp_text = str(plan.water_temp_c)
+        self._sac_text = f"{plan.sac_lpm:g}"
+        self._max_depth_text = f"{plan.max_depth_m:g}" if plan.max_depth_m else ""
+        self._bottom_po2_text = f"{plan.max_po2_bottom:g}"
+        self._deco_po2_text = f"{plan.max_po2_deco:g}"
+        self._runtime_text = _format_minutes(plan.planned_runtime_sec) if plan.planned_runtime_sec else ""
+        if plan.ccr_low_setpoint > plan.ccr_high_setpoint:
+            plan.ccr_low_setpoint = plan.ccr_high_setpoint
+        self._ccr_low_text = f"{plan.ccr_low_setpoint:g}"
+        self._ccr_high_text = f"{plan.ccr_high_setpoint:g}"
+        self._ccr_error_text = ""
+        self._ccr_switch_depth_text = f"{plan.ccr_setpoint_switch_depth_m:g}"
+        self._ccr_o2_size_text = f"{plan.ccr_o2_tank_size_l:g}"
+        self._ccr_o2_start_text = f"{plan.ccr_o2_start_pressure_bar:g}"
+        self._sidemount_switch_text = f"{plan.sidemount_switch_bar:g}"
+        self._serial_text = plan.computer_serial
+        self._start_time_text = plan.start_time.strftime(START_TIME_FORMATS[0]) if plan.start_time else ""
+        self._log_error_text = ""
+
+    # ------------------------------------------------------------------
+    # Open log - a log the builder saved, back into the editor
+    # ------------------------------------------------------------------
+
+    def load_log(self, path):
+        """Replaces the plan with the one in a UWMedia-written log: the
+        embedded plan as saved, or (older files) one rebuilt from the
+        log's gases, switches and samples. Returns a status line; raises
+        ValueError for a file UWMedia didn't write or can't read."""
+        path = Path(path)
+        parser = LOG_PARSERS.get(path.suffix.lower())
+        if parser is None:
+            raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit or .ssrf")
+        if not path.is_file():
+            raise ValueError(f"{path} does not exist")
+        origin = read_log_origin(path)
+        if not origin.created_by_uwmedia:
+            raise ValueError(
+                f"{path.name} was not written by UWMedia's Dive Profile Builder - only logs it saved can be opened"
+            )
+        if origin.plan is not None:
+            plan, how = origin.plan, "plan restored as saved"
+        else:
+            dives = parser().parse(path)
+            if not dives:
+                raise ValueError(f"No dive found in {path.name}")
+            plan = plan_from_log(path, dives[0], self.dive_plan)
+            how = "saved before UWMedia kept the plan, so rebuilt from its samples - check the waypoints"
+        self._apply_plan(plan)
+        return f"Opened {path.name}: {how}"
+
+    def _apply_plan(self, plan):
+        self.dive_plan = plan
+        self._apply_dive_type_defaults()
+        for attr in PERSISTED_PLAN_FIELDS:
+            self._persist(attr)
+        set_field(GF_LOW_FIELD, plan.gf_low)
+        set_field(GF_HIGH_FIELD, plan.gf_high)
+        self._sync_texts_from_plan()
+        self._check_log_details()
+        self.newGas()
+        self._clear_waypoint_inputs()
+        self.settingsChanged.emit()
+        self.gasesChanged.emit()
+        self.waypointsChanged.emit()
+        self._update_cursor_info()
+        self._resimulate()
+
+    @Slot()
+    def openLog(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        path, _ = QFileDialog.getOpenFileName(None, "Open dive log", "", LOG_OPEN_FILTER)
+        if not path:
+            return
+        try:
+            message = self.load_log(path)
+        except Exception as e:
+            QMessageBox.warning(None, "Could not open log", str(e))
+            return
+        self._end_dive_status_text = message
+        self.statusChanged.emit()
 
     # ------------------------------------------------------------------
     # Dive settings

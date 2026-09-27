@@ -44,6 +44,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from parsers.garmin import GarminParser
 from utils.app_settings import get_fields, set_field, update_settings
+from utils import filename_formats
 from utils.filename_formats import (
     add_filename_format,
     custom_filename_formats,
@@ -215,6 +216,11 @@ class AdvancedBackend(QObject):
     @Property(str, notify=filenameFormatFieldChanged)
     def filenameFormatError(self):
         return self._filename_format_error
+
+    @Property(bool, constant=True)
+    def customFilenameFormatsEnabled(self):
+        """Gates the Custom filename formats section (hidden 2026-09-28)."""
+        return filename_formats.CUSTOM_FILENAME_FORMATS_ENABLED
 
     @Property("QVariant", notify=filenameFormatsChanged)
     def filenameFormats(self):

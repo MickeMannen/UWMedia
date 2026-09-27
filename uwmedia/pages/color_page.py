@@ -55,7 +55,7 @@ from parsers.subsurface import SubsurfaceParser
 from parsers.uddf import UDDFParser
 from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
-from utils.layouts import list_templates, resolve_template_state
+from utils.layouts import list_templates, resolve_template_state, load_layout_file, strip_variant_markers
 
 from uwmedia.pages.add_hud_dialog import HUD_LOCATION_PRESETS, AddHudDialog
 from uwmedia.pages.color_page_ui import Ui_ColorPage
@@ -363,8 +363,7 @@ class ColorPage(QtWidgets.QWidget, Ui_ColorPage):
             if state_path is None:
                 return None
 
-            with open(state_path) as f:
-                raw_layout = json.load(f)
+            raw_layout = strip_variant_markers(load_layout_file(state_path))
             hud_skin = raw_layout.setdefault("hud_skin", {})
             skin_path = hud_skin.get("path")
             if skin_path and not Path(skin_path).is_absolute():

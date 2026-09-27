@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from models.dive import Waypoint, TankData
 from gui.hud_renderer import draw_hud
-from utils.layouts import resolve_template_state
+from utils.layouts import load_layout_file, resolve_template_state, strip_variant_markers
 
 def test_hud_renderer_text_scaling():
     # Design width is 1000, frame width is 1920 (w_v = 1920)
@@ -182,7 +182,9 @@ def test_depth_graph_deco_ceiling_reveals_progressively_and_never_retracts():
         wp(0, 0), wp(10, 10), wp(20, 20),
         wp(30, 20, 10.0), wp(40, 20, 15.0), wp(50, 15, 10.0), wp(60, 10, 10.0), wp(70, 0, None),
     ]
-    elem = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#FF0000"}
+    # The progressive reveal is the graph's reveal_profile mode; without it
+    # the whole dive's ceiling is on the graph from the first frame (below).
+    elem = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#FF0000", "reveal_profile": True}
     skin_info = {"x": 0, "y": 0, "w": 1, "h": 1, "res_scale": 1.0}
     # Blue channel is 0 wherever only the red line/fill has been drawn, and a
     # distinctly nonzero flat gray tint wherever the ceiling band has been
@@ -190,6 +192,10 @@ def test_depth_graph_deco_ceiling_reveals_progressively_and_never_retracts():
     early_stop_px = (45, 15)   # under the t=30-40 (10m) ceiling
     deep_stop_px = (58, 30)    # under the t=40-45 (15m) ceiling
     later_hold_px = (85, 15)   # under the t=50-70 (10m again) ceiling
+
+    whole = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(whole, {**elem, "reveal_profile": False}, wp(25, 20), waypoints, skin_info)
+    assert all(whole[y, x][0] > 0 for x, y in (early_stop_px, deep_stop_px, later_hold_px))  # all there at t=25
 
     frame = np.zeros((50, 100, 3), dtype=np.uint8)
     draw_depth_graph(frame, elem, wp(25, 20), waypoints, skin_info)
@@ -274,8 +280,7 @@ def test_hud_renderer_badge_safety_stop_from_alert_event():
 def _load_garmin_layout(page, variant=None):
     state_path = resolve_template_state("garmin", "x50i", page, variant=variant)
     assert state_path is not None
-    with open(state_path) as f:
-        layout = json.load(f)
+    layout = strip_variant_markers(load_layout_file(state_path))
     layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
     return layout
 
@@ -400,8 +405,7 @@ def test_hud_renderer_badge_value_font_size_independent_of_label():
 def _load_perdix3_layout(page):
     state_path = resolve_template_state("shearwater", "perdix_3", page)
     assert state_path is not None
-    with open(state_path) as f:
-        layout = json.load(f)
+    layout = strip_variant_markers(load_layout_file(state_path))
     layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
     return layout
 
@@ -510,8 +514,7 @@ def test_perdix3_tec_renders_safety_stop_state():
 def _load_perdix2_layout(page, variant=None):
     state_path = resolve_template_state("shearwater", "perdix_2", page, variant=variant)
     assert state_path is not None
-    with open(state_path) as f:
-        layout = json.load(f)
+    layout = strip_variant_markers(load_layout_file(state_path))
     layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
     return layout
 
@@ -674,9 +677,14 @@ def test_badge_lines_none_for_normal_and_three_lines_for_deco():
     assert badge_lines("Shearwater", "Perdix 2", elem, None) is None
     deco = Waypoint(timestamp=datetime.now(), depth=12.0, time_since_start=0,
                     deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=180)
-    lines = badge_lines("Shearwater", "Perdix 2", elem, deco)
+    lines = badge_lines("Shearwater", "Perdix 2", {**elem, "depth_unit": "m"}, deco)
+    # Perdix 2 manual p.33: "DECO STOP" in red, then "6m↑ 3min" in white on one line
+    assert [t for t, _, _ in lines] == ["DECO STOP", "6m↑ 3min"]
+    assert [v for _, _, v in lines] == [False, True]
+    assert [c for _, c, _ in lines] == [(255, 0, 0), (255, 255, 255)]
+    # Garmin keeps its three lines
+    lines = badge_lines("Garmin", "x50i", elem, deco)
     assert [t for t, _, _ in lines] == ["DECO", "↑6", "03:00"]
-    assert [v for _, _, v in lines] == [False, True, True]
 
 
 def test_rules_profile_borrows_another_brands_rules():
@@ -981,8 +989,13 @@ def test_deco_graph_shades_stops_and_ceiling_separately_and_keeps_cleared_stops(
     six_m_stop_only = (47, 10)  # t~33, ~4.4m: under the 6m stop, below the ~3m ceiling
     ceiling_px = (44, 4)        # t~31, ~1.8m: under both
 
+    # without reveal_profile the whole dive's stops are shaded from the start
     frame = np.zeros((50, 100, 3), dtype=np.uint8)
     draw_depth_graph(frame, DECO_ELEM, wps[3], wps, GRAPH_SKIN)
+    assert frame[six_m_stop_only[1], six_m_stop_only[0]][1] > 0  # t=30: the later stop already on the graph
+    # with it, a stop appears only once the dive reaches it
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**DECO_ELEM, "reveal_profile": True}, wps[3], wps, GRAPH_SKIN)
     assert frame[six_m_stop_only[1], six_m_stop_only[0]][1] == 0  # t=30: not revealed yet
 
     frame = np.zeros((50, 100, 3), dtype=np.uint8)
@@ -1014,7 +1027,7 @@ def test_graph_stop_label_text():
 
     wps = _deco_waypoints()
     assert graph_stop_label(wps[3]) == ("STOP 6m 2:00", True)
-    assert graph_stop_label(wps[1]) == ("NDL 10", False)
+    assert graph_stop_label(wps[1]) is None  # out of deco: nothing (no NDL fallback)
     legacy = Waypoint(timestamp=datetime.now(), depth=10, time_since_start=0, deco_stop_depth=4.2)
     assert graph_stop_label(legacy) == ("STOP 6m", True)  # stop depth rounded up to a 3m level
 
@@ -1028,3 +1041,341 @@ def test_stop_label_is_drawn_in_the_text_pass():
     with_label = np.zeros((1080, 1920, 3), dtype=np.uint8)
     draw_hud(with_label, layout, wps[3], render_log=False, waypoints=wps)
     assert not np.array_equal(without, with_label)
+
+
+def test_mk3i_badge_is_label_less_ceiling_over_short_timer():
+    # Descent Mk3 manual p.10: the NDL slot shows "↑ceiling" small over the
+    # stop timer as 2:33 - no STOP/DECO word, white text.
+    from gui.hud_renderer import badge_lines
+    elem = {"field": "state_badge", "type": "badge", "rel_x": 0, "rel_y": 0,
+            "depth_font": "label", "depth_unit": "m", "timer_format": "m:ss"}
+    deco = Waypoint(timestamp=datetime.now(), depth=6.2, time_since_start=0,
+                    deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=153)
+    lines = badge_lines("Garmin", "mk3i", elem, deco)
+    assert [t for t, _, _ in lines] == ["↑6m", "2:33"]
+    assert [v for _, _, v in lines] == [False, True]
+    assert all(rgb == (255, 255, 255) for _, rgb, _ in lines)
+
+
+def test_ceiling_broken_flashes_depth_line_red_on_garmin_only():
+    from gui.hud_renderer import badge_lines
+    from utils.hud_rules_engine import ceiling_broken
+    elem = {"field": "state_badge", "type": "badge", "rel_x": 0, "rel_y": 0}
+    within = Waypoint(timestamp=datetime.now(), depth=5.5, time_since_start=0, dive_time=0,
+                      deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=60)
+    above = Waypoint(timestamp=datetime.now(), depth=5.0, time_since_start=0, dive_time=0,
+                     deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=60)
+    assert not ceiling_broken("Garmin", "mk3i", within)
+    assert ceiling_broken("Garmin", "mk3i", above)
+    assert not ceiling_broken("Shearwater", "Perdix 2", above)  # no such rule there
+    # dive_time 0 -> first half of the blink period -> the red phase
+    assert badge_lines("Garmin", "mk3i", elem, above)[0][1] == (255, 0, 0)
+    assert badge_lines("Garmin", "mk3i", elem, within)[0][1] == (255, 255, 255)
+
+
+@pytest.mark.parametrize("variant", ["single_tank", "sidemount"])
+def test_garmin_mk3i_main_renders_stop_states_in_the_ndl_slot(variant):
+    from utils.layouts import resolve_template_state
+    state_path = resolve_template_state("garmin", "mk3i", "main", variant=variant)
+    layout = strip_variant_markers(load_layout_file(state_path))
+    layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
+    elems = layout["hud_skin"]["linked_elements"]
+    badge = next(e for e in elems if e.get("type") == "badge")
+    assert badge["depth_font"] == "label" and badge["timer_format"] == "m:ss"
+    for field in ("ndl", "custom:N\nD\nL"):
+        assert set(next(e for e in elems if e["field"] == field)["hide_in_states"]) == {"safety_stop", "deco", "clear"}
+    tanks = {"T1": TankData(pressure_bar=150, o2_percent=32.0), "T2": TankData(pressure_bar=140, o2_percent=32.0)}
+    deco = Waypoint(timestamp=datetime.now(), depth=12.0, max_depth=40.0, temp=27.0, time_since_start=1500,
+                    dive_time=1500, deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=180, ndl=0, tanks=tanks)
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, deco, render_log=False)
+    assert not np.all(frame == 0)
+
+
+
+def test_perdix_badge_phases_from_the_manual():
+    from gui.hud_renderer import badge_lines
+    from models.dive import Waypoint
+    elem = {"field": "state_badge", "type": "badge", "rel_x": 0, "rel_y": 0, "depth_unit": "m"}
+    at_stop = Waypoint(timestamp=datetime.now(), depth=6.8, time_since_start=0, dive_time=0,
+                       deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
+    lines = badge_lines("Shearwater", "Perdix 2", elem, at_stop)
+    assert lines[0] == ("✓ DECO STOP", (0, 200, 0), False)       # green title with a check at the stop
+    assert lines[1][0] == "6m↑ 2min"
+    approaching = Waypoint(timestamp=datetime.now(), depth=9.0, time_since_start=0, dive_time=0,
+                           deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
+    assert badge_lines("Shearwater", "Perdix 2", elem, approaching)[0][1] == (255, 255, 0)  # yellow while approaching
+    # the safety stop shows its planned time with no depth line; the Garmin box keeps its ↑5m
+    counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                        dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=150)
+    sw = badge_lines("Shearwater", "Perdix 2", elem, counting)
+    assert [t for t, _, _ in sw] == ["✓ SAFETY STOP", "2:30"]
+    assert sw[1][1] == (255, 255, 255)
+    garmin = badge_lines("Garmin", "x50i", elem, counting)
+    assert [t for t, _, _ in garmin] == ["STOP", "↑5m", "02:30"]
+    cleared = Waypoint(timestamp=datetime.now(), depth=4.5, time_since_start=0, dive_time=0,
+                       deco_stop_depth=0.0, next_stop_depth=0.0, next_stop_time=0, dive_alerts=["deco_stop_cleared"])
+    assert [t for t, _, _ in badge_lines("Shearwater", "Perdix 2", elem, cleared)] == ["CLEAR", "0:00"]
+
+
+def test_sac_formats_like_the_perdix():
+    from gui.hud_renderer import format_telemetry_value
+    assert format_telemetry_value("pressure_sac", None) == "wait"
+    assert format_telemetry_value("pressure_sac", 1.06) == "1.1"
+
+
+def test_perdix2_main_variants_share_a_base_and_the_sidemount_row_highlights_the_tank_to_switch_to():
+    from utils.layouts import ELEMENT_ORIGIN_KEY, load_layout_file
+    page = Path("overlays/templates/shearwater/perdix_2/main")
+    base = json.load(open(page / "normal.json"))
+    assert [e["id"] for e in base["hud_skin"]["linked_elements"]] == [
+        "depth", "label_m", "label_time", "dive_time", "state_badge", "label_ndl", "ndl", "n2_bar", "ascent_rate"]
+    single = load_layout_file(page / "single_tank/normal.json")
+    side = load_layout_file(page / "sidemount/normal.json")
+    single_row = [e["field"] for e in single["hud_skin"]["linked_elements"] if e[ELEMENT_ORIGIN_KEY] == "variant"]
+    side_row = [e["field"] for e in side["hud_skin"]["linked_elements"] if e[ELEMENT_ORIGIN_KEY] == "variant"]
+    assert single_row[0] == "gasmix" and "air_remaining" in single_row
+    assert {"pressure_sac", "custom:SM", "secondary_tank_pressure"} <= set(side_row)
+    assert not (page / "sidemount/normal.png").exists() and (page / "normal.png").exists()
+
+    layout = _load_perdix2_layout("main", variant="sidemount")
+    tanks = {"T1": TankData(pressure_bar=175, o2_percent=21.0), "T2": TankData(pressure_bar=153, o2_percent=21.0)}
+    wp = Waypoint(timestamp=datetime.now(), depth=15.7, max_depth=15.7, temp=23.0, dive_time=2151,
+                  time_since_start=2151, ndl=22 * 60, air_remaining=45 * 60, pressure_sac=1.1, tanks=tanks, gf=40.0)
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, wp, render_log=False)
+    green = (frame[:, :, 1] > 180) & (frame[:, :, 0] < 60) & (frame[:, :, 2] < 60)
+    # the switch highlight (#00C800 box behind T1) adds a green patch in the info row's left cell
+    even = {"T1": TankData(pressure_bar=170, o2_percent=21.0), "T2": TankData(pressure_bar=165, o2_percent=21.0)}
+    frame_even = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame_even, layout, wp.model_copy(update={"tanks": even}), render_log=False)
+    green_even = (frame_even[:, :, 1] > 180) & (frame_even[:, :, 0] < 60) & (frame_even[:, :, 2] < 60)
+    assert green.sum() > green_even.sum() + 50
+
+
+def test_teric_badge_lines_follow_its_manual():
+    from gui.hud_renderer import badge_lines
+    elem = {"field": "state_badge", "type": "badge", "rel_x": 0, "rel_y": 0, "depth_unit": "m"}
+    counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                        dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=202)
+    lines = badge_lines("Shearwater", "Teric", elem, counting)
+    assert lines == [("SAFETY", (0, 200, 0), False), ("3:22", (0, 200, 0), True)]
+    deco = Waypoint(timestamp=datetime.now(), depth=20.0, time_since_start=0, dive_time=0,
+                    deco_stop_depth=15.0, next_stop_depth=15.0, next_stop_time=120)
+    lines = badge_lines("Shearwater", "Tern", elem, deco)
+    assert lines == [("DECO", (255, 0, 0), False), ("15m↑ 2min", (255, 255, 255), True)]
+
+
+@pytest.mark.parametrize("computer", ["teric", "tern"])
+def test_watch_templates_replace_the_ndl_with_the_stop_badge(computer):
+    state_path = resolve_template_state("shearwater", computer, "main")
+    layout = strip_variant_markers(load_layout_file(state_path))
+    layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
+    elems = layout["hud_skin"]["linked_elements"]
+    assert any(e.get("type") == "badge" for e in elems)
+    for field in ("ndl", "custom:NDL"):
+        assert set(next(e for e in elems if e["field"] == field)["hide_in_states"]) == {"safety_stop", "deco", "clear"}
+    deco = Waypoint(timestamp=datetime.now(), depth=12.0, max_depth=30.0, temp=27.0, time_since_start=1500,
+                    dive_time=1500, deco_stop_depth=9.0, next_stop_depth=9.0, next_stop_time=120, ndl=0, tts=600,
+                    tanks={"T1": TankData(pressure_bar=150, o2_percent=32.0)})
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, deco, render_log=False)
+    assert not np.all(frame == 0)
+
+
+def test_petrel_main_variants_share_a_base_like_the_perdix():
+    from utils.layouts import ELEMENT_ORIGIN_KEY, load_layout_file
+    page = Path("overlays/templates/shearwater/petrel/main")
+    assert json.load(open(page / "single_tank/normal.json"))["base"] == "../normal.json"
+    side = load_layout_file(page / "sidemount/normal.json")
+    row = [e["field"] for e in side["hud_skin"]["linked_elements"] if e[ELEMENT_ORIGIN_KEY] == "variant"]
+    assert {"pressure_sac", "custom:SM", "secondary_tank_pressure", "primary_tank_pressure"} <= set(row)
+    assert (page / "normal.png").exists() and not (page / "sidemount/normal.png").exists()
+
+
+def test_perdix_3_badge_lines_and_boxed_title():
+    from gui.hud_renderer import badge_lines
+    elem = {"field": "state_badge", "type": "badge", "rel_x": 0, "rel_y": 0, "depth_unit": "m"}
+    counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                        dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=202)
+    assert badge_lines("Shearwater", "Perdix 3", elem, counting) == [("SAFETY", (0, 200, 0), False), ("3:22", (0, 200, 0), True)]
+    deco = Waypoint(timestamp=datetime.now(), depth=23.6, time_since_start=0, dive_time=0,
+                    deco_stop_depth=18.0, next_stop_depth=18.0, next_stop_time=60)
+    assert badge_lines("Shearwater", "Perdix 3", elem, deco) == [("DECO", (0, 173, 237), False), ("18m↑ 1min", (255, 255, 255), True)]
+    # the boxed title paints a green block behind "SAFETY" on the rendered page
+    layout = _load_perdix3_layout("main")
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, counting, render_log=False)
+    green_block = ((frame[:, :, 1] > 180) & (frame[:, :, 0] < 60) & (frame[:, :, 2] < 60)).sum()
+    frame_normal = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame_normal, layout, Waypoint(timestamp=datetime.now(), depth=18.0, time_since_start=0, ndl=12 * 60), render_log=False)
+    green_normal = ((frame_normal[:, :, 1] > 180) & (frame_normal[:, :, 0] < 60) & (frame_normal[:, :, 2] < 60)).sum()
+    assert green_block > green_normal + 200
+
+
+@pytest.mark.parametrize("page", ["main", "standard", "tec"])
+def test_perdix_3_pages_hide_the_ndl_while_a_stop_shows(page):
+    layout = _load_perdix3_layout(page)
+    elems = layout["hud_skin"]["linked_elements"]
+    assert any(e.get("type") == "badge" for e in elems)
+    for field in ("ndl", "custom:NDL"):
+        assert set(next(e for e in elems if e["field"] == field)["hide_in_states"]) == {"safety_stop", "deco", "clear"}
+
+
+def test_shearwater_safety_stop_time_is_centred_under_the_title():
+    # hud_rules.json gives the Shearwater safety stop value_align "center":
+    # the timer's ink is centred under "✓ SAFETY STOP" (check mark included),
+    # while the Garmin-style badge keeps every line on the left anchor.
+    from gui.hud_renderer import badge_title_ink_span, get_font
+    layout = _shape_layout([{"type": "badge", "field": "state_badge", "font_size": 28, "value_font_size": 38,
+                             "rel_x": 0.1, "rel_y": 0.1, "outline": False}], "Shearwater", "Perdix 2")
+    counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                        dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=150)
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, counting, render_log=False)
+    green = (frame[:, :, 1] > 150) & (frame[:, :, 0] < 80) & (frame[:, :, 2] < 80)   # "✓ SAFETY STOP" in #00C800
+    white = (frame[:, :, 0] > 200) & (frame[:, :, 1] > 200) & (frame[:, :, 2] > 200)  # "2:30"
+    assert green.any() and white.any()
+    title_cols = np.where(green.any(axis=0))[0]
+    timer_cols = np.where(white.any(axis=0))[0]
+    title_center = (title_cols.min() + title_cols.max()) / 2
+    timer_center = (timer_cols.min() + timer_cols.max()) / 2
+    assert abs(title_center - timer_center) <= 3
+    assert timer_cols.min() > title_cols.min() + 20  # not left-anchored any more
+    # the span helper counts the drawn check mark in front of the title
+    font = get_font(28)
+    plain = badge_title_ink_span(font, "SAFETY STOP", 28)
+    checked = badge_title_ink_span(font, "✓ SAFETY STOP", 28)
+    assert checked[1] - checked[0] > plain[1] - plain[0]
+
+
+def _ink_box(frame):
+    ink = frame.max(axis=2) > 40
+    rows = np.where(ink.any(axis=1))[0]
+    cols = np.where(ink.any(axis=0))[0]
+    return cols.min(), rows.min(), cols.max(), rows.max()
+
+
+def test_vertical_text_orientations_stack_or_turn_the_label():
+    # `orientation` on a text element: "stacked" draws the letters one under
+    # another, "up"/"down" turn the line on its side - all taller than wide
+    # for a word, and the designer's bounds follow the painted ink.
+    def render(orientation, **extra):
+        elem = {"field": "custom:SAFETY", "font_size": 40, "rel_x": 0.3, "rel_y": 0.2, "outline": False, "orientation": orientation}
+        elem.update(extra)
+        layout = _shape_layout([elem])
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        wp = Waypoint(timestamp=datetime.now(), depth=5.0, time_since_start=0)
+        draw_hud(frame, layout, wp, render_log=False)
+        return frame
+    flat = _ink_box(render("horizontal"))
+    assert flat[2] - flat[0] > flat[3] - flat[1]
+    for orientation in ("stacked", "up", "down"):
+        x0, y0, x1, y1 = _ink_box(render(orientation))
+        assert y1 - y0 > x1 - x0, orientation
+    up, down = render("up"), render("down")
+    assert not np.array_equal(up, down)  # mirrored reading directions
+    # "up" reads bottom-to-top: the S (first letter) ends up at the bottom, so
+    # flipping "up" twice (180°) is "down" apart from anchor placement -
+    # the ink boxes have the same shape
+    bu, bd = _ink_box(up), _ink_box(down)
+    assert abs((bu[2] - bu[0]) - (bd[2] - bd[0])) <= 2 and abs((bu[3] - bu[1]) - (bd[3] - bd[1])) <= 2
+    # outline adds a halo but keeps it vertical
+    hx0, hy0, hx1, hy1 = _ink_box(render("stacked", outline=True))
+    assert hy1 - hy0 > hx1 - hx0
+
+
+def test_vertical_text_bounds_match_the_ink_in_the_designer():
+    from gui.hud_renderer import get_font, oriented_text_geometry
+    font = get_font(40)
+    for orientation in ("stacked", "up", "down"):
+        dx, dy, w, h = oriented_text_geometry(font, "SAFETY", orientation, 40)
+        assert h > w and dx == 0 and dy == 0
+        cdx, cdy, _, _ = oriented_text_geometry(font, "SAFETY", orientation, 40, "center", "middle")
+        assert cdx == -w / 2 and cdy == -h / 2
+
+
+def test_shearwater_ascent_arrows_follow_the_perdix_manual():
+    # Perdix 2 manual p.12: 1 arrow per 3 m/min, white < 9, yellow 9-18,
+    # flashing red > 18; six arrows and no divider bar (hud_rules.json).
+    from gui.hud_renderer import ascent_lit_count
+    assert ascent_lit_count(2.0, 6, 3.0) == 1 and ascent_lit_count(3.0, 6, 3.0) == 1
+    assert ascent_lit_count(8.0, 6, 3.0) == 3 and ascent_lit_count(10.0, 6, 3.0) == 4 and ascent_lit_count(25.0, 6, 3.0) == 6
+    t0 = datetime.now()
+
+    def render(rate, elapsed=0, **extra):
+        elem = {"field": "ascent_rate", "type": "ascent_chevrons", "rel_x": 0.25, "rel_y": 0.25, "width": 16, "height": 48,
+                "up_count": 6, "down_count": 0}
+        elem.update(extra)
+        layout = {"design_width": 1920, "design_height": 1080, "manufacturer": "Shearwater", "model": "Perdix 2",
+                  "hud_skin": {"type": "shape", "width": 200, "height": 200, "anchor": "TOP_LEFT", "opacity": 0.0,
+                               "linked_elements": [elem]}}
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        wp = Waypoint(timestamp=t0, depth=10.0, time_since_start=elapsed, ascent_rate=rate)
+        draw_hud(frame, layout, wp, render_log=True)
+        return frame[50:98, 50:66]
+
+    def count(frame, bgr):
+        return int(np.all(frame == np.array(bgr, dtype=np.uint8), axis=2).sum())
+
+    level = render(0.0)
+    assert count(level, (138, 138, 138)) > 100 and count(level, (255, 255, 255)) == 0  # six grey arrows, no bar
+    slow = render(5.0)
+    assert count(slow, (255, 255, 255)) > 0 and count(slow, (0, 255, 255)) == 0          # two white arrows
+    warn = render(12.0)
+    assert count(warn, (0, 255, 255)) > count(slow, (255, 255, 255))                     # four yellow
+    fast = render(20.0)
+    assert count(fast, (0, 0, 255)) > 0 and count(fast, (0, 255, 255)) == 0                # all six red
+    # the red is the blink colour (shown in the first half of each second, so
+    # at whole-second waypoints), the unlit grey the other half
+    from utils.hud_rules_engine import resolve_blink_color
+    assert resolve_blink_color("#8A8A8A", "#FF0000", 3.0) == "#FF0000" and resolve_blink_color("#8A8A8A", "#FF0000", 3.75) == "#8A8A8A"
+    # the brand rule supplies the missing bar/count defaults; an element can put the bar back
+    assert count(render(0.0, bar=True), (255, 255, 255)) > 10
+
+
+def test_graph_shading_colour_and_opacity_are_element_keys():
+    # fill_color / fill_opacity (under the line), ceiling_opacity (band or
+    # deco ceiling) and stops_opacity (deco steps) - 0 hides the area
+    from gui.hud_renderer import draw_depth_graph
+    wps = _deco_waypoints()
+    under_line = (30, 40)      # t~21, ~17.6 m: under the 20 m bottom, below every stop
+    six_m_stop_only = (47, 10)
+    ceiling_px = (44, 4)
+    plain = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#0000FF"}
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, plain, wps[-1], wps, GRAPH_SKIN)
+    assert frame[under_line[1], under_line[0]][0] > 0                       # default fill: a faint blue tint
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**plain, "fill_opacity": 0}, wps[-1], wps, GRAPH_SKIN)
+    assert tuple(frame[under_line[1], under_line[0]]) == (0, 0, 0)          # no fill at all
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**plain, "fill_color": "#00FF00", "fill_opacity": 1.0}, wps[-1], wps, GRAPH_SKIN)
+    assert tuple(frame[under_line[1], under_line[0]]) == (0, 255, 0)        # solid, in the fill colour (BGR)
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**DECO_ELEM, "stops_opacity": 0, "ceiling_opacity": 0}, wps[-1], wps, GRAPH_SKIN)
+    assert frame[six_m_stop_only[1], six_m_stop_only[0]][1] == 0 and frame[ceiling_px[1], ceiling_px[0]][2] == 0
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**DECO_ELEM, "fill_opacity": 0, "stops_opacity": 1.0, "ceiling_opacity": 0}, wps[-1], wps, GRAPH_SKIN)
+    assert tuple(frame[six_m_stop_only[1], six_m_stop_only[0]]) == (0, 255, 0)  # solid stops colour
+
+
+def test_graph_background_box_colour_and_opacity():
+    from gui.hud_renderer import draw_depth_graph
+    wps = _deco_waypoints()
+    plain = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#0000FF", "fill_opacity": 0}
+    corner = (30, 10)  # inside the box, well above the 20 m bottom at t=20-30, no ceiling band there
+    frame = np.full((50, 100, 3), 200, dtype=np.uint8)
+    draw_depth_graph(frame, plain, wps[-1], wps, GRAPH_SKIN)
+    assert 100 < frame[corner[1], corner[0]][0] < 140                       # default: black box at 0.4 over grey
+    frame = np.full((50, 100, 3), 200, dtype=np.uint8)
+    draw_depth_graph(frame, {**plain, "background_opacity": 0}, wps[-1], wps, GRAPH_SKIN)
+    assert tuple(frame[corner[1], corner[0]]) == (200, 200, 200)            # no box at all
+    frame = np.full((50, 100, 3), 200, dtype=np.uint8)
+    draw_depth_graph(frame, {**plain, "background_color": "#FF0000", "background_opacity": 1.0}, wps[-1], wps, GRAPH_SKIN)
+    assert tuple(frame[corner[1], corner[0]]) == (0, 0, 255)                # solid, in the box colour (BGR)

@@ -1,3 +1,4 @@
+import re
 import math
 from lxml import etree
 from datetime import datetime, timedelta
@@ -6,6 +7,7 @@ from pathlib import Path
 from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
 from utils.deco_engine import DiveDecompressor, GasDefinition
+from utils.gas_consumption import fill_sac_and_gtr
 from utils.config import get_config
 
 def parse_time_str(time_str: str) -> int:
@@ -177,6 +179,17 @@ class SubsurfaceParser(BaseParser):
                 if k:
                     extradata[k] = v
 
+            # The file's own GFs ("Deco model" extradata, "GF 40/85" - what
+            # UWMedia's builder writes) drive the recompute below.
+            file_gf = None
+            gf_match = re.search(r"GF\s*(\d+)\s*/\s*(\d+)", extradata.get("Deco model", "") or "")
+            if gf_match:
+                low, high = int(gf_match.group(1)) / 100.0, int(gf_match.group(2)) / 100.0
+                if 0 < low <= high <= 1.0:
+                    file_gf = (low, high)
+            # A log that records its own stopdepth says "no stop" by leaving it out.
+            file_logs_stops = bool(divecomputer_elem.xpath("sample[@stopdepth]"))
+
             # Resolve friendly tank names
             tank_keys = {}
             for idx in range(len(cylinders)):
@@ -269,6 +282,8 @@ class SubsurfaceParser(BaseParser):
                 logged_deco_stop_depth = parse_depth_str(stopdepth_val) if stopdepth_val else None
                 stoptime_val = sample.get("stoptime")
                 logged_next_stop_time = parse_time_str(stoptime_val) if stoptime_val else None
+                if logged_deco_stop_depth is None and (file_logs_stops or (ndl is not None and ndl > 0)):
+                    logged_deco_stop_depth, logged_next_stop_time = 0.0, 0
 
                 # Update cylinder pressures
                 for idx, cyl in enumerate(cylinders):
@@ -326,7 +341,10 @@ class SubsurfaceParser(BaseParser):
                     if not deco_gases:
                         deco_gases.append(GasDefinition("AIR", 0.21, 0.0, 56.0))
 
-                    decompressor = DiveDecompressor(simulation_interval=10)
+                    decompressor = (
+                        DiveDecompressor(gf_low=file_gf[0], gf_high=file_gf[1], simulation_interval=10)
+                        if file_gf else DiveDecompressor(simulation_interval=10)
+                    )
                     wp_dicts = [wp.model_dump() for wp in waypoints]
                     for d in wp_dicts:
                         d['divetime'] = d['time_since_start']
@@ -337,7 +355,8 @@ class SubsurfaceParser(BaseParser):
                     for wp in waypoints:
                         res = deco_results.get(wp.time_since_start)
                         if res:
-                            wp.tts = res.tts_seconds
+                            if wp.tts is None:
+                                wp.tts = res.tts_seconds
                             wp.ceiling = res.ceiling_meters
                             if wp.deco_stop_depth is None:
                                 wp.deco_stop_depth = res.ceiling_meters
@@ -356,6 +375,11 @@ class SubsurfaceParser(BaseParser):
                                 wp.next_stop_time = 0
                 except Exception as e:
                     print(f"Warning: Decompression calculation failed for dive: {e}")
+
+                # SAC / GTR the way the computer shows them (utils/gas_consumption.py),
+                # for logs that don't record them - a Shearwater logs pressure only.
+                if not any(getattr(wp, "pressure_sac", None) is not None for wp in waypoints):
+                    fill_sac_and_gtr(waypoints)
 
                 # Cylinders with no live per-sample pressure reading anywhere
                 # in the dive get a start->end linear interpolation over

@@ -149,3 +149,108 @@ def test_list_templates_finds_bundled_generic_dive_profile_deco():
     assert (deco["manufacturer"], deco["model"]) == ("Generic", "Dive Profile Deco")
     state_path = resolve_template_state("generic", "dive_profile_deco", "main")
     assert state_path is not None and state_path.exists()
+
+
+# --- variant overlays: one shared base per page plus per-variant blocks ------
+
+import pytest
+from pathlib import Path
+
+from utils.layouts import (
+    ELEMENT_ORIGIN_KEY,
+    LAYOUT_BASE_KEY,
+    load_layout_file,
+    merge_variant_layout,
+    split_variant_layout,
+    strip_variant_markers,
+)
+
+
+@pytest.mark.parametrize("computer", ["x50i", "mk3i"])
+def test_garmin_main_variants_share_one_base(computer):
+    page = Path("overlays/templates/garmin") / computer / "main"
+    base = json.loads((page / "normal.json").read_text())
+    base_ids = [e["id"] for e in base["hud_skin"]["linked_elements"]]
+    assert len(base_ids) == len(set(base_ids))
+    assert not any(e["field"].startswith(("primary_tank", "secondary_tank")) for e in base["hud_skin"]["linked_elements"])
+    assert (page / "normal.png").exists()
+    merged = {}
+    for variant in ("single_tank", "sidemount"):
+        raw = json.loads((page / variant / "normal.json").read_text())
+        assert raw["base"] == "../normal.json" and "hud_skin" not in raw
+        assert not (page / variant / "normal.png").exists()
+        layout = load_layout_file(page / variant / "normal.json")
+        assert layout[LAYOUT_BASE_KEY] == str((page / "normal.json").resolve())
+        assert layout["hud_skin"]["path"] == "../normal.png"
+        elems = layout["hud_skin"]["linked_elements"]
+        assert [e for e in elems if e[ELEMENT_ORIGIN_KEY] == "base"] == [
+            {**e, ELEMENT_ORIGIN_KEY: "base"} for e in base["hud_skin"]["linked_elements"]
+        ]
+        merged[variant] = elems
+    # the shared elements are literally the same in both variants; only the tank block differs
+    shared = lambda elems: [strip_variant_markers({"hud_skin": {"linked_elements": [e]}})["hud_skin"]["linked_elements"][0]
+                            for e in elems if e[ELEMENT_ORIGIN_KEY] == "base"]
+    assert shared(merged["single_tank"]) == shared(merged["sidemount"])
+    single_block = {e["field"] for e in merged["single_tank"] if e[ELEMENT_ORIGIN_KEY] == "variant"}
+    side_block = {e["field"] for e in merged["sidemount"] if e[ELEMENT_ORIGIN_KEY] == "variant"}
+    assert single_block == {"primary_tank_name", "primary_tank_pressure"}
+    assert {"secondary_tank_name", "secondary_tank_pressure"} <= side_block
+    # a page with variants has no state of its own
+    assert resolve_template_state("garmin", computer, "main") is None
+
+
+def test_flat_state_files_load_unchanged():
+    path = Path("overlays/templates/garmin/x50i/gases/normal.json")
+    assert load_layout_file(path) == json.loads(path.read_text())
+
+
+def _tiny_base():
+    return {
+        "manufacturer": "Garmin", "model": "x", "design_width": 1920, "design_height": 1080,
+        "hud_skin": {"type": "image", "path": "normal.png", "scale": 0.5, "linked_elements": [
+            {"id": "depth", "field": "depth", "rel_x": 0.1, "rel_y": 0.1, "font_size": 20},
+            {"id": "ndl", "field": "ndl", "rel_x": 0.2, "rel_y": 0.2, "font_size": 20},
+        ]},
+    }
+
+
+def test_merge_applies_overrides_removals_and_adds_variant_elements(tmp_path):
+    overlay = {"base": "../normal.json",
+               "linked_elements": [{"id": "tank", "field": "primary_tank_pressure", "rel_x": 0.5, "rel_y": 0.5}],
+               "overrides": {"depth": {"rel_x": 0.15}},
+               "remove": ["ndl"]}
+    merged = merge_variant_layout(_tiny_base(), overlay, tmp_path, tmp_path / "sidemount")
+    elems = merged["hud_skin"]["linked_elements"]
+    assert [(e["id"], e[ELEMENT_ORIGIN_KEY]) for e in elems] == [("depth", "override"), ("tank", "variant")]
+    assert elems[0]["rel_x"] == 0.15 and elems[0]["font_size"] == 20
+    assert merged["hud_skin"]["path"] == "../normal.png"
+    assert merged["hud_skin"]["scale"] == 0.5 and merged["manufacturer"] == "Garmin"
+
+
+def test_split_puts_shared_edits_in_the_base_and_variant_edits_in_the_overlay(tmp_path):
+    base = _tiny_base()
+    overlay = {"base": "../normal.json",
+               "linked_elements": [{"id": "tank", "field": "primary_tank_pressure", "rel_x": 0.5, "rel_y": 0.5}],
+               "overrides": {"depth": {"rel_x": 0.15}}}
+    merged = merge_variant_layout(base, overlay, tmp_path, tmp_path / "sidemount")
+    elems = merged["hud_skin"]["linked_elements"]
+    elems[1]["rel_y"] = 0.25            # ndl (shared) moved -> base
+    elems[0]["rel_y"] = 0.12            # depth (overridden) moved -> overrides gain rel_y, base keeps 0.1
+    elems[2]["rel_x"] = 0.55            # tank (variant) moved -> overlay
+    elems.append({"field": "tts", "rel_x": 0.9, "rel_y": 0.9})  # new while editing -> overlay
+    merged["hud_skin"]["scale"] = 0.6   # skin is shared -> base
+    new_base, new_overlay = split_variant_layout(merged, base)
+    assert LAYOUT_BASE_KEY not in new_base
+    assert new_base["hud_skin"]["scale"] == 0.6
+    assert [e["id"] for e in new_base["hud_skin"]["linked_elements"]] == ["depth", "ndl"]
+    assert new_base["hud_skin"]["linked_elements"][0] == base["hud_skin"]["linked_elements"][0]
+    assert new_base["hud_skin"]["linked_elements"][1]["rel_y"] == 0.25
+    assert new_overlay["overrides"] == {"depth": {"rel_x": 0.15, "rel_y": 0.12}}
+    assert [e.get("id", e["field"]) for e in new_overlay["linked_elements"]] == ["tank", "tts"]
+    assert new_overlay["linked_elements"][0]["rel_x"] == 0.55
+    assert "remove" not in new_overlay
+    assert all(ELEMENT_ORIGIN_KEY not in e for e in new_overlay["linked_elements"])
+
+    del merged["hud_skin"]["linked_elements"][1]  # ndl deleted while editing this variant
+    _, new_overlay = split_variant_layout(merged, base)
+    assert new_overlay["remove"] == ["ndl"]

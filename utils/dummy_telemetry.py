@@ -197,16 +197,17 @@ def apply_state(waypoint: Waypoint, state: str) -> Waypoint:
             "dive_alerts": ["approaching_first_deco_stop"],
         })
     elif state == "clear":
-        # 0.5 m above the 6 m stop: inside Shearwater's 1.0 m "clear" margin,
-        # and Garmin's own deco_stop_cleared alert for the alert-driven path.
+        # Deco just cleared: Garmin's own deco_stop_cleared alert drives the
+        # alert path; a Shearwater badge shows its deco-clear count-up (from
+        # zero here, with no dive around this one waypoint).
         update.update({
-            "depth": 6.5,
+            "depth": 4.5,
             "max_depth": max(waypoint.max_depth, 30.0),
-            "deco_stop_depth": 6.0,
-            "next_stop_depth": 6.0,
-            "next_stop_time": 45,
-            "ndl": None,
-            "tts": 300,
+            "deco_stop_depth": 0.0,
+            "next_stop_depth": 0.0,
+            "next_stop_time": 0,
+            "ndl": 99 * 60,
+            "tts": 30,
             "dive_alerts": ["deco_stop_cleared"],
         })
 

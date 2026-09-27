@@ -1,0 +1,110 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 2",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.75,
+    "linked_elements": [
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.17335,
+        "rel_y": 0.1961,
+        "color": "#FFFFFF",
+        "font_size": 126,
+        "scale": 1.0,
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
+      },
+      {
+        "id": "label_m",
+        "field": "custom:m",
+        "rel_x": 0.33641,
+        "rel_y": 0.29919,
+        "color": "#00ADED",
+        "font_size": 41,
+        "scale": 1.0
+      },
+      {
+        "id": "label_time",
+        "field": "custom:TIME",
+        "rel_x": 0.13965,
+        "rel_y": 0.40273,
+        "color": "#00ADED",
+        "font_size": 36,
+        "scale": 1.0
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.16356,
+        "rel_y": 0.46577,
+        "color": "#FFFFFF",
+        "font_size": 88,
+        "scale": 1.0
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.50895,
+        "rel_y": 0.21331,
+        "font_size": 29,
+        "value_font_size": 63,
+        "scale": 1.0,
+        "depth_unit": "m"
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.59836,
+        "rel_y": 0.41403,
+        "color": "#00ADED",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.59578,
+        "rel_y": 0.47892,
+        "color": "#FFFFFF",
+        "font_size": 87,
+        "scale": 1.0
+      },
+      {
+        "id": "n2_bar",
+        "field": "gf",
+        "type": "tissue_bar",
+        "style": "fill",
+        "rel_x": 0.7355,
+        "rel_y": 0.39588,
+        "width": 35,
+        "height": 145,
+        "marker_size": 3,
+        "outline_color": "#00ADED",
+        "label": "N2 loading"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.405,
+        "rel_y": 0.21,
+        "width": 30,
+        "height": 100,
+        "up_count": 6,
+        "down_count": 0,
+        "bar": false,
+        "label": "Ascent rate (manual p.12)"
+      }
+    ]
+  }
+}

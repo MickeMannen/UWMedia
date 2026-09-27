@@ -70,10 +70,20 @@ class OverlayDocument:
 
     @classmethod
     def load(cls, path: Path, ref: Optional[TemplateRef] = None) -> "OverlayDocument":
+        """A variant overlay file loads as its merged layout (utils.layouts.
+        load_layout_file), tagged so save_template can split it again."""
+        from utils.layouts import load_layout_file
+
         path = Path(path)
-        with open(path) as f:
-            layout = json.load(f)
-        return cls(layout, source_path=path, ref=ref)
+        return cls(load_layout_file(path), source_path=path, ref=ref)
+
+    @property
+    def variant_base_path(self) -> Optional[Path]:
+        """The shared base file when this document is a variant overlay."""
+        from utils.layouts import LAYOUT_BASE_KEY
+
+        raw = self.layout.get(LAYOUT_BASE_KEY)
+        return Path(raw) if raw else None
 
     def _resolve_skin(self) -> None:
         """Absolute skin path (relative paths resolve against the JSON's own

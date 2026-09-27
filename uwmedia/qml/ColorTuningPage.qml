@@ -12,7 +12,7 @@ import QtQuick.Layouts
 ScrollView {
     id: root
     width: 1060
-    height: 720
+    height: 800
     clip: true
     contentWidth: availableWidth
 

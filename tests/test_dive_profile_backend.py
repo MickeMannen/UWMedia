@@ -355,3 +355,65 @@ def test_hover_shows_ceiling_at_both_gfs_and_chart_gets_stop_schedules(settings_
     backend.onScrub(xy_of(25 * 60, 40, 700, 420, backend._axes())[0])
     ceiling = next(r["value"] for r in backend.cursorInfo if r["label"] == "Ceiling")
     assert "(GF 70)" in ceiling and "(GF 30)" in ceiling
+
+
+def _saved_log(tmp_path, fmt="uddf"):
+    from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
+    from parsers.uddf_writer import write_uddf
+    from parsers.fit_writer import write_fit
+    from utils.dive_plan_engine import simulate
+
+    plan = DiveProfilePlan(
+        name="Reopen me", gf_low=35, gf_high=80, sac_lpm=18, computer="Garmin Descent X50i", computer_serial="777",
+        start_time=datetime(2026, 9, 27, 9, 30), dive_type="oc", max_depth_m=25.0, planned_runtime_sec=2400,
+        gases=[PlannedGas(id="Air", gas_type="air", o2_percent=21.0, start_pressure_bar=210)],
+        waypoints=[PlannedWaypoint(runtime_sec=90, depth_m=20.0, gas_id="Air"),
+                   PlannedWaypoint(runtime_sec=1500, depth_m=20.0, gas_id="Air"),
+                   PlannedWaypoint(runtime_sec=1800, depth_m=0.0, gas_id="Air")],
+    )
+    samples, _ = simulate(plan, resolution_sec=1)
+    path = tmp_path / f"reopen.{fmt}"
+    (write_fit if fmt == "fit" else write_uddf)(plan, samples, path)
+    return plan, path
+
+
+def test_open_log_restores_the_saved_plan_and_the_settings_texts(settings_file, tmp_path):
+    plan, path = _saved_log(tmp_path)
+    backend = DiveProfileBackend()
+    message = backend.load_log(path)
+    assert "restored as saved" in message
+    assert backend.dive_plan.model_dump() == plan.model_dump()
+    assert backend.nameText == "Reopen me"
+    assert (backend.gfLowText, backend.gfHighText) == ("35", "80")
+    assert backend.sacText == "18"
+    assert backend.computerLabel == "Garmin Descent X50i"
+    assert backend.serialText == "777"
+    assert backend.startTimeText == "2026-09-27 09:30"
+    assert backend.maxDepthText == "25"
+    assert len(backend.waypointRows) == 3
+    assert len(backend.gasTableRows) == 1
+    assert backend.dive_profile_samples  # resimulated
+    # the settings pane's values are remembered like typed ones
+    fields = json.loads(settings_file.read_text())["fields"]
+    assert (fields[GF_LOW_FIELD], fields[GF_HIGH_FIELD]) == (35, 80)
+    assert fields["dive_profile_computer"] == "Garmin Descent X50i"
+
+
+def test_open_log_refuses_logs_uwmedia_did_not_write(settings_file):
+    backend = DiveProfileBackend()
+    before = backend.dive_plan.model_dump()
+    with pytest.raises(ValueError, match="not written by UWMedia"):
+        backend.load_log("test_data/logs/fit/489 Camera Bay_new.fit")
+    with pytest.raises(ValueError, match="not written by UWMedia"):
+        backend.load_log("test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf")
+    assert backend.dive_plan.model_dump() == before
+
+
+def test_open_log_rebuilds_an_older_uddf_without_embedded_plan(settings_file):
+    backend = DiveProfileBackend()
+    message = backend.load_log("test_data/logs/DecoTest.uddf")
+    assert "rebuilt" in message
+    assert backend.computerLabel == "Garmin Descent X50i"
+    assert backend.dive_plan.dive_type == "sidemount"
+    assert backend.waypointRows
+    assert backend.dive_profile_samples

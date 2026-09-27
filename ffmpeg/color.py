@@ -24,6 +24,32 @@ SAMPLE_SECONDS = 2
 # Option 2: Adaptive Highlight Damping to prevent spotlight/flashlight oversaturation
 ENABLE_ADAPTIVE_DAMPING = False
 
+def hud_bypass_filter_complex(color_vf: str) -> str:
+    """FFmpeg filter graph for process_video's colour-corrected HUD runs:
+    input 0 is piped BGRA (hud_marked_bgra) - the frame with the HUD drawn
+    on, alpha 255 where the HUD is. The colour correction (`color_vf`, the
+    lut3d chain) runs on the RGB, then maskedmerge takes the *uncorrected*
+    pixels back wherever the alpha says HUD - the dive computer's bezel and
+    text keep their own colours instead of the underwater red boost."""
+    return (
+        "[0:v]format=rgba,split=2[src][keep];"
+        f"[src]format=gbrp,{color_vf}[corr];"
+        "[keep]alphaextract,format=gray,format=gbrp[mask];"
+        "[keep]format=gbrp[orig];"
+        "[corr][orig][mask]maskedmerge[out]"
+    )
+
+
+def hud_marked_bgra(frame: np.ndarray, before: np.ndarray) -> np.ndarray:
+    """`frame` (BGR, HUD drawn on) as BGRA whose alpha is 255 wherever it
+    differs from `before` (the same frame before the HUD) - the HUD mask
+    hud_bypass_filter_complex() keys on."""
+    bgra = np.empty((frame.shape[0], frame.shape[1], 4), dtype=np.uint8)
+    bgra[:, :, :3] = frame
+    bgra[:, :, 3] = np.any(frame != before, axis=2).astype(np.uint8) * 255
+    return bgra
+
+
 class ColorCorrectionEngine:
     """
     Underwater Color Correction Engine.
@@ -813,11 +839,19 @@ class ColorCorrectionEngine:
             lut_dir = Path(tempfile.mkdtemp(prefix='uwmedia_lut_'))
             color_vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, lut_dir)
 
+        # The HUD must not be colour-corrected: the lut3d filter runs on the
+        # piped, already-composited frame, so a neutral bezel (Garmin X50i)
+        # came out red-tinted by the underwater correction (2026-09-27, per
+        # the user). With both a LUT and a HUD, the frames are piped as BGRA
+        # whose alpha marks the HUD's pixels, and hud_bypass_filter_complex()
+        # puts the uncorrected pixels back over the corrected frame.
+        hud_bypass = bool(color_vf) and bool((layout or overlay_layouts) and dive)
+
         # Build FFmpeg pipe
         cmd = [
             str(self.ffmpeg_tool.get_path()), '-y',
             '-f', 'rawvideo', '-vcodec', 'rawvideo',
-            '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
+            '-s', f'{width}x{height}', '-pix_fmt', 'bgra' if hud_bypass else 'bgr24', '-r', str(fps),
             '-i', '-',
             '-i', str(input_path)
         ]
@@ -825,10 +859,12 @@ class ColorCorrectionEngine:
         if not self.ffmpeg_tool.debug:
             cmd.extend(["-nostats", "-loglevel", "error"])
 
-        if color_vf:
-            cmd.extend(['-vf', color_vf])
-
-        cmd.extend(['-map', '0:v', '-map', '1:a?'])
+        if hud_bypass:
+            cmd.extend(['-filter_complex', hud_bypass_filter_complex(color_vf), '-map', '[out]', '-map', '1:a?'])
+        else:
+            if color_vf:
+                cmd.extend(['-vf', color_vf])
+            cmd.extend(['-map', '0:v', '-map', '1:a?'])
         
         try:
             bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
@@ -916,6 +952,7 @@ class ColorCorrectionEngine:
                     # layout and multi-overlay layers composite onto the
                     # same frame in order - last in overlay_layouts draws on
                     # top, matching Pass 2's confirmed z-order rule.
+                    before = frame.copy() if hud_bypass else None
                     if hud_draw_func and dive:
                         elapsed_total = frame_idx / fps
                         current_time = creation_date + timedelta(seconds=elapsed_total)
@@ -929,6 +966,11 @@ class ColorCorrectionEngine:
                                 hud_draw_func(frame, layer_layout, wp,
                                               preloaded_skin=layer_skin,
                                               waypoints=dive.waypoints)
+
+                    if hud_bypass:
+                        # BGRA: alpha 255 wherever the HUD touched the frame,
+                        # so the filter graph keeps those pixels uncorrected
+                        frame = hud_marked_bgra(frame, before)
 
                     # Pre-serialize to bytes (avoids doing it in the write thread)
                     process_q.put(frame.tobytes())

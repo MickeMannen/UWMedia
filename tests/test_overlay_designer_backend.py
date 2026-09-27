@@ -86,12 +86,12 @@ def test_variant_combo_lists_page_variants_and_overrides_auto_pick():
     app = OverlayDesignerBackend()
     _select_garmin_x50i_main(app)
     assert app.variantVisible is True
-    assert app.variantList == ["Sidemount", "Single Tank"]
-    assert app.variantIndex == 1  # auto-picked single_tank
+    assert app.variantList == ["Single tank", "Sidemount"]
+    assert app.variantIndex == 0  # auto-picked single_tank
 
     app.onVariantSelected("Sidemount")
     assert app.document.ref.variant == "sidemount"
-    assert app.variantIndex == 0
+    assert app.variantIndex == 1
     # the dummy dive follows the variant so the second tank renders
     assert all(len(w.tanks) == 2 for w in app.dummy_dive.waypoints)
 
@@ -471,6 +471,26 @@ def test_custom_label_text_and_field_changes():
     assert "temp" in app.availableFields and "state_badge" in app.availableFields and "timestamp" not in app.availableFields
 
 
+def test_add_depth_with_small_decimals_preset():
+    # "depth_small_decimals" is an Add-popup preset, not a field: it adds a
+    # plain "depth" element with the Garmin/Shearwater small-decimal style
+    app = _perdix_at_100(OverlayDesignerBackend())
+    fields = app.addableFields
+    assert fields.index("depth_small_decimals") == fields.index("depth") + 1
+    assert "depth_small_decimals" not in app.availableFields  # the inspector's Field combo stays real fields
+    app.addElement("depth_small_decimals", "text")
+    elem = app.document.elements[app.selectedIndex]
+    assert elem["field"] == "depth" and elem["small_suffix"] == "decimals"
+    assert app.selectedElement["small_suffix"] == "decimals"
+    app.addElement("depth", "text")
+    assert "small_suffix" not in app.document.elements[app.selectedIndex]
+    # dive time likewise, with the seconds small
+    assert fields.index("dive_time_small_seconds") == fields.index("dive_time") + 1
+    app.addElement("dive_time_small_seconds", "text")
+    elem = app.document.elements[app.selectedIndex]
+    assert elem["field"] == "dive_time" and elem["small_suffix"] == "seconds"
+
+
 def test_add_remove_duplicate_reorder_through_backend():
     app = _perdix_at_100(OverlayDesignerBackend())
     n = len(app.elements)
@@ -539,9 +559,9 @@ def test_skin_attr_edits_anchor_by_display_name_and_scale_refits():
 
 def test_replace_skin_image_updates_native_size_and_canvas():
     app = _perdix_at_100(OverlayDesignerBackend())
-    other = Path("overlays/templates/garmin/x50i/main/single_tank/normal.png").resolve()
+    other = Path("overlays/templates/garmin/x50i/main/normal.png").resolve()
     assert app._replace_skin_image_from_path(other) is True
-    assert app.skinAttrs["native_width"] == 473 and (app.canvasDisplayWidth, app.canvasDisplayHeight) == (473, 301)
+    assert app.skinAttrs["native_width"] == 946 and (app.canvasDisplayWidth, app.canvasDisplayHeight) == (946, 602)  # the x50i 2× bezel
     assert app.isDirty
     assert app._replace_skin_image_from_path(Path("nope.png")) is False
 
@@ -635,9 +655,15 @@ def test_dev_mode_saves_bundled_page_into_repo_tree(isolated_template_roots):
     app.selectElement(0)
     app.setSelectedAttr("align", "right")
     assert app.save() is True and not app.isDirty
-    saved = json.loads((roots["bundled"] / "shearwater" / "perdix_2" / "main" / "single_tank" / "normal.json").read_text())
+    # The Perdix 2 main page is a shared base + variant overlays: element 0
+    # (the depth) is shared, so the edit lands in the base and the variant
+    # file stays an overlay.
+    page = roots["bundled"] / "shearwater" / "perdix_2" / "main"
+    saved = json.loads((page / "normal.json").read_text())
     assert saved["hud_skin"]["linked_elements"][0]["align"] == "right"
     assert saved["hud_skin"]["path"] == "normal.png"
+    overlay = json.loads((page / "single_tank" / "normal.json").read_text())
+    assert overlay["base"] == "../normal.json" and "hud_skin" not in overlay
     assert list(roots["user"].iterdir()) == []
 
 
@@ -1018,11 +1044,12 @@ def test_align_moves_others_onto_the_primary_element():
 
 def test_resize_selected_scales_fonts_and_icon_geometry():
     app = _perdix_at_100(OverlayDesignerBackend())
-    app.selectElement(0)  # depth, font 112
+    app.selectElement(0)  # depth - the template's own size, +5 % and back
+    font = app.document.elements[0]["font_size"]
     app.resizeSelected(1)
-    assert app.document.elements[0]["font_size"] == 118
+    assert app.document.elements[0]["font_size"] == round(font * 1.05)
     app.resizeSelected(-1)
-    assert app.document.elements[0]["font_size"] == 112
+    assert app.document.elements[0]["font_size"] == font
     icon = next(i for i, e in enumerate(app.document.elements) if e.get("type") == "tank_icon")
     app.selectElement(icon)
     w, h = app.document.elements[icon]["width"], app.document.elements[icon]["height"]  # 19 x 34
@@ -1035,7 +1062,7 @@ def test_resize_selected_scales_fonts_and_icon_geometry():
     assert len(app.document._undo) == steps
     app.selectElement(0); app.toggleElement(icon)
     app.resizeSelected(2)
-    assert app.document.elements[0]["font_size"] == round(112 * 1.05 ** 2)
+    assert app.document.elements[0]["font_size"] == round(font * 1.05 ** 2)
 
 
 def test_small_suffix_inspector_attribute_round_trip():
@@ -1208,3 +1235,40 @@ def test_graph_deco_options_are_edited_through_the_inspector():
     elem = app.document.element(app.selectedIndex)
     assert "stops_color" not in elem and "reveal_profile" not in elem
     assert app.selectedElement["stops_color"] == "#FFA500"  # what switching it back on starts from
+
+
+def test_add_ascent_chevrons_takes_the_brand_shape():
+    # Perdix: six arrows, no divider bar (hud_rules.json ascent_chevrons);
+    # the Garmin x50i keeps the element_defaults (4 over a bar, 1 below)
+    app = _perdix_at_100(OverlayDesignerBackend())
+    app.addElement("x", "ascent_chevrons")
+    elem = app.document.elements[app.selectedIndex]
+    assert elem["up_count"] == 6 and elem["down_count"] == 0 and elem["bar"] is False
+    assert app.selectedElement["bar"] is False
+    app.setSelectedAttr("bar", True)
+    assert "bar" not in app.document.elements[app.selectedIndex]  # True is the absent default
+
+
+def test_graph_shading_colour_and_opacity_round_trip_through_the_inspector():
+    app = _perdix_at_100(OverlayDesignerBackend())
+    app.addElement("anything", "graph")
+    sel = app.selectedElement
+    assert (sel["fill_color"], sel["fill_opacity"], sel["ceiling_opacity"], sel["stops_opacity"]) == ("#00FF00", 0.15, 0.45, 0.5)
+    app.setSelectedAttr("fill_color", "#123456")
+    app.setSelectedAttr("fill_opacity", "0.05")
+    app.setSelectedAttr("ceiling_opacity", "2")       # clamped to 1
+    app.setSelectedAttr("stops_opacity", "-1")        # clamped to 0
+    elem = app.document.element(app.selectedIndex)
+    assert (elem["fill_color"], elem["fill_opacity"], elem["ceiling_opacity"], elem["stops_opacity"]) == ("#123456", 0.05, 1.0, 0.0)
+    app.setSelectedAttr("deco_stops", True)
+    assert app.selectedElement["ceiling_opacity"] == 1.0  # the element's own value, whatever the mode
+
+
+def test_graph_box_colour_and_opacity_round_trip():
+    app = _perdix_at_100(OverlayDesignerBackend())
+    app.addElement("anything", "graph")
+    assert (app.selectedElement["background_color"], app.selectedElement["background_opacity"]) == ("#000000", 0.4)
+    app.setSelectedAttr("background_color", "#202030")
+    app.setSelectedAttr("background_opacity", "0.15")
+    elem = app.document.element(app.selectedIndex)
+    assert (elem["background_color"], elem["background_opacity"]) == ("#202030", 0.15)

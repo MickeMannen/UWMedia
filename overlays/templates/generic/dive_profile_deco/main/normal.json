@@ -22,7 +22,6 @@
         "color": "#4FC3F7",
         "ceiling_color": "#FF3B30",
         "stops_color": "#FFA500",
-        "reveal_profile": true,
         "stop_label": true,
         "font_size": 22,
         "marker_style": "dot",

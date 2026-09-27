@@ -25,7 +25,11 @@ python cli_main.py ./raw/ ./out/ --logs ./dive_logs/ --layout skins/perdix.zip -
 # Telemetry-only overlays for every file in a folder, matched to the logs by time
 python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --logs ./dive_logs/
 
-# Telemetry-only video straight from one log (size follows the layout)
+# ...at 2x for 4K footage, or as whole 3840x2160 frames with the overlay already placed
+python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --logs ./dive_logs/ --overlay-size 4k
+python cli_main.py ./raw/ ./out/ --render-video-log --layout skins/perdix.zip --logs ./dive_logs/ --overlay-size 4k --overlay-full-frame
+
+# Telemetry-only video straight from one log (the template's 1080p size unless --overlay-size says otherwise)
 python cli_main.py --render-log dive_log.fit --layout perdix_layout.json
 
 # ...only the first 100 samples, for quick tests
@@ -57,6 +61,8 @@ python cli_main.py ./raw/ --force-media-tz +8 --fix-tz
 | `--overlays-file FILE` | JSON list `[{layout_path, x, y, scale}, …]` of several overlays composited onto one colour-correction run (what the Color page does). Each `layout_path` must be a JSON layout, not a ZIP. |
 | `--render-log LOG [N]` | Telemetry-only video from one log (needs `--layout`). Optional `N` renders only the first N samples. An FCPXML `.xml` is written next to the video for direct import into Final Cut Pro. |
 | `--render-video-log` | Telemetry-only video/photo on a black background for every file in `source`, matched to the logs by time (needs `--layout` and `--logs`). |
+| `--overlay-size {1080p,4k}` | Size of telemetry-only renders: `1080p` (default) is the template's size in its 1920×1080 design frame, `4k` twice that for 4K footage. |
+| `--overlay-full-frame` | Render telemetry-only videos/photos as the whole frame (1920×1080, or 3840×2160 with `4k`) with the overlay placed as the layout anchors it. |
 | `--render-log-filename-format T` | Output names for `--render-video-log`. Tokens: `{filename}` (source name), `{hud}` (layout name), `{datetaken:%Y%m%d_%H%M%S}` (date taken). |
 | `--export-json DIR` | Parse every log in `DIR` and write it as JSON next to it. |
 | `--create-config` | Scan the log folder for Garmin tank sensors and create `config.yaml` (sensor names). |
@@ -66,7 +72,7 @@ python cli_main.py ./raw/ --force-media-tz +8 --fix-tz
 
 | Option | Meaning |
 |---|---|
-| `--filename-format T` | Output name from the date taken, `strftime` codes, e.g. `"%Y%m%d_%H%M%S_Bali"`. |
+| `--filename-format T` | Output name from the date taken, `strftime` codes, e.g. `"%Y%m%d_%H%M%S_Bali"`; `{filename}` is the source name, e.g. `"{filename}_color"`. |
 | `--keep-filename` | Keep the source file's name (extension lower-cased). Can't be combined with `--filename-format`. |
 | `--no-overwrite` | Skip files whose output already exists. |
 | `--overwrite` | Replace an existing output instead of adding `_1`, `_2` … |

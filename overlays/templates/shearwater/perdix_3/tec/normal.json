@@ -43,11 +43,15 @@
       {
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.6388,
-        "rel_y": 0.1662,
-        "font_size": 13,
-        "value_font_size": 18,
-        "scale": 1.0
+        "rel_x": 0.6438,
+        "rel_y": 0.2733,
+        "font_size": 26,
+        "value_font_size": 40,
+        "scale": 1.0,
+        "depth_unit": "m",
+        "outline": false,
+        "title_box": false,
+        "label": "Deco (replaces NDL)"
       },
       {
         "field": "custom:NDL",
@@ -55,7 +59,12 @@
         "rel_y": 0.2733,
         "color": "#00ADED",
         "font_size": 22,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "field": "ndl",
@@ -63,7 +72,12 @@
         "rel_y": 0.3189,
         "color": "#FFFFFF",
         "font_size": 28,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "field": "custom:MAX",
