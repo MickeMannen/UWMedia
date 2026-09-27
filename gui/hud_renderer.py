@@ -335,6 +335,84 @@ def overlay_pixel_bbox(layout, x, y, scale, frame_w, frame_h, preloaded_skin=Non
     skin_y = int(y * frame_h)
     return (skin_x, skin_y, skin_x + w_hud, skin_y + h_hud)
 
+def _hex_to_bgr(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i + 2], 16) for i in (4, 2, 0))
+
+
+def stop_depth_of(waypoint):
+    """The deco stop a waypoint is logged at, on 3 m levels - the logged
+    next stop, else the stop depth rounded up to a level. 0 out of deco."""
+    depth = getattr(waypoint, "next_stop_depth", None) or 0.0
+    if depth <= 0:
+        logged = getattr(waypoint, "deco_stop_depth", None) or 0.0
+        depth = math.ceil(logged / 3.0 - 1e-9) * 3.0 if logged > 0 else 0.0
+    return depth
+
+
+def graph_stop_label(waypoint):
+    """(text, in_deco) for a graph's stop label - 'STOP 6m 2:00' in deco,
+    'NDL 12' otherwise - or None when the waypoint has neither."""
+    if waypoint is None:
+        return None
+    stop = stop_depth_of(waypoint)
+    if stop > 0:
+        seconds = getattr(waypoint, "next_stop_time", None)
+        return f"STOP {stop:g}m" + (f" {seconds // 60}:{seconds % 60:02d}" if seconds else ""), True
+    ndl = getattr(waypoint, "ndl", None)
+    if ndl is not None:
+        return f"NDL {ndl // 60}", False
+    return None
+
+
+def _graph_geometry(elem, waypoints, skin_info):
+    """Where a graph element sits and how it maps (time, depth) to frame
+    pixels - shared by draw_depth_graph and its stop label, which is drawn
+    in the later PIL text pass. None with fewer than two waypoints."""
+    if not waypoints or len(waypoints) < 2:
+        return None
+    user_scale = skin_info.get('user_scale', 1.0)
+    res_scale = skin_info['res_scale']
+    graph_w = int(elem.get("width", 300) * user_scale * res_scale)
+    graph_h = int(elem.get("height", 150) * user_scale * res_scale)
+    abs_x = int(skin_info['x'] + (elem.get("rel_x", 0.0) * skin_info['w']))
+    abs_y = int(skin_info['y'] + (elem.get("rel_y", 0.0) * skin_info['h']))
+    max_d = max((wp.depth or 0.0) for wp in waypoints)
+    max_d = (max_d if max_d > 0 else 1.0) * 1.1
+    t0 = waypoints[0].time_since_start
+    total_t = (waypoints[-1].time_since_start - t0) or 1
+
+    def x_for_time(t):
+        return abs_x + min(1.0, max(0.0, (t - t0) / total_t)) * graph_w
+
+    def y_for_depth(d):
+        return int(abs_y + d * graph_h / max_d)
+
+    return abs_x, abs_y, graph_w, graph_h, x_for_time, y_for_depth
+
+
+def draw_graph_stop_label(draw, elem, waypoint, waypoints, skin_info):
+    """A graph's optional stop_label: the current stop (or NDL) as text next
+    to the playback cursor, in the stops colour while in deco."""
+    geometry = _graph_geometry(elem, waypoints, skin_info)
+    label = graph_stop_label(waypoint)
+    if geometry is None or label is None:
+        return
+    abs_x, abs_y, graph_w, graph_h, x_for_time, y_for_depth = geometry
+    text, in_deco = label
+    scale = skin_info['res_scale'] * skin_info.get('user_scale', 1.0)
+    font = get_font(max(1, int(elem.get("font_size", 16) * scale)), elem.get("font_family"), elem.get("font_weight"))
+    color = elem.get("stops_color") if in_deco and elem.get("stops_color") else elem.get("color", "#00FF00")
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    pad = int(6 * scale)
+    x = x_for_time(waypoint.time_since_start) + pad
+    if x + (right - left) > abs_x + graph_w:  # flip to the cursor's left near the end
+        x = x_for_time(waypoint.time_since_start) - pad - (right - left)
+    y = min(max(abs_y, y_for_depth(waypoint.depth or 0.0) - (bottom - top) - pad), abs_y + graph_h - (bottom - top))
+    draw.text((x - left, y - top), text, font=font, fill=color,
+              stroke_width=max(1, int(2 * scale)), stroke_fill="#000000")
+
+
 def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
     skin_x = skin_info['x']
     skin_y = skin_info['y']
@@ -396,15 +474,23 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
     def y_for_depth(d):
         return int(abs_y + d * dy)
 
+    # reveal_profile: the line and fill only run up to the playback
+    # position, so the dive draws itself as the video plays (the axes still
+    # span the whole dive, so nothing rescales on the way).
+    reveal_t = waypoint.time_since_start if waypoint is not None else None
+    shown = waypoints
+    if elem.get("reveal_profile") and reveal_t is not None:
+        shown = [wp for wp in waypoints if wp.time_since_start <= reveal_t] or waypoints[:1]
+
     # Fill path
     fill_overlay = frame.copy()
     pts = []
     pts.append([abs_x, abs_y])
-    for i in range(n_wps):
-        x = int(x_for_time(waypoints[i].time_since_start))
-        y = y_for_depth(waypoints[i].depth)
+    for wp_i in shown:
+        x = int(x_for_time(wp_i.time_since_start))
+        y = y_for_depth(wp_i.depth)
         pts.append([x, y])
-    pts.append([abs_x + graph_w, abs_y])
+    pts.append([int(x_for_time(shown[-1].time_since_start)), abs_y])
 
     pts = np.array(pts, dtype=np.int32)
     cv2.fillPoly(fill_overlay, [pts], color_bgr)
@@ -418,8 +504,9 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
     # waypoint's own logged ceiling value and nothing already drawn is ever
     # erased, a stop's shaded patch is permanent once revealed even after it
     # clears and the diver moves on to a shallower one.
-    if waypoint is not None:
-        reveal_t = waypoint.time_since_start
+    if waypoint is not None and elem.get("stops_color"):
+        _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth, abs_y)
+    elif waypoint is not None:
         ceiling_hex = elem.get("ceiling_color", "#808080").lstrip('#')
         ceiling_bgr = tuple(int(ceiling_hex[i:i + 2], 16) for i in (4, 2, 0))
         ceiling_overlay = frame.copy()
@@ -443,9 +530,9 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
 
     # Outline line
     line_pts = []
-    for i in range(n_wps):
-        x = int(x_for_time(waypoints[i].time_since_start))
-        y = y_for_depth(waypoints[i].depth)
+    for wp_i in shown:
+        x = int(x_for_time(wp_i.time_since_start))
+        y = y_for_depth(wp_i.depth)
         line_pts.append([x, y])
     line_pts = np.array(line_pts, dtype=np.int32)
     cv2.polylines(frame, [line_pts], False, color_bgr, int(2 * res_scale))
@@ -479,17 +566,57 @@ def draw_depth_graph(frame, elem, waypoint, waypoints, skin_info):
             cv2.line(frame, (curr_x - scaled_size, curr_y), (curr_x + scaled_size, curr_y), color_bgr, thickness)
             cv2.line(frame, (curr_x, curr_y - scaled_size), (curr_x, curr_y + scaled_size), color_bgr, thickness)
 
-def badge_lines(manufacturer, model, elem, waypoint):
+def _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth, abs_y):
+    """A graph with stops_color: the deco stops and the ceiling as two
+    separate shaded areas, both revealed up to the playback position and
+    never erased afterwards - so every stop the dive picked up stays on the
+    graph once it clears. Stops (stop_depth_of) are a stepped area from the
+    surface down to each stop level in stops_color; the recomputed ceiling
+    (Waypoint.ceiling, GF high) a smooth area on top in ceiling_color."""
+    stops_bgr = _hex_to_bgr(elem.get("stops_color"))
+    ceiling_bgr = _hex_to_bgr(elem.get("ceiling_color", "#808080"))
+    revealed = [wp for wp in waypoints if wp.time_since_start <= reveal_t]
+    if not revealed:
+        return
+
+    stops_overlay = frame.copy()
+    any_stop = False
+    for i, wp_i in enumerate(revealed):
+        stop = stop_depth_of(wp_i)
+        if stop <= 0:
+            continue
+        next_t = waypoints[i + 1].time_since_start if i + 1 < len(waypoints) else reveal_t
+        x_start = int(x_for_time(wp_i.time_since_start))
+        x_end = max(x_start + 1, int(x_for_time(min(next_t, reveal_t))))
+        cv2.rectangle(stops_overlay, (x_start, abs_y), (x_end, y_for_depth(stop)), stops_bgr, -1)
+        any_stop = True
+    if any_stop:
+        cv2.addWeighted(stops_overlay, 0.5, frame, 0.5, 0, frame)
+
+    if any((wp_i.ceiling or 0) > 0 for wp_i in revealed):
+        pts = [[int(x_for_time(revealed[0].time_since_start)), abs_y]]
+        pts += [[int(x_for_time(wp_i.time_since_start)), y_for_depth(wp_i.ceiling or 0.0)] for wp_i in revealed]
+        pts.append([int(x_for_time(revealed[-1].time_since_start)), abs_y])
+        ceiling_overlay = frame.copy()
+        cv2.fillPoly(ceiling_overlay, [np.array(pts, dtype=np.int32)], ceiling_bgr)
+        cv2.addWeighted(ceiling_overlay, 0.4, frame, 0.6, 0, frame)
+
+
+def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     """The (text, color_rgb, is_value) lines a state badge renders for this
     waypoint - None when nothing is drawn ('normal' state, no badge config,
     no waypoint). Shared by _draw_state_badge and the Overlay Designer's
-    hit-testing. See rework_hud.md's "State rendering" section."""
-    from utils.hud_rules_engine import resolve_state, get_badge_config, resolve_blink_color
+    hit-testing. See rework_hud.md's "State rendering" section. `waypoints`
+    (the whole dive) enables the timed safety stop (safety_stop_timeline):
+    its stop depth and countdown instead of the waypoint's deco-stop fields."""
+    from utils.hud_rules_engine import (
+        resolve_state, get_badge_config, resolve_blink_color, get_rule_config, safety_stop_status,
+    )
 
     if waypoint is None:
         return None
 
-    state = resolve_state(manufacturer, model, waypoint)
+    state = resolve_state(manufacturer, model, waypoint, waypoints)
     if state == "normal":
         return None
 
@@ -509,19 +636,57 @@ def badge_lines(manufacturer, model, elem, waypoint):
     lines = [(badge.get("label", state.upper()), label_rgb, False)]
 
     depth_val = getattr(waypoint, "next_stop_depth", None)
+    timer_val = getattr(waypoint, "next_stop_time", None)
+    status = safety_stop_status(manufacturer, model, waypoint, waypoints) if state == "safety_stop" else None
+    if status is not None:
+        depth_val = (get_rule_config(manufacturer, model, "safety_stop") or {}).get("stop_depth", 5.0)
+        timer_val = status[1]
     if depth_val:
         depth_color_hex = label_color_hex
         if badge.get("blink_depth"):
             elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
             depth_color_hex = resolve_blink_color(label_color_hex, "#FF0000", elapsed)
         depth_rgb = tuple(int(depth_color_hex.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
-        lines.append((f"↑{depth_val:.0f}", depth_rgb, True))
+        lines.append((f"↑{depth_val:.0f}{elem.get('depth_unit', '')}", depth_rgb, True))
 
-    timer_val = getattr(waypoint, "next_stop_time", None)
     if timer_val is not None:
         mins, secs = divmod(max(0, int(timer_val)), 60)
-        lines.append((f"{mins:02d}:{secs:02d}", label_rgb, True))
+        timer_text = f"{mins}:{secs:02d}" if elem.get("style") == "box" else f"{mins:02d}:{secs:02d}"
+        lines.append((timer_text, label_rgb, True))
     return lines
+
+
+def badge_box_size(elem, user_scale, res_scale, render_log):
+    """(w, h) final pixel size of a `style: "box"` badge."""
+    scale = user_scale if render_log else user_scale * res_scale
+    return max(1, int(elem.get("width", 80) * scale)), max(1, int(elem.get("height", 44) * scale))
+
+
+def _draw_badge_box(draw, elem, lines, state, abs_x, abs_y, label_size, value_size, box_w, box_h, scale):
+    """Garmin Descent-style stop box (X50i manual p.10): a filled rounded
+    box in the state's colour replacing the NDL field - the label and
+    "↑depth" on the top row, the stop timer large underneath, in dark text.
+    `fill_colors` on the element overrides the badge colour per state."""
+    fill_hex = (elem.get("fill_colors") or {}).get(state)
+    fill = tuple(int(fill_hex.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)) if fill_hex else lines[0][1]
+    text_rgb = tuple(int(elem.get("text_color", "#000000").lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+    radius = max(1, int(elem.get("corner_radius", 4) * scale))
+    draw.rounded_rectangle([abs_x, abs_y, abs_x + box_w, abs_y + box_h], radius=radius, fill=fill)
+
+    family, weight = elem.get("font_family"), elem.get("font_weight")
+    label_font = get_font(label_size, family, weight)
+    value_font = get_font(value_size, family, weight)
+    pad = max(1, int(elem.get("padding", 4) * scale))
+    top_row = [text for text, _, is_value in lines if not is_value or text.startswith("↑")]
+    timer = next((text for text, _, is_value in lines if is_value and not text.startswith("↑")), None)
+
+    top_text = "  ".join(top_row)
+    draw.text((abs_x + pad, abs_y + pad), top_text, font=label_font, fill=text_rgb)
+    if timer:
+        left, top, right, bottom = value_font.getbbox(timer)
+        x = abs_x + (box_w - (right - left)) / 2 - left
+        y = abs_y + box_h - pad - bottom
+        draw.text((x, y), timer, font=value_font, fill=text_rgb)
 
 def badge_line_sizes(elem, user_scale, res_scale, render_log):
     """(label_px, value_px) final pixel sizes of a badge's two font tiers."""
@@ -535,11 +700,11 @@ def badge_line_sizes(elem, user_scale, res_scale, render_log):
 
     return _scaled(base_font_size), _scaled(base_value_font_size)
 
-def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
+def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log, waypoints=None):
     """Renders a compound label + ceiling-depth + countdown-timer badge for the
     waypoint's resolved safety_stop/deco state - see rework_hud.md's "State rendering"
     section. Draws nothing for 'normal' state or when no badge_states config exists."""
-    lines = badge_lines(manufacturer, model, elem, waypoint)
+    lines = badge_lines(manufacturer, model, elem, waypoint, waypoints)
     if not lines:
         return
 
@@ -549,6 +714,13 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
     abs_y = int(skin_y + (rel_y * h_scaled))
 
     label_size, value_size = badge_line_sizes(elem, user_scale, res_scale, render_log)
+    if elem.get("style") == "box":
+        from utils.hud_rules_engine import resolve_state
+        box_w, box_h = badge_box_size(elem, user_scale, res_scale, render_log)
+        scale = user_scale if render_log else user_scale * res_scale
+        state = resolve_state(manufacturer, model, waypoint, waypoints)
+        _draw_badge_box(draw, elem, lines, state, abs_x, abs_y, label_size, value_size, box_w, box_h, scale)
+        return
     family, weight = elem.get("font_family"), elem.get("font_weight")
     label_font = get_font(label_size, family, weight)
     value_font = get_font(value_size, family, weight)
@@ -1023,15 +1195,26 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(pil_img)
 
+    # `hide_in_states` elements (e.g. the NDL a stop box replaces) step aside
+    # while the HUD is in one of those states.
+    hud_state = None
+    if any(elem.get("hide_in_states") for elem in linked_elements):
+        from utils.hud_rules_engine import resolve_state
+        hud_state = resolve_state(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints)
+
     for elem in linked_elements:
         field = elem.get("field", "")
+        if hud_state is not None and hud_state in (elem.get("hide_in_states") or ()):
+            continue
         if elem.get("type") == "graph" or field == "depth_graph":
+            if elem.get("stop_label"):
+                draw_graph_stop_label(draw, elem, waypoint, waypoints, skin_info)
             continue
 
         if elem.get("type") == "badge":
             manufacturer = rules_manufacturer(layout)
             model = layout.get("model", "Perdix2")
-            _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
+            _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log, waypoints)
             continue
 
         if elem.get("type") == "tank_icon":

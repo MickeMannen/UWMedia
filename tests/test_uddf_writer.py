@@ -64,3 +64,21 @@ def test_round_trip_write_and_parse(tmp_path):
 def test_write_uddf_requires_samples(tmp_path):
     with pytest.raises(ValueError):
         write_uddf(_deco_plan(), [], tmp_path / "empty.uddf")
+
+
+def test_uddf_writes_tank_volume(tmp_path):
+    from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
+    from parsers.uddf_writer import write_uddf
+    from utils.dive_plan_engine import simulate
+
+    plan = DiveProfilePlan(
+        gases=[PlannedGas(id="Air", tank_size_l=12.0, start_pressure_bar=232.0)],
+        waypoints=[PlannedWaypoint(runtime_sec=120, depth_m=10, gas_id="Air"),
+                   PlannedWaypoint(runtime_sec=600, depth_m=0, gas_id="Air")],
+    )
+    samples, _ = simulate(plan, resolution_sec=10)
+    out = tmp_path / "t.uddf"
+    write_uddf(plan, samples, out)
+    text = out.read_text()
+    assert "<tankvolume>0.012</tankvolume>" in text
+    assert "<tankpressurebegin>23200000</tankpressurebegin>" in text

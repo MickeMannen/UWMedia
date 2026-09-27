@@ -43,7 +43,14 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from parsers.garmin import GarminParser
-from utils.app_settings import add_unique, get_fields, set_field, update_settings
+from utils.app_settings import get_fields, set_field, update_settings
+from utils.filename_formats import (
+    add_filename_format,
+    custom_filename_formats,
+    example_filename,
+    pattern_error,
+    remove_filename_format,
+)
 from utils.color_profiles import user_color_yaml_path
 from utils.config import get_config, user_config_yaml_path
 from utils.layouts import user_layouts_dir, user_templates_dir
@@ -56,6 +63,7 @@ class AdvancedBackend(QObject):
     toolsChanged = Signal()
     statusChanged = Signal()
     filenameFormatFieldChanged = Signal()
+    filenameFormatsChanged = Signal()  # saved list changed - ColorBackend reloads
     tankNamesChanged = Signal()
 
     def __init__(self):
@@ -66,6 +74,7 @@ class AdvancedBackend(QObject):
         self._summary = fields.get("summary_switch", False)
 
         self._new_filename_format_text = ""
+        self._filename_format_error = ""
         self._status_text = ""
 
         self._tank_row_state = dict(get_config().get_tank_mapping())
@@ -203,14 +212,33 @@ class AdvancedBackend(QObject):
         self._new_filename_format_text = value
         self.filenameFormatFieldChanged.emit()
 
+    @Property(str, notify=filenameFormatFieldChanged)
+    def filenameFormatError(self):
+        return self._filename_format_error
+
+    @Property("QVariant", notify=filenameFormatsChanged)
+    def filenameFormats(self):
+        """Saved patterns as [{pattern, example}] for the list on this page."""
+        return [{"pattern": p, "example": example_filename(p)} for p in custom_filename_formats()]
+
     @Slot()
     def addFilenameFormat(self):
         pattern = self._new_filename_format_text.strip()
-        if not pattern:
+        error = pattern_error(pattern)
+        if error:
+            self._filename_format_error = error
+            self.filenameFormatFieldChanged.emit()
             return
-        add_unique("filename_formats", pattern)
+        add_filename_format(pattern)
         self._new_filename_format_text = ""
+        self._filename_format_error = ""
         self.filenameFormatFieldChanged.emit()
+        self.filenameFormatsChanged.emit()
+
+    @Slot(str)
+    def removeFilenameFormat(self, pattern):
+        remove_filename_format(pattern)
+        self.filenameFormatsChanged.emit()
 
     # ------------------------------------------------------------------
     # Tank Sensor Names window - ported close to verbatim from

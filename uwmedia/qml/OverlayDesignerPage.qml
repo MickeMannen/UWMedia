@@ -394,6 +394,7 @@ Item {
                                     enabled: overlayDesignerBackend.hasBackground
                                     onClicked: overlayDesignerBackend.clearBackground()
                                 }
+                                Button { text: "Select log file"; onClicked: overlayDesignerBackend.loadLogFile() }
                                 Button { text: "Select log directory"; onClicked: overlayDesignerBackend.loadLogs() }
                             }
 
@@ -411,7 +412,7 @@ Item {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Label { text: "Preview a found log directly (no video needed)" }
+                                Label { text: "Preview a loaded log directly (no video needed)" }
                                 ComboBox {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 34

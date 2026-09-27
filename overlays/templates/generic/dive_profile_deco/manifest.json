@@ -1,0 +1,10 @@
+{
+  "manufacturer": "Generic",
+  "model": "Dive Profile Deco",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main"
+    }
+  ]
+}

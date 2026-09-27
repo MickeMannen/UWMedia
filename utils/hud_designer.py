@@ -375,6 +375,8 @@ def element_native_bounds(
     align = elem.get("align", "left")
     valign = elem.get("valign", "top")
 
+    if kind == "badge" and elem.get("style") == "box":
+        return x, y, x + float(elem.get("width", 80)), y + float(elem.get("height", 44))
     if kind == "badge":
         label_size, value_size = badge_line_sizes(elem, 1.0, 1.0, True)
         lines = badge_lines or [(element_display_name("state_badge"), None, False)]

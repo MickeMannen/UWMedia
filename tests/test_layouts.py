@@ -141,3 +141,11 @@ def test_user_only_computer_and_brand_are_added_whole(isolated_template_roots):
     # bundled brands unaffected
     assert templates["shearwater"]["perdix_2"]["origin"] == "bundled"
     assert "user_path" not in templates["shearwater"]["perdix_2"]
+
+
+def test_list_templates_finds_bundled_generic_dive_profile_deco():
+    templates = list_templates()
+    deco = templates["generic"]["dive_profile_deco"]
+    assert (deco["manufacturer"], deco["model"]) == ("Generic", "Dive Profile Deco")
+    state_path = resolve_template_state("generic", "dive_profile_deco", "main")
+    assert state_path is not None and state_path.exists()

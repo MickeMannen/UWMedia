@@ -473,6 +473,76 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             done += 1
             print(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}", flush=True)
 
+def output_filename(source: Path, output_dir: Path, args, creation_date, forced_filename=None) -> str:
+    """Output file name for `source`: --render-video-log's pattern, a forced
+    name (single file to an explicit output path), --keep-filename, a
+    --filename-format pattern, or - by default for batch runs / another
+    folder - the date taken as %Y%m%d_%H%M%S. Extensions are lower-cased."""
+    if args.render_video_log:
+        layout_name = args.original_layout_stem or "default"
+        try:
+            filename = args.render_log_filename_format.format(
+                filename=source.stem, hud=layout_name, datetaken=creation_date
+            ) + source.suffix.lower()
+        except Exception as e:
+            print(f"Error formatting render-log filename with pattern '{args.render_log_filename_format}': {e}")
+            filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
+    elif forced_filename:
+        # If forced, still ensure extension is lower case if it has one
+        p = Path(forced_filename)
+        filename = p.stem + p.suffix.lower()
+    elif getattr(args, "keep_filename", False):
+        filename = source.stem + source.suffix.lower()
+    else:
+        format_to_use = args.filename_format
+        if not format_to_use and (output_dir != source.parent or args.source.is_dir()):
+            # Default date format if outputting to a different directory or batch processing
+            format_to_use = "%Y%m%d_%H%M%S"
+
+        if format_to_use:
+            try:
+                filename = creation_date.strftime(format_to_use) + source.suffix.lower()
+            except Exception as e:
+                print(f"Error formatting filename with pattern '{format_to_use}': {e}")
+                filename = source.stem + source.suffix.lower()
+        else:
+            filename = source.stem + source.suffix.lower()
+
+    # Add milliseconds to photo filenames (limit to 3 digits) - keeps
+    # date-named photos taken in the same second apart; not wanted when the
+    # original name is kept.
+    is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
+    keep_name = getattr(args, "keep_filename", False) and not args.render_video_log and not forced_filename
+    if not args.render_video_log and not keep_name and not is_video and creation_date.microsecond > 0:
+        ms = creation_date.microsecond // 1000
+        p = Path(filename)
+        filename = f"{p.stem}_{ms:03d}{p.suffix}"
+    return filename
+
+
+def resolve_target_path(target_path: Path, source: Path, args):
+    """Applies --no-overwrite/--overwrite to `target_path`. Returns
+    (path, skipped); an existing file otherwise gets _1, _2 … appended."""
+    # Never write over the source itself (same folder + same name), even
+    # with --overwrite - it's still being read. It also isn't an earlier
+    # output, so --no-overwrite mustn't skip because of it. samefile, not a
+    # path comparison: on case-insensitive file systems (macOS default)
+    # "DSC01.jpg" is the source "DSC01.JPG".
+    writes_over_source = target_path.exists() and os.path.samefile(target_path, source)
+
+    if (args.color or args.layout or args.render_video_log) and args.no_overwrite and not writes_over_source:
+        if target_path.exists():
+            print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
+            return target_path, True
+
+    if (args.color or args.layout or args.render_video_log) and args.overwrite and not writes_over_source:
+        if target_path.exists():
+            print(f"Overwriting existing target file: {target_path}")
+    else:
+        target_path = get_unique_path(target_path)
+    return target_path, False
+
+
 def process_single_file(source: Path, output_dir: Path, args, manager, meta_handler, tmp_hud_dir, forced_filename=None):
     """Processes a single video or photo file."""
     t_file_start = time.time()
@@ -493,54 +563,10 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         return {"file": source.name, "error": f"Error extracting metadata: {e}"}
 
     # Determine Output Path
-    if args.render_video_log:
-        layout_name = args.original_layout_stem or "default"
-        try:
-            filename = args.render_log_filename_format.format(
-                filename=source.stem, hud=layout_name, datetaken=creation_date
-            ) + source.suffix.lower()
-        except Exception as e:
-            print(f"Error formatting render-log filename with pattern '{args.render_log_filename_format}': {e}")
-            filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
-    elif forced_filename:
-        # If forced, still ensure extension is lower case if it has one
-        p = Path(forced_filename)
-        filename = p.stem + p.suffix.lower()
-    else:
-        format_to_use = args.filename_format
-        if not format_to_use and (output_dir != source.parent or args.source.is_dir()):
-            # Default date format if outputting to a different directory or batch processing
-            format_to_use = "%Y%m%d_%H%M%S"
-
-        if format_to_use:
-            try:
-                filename = creation_date.strftime(format_to_use) + source.suffix.lower()
-            except Exception as e:
-                print(f"Error formatting filename with pattern '{format_to_use}': {e}")
-                filename = source.stem + source.suffix.lower()
-        else:
-            filename = source.stem + source.suffix.lower()
-
-    # Add milliseconds to photo filenames (limit to 3 digits)
-    is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
-    if not args.render_video_log and not is_video and creation_date.microsecond > 0:
-        ms = creation_date.microsecond // 1000
-        p = Path(filename)
-        filename = f"{p.stem}_{ms:03d}{p.suffix}"
-    
-    target_path = output_dir / filename
-
-    # Check no-overwrite/overwrite options
-    if (args.color or args.layout or args.render_video_log) and args.no_overwrite:
-        if target_path.exists():
-            print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
-            return {"file": source.name, "skipped": True}
-
-    if (args.color or args.layout or args.render_video_log) and args.overwrite:
-        if target_path.exists():
-            print(f"Overwriting existing target file: {target_path}")
-    else:
-        target_path = get_unique_path(target_path)
+    filename = output_filename(source, output_dir, args, creation_date, forced_filename)
+    target_path, skipped = resolve_target_path(output_dir / filename, source, args)
+    if skipped:
+        return {"file": source.name, "skipped": True}
     target_path.parent.mkdir(parents=True, exist_ok=True)
     
     print(f"Output path: {target_path}")
@@ -1065,7 +1091,9 @@ def main():
     parser.add_argument("--create-config", action="store_true", help="Scan log directory for tanks and create/overwrite config.yaml")
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
-    parser.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
+    naming_group = parser.add_mutually_exclusive_group()
+    naming_group.add_argument("--filename-format", help='Template for output filename (e.g. "%%Y%%m%%d_%%H%%M%%S_color")')
+    naming_group.add_argument("--keep-filename", action="store_true", help="Keep the source file's name for the output (only the extension is lower-cased). Without this or --filename-format, batch runs and runs into another folder name files by date taken (%%Y%%m%%d_%%H%%M%%S).")
     overwrite_group = parser.add_mutually_exclusive_group()
     overwrite_group.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")
     overwrite_group.add_argument("--overwrite", action="store_true", help="Replace the target file in place if it already exists, instead of appending _1/_2/etc. (only when running --color or --layout)")

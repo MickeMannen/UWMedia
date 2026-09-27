@@ -5,6 +5,7 @@ from pathlib import Path
 from parsers.base import BaseParser
 from models.dive import Dive, Waypoint, TankData
 from utils.config import get_config
+from utils.deco_engine import DiveDecompressor, GasDefinition
 
 FIT_EPOCH_S = 631065600
 
@@ -35,6 +36,28 @@ def timezone_from_pair(local_dt: datetime, utc_dt: datetime) -> timezone:
     # Round to nearest minute to handle potential small discrepancies
     minutes = round(offset.total_seconds() / 60)
     return timezone(timedelta(minutes=minutes))
+
+def _add_ceilings(waypoints: List[Waypoint], gas_dict: Dict) -> None:
+    """FIT logs the computer's own next stop but no ceiling - recompute it
+    with the same Buhlmann pass the UDDF/Subsurface parsers already run.
+    Treats every gas as open circuit."""
+    gases = [
+        GasDefinition(f"{g['o2']}/{g['he']}", g["o2"] / 100.0, g["he"] / 100.0, max(0.0, (1.4 / (g["o2"] / 100.0) - 1.0) * 10.0))
+        for g in gas_dict.values() if g["status"] and g["o2"]
+    ] or [GasDefinition("AIR", 0.21, 0.0, 56.0)]
+    try:
+        results = DiveDecompressor(simulation_interval=10).process_waypoints(
+            [{"divetime": wp.time_since_start, "datetime": wp.timestamp, "depth": wp.depth or 0.0} for wp in waypoints],
+            gases,
+        )
+    except Exception as e:
+        print(f"Warning: Ceiling calculation failed for dive: {e}")
+        return
+    for wp in waypoints:
+        res = results.get(wp.time_since_start)
+        if res:
+            wp.ceiling = res.ceiling_meters
+
 
 class GarminParser(BaseParser):
     def get_unique_tank_serials(self, file_path: Path) -> List[str]:
@@ -309,6 +332,7 @@ class GarminParser(BaseParser):
 
         if not waypoints:
             return []
+        _add_ceilings(waypoints, gas_dict)
 
         dive = Dive(
             start_time=start_time_local,

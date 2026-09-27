@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 from models.dive import Waypoint, TankData
 from gui.hud_renderer import draw_hud
 from utils.layouts import resolve_template_state
@@ -954,3 +954,77 @@ def test_tank_icon_segments_bounds_span_all_segments_and_nose():
     assert (x0, y0) == (95.0, 95.0)
     assert x1 == 100 + 5 * 12 + 4 * 2 + 3 + 2 + 10 + 4   # segments + padding + stroke + nose + nub
     assert y1 == 100 + 23 + 3 + 2
+
+
+# --- Graph deco mode (stops_color), reveal_profile, stop_label --------------
+
+def _deco_waypoints():
+    def wp(t, d, stop=None, ceiling=None, stop_time=None, ndl=None):
+        return Waypoint(timestamp=datetime(2026, 1, 1) + timedelta(seconds=t), depth=d, time_since_start=t,
+                        next_stop_depth=stop, ceiling=ceiling, next_stop_time=stop_time, ndl=ndl)
+    return [
+        wp(0, 0, ndl=5940), wp(10, 20, ndl=600), wp(20, 20, 3.0, 1.0, 60), wp(30, 20, 6.0, 4.0, 120),
+        wp(40, 12, 6.0, 3.0, 60), wp(50, 6, 3.0, 1.0, 60), wp(60, 3, 3.0, 0.5, 30), wp(70, 0, ndl=5940),
+    ]
+
+
+DECO_ELEM = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#0000FF",
+             "stops_color": "#00FF00", "ceiling_color": "#FF0000"}
+GRAPH_SKIN = {"x": 0, "y": 0, "w": 1, "h": 1, "res_scale": 1.0}
+
+
+def test_deco_graph_shades_stops_and_ceiling_separately_and_keeps_cleared_stops():
+    from gui.hud_renderer import draw_depth_graph
+
+    wps = _deco_waypoints()
+    # x = 100 * t / 70; y = depth * 50 / 22
+    six_m_stop_only = (47, 10)  # t~33, ~4.4m: under the 6m stop, below the ~3m ceiling
+    ceiling_px = (44, 4)        # t~31, ~1.8m: under both
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, DECO_ELEM, wps[3], wps, GRAPH_SKIN)
+    assert frame[six_m_stop_only[1], six_m_stop_only[0]][1] == 0  # t=30: not revealed yet
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, DECO_ELEM, wps[-1], wps, GRAPH_SKIN)
+    b, g, r = frame[six_m_stop_only[1], six_m_stop_only[0]]
+    assert g > 0 and r == 0  # stops colour only, kept after the stop cleared
+    b, g, r = frame[ceiling_px[1], ceiling_px[0]]
+    assert g > 0 and r > 0  # ceiling blended on top of the stop
+
+
+def test_reveal_profile_draws_line_only_up_to_the_cursor():
+    from gui.hud_renderer import draw_depth_graph
+
+    wps = _deco_waypoints()
+    elem = {"width": 100, "height": 50, "rel_x": 0.0, "rel_y": 0.0, "color": "#0000FF", "marker_size": 1}
+    late_bottom_px = (40, 45)  # t~28 on the 20m line (y ~45)
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, {**elem, "reveal_profile": True}, wps[1], wps, GRAPH_SKIN)
+    assert frame[late_bottom_px[1], late_bottom_px[0]][0] == 0  # blue is channel 0 (BGR)
+
+    frame = np.zeros((50, 100, 3), dtype=np.uint8)
+    draw_depth_graph(frame, elem, wps[1], wps, GRAPH_SKIN)
+    assert frame[late_bottom_px[1], late_bottom_px[0]][0] > 0  # the default still draws the whole dive
+
+
+def test_graph_stop_label_text():
+    from gui.hud_renderer import graph_stop_label
+
+    wps = _deco_waypoints()
+    assert graph_stop_label(wps[3]) == ("STOP 6m 2:00", True)
+    assert graph_stop_label(wps[1]) == ("NDL 10", False)
+    legacy = Waypoint(timestamp=datetime.now(), depth=10, time_since_start=0, deco_stop_depth=4.2)
+    assert graph_stop_label(legacy) == ("STOP 6m", True)  # stop depth rounded up to a 3m level
+
+
+def test_stop_label_is_drawn_in_the_text_pass():
+    wps = _deco_waypoints()
+    layout = _shape_layout([{**DECO_ELEM, "type": "graph", "field": "depth_graph", "width": 180, "height": 90}])
+    without = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(without, layout, wps[3], render_log=False, waypoints=wps)
+    layout["hud_skin"]["linked_elements"][0]["stop_label"] = True
+    with_label = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(with_label, layout, wps[3], render_log=False, waypoints=wps)
+    assert not np.array_equal(without, with_label)

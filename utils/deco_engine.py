@@ -185,28 +185,29 @@ class BuhlmannEngine:
         depth_meters: float,
         f_o2: float,
         f_he: float,
-        gf_low: float,
+        gf: float,
         step_seconds: float = 10.0,
         cap_seconds: int = 99 * 60,
     ) -> Optional[int]:
         """Forward-simulates staying at `depth_meters` on this gas until the
-        GF-low ceiling first rises above the surface - the same "time until
-        you owe a stop" definition a dive computer's NDL represents. Uses
-        gf_low as the trigger threshold, matching how
-        DiveDecompressor._simulate_tts already decides an ascent must stop
-        (its own `target_ceiling = sim_engine.get_ceiling(self.gf_low)`).
+        ceiling at `gf` first rises above the surface - the same "time until
+        you owe a stop" definition a dive computer's NDL represents. Pass GF
+        high: that's the ceiling that decides whether the diver may surface
+        (a stop is mandatory), as dive computers compute NDL. GF low only
+        places the first stop once deco is owed - using it here ends the NDL
+        far too early (18 m on air at GF 30/70: ~7 min instead of ~40).
         Returns None once `cap_seconds` passes with no ceiling appearing -
         display as "99+", the convention already used elsewhere in this app
         for an unbounded NDL. No NDL computation existed anywhere in this
         codebase before this method (see todo.md's "what-if NDL" gap)."""
-        if self.get_ceiling(gf_low) > 0:
+        if self.get_ceiling(gf) > 0:
             return 0
         sim = self.clone()
         elapsed = 0.0
         while elapsed < cap_seconds:
             sim.update(depth_meters, step_seconds, f_o2, f_he)
             elapsed += step_seconds
-            if sim.get_ceiling(gf_low) > 0:
+            if sim.get_ceiling(gf) > 0:
                 return int(elapsed)
         return None
 

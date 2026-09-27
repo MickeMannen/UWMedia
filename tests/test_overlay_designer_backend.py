@@ -1188,3 +1188,23 @@ def test_perdix_2_tank_icons_are_segmented_gauges_on_clean_skins():
     assert e["style"] == "segments" and e["segments"] == 1 and e["full_bar"] == 232
     app.resizeSelected(1)
     assert e["width"] > 16 or e["height"] > 32
+
+
+def test_graph_deco_options_are_edited_through_the_inspector():
+    app = _perdix_at_100(OverlayDesignerBackend())
+    app.addElement("anything", "graph")
+    sel = app.selectedElement
+    assert (sel["deco_stops"], sel["reveal_profile"], sel["stop_label"]) == (False, False, False)
+
+    app.setSelectedAttr("deco_stops", True)
+    app.setSelectedAttr("reveal_profile", True)
+    app.setSelectedAttr("stop_label", True)
+    app.setSelectedAttr("stops_color", "#00FF00")
+    elem = app.document.element(app.selectedIndex)
+    assert (elem["stops_color"], elem["reveal_profile"], elem["stop_label"]) == ("#00FF00", True, True)
+
+    app.setSelectedAttr("deco_stops", False)
+    app.setSelectedAttr("reveal_profile", False)
+    elem = app.document.element(app.selectedIndex)
+    assert "stops_color" not in elem and "reveal_profile" not in elem
+    assert app.selectedElement["stops_color"] == "#FFA500"  # what switching it back on starts from

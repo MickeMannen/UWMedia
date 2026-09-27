@@ -64,6 +64,7 @@ from parsers.uddf import UDDFParser
 from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
+from utils.filename_formats import custom_filename_formats, example_filename, pattern_error
 from utils.layouts import list_templates, page_display_name, resolve_template_state
 
 from uwmedia.pages.add_hud_dialog import HUD_LOCATION_PRESETS
@@ -110,6 +111,18 @@ FILENAME_FORMAT_PRESETS = [
     ("Date + time (20260905_143000)", "%Y%m%d_%H%M%S"),
     ("Date + time + color (20260905_143000_color)", "%Y%m%d_%H%M%S_color"),
 ]
+
+
+def _filename_format_choices():
+    """Built-in presets, then the user's own patterns from the Advanced page
+    (settings.json "filename_formats"), labelled with an example name.
+    Unusable saved patterns are skipped."""
+    choices = dict(FILENAME_FORMAT_PRESETS)
+    for pattern in custom_filename_formats():
+        if pattern in choices.values() or pattern_error(pattern):
+            continue
+        choices[f"{pattern}  →  {example_filename(pattern)}"] = pattern
+    return choices
 
 
 def _load_color_profiles():
@@ -180,7 +193,7 @@ class ColorBackend(QObject):
         self._hw_accel = True
         self._color_profiles = _load_color_profiles()
         self._color_profile = self._color_profiles[0]
-        self._filename_format_by_label = dict(FILENAME_FORMAT_PRESETS)
+        self._filename_format_by_label = _filename_format_choices()
         self._filename_format = FILENAME_FORMAT_PRESETS[0][0]
 
         self._scrub_value = 0
@@ -338,9 +351,20 @@ class ColorBackend(QObject):
         set_field("color_profile", value)
         self.colorProfileChanged.emit()
 
-    @Property(list, constant=True)
+    @Property(list, notify=filenameFormatChanged)
     def filenameFormatList(self):
         return list(self._filename_format_by_label.keys())
+
+    @Slot()
+    def reloadFilenameFormats(self):
+        """Re-reads the user's patterns - wired to AdvancedBackend's
+        filenameFormatsChanged in app.py. A selected pattern that was
+        removed falls back to the first preset."""
+        self._filename_format_by_label = _filename_format_choices()
+        if self._filename_format not in self._filename_format_by_label:
+            self._filename_format = FILENAME_FORMAT_PRESETS[0][0]
+            set_field("filename_format_select", self._filename_format)
+        self.filenameFormatChanged.emit()
 
     @Property(str, notify=filenameFormatChanged)
     def filenameFormat(self):
@@ -1094,6 +1118,10 @@ class ColorBackend(QObject):
         pattern = self._filename_format_by_label.get(self._filename_format)
         if pattern:
             args += ["--filename-format", pattern]
+        else:
+            # "Keep original filename" - without this the CLI names batch
+            # output by date taken.
+            args.append("--keep-filename")
         # --hw-accel defaults to False in cli_main.py's argparse if never
         # passed - this used to never be appended at all (a long-deferred
         # gap, see hwAccel's own docstring above for history), silently

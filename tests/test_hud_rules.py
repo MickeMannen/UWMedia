@@ -11,6 +11,8 @@ from utils.hud_rules_engine import (
     get_tank_fill_color,
     is_clearing_deco_stop,
     get_ndl_before_clear,
+    safety_stop_status,
+    safety_stop_timeline,
 )
 
 def test_rules_loading_and_hierarchical_fallback():
@@ -261,3 +263,87 @@ def test_get_tank_fill_color():
 
     # Unknown manufacturer/model still falls back to the global default bands
     assert get_tank_fill_color("UnknownMfg", "UnknownModel", 40) == "#FF0000"
+
+def _profile(points):
+    """Per-second waypoints linearly interpolated through (time, depth) points."""
+    wps, max_depth = [], 0.0
+    for (t0, d0), (t1, d1) in zip(points, points[1:]):
+        for t in range(t0, t1):
+            depth = d0 + (d1 - d0) * (t - t0) / (t1 - t0)
+            max_depth = max(max_depth, depth)
+            wps.append(_wp(time_since_start=t, depth=depth, max_depth=max_depth))
+    return wps
+
+def test_garmin_safety_stop_timer_counts_down_and_completes():
+    # X50i manual p.10: after >11 m, the 3:00 timer starts within 1 m of 5 m.
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5), (1060, 0)])
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Garmin", "x50i", at[500], wps) == "normal"
+    assert safety_stop_status("Garmin", "x50i", at[750], wps)[0] is True
+    assert safety_stop_status("Garmin", "x50i", at[750], wps)[1] < 180
+    assert resolve_state("Garmin", "x50i", at[750], wps) == "safety_stop"
+    # 3 minutes after reaching the stop band it's done - back to normal (NDL).
+    assert resolve_state("Garmin", "x50i", at[900], wps) == "normal"
+
+def test_garmin_safety_stop_resets_below_11m_and_skips_shallow_dives():
+    wps = _profile([(0, 0), (60, 20), (300, 20), (400, 5), (460, 5), (520, 15), (600, 15), (700, 5), (760, 5), (800, 0)])
+    at = {w.time_since_start: w for w in wps}
+    # Descending below 11 m resets the stop to a full 3:00.
+    assert safety_stop_status("Garmin", "x50i", at[600], wps) == (False, 180)
+    assert resolve_state("Garmin", "x50i", at[750], wps) == "safety_stop"
+
+    shallow = _profile([(0, 0), (60, 9), (600, 9), (700, 5), (900, 5), (960, 0)])
+    assert resolve_state("Garmin", "x50i", shallow[750], shallow) == "normal"
+
+def test_safety_stop_timer_only_for_rules_with_a_duration():
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5)])
+    assert safety_stop_timeline("Shearwater", "Perdix 2", wps) is None
+
+def test_garmin_safety_stop_not_shown_after_a_3m_deco_stop():
+    # A deco dive whose last stop is at 3 m: once the ceiling clears the diver
+    # is already shallower than the 5 m ± 1 m start window, so no safety stop
+    # timer ever starts - the HUD goes straight back to NDL, not to a stop box
+    # with a frozen 3:00.
+    wps = _profile([(0, 0), (120, 45), (1500, 45), (1800, 9), (2100, 6), (2400, 3), (3000, 3), (3030, 0)])
+    for w in wps:
+        if 1700 <= w.time_since_start < 2700:
+            w.deco_stop_depth = 3.0
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Garmin", "x50i", at[2000], wps) == "deco"
+    assert resolve_state("Garmin", "x50i", at[2800], wps) == "normal"
+    assert safety_stop_status("Garmin", "x50i", at[2800], wps)[0] is False
+    assert resolve_state("Garmin", "x50i", at[3020], wps) == "normal"
+
+def test_garmin_safety_stop_timeline_follows_the_computers_own_alerts():
+    # The X50i's own started/complete alerts win over the depth rules: a stop
+    # the computer ended early stays ended, and the NDL comes back for good.
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5), (1060, 0)])
+    at = {w.time_since_start: w for w in wps}
+    at[720].dive_alerts = ["safety_stop_started"]
+    at[800].dive_alerts = ["safety_stop_complete"]
+    assert resolve_state("Garmin", "x50i", at[750], wps) == "safety_stop"
+    assert resolve_state("Garmin", "x50i", at[800], wps) == "normal"
+    assert resolve_state("Garmin", "x50i", at[850], wps) == "normal"
+    assert resolve_state("Garmin", "x50i", at[990], wps) == "normal"
+
+def test_garmin_no_safety_stop_after_deco_in_a_real_mk3i_log():
+    # test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases.fit: the
+    # computer fires deco_complete at 6.9 m and no safety_stop_started for the
+    # rest of the dive - so neither does the HUD, even as the diver hangs at
+    # 6 m on the way up, and the last 1.0-1.5 m never flicker a stop box.
+    import io, contextlib
+    from pathlib import Path
+    from parsers.garmin import GarminParser
+    with contextlib.redirect_stdout(io.StringIO()):
+        dive = GarminParser().parse(Path("test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases.fit"))[0]
+    wps = dive.waypoints
+    states = [(wp.time_since_start, resolve_state("Garmin", "Descent Mk3i", wp, wps)) for wp in wps]
+    complete = next(t for t, wp in zip((s[0] for s in states), wps) if "deco_complete" in wp.dive_alerts)
+    assert any(s == "deco" for _, s in states)
+    assert all(s == "normal" for t, s in states if t >= complete)
+
+def test_garmin_safety_stop_ends_on_surfacing_without_flicker():
+    wps = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (760, 5), (800, 1.0), (820, 1.4), (840, 1.0), (900, 1.4)])
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Garmin", "x50i", at[750], wps) == "safety_stop"
+    assert all(resolve_state("Garmin", "x50i", at[t], wps) == "normal" for t in range(801, 900))

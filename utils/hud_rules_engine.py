@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from utils.resource_paths import find_resource
 
@@ -230,7 +230,92 @@ def is_clearing_deco_stop(manufacturer: Optional[str], model: Optional[str], way
     distance = deco_depth - current_depth
     return 0 < distance < margin
 
-def resolve_state(manufacturer: Optional[str], model: Optional[str], waypoint: Any) -> str:
+# id(waypoints) -> (the list itself, its timeline). Holding the list keeps its
+# id from being reused by a later dive of the same length (a re-saved plan,
+# a test's identical profile) while the entry is cached.
+_safety_stop_cache: Dict[Any, Tuple[List[Any], Dict[int, Tuple[bool, int]]]] = {}
+
+def safety_stop_timeline(manufacturer: Optional[str], model: Optional[str], waypoints: Optional[List[Any]]) -> Optional[Dict[int, Tuple[bool, int]]]:
+    """{time_since_start: (active, seconds_left)} for a dive computer whose
+    safety_stop rule has a `duration_sec` - the Garmin Descent behaviour
+    (X50i manual, "Performing a Safety Stop"): after a dive deeper than
+    trigger_max_depth the stop becomes active; its timer starts once within
+    `start_window` m of `stop_depth`, pauses while more than `pause_above` m
+    above it, and the whole stop resets when descending below
+    trigger_max_depth. Mandatory deco (resolve_state 'deco'/'clear') ends
+    the safety stop for good: a Descent asks for no safety stop after deco
+    (confirmed against the real Mk3i log test_data/logs/submersion_dives/
+    005_oc-trimix-two-deco-gases.fit - no safety_stop_started after its
+    deco_complete even though the diver then hung at 6 m), so the HUD goes
+    straight back to NDL when the last stop clears. Surfacing (shallower
+    than min_depth) after the timer started ends it too, rather than
+    flickering the box as the depth bobs around the threshold. The
+    computer's own safety_stop_started / safety_stop_complete alerts
+    (Garmin FIT dive_alerts) override the depth rules where present, so a
+    real log renders exactly what the computer showed. None when the rule
+    has no timer or there are no waypoints; cached per waypoint list."""
+    if not waypoints:
+        return None
+    cfg = get_rule_config(manufacturer, model, "safety_stop")
+    if not isinstance(cfg, dict) or not cfg.get("duration_sec"):
+        return None
+    key = (id(waypoints), len(waypoints), manufacturer, model)
+    cached = _safety_stop_cache.get(key)
+    if cached is not None and cached[0] is waypoints:
+        return cached[1]
+
+    duration = int(cfg["duration_sec"])
+    trigger = float(cfg.get("trigger_max_depth", 11.0))
+    stop_depth = float(cfg.get("stop_depth", 5.0))
+    start_window = float(cfg.get("start_window", 1.0))
+    pause_above = float(cfg.get("pause_above", 3.0))
+    surface = float(cfg.get("min_depth", 1.2))
+
+    timeline: Dict[int, Tuple[bool, int]] = {}
+    armed, started, left, prev_t, had_deco = False, False, duration, None, False
+    for wp in waypoints:
+        t = getattr(wp, "time_since_start", 0) or 0
+        depth = getattr(wp, "depth", 0.0) or 0.0
+        dt = 0 if prev_t is None else max(0, t - prev_t)
+        prev_t = t
+        if resolve_state(manufacturer, model, wp) in ("deco", "clear"):
+            had_deco = True
+        if depth > trigger or had_deco:
+            armed = (getattr(wp, "max_depth", 0.0) or 0.0) >= trigger and not had_deco
+            started, left = False, duration
+            timeline[t] = (False, left)
+            continue
+        if not armed and (getattr(wp, "max_depth", 0.0) or 0.0) >= trigger:
+            armed = True
+        alerts = set(getattr(wp, "dive_alerts", None) or [])
+        if alerts & _SAFETY_STOP_START_ALERTS:
+            armed, started, left = True, True, duration
+        if armed and left > 0:
+            if started and depth < surface:
+                left = 0  # surfaced - the stop is over, whatever was left
+            elif not started and abs(depth - stop_depth) <= start_window:
+                started = True
+            if started and left > 0 and depth >= stop_depth - pause_above:
+                left = max(0, left - dt)
+        if alerts & _SAFETY_STOP_END_ALERTS:
+            left = 0
+        active = armed and started and left > 0
+        timeline[t] = (active, left)
+
+    if len(_safety_stop_cache) > 8:
+        _safety_stop_cache.clear()
+    _safety_stop_cache[key] = (waypoints, timeline)
+    return timeline
+
+def safety_stop_status(manufacturer: Optional[str], model: Optional[str], waypoint: Any, waypoints: Optional[List[Any]]) -> Optional[Tuple[bool, int]]:
+    """(active, seconds_left) at this waypoint from safety_stop_timeline, or
+    None when that timeline doesn't apply."""
+    timeline = safety_stop_timeline(manufacturer, model, waypoints)
+    if timeline is None or waypoint is None:
+        return None
+    return timeline.get(getattr(waypoint, "time_since_start", None))
+
+def resolve_state(manufacturer: Optional[str], model: Optional[str], waypoint: Any, waypoints: Optional[List[Any]] = None) -> str:
     """Resolves the current HUD state - 'deco', 'clear', 'safety_stop', or 'normal' -
     for one waypoint, deco -> clear -> safety_stop -> normal priority ('clear' is a
     refinement of 'deco': still ascending into a deco stop, but within the
@@ -262,6 +347,12 @@ def resolve_state(manufacturer: Optional[str], model: Optional[str], waypoint: A
     deco_depth = getattr(waypoint, "deco_stop_depth", None)
     if deco_depth is not None and deco_depth > 0:
         return "clear" if is_clearing_deco_stop(manufacturer, model, waypoint) else "deco"
+
+    # With the whole dive at hand, a timed safety stop (safety_stop_timeline)
+    # knows when the stop is done - the depth band alone would keep showing it.
+    status = safety_stop_status(manufacturer, model, waypoint, waypoints)
+    if status is not None:
+        return "safety_stop" if status[0] else "normal"
 
     if get_safety_stop_text(manufacturer, model, waypoint):
         return "safety_stop"

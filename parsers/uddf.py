@@ -173,6 +173,11 @@ class UDDFParser(BaseParser):
                         logged_deco_stop_time = int(float(decostop_elem.get("duration")))
                     except (TypeError, ValueError):
                         logged_deco_stop_time = None
+                elif ndl is not None and ndl > 0:
+                    # The file's own NDL says no mandatory stop yet - don't
+                    # let the generic recompute below (other GFs) invent one.
+                    logged_deco_stop_depth = 0.0
+                    logged_deco_stop_time = 0
                 else:
                     logged_deco_stop_depth = None
                     logged_deco_stop_time = None
@@ -273,6 +278,7 @@ class UDDFParser(BaseParser):
                         res = deco_results.get(wp.time_since_start)
                         if res:
                             wp.tts = res.tts_seconds
+                            wp.ceiling = res.ceiling_meters
                             if wp.deco_stop_depth is None:
                                 wp.deco_stop_depth = res.ceiling_meters
                             if wp.gf is None:

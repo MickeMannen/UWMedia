@@ -149,9 +149,13 @@
     "safety_stop": {
       "text": "SAFETY STOP",
       "color": "#FFFF00",
-      "trigger_max_depth": 10.0,
-      "min_depth": 3.0,
-      "max_depth": 6.0
+      "trigger_max_depth": 11.0,
+      "min_depth": 1.2,
+      "max_depth": 6.0,
+      "stop_depth": 5.0,
+      "duration_sec": 180,
+      "start_window": 1.0,
+      "pause_above": 3.0
     },
     "badge_states": {
       "safety_stop": {

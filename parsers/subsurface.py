@@ -338,6 +338,7 @@ class SubsurfaceParser(BaseParser):
                         res = deco_results.get(wp.time_since_start)
                         if res:
                             wp.tts = res.tts_seconds
+                            wp.ceiling = res.ceiling_meters
                             if wp.deco_stop_depth is None:
                                 wp.deco_stop_depth = res.ceiling_meters
                             if wp.gf is None:

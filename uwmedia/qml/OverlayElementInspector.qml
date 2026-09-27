@@ -415,6 +415,41 @@ ColumnLayout {
                 ColorField { Layout.columnSpan: 3; attr: "color"; value: inspector.sel.color; visible: inspector.kind === "graph" }
                 Label { text: "Ceiling"; visible: inspector.kind === "graph" }
                 ColorField { Layout.columnSpan: 3; attr: "ceiling_color"; value: inspector.sel.ceiling_color; visible: inspector.kind === "graph" }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Deco stops"
+                    visible: inspector.kind === "graph"
+                    checked: inspector.sel.deco_stops === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("deco_stops", checked)
+                    ToolTip.text: "Shade each logged deco stop and the ceiling separately, kept on the graph after they clear"
+                    ToolTip.visible: hovered
+                }
+                Label { text: "Stops"; visible: inspector.kind === "graph" && inspector.sel.deco_stops === true }
+                ColorField {
+                    Layout.columnSpan: 3; attr: "stops_color"; value: inspector.sel.stops_color
+                    visible: inspector.kind === "graph" && inspector.sel.deco_stops === true
+                }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Reveal profile over time"
+                    visible: inspector.kind === "graph"
+                    checked: inspector.sel.reveal_profile === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("reveal_profile", checked)
+                    ToolTip.text: "Draw the depth line only up to the current time, instead of the whole dive"
+                    ToolTip.visible: hovered
+                }
+                CheckBox {
+                    Layout.columnSpan: 2
+                    text: "Stop label"
+                    visible: inspector.kind === "graph"
+                    checked: inspector.sel.stop_label === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("stop_label", checked)
+                    ToolTip.text: "Current deco stop (or NDL) next to the cursor"
+                    ToolTip.visible: hovered
+                }
+                Label { text: "Size"; visible: inspector.kind === "graph" && inspector.sel.stop_label === true }
+                NumField { attr: "font_size"; value: inspector.sel.font_size; visible: inspector.kind === "graph" && inspector.sel.stop_label === true }
+                Item { Layout.columnSpan: 2; visible: inspector.kind === "graph" && inspector.sel.stop_label !== true }
                 Label { text: "Marker"; visible: inspector.kind === "graph" }
                 ComboBox {
                     id: markerCombo

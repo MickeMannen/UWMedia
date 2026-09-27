@@ -17,6 +17,14 @@ class Waypoint(BaseModel):
     temp: Optional[float] = Field(None, description="Temperature in Celsius")
     max_depth: float = Field(0.0, description="Maximum depth reached until this waypoint")
     deco_stop_depth: Optional[float] = Field(None, description="Current deco stop depth in meters")
+    ceiling: Optional[float] = Field(
+        None,
+        description=(
+            "Deco ceiling in meters (GF high) - recomputed by the parsers' own Buhlmann pass "
+            "(utils.deco_engine.DiveDecompressor), dive computers don't log it. Unlike "
+            "deco_stop_depth it isn't rounded to a stop level"
+        ),
+    )
     tts: Optional[int] = Field(None, description="Time to surface in seconds")
     ndl: Optional[int] = Field(None, description="No deco limit in seconds")
     time_since_start: int = Field(..., description="Seconds since start of dive")

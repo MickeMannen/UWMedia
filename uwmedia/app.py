@@ -88,6 +88,8 @@ def main():
 
     advanced_backend = AdvancedBackend()
     engine.rootContext().setContextProperty("advancedBackend", advanced_backend)
+    # Patterns saved on Advanced show up in Color's output-filename list at once.
+    advanced_backend.filenameFormatsChanged.connect(color_backend.reloadFilenameFormats)
 
     about_backend = AboutBackend()
     engine.rootContext().setContextProperty("aboutBackend", about_backend)

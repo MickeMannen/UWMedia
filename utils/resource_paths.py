@@ -1,30 +1,63 @@
 import json
 import os
 import platform
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 
-def user_data_dir(app_name: str = "UWMedia") -> Path:
+APP_DATA_DIR_NAME = "org.christersson.uwmedia"
+
+# Folder name used before the switch to the reverse-DNS name above. Its
+# contents are copied over once, the first time the new folder is created.
+LEGACY_APP_DATA_DIR_NAME = "UWMedia"
+
+
+def _user_data_base() -> Path:
+    """The per-OS parent directory that holds per-app data folders."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    if sys.platform.startswith("win"):
+        return Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+    return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+
+
+def user_data_dir(app_name: str = APP_DATA_DIR_NAME) -> Path:
     """
-    Per-OS, per-user writable data directory for the app - the same location
-    Toga's `app.paths.data` reports, computed standalone so non-GUI code
-    (cli_main.py, ffmpeg/color.py) can use it without a toga.App instance.
+    Per-OS, per-user writable data directory for the app, computed standalone
+    so non-GUI code (cli_main.py, ffmpeg/color.py) can use it too:
+
+      macOS   ~/Library/Application Support/org.christersson.uwmedia
+      Windows %APPDATA%\\org.christersson.uwmedia
+      Linux   $XDG_DATA_HOME/org.christersson.uwmedia (~/.local/share/...)
 
     User-editable resources (custom HUD layouts, custom color profiles,
     settings) live here so they survive app reinstalls/updates, unlike
     anything under the bundled, effectively read-only install location.
     """
-    if sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support"
-    elif sys.platform.startswith("win"):
-        base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
-    else:
-        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+    base = _user_data_base()
     path = base / app_name
+    if not path.exists() and app_name == APP_DATA_DIR_NAME:
+        _migrate_legacy_data_dir(base / LEGACY_APP_DATA_DIR_NAME, path)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _migrate_legacy_data_dir(legacy: Path, target: Path) -> None:
+    """
+    Copy (not move) the pre-rename data folder to its new name, leaving the
+    old one untouched so an older UWMedia install keeps working. On any
+    failure the partial copy is removed and the app starts with an empty
+    data folder rather than a half-migrated one.
+    """
+    if not legacy.is_dir():
+        return
+    try:
+        shutil.copytree(legacy, target)
+    except Exception as e:
+        print(f"Could not migrate {legacy} to {target}: {e}")
+        shutil.rmtree(target, ignore_errors=True)
 
 
 def find_resource(filename: str, start: Union[str, Path], max_depth: int = 3) -> Optional[Path]:

@@ -5,6 +5,7 @@ from typing import List, Optional
 from lxml import etree
 
 from models.dive_plan import DiveProfilePlan, PlannedGas
+from utils.dive_computers import dive_computer
 from utils.dive_plan_engine import SimulatedSample
 
 UDDF_NS = "http://www.streit.cc/uddf/3.2/"
@@ -28,6 +29,21 @@ def _gas_mix_id(gas: PlannedGas) -> str:
     return f"{gas.id}:{round(gas.o2_percent):02d}/{round(gas.he_percent):02d}"
 
 
+def log_start_time(plan: DiveProfilePlan, start_time: Optional[datetime] = None) -> datetime:
+    """The dive's local start for a written log: the explicit argument, else
+    the plan's own start_time, else now. Shared by all three log writers."""
+    when = start_time or plan.start_time or datetime.now()
+    return when.replace(microsecond=0, tzinfo=None)
+
+
+def utc_offset_minutes(local_start: datetime) -> int:
+    """This machine's UTC offset at `local_start` (DST included) - the
+    builder has no time zone of its own, so a log is written as if dived
+    in the local zone."""
+    offset = local_start.astimezone().utcoffset()
+    return int(offset.total_seconds() // 60) if offset is not None else 0
+
+
 def write_uddf(
     plan: DiveProfilePlan,
     samples: List[SimulatedSample],
@@ -35,37 +51,42 @@ def write_uddf(
     start_time: Optional[datetime] = None,
 ) -> None:
     """Writes `samples` (from utils.dive_plan_engine.simulate) as a
-    Shearwater Perdix 2 style UDDF file - structure matched against a real
-    export (test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf)
-    closely enough that parsers/uddf.py's UDDFParser reads it back correctly
-    (see tests/test_uddf_writer.py's round-trip test).
+    Shearwater Cloud style UDDF file - structure matched against real
+    exports (test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf,
+    006_ccr_petrel3_shearwater-cloud-export.uddf) closely enough that
+    parsers/uddf.py's UDDFParser reads it back correctly (see
+    tests/test_uddf_writer.py's round-trip tests). Like those exports,
+    every waypoint lists every tank's pressure, so a sidemount pair or a
+    CCR's O2/diluent cylinders all come through.
 
-    CCR waypoint fields are a best-effort model - no real Shearwater CCR
-    UDDF export was available to confirm the exact structure against,
-    unlike the OC path (same caveat this codebase already flags for other
-    unverified CCR sources - see shearwater_rework.md Phase 5).
+    The device is plan.computer (utils.dive_computers); the generator's
+    manufacturer is set to the computer's too, since UDDFParser reads a
+    dive's manufacturer from there.
     """
     if not samples:
         raise ValueError("No samples to write - run utils.dive_plan_engine.simulate() first")
-    if start_time is None:
-        start_time = datetime.now().replace(microsecond=0)
+    start_time = log_start_time(plan, start_time)
+    computer = dive_computer(plan.computer)
+    serial = plan.computer_serial or "0"
 
     root = etree.Element(_q("uddf"), nsmap=_NSMAP, version="3.2.3")
 
     generator = _el(root, "generator")
     _el(generator, "name", "UWMedia Dive Profile Builder")
     _el(generator, "type", "logbook")
-    manufacturer = _el(generator, "manufacturer", id="UWMedia")
-    _el(manufacturer, "name", "UWMedia")
+    manufacturer = _el(generator, "manufacturer", id=computer.manufacturer)
+    _el(manufacturer, "name", computer.manufacturer)
     _el(generator, "datetime", datetime.now().replace(microsecond=0).isoformat() + "Z")
 
     diver = _el(root, "diver")
     owner = _el(diver, "owner")
     equipment = _el(owner, "equipment")
-    divecomputer = _el(equipment, "divecomputer", id="Perdix 2_00000000")
-    _el(divecomputer, "name", "Perdix 2")
-    _el(divecomputer, "model", "Perdix 2")
-    _el(divecomputer, "serialnumber", "00000000")
+    divecomputer = _el(equipment, "divecomputer", id=f"{computer.model}_{serial}")
+    _el(divecomputer, "name", computer.model)
+    dc_manufacturer = _el(divecomputer, "manufacturer", id=computer.manufacturer)
+    _el(dc_manufacturer, "name", computer.manufacturer)
+    _el(divecomputer, "model", computer.model)
+    _el(divecomputer, "serialnumber", serial)
 
     gasdefs = _el(root, "gasdefinitions")
     mix_ids = {}
@@ -76,7 +97,7 @@ def write_uddf(
         _el(mix, "name", gas.id)
         _el(mix, "o2", round(gas.f_o2, 4))
         _el(mix, "he", round(gas.f_he, 4))
-        _el(mix, "maximumpo2", gas.ccr_setpoint if gas.is_ccr and gas.ccr_setpoint else 1.4)
+        _el(mix, "maximumpo2", plan.ccr_high_setpoint if plan.on_loop(gas) else plan.max_po2_bottom)
 
     decomodel = _el(root, "decomodel")
     buehlmann = _el(decomodel, "buehlmann", id="zhl16c")
@@ -89,13 +110,15 @@ def write_uddf(
 
     info_before = _el(dive, "informationbeforedive")
     _el(info_before, "datetime", start_time.isoformat() + "Z")
-    for gas in plan.gases:
-        end_pressure = next(
-            (s.tank_pressure_bar for s in reversed(samples) if s.gas_id == gas.id),
-            gas.start_pressure_bar,
-        )
-        tankdata = _el(info_before, "tankdata")
-        _el(tankdata, "tankpressurebegin", int(gas.start_pressure_bar * 100000))
+    tanks = plan.tank_specs()
+    end_pressures = samples[-1].tank_pressures
+    for tank in tanks:
+        tankdata = _el(info_before, "tankdata", id=tank.ref)
+        if tank.gas_id is not None:
+            _el(tankdata, "link", ref=mix_ids[tank.gas_id])
+        _el(tankdata, "tankvolume", round(tank.size_l / 1000.0, 4))  # UDDF volumes are in m^3
+        _el(tankdata, "tankpressurebegin", int(tank.start_pressure_bar * 100000))
+        end_pressure = end_pressures.get(tank.ref, tank.start_pressure_bar)
         _el(tankdata, "tankpressureend", int(end_pressure * 100000))
 
     samples_el = _el(dive, "samples")
@@ -112,11 +135,13 @@ def write_uddf(
         _el(wp, "divetime", s.time_sec)
         _el(wp, "temperature", temp_k)
 
-        gas = plan.gas_by_id(s.gas_id)
-        if gas is not None and gas.tank_size_l > 0:
-            _el(wp, "tankpressure", int(s.tank_pressure_bar * 100000), ref=gas.tank_ref)
+        for tank in tanks:
+            if tank.ref in s.tank_pressures:
+                _el(wp, "tankpressure", int(s.tank_pressures[tank.ref] * 100000), ref=tank.ref)
 
         _el(wp, "calculatedpo2", round(s.po2, 2))
+        if s.divemode == "closedcircuit":
+            _el(wp, "setpo2", plan.setpoint_at(s.depth_m), setby="computer")
         if s.cns_pct:
             _el(wp, "cns", int(s.cns_pct))
         _el(wp, "divemode", type=s.divemode)
@@ -131,6 +156,10 @@ def write_uddf(
             )
         elif s.ndl_sec is not None:
             _el(wp, "nodecotime", s.ndl_sec)
+
+    # Read back as Dive.timezone by UDDFParser (its own update_timezone
+    # convention: offset in minutes, a direct child of <dive>).
+    _el(dive, "timezone", utc_offset_minutes(start_time))
 
     tree = etree.ElementTree(root)
     tree.write(str(file_path), pretty_print=True, xml_declaration=True, encoding="utf-8")

@@ -3,6 +3,60 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Dive Profile Builder saves as Garmin FIT and Subsurface XML as well as UDDF
+  (one **Save log…** button), posing as a chosen dive computer (the Garmin and
+  Shearwater models UWMedia has templates for) with a serial number and a set
+  start date/time for matching media.
+- Dive Profile Builder dive types: open circuit, sidemount (paired left/right
+  tanks, switched every N bar) and CCR (diluent loop with low/high setpoints and
+  a switch depth, O2 cylinder, open-circuit bailout gases). This replaces the
+  per-gas CCR gas type and setpoint.
+- Dive Profile Builder chart shades the planned deco stops over the dive (every
+  stop, darker for longer ones) in translucent grey - the ceiling itself is no
+  longer drawn - and the hover box shows the ceiling at both GF high and GF low.
+- Overlay Designer **Select log file** loads a single log file (e.g. one saved
+  from the Dive Profile Builder) and previews it right away.
+- Garmin x50i template: a green **STOP ↑5m** / amber **DECO ↑depth** box with
+  the stop timer replaces the NDL field during a safety or deco stop, as on the
+  real computer. The Garmin safety stop follows the Descent manual: after a
+  dive deeper than 11 m, a 3:00 timer that starts within 1 m of 5 m, pauses
+  more than 3 m above it and resets below 11 m. The box goes back to NDL once
+  the timer completes or the deco stops clear - a diver already shallower than
+  the start window after a 3 m deco stop gets no frozen stop box - and the
+  computer's own safety-stop started/complete alerts override the depth rules.
+  New element options: `hide_in_states` (any element) and badge
+  `style: "box"`.
+- Depth graph options (Overlay Designer inspector): **Deco stops** (stops and
+  ceiling shaded separately, kept after they clear), **Reveal profile over
+  time** and a **Stop label** at the cursor. New **Generic → Dive Profile
+  Deco** template uses all three.
+- Log parsers recompute a deco ceiling for every sample (`Waypoint.ceiling`),
+  Garmin FIT included.
+
+### Changed
+- The per-user data folder is now `org.christersson.uwmedia` instead of
+  `UWMedia` (macOS `~/Library/Application Support/`, Windows `%APPDATA%`,
+  Linux `~/.local/share`). An existing `UWMedia` folder is copied over on
+  first start and left in place.
+- App bundle identifier is now `org.christersson.uwmedia` (was
+  `com.mikaelchristersson.uwmedia`).
+
+### Fixed
+- UDDF logs flipped the HUD to deco while the log still showed an NDL (the
+  parser's own ceiling recompute overrode the file), and Dive Profile Builder
+  logs had a 0 m deco stop in the first second of deco.
+- Dive Profile Builder NDL was judged at GF low instead of GF high, so it ran
+  out far too early (18 m on air at GF 30/70: about 7 min instead of about 40)
+  and showed NDL 0 while no deco was needed. Saved logs carry the corrected NDL.
+
+### Changed
+- Dive Profile Builder logs: stops are held with the GF interpolated between
+  GF low and GF high (as End dive does), and the logged first stop shows whole
+  minutes, at least one - no more zero-length deep stops.
+
 ## [0.7.0] - 2026-09-20
 
 The GUI was rebuilt and the overlay system became fully editable. Everything

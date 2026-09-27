@@ -164,6 +164,8 @@ _ELEMENT_ATTR_DEFAULTS = {
 _NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
 _INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
 _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill"}
+# A graph's deco-stop shading colour when the inspector switches it on.
+DEFAULT_STOPS_COLOR = "#FFA500"
 _NUMERIC_SKIN_ATTRS = {"scale", "opacity", "ref_offset_x", "ref_offset_y", "width", "height", "corner_radius"}
 _INT_SKIN_ATTRS = {"width", "height", "corner_radius"}
 
@@ -820,6 +822,7 @@ class OverlayDesignerBackend(QObject):
                 "color": "#FFFFFF", "align": "left", "valign": "top", "font_family": DEFAULT_FAMILY,
                 "bold": False, "outline": True, "width": 0, "height": 0, "corner_radius": 0,
                 "marker_style": "dot", "marker_size": 6, "ceiling_color": "#808080", "label": "",
+                "deco_stops": False, "stops_color": DEFAULT_STOPS_COLOR, "reveal_profile": False, "stop_label": False,
                 "small_suffix": "", "small_suffix_scale": SMALL_SUFFIX_DEFAULT_SCALE,
                 "draw_outline": False, "outline_color": "#FFFFFF", "outline_width": 2, "outline_gap": 4,
                 "up_count": 4, "down_count": 1, "style": "segments",
@@ -850,6 +853,13 @@ class OverlayDesignerBackend(QObject):
             "marker_style": elem.get("marker_style", "dot"),
             "marker_size": elem.get("marker_size", 6),
             "ceiling_color": elem.get("ceiling_color", "#808080"),
+            # Graph deco mode (gui.hud_renderer._draw_deco_history) is on
+            # while stops_color is set; the colour shown when off is what
+            # switching it on starts from.
+            "deco_stops": bool(elem.get("stops_color")),
+            "stops_color": elem.get("stops_color") or DEFAULT_STOPS_COLOR,
+            "reveal_profile": bool(elem.get("reveal_profile", False)),
+            "stop_label": bool(elem.get("stop_label", False)),
             "label": elem.get("label", ""),
             "small_suffix": elem.get("small_suffix") or "",
             "small_suffix_scale": elem.get("small_suffix_scale", SMALL_SUFFIX_DEFAULT_SCALE),
@@ -918,6 +928,12 @@ class OverlayDesignerBackend(QObject):
             doc.set_element_attr(index, key, str(value))
         elif key == "draw_outline":
             doc.set_element_attr(index, "draw_outline", True if bool(value) else None)
+        elif key == "deco_stops":
+            doc.set_element_attr(index, "stops_color", DEFAULT_STOPS_COLOR if bool(value) else None)
+        elif key == "stops_color":
+            doc.set_element_attr(index, "stops_color", str(value))
+        elif key in ("reveal_profile", "stop_label"):
+            doc.set_element_attr(index, key, True if bool(value) else None)
         elif key == "style":
             if value not in ("segments", "fill"):
                 return
@@ -1498,7 +1514,7 @@ class OverlayDesignerBackend(QObject):
                     text, _ = resolve_element_text(layout, elem.get("field", ""), wp, waypoints)
                     text = str(text) if text not in (None, "") else None
                 elif kind == "badge":
-                    lines = badge_lines(doc.rules_manufacturer, doc.model, elem, wp)
+                    lines = badge_lines(doc.rules_manufacturer, doc.model, elem, wp, waypoints)
                 result.append(element_native_bounds(elem, native_w, native_h, text=text, badge_lines=lines))
             except Exception as e:
                 print(f"Overlay Designer bounds error ({elem.get('field')}): {e}")
@@ -2194,7 +2210,7 @@ class OverlayDesignerBackend(QObject):
         return wp, waypoints
 
     def _update_data_text(self):
-        wp, _ = self._telemetry_for_render()
+        wp, waypoints = self._telemetry_for_render()
         using_log = (
             self._telemetry_source == SOURCE_LOG
             and self.current_dive is not None
@@ -2208,7 +2224,7 @@ class OverlayDesignerBackend(QObject):
                 source = "Out of dive range - showing dummy telemetry"
             manufacturer = self.document.rules_manufacturer if self.document else None
             model = self.document.model if self.document else None
-            state = resolve_state(manufacturer, model, wp)
+            state = resolve_state(manufacturer, model, wp, waypoints)
             depth = f"{wp.depth:.1f} m" if wp.depth is not None else "--"
             temp = f"{wp.temp:.1f} °C" if wp.temp is not None else "--"
             self._data_text = f"{source} · Depth {depth} · Temp {temp} · State: {state}"
@@ -2400,22 +2416,63 @@ class OverlayDesignerBackend(QObject):
             return
         self._load_logs_from_path(Path(path))
 
+    @Slot()
+    def loadLogFile(self):
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            None, "Select dive log file", "", "Dive logs (*.uddf *.fit *.ssrf *.xml);;All files (*)",
+        )
+        if not path:
+            return
+        self._load_log_file(Path(path))
+
+    def _parse_log_file(self, path: Path):
+        """Dives in one log file by its extension, or None when it isn't a
+        log format UWMedia reads."""
+        suffix = path.suffix.lower()
+        if suffix == ".uddf":
+            return UDDFParser().parse(path)
+        if suffix == ".fit":
+            return GarminParser().parse(path)
+        if suffix in (".ssrf", ".xml"):
+            return SubsurfaceParser().parse(path)
+        return None
+
+    def _load_log_file(self, path: Path):
+        """Loads a single log file (e.g. one saved from the Dive Profile
+        Builder). With no video/photo to match against, previews its first
+        dive straight away."""
+        try:
+            dives = self._parse_log_file(path)
+        except Exception as e:
+            self._set_status(f"Error parsing {path.name}: {e}")
+            return
+        if dives is None:
+            self._set_status(f"Unsupported log file: {path.name} (use .uddf, .fit, .ssrf or .xml)")
+            return
+        if not dives:
+            self._set_status(f"No dives found in {path.name}")
+            return
+        self.dive_manager = DiveManager()
+        self.dive_manager.add_dives(dives)
+        self._set_status(f"Loaded {len(dives)} dive(s) from {path.name}")
+        self._refresh_log_file_choices()
+        if self.video_creation_date:
+            self._match_dive_to_media()
+        elif self.log_file_choices:
+            self.onLogFileSelected(next(iter(self.log_file_choices)))
+
     def _load_logs_from_path(self, dir_path: Path):
         self.dive_manager = DiveManager()
-        uddf, garmin, subsurface = UDDFParser(), GarminParser(), SubsurfaceParser()
         count = 0
         if not dir_path.exists():
             return
         for path in dir_path.iterdir():
             try:
-                if path.suffix == ".uddf":
-                    self.dive_manager.add_dives(uddf.parse(path))
-                    count += 1
-                elif path.suffix == ".fit":
-                    self.dive_manager.add_dives(garmin.parse(path))
-                    count += 1
-                elif path.suffix in (".ssrf", ".xml"):
-                    self.dive_manager.add_dives(subsurface.parse(path))
+                dives = self._parse_log_file(path)
+                if dives is not None:
+                    self.dive_manager.add_dives(dives)
                     count += 1
             except Exception as e:
                 print(f"Error parsing {path.name}: {e}")

@@ -153,6 +153,29 @@ Item {
                     anchors.right: parent.right
                     spacing: 8
                     Label { text: "Custom filename formats"; font.bold: true; font.pixelSize: 14 }
+                    Label {
+                        Layout.fillWidth: true
+                        text: "Output filename patterns from the file's date taken (strftime codes: %Y year, %m month, %d day, %H hour, %M minute, %S second). They appear in the Color page's Output filename list."
+                        color: "#9AA0A6"
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                    Repeater {
+                        model: advancedBackend.filenameFormats
+                        delegate: RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Label {
+                                Layout.fillWidth: true
+                                text: modelData.pattern + "   →   " + modelData.example
+                                elide: Text.ElideRight
+                            }
+                            Button {
+                                text: "Remove"
+                                onClicked: advancedBackend.removeFilenameFormat(modelData.pattern)
+                            }
+                        }
+                    }
                     RowLayout {
                         Layout.fillWidth: true
                         TextField {
@@ -162,8 +185,16 @@ Item {
                             placeholderText: "e.g. \"%Y-%m-%d_%H-%M-%S\""
                             text: advancedBackend.newFilenameFormatText
                             onTextEdited: advancedBackend.newFilenameFormatText = text
+                            onAccepted: advancedBackend.addFilenameFormat()
                         }
                         Button { text: "Add"; onClicked: advancedBackend.addFilenameFormat() }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: advancedBackend.filenameFormatError
+                        color: "#EF4444"
+                        wrapMode: Text.WordWrap
+                        visible: text.length > 0
                     }
                 }
             }
