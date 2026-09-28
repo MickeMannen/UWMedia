@@ -62,7 +62,6 @@ tests rely on this), it only reads bundled template files in __init__.
 """
 import copy
 import json
-import tempfile
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -116,6 +115,7 @@ from utils.hud_designer import (
 from utils.hud_rules_engine import load_rules_json, resolve_state, resolve_tank_variant
 from utils.layouts import list_templates, page_display_name, resolve_template_state, variant_display_name
 from utils.overlay_document import OverlayDocument, TemplateRef
+from utils.resource_paths import app_temp_dir
 from utils.template_store import (
     CUSTOM_BRAND,
     CUSTOM_MANUFACTURER,
@@ -1963,7 +1963,7 @@ class OverlayDesignerBackend(QObject):
                 if layout.get("hud_skin", {}).get("type", "image") == "image":
                     if SKIN_FILENAME not in names:
                         return f"{path.name} has no {SKIN_FILENAME} skin image."
-                    tmp_dir = Path(tempfile.mkdtemp(prefix="uwmedia_import_"))
+                    tmp_dir = app_temp_dir("uwmedia_import_")
                     skin_path = tmp_dir / SKIN_FILENAME
                     skin_path.write_bytes(zf.read(SKIN_FILENAME))
                     layout["hud_skin"]["path"] = str(skin_path)

@@ -3,7 +3,6 @@ import sys
 import os
 import re
 import time
-import tempfile
 import shutil
 import copy
 import json
@@ -20,6 +19,7 @@ from models.dive import Waypoint, Dive
 from models.manager import DiveManager
 from ffmpeg import FfmpegClass
 from utils.dependency_check import check_dependencies
+from utils.resource_paths import app_temp_dir, prune_temp_dirs
 
 import cv2
 import numpy as np
@@ -1302,6 +1302,8 @@ def main():
                 print(f"Error: Output directory '{output_parent}' is not writable.")
                 sys.exit(1)
 
+    prune_temp_dirs()  # yesterday's working folders under the cache dir
+
     # Handle HUD Package / Layout
     tmp_hud_dir = None
     args.original_layout_stem = args.layout.stem if args.layout else None
@@ -1310,7 +1312,7 @@ def main():
             print(f"Error: HUD package {args.layout} not found.")
             sys.exit(1)
         
-        tmp_hud_dir = tempfile.mkdtemp()
+        tmp_hud_dir = str(app_temp_dir("uwmedia_hud_pkg_"))
         with zipfile.ZipFile(args.layout, "r") as zip_file:
             zip_file.extractall(tmp_hud_dir)
             layout_path = Path(tmp_hud_dir) / "hud_layout.json"

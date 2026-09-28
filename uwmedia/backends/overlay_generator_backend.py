@@ -28,13 +28,13 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
 from utils.app_settings import get_fields, set_field
 from utils.display_paths import contract_home_path
+from utils.resource_paths import app_temp_dir
 from utils.run_timing import RunTiming
 from utils.layouts import list_templates, page_display_name, resolve_template_state, load_layout_file, strip_variant_markers, variant_display_name
 
@@ -561,7 +561,7 @@ class OverlayGeneratorBackend(QObject):
         name_parts.append(page)
         if variant:
             name_parts.append(variant)
-        out_dir = Path(tempfile.mkdtemp(prefix="uwmedia_qt_hud_"))
+        out_dir = app_temp_dir("uwmedia_qt_hud_")
         out_path = out_dir / f"{'_'.join(name_parts)}.json"
         with open(out_path, "w") as f:
             json.dump(layout, f, indent=2)

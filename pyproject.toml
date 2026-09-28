@@ -40,6 +40,7 @@ requires = [
     "tqdm",
     "PyYAML",
     "Pillow",
+    "platformdirs",
 ]
 
 # Plain GUI app - what most users should download. Installs into

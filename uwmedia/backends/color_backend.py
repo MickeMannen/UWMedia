@@ -45,7 +45,6 @@ import math
 import re
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -64,6 +63,7 @@ from parsers.uddf import UDDFParser
 from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
+from utils.resource_paths import app_temp_dir
 from utils.run_timing import RunTiming
 from utils import filename_formats
 from utils.filename_formats import custom_filename_formats, example_filename, pattern_error
@@ -657,7 +657,7 @@ class ColorBackend(QObject):
         name_parts.append(page)
         if variant:
             name_parts.append(variant)
-        out_dir = Path(tempfile.mkdtemp(prefix="uwmedia_qt_color_overlay_"))
+        out_dir = app_temp_dir("uwmedia_qt_color_overlay_")
         layout_path = out_dir / f"{'_'.join(name_parts)}.json"
         with open(layout_path, "w") as f:
             json.dump(raw_layout, f, indent=2)
@@ -1184,7 +1184,7 @@ class ColorBackend(QObject):
                 }
                 for instance in self.color_overlay_instances
             ]
-            overlays_dir = Path(tempfile.mkdtemp(prefix="uwmedia_qt_overlays_"))
+            overlays_dir = app_temp_dir("uwmedia_qt_overlays_")
             overlays_path = overlays_dir / "overlays.json"
             with open(overlays_path, "w") as f:
                 json.dump(overlays_data, f, indent=2)

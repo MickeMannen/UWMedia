@@ -40,6 +40,21 @@ def mark_as_checkout(roots):
     (roots["repo"] / "pyproject.toml").write_text("[tool.briefcase]\n")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_user_dirs(tmp_path, monkeypatch):
+    """Every test gets its own config / data / cache folders (CLAUDE.md rule:
+    never write the real Application Support / Caches tree). ffmpeg/color.py
+    and the backends put their working folders under the cache dir, so
+    without this a render test would create ~/Library/Caches/... for real."""
+    import utils.resource_paths as rp
+
+    # The env overrides also reach a CLI run in a subprocess, which inherits them.
+    monkeypatch.setattr(rp, "_legacy_data_base", lambda: tmp_path / "legacy_base")
+    monkeypatch.setenv(rp.ENV_CONFIG_DIR, str(tmp_path / "user_config"))
+    monkeypatch.setenv(rp.ENV_DATA_DIR, str(tmp_path / "user_data"))
+    monkeypatch.setenv(rp.ENV_CACHE_DIR, str(tmp_path / "user_cache"))
+
+
 @pytest.fixture
 def settings_file(tmp_path, monkeypatch):
     """A throwaway settings.json for backends that persist form fields

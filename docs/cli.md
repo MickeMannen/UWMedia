@@ -82,6 +82,11 @@ Without `--filename-format` or `--keep-filename`, a batch run (or a run into
 another folder) names files by date taken, `%Y%m%d_%H%M%S`; photos get the
 milliseconds added (`_123`) so shots from the same second don't clash.
 
+The app's folders can be redirected with `UWMEDIA_CONFIG_DIR`,
+`UWMEDIA_DATA_DIR` and `UWMEDIA_CACHE_DIR` (a portable install, or keeping a
+test run away from your real settings) - see
+[Getting started](getting-started.md#where-your-files-live) for the defaults.
+
 `--no-overwrite`, `--overwrite` and `--move-original` apply when running
 `--color` or `--layout`. The source file itself is never overwritten - if the
 output would land on it, `_1` is added instead.

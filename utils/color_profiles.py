@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import yaml
 
 from utils.app_settings import load_settings
-from utils.resource_paths import find_resource, user_data_dir
+from utils.resource_paths import find_resource, user_config_dir
 
 COLOR_YAML_NAME = "color.yaml"
 
@@ -17,7 +17,7 @@ def bundled_color_yaml_path() -> Optional[Path]:
 def user_color_yaml_path() -> Path:
     """Writable color.yaml for the user's own profiles - overridable in Advanced settings."""
     override = load_settings().get("color_profiles_dir")
-    base = Path(override) if override else user_data_dir()
+    base = Path(override) if override else user_config_dir()
     base.mkdir(parents=True, exist_ok=True)
     return base / COLOR_YAML_NAME
 

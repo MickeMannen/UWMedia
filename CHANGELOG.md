@@ -149,6 +149,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   color**; the date-only preset is gone. Overlay Generator's two presets are
   now **Original + overlay** and **Date + time + overlay**. Selections saved
   under the old names still resolve.
+- Per-user folders follow the platform conventions (via `platformdirs`):
+  configuration (`settings.json`, `config.yaml`, `color.yaml`), data
+  (templates, layouts) and cache are separate on Windows
+  (`%APPDATA%\Christersson\UWMedia`, `%LOCALAPPDATA%\Christersson\UWMedia`
+  and its `Cache`) and Linux (`~/.config/uwmedia`, `~/.local/share/uwmedia`,
+  `~/.cache/uwmedia`); macOS keeps `~/Library/Application Support/
+  org.christersson.uwmedia` plus `~/Library/Caches/org.christersson.uwmedia`.
+  The old single folder is copied over on first start. A run's working
+  files (rendered overlays, LUTs) go under the cache folder instead of the
+  system temp dir and are cleared after a day.
 - The Advanced page's **Custom filename formats** section is hidden (the
   saved patterns are kept but no longer listed on the Color page).
 - Overlay Designer left column is shorter so the canvas keeps its height

@@ -37,11 +37,13 @@ from uwmedia.backends.overlay_designer_backend import OverlayDesignerBackend, Ov
 from uwmedia.backends.log_viewer_backend import LogViewerBackend
 from uwmedia.backends.tag_editor_backend import TagEditorBackend
 from uwmedia.backends.overlay_generator_backend import OverlayGeneratorBackend
+from utils.resource_paths import prune_temp_dirs
 
 QML_MAIN = Path(__file__).resolve().parent / "qml" / "main.qml"
 
 
 def main():
+    prune_temp_dirs()  # yesterday's working folders under the cache dir
     app = QApplication(sys.argv)
     engine = QQmlApplicationEngine()
 

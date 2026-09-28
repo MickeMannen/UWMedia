@@ -8,7 +8,6 @@ import time
 import sys
 import threading
 from queue import Queue
-import tempfile
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -17,6 +16,7 @@ from tqdm import tqdm
 from ffmpeg.ffmpeg_class import FfmpegClass
 from models.dive import Dive, Waypoint
 from utils.color_profiles import load_merged_color_profiles
+from utils.resource_paths import app_temp_dir
 
 # Constants for analysis
 SAMPLE_SECONDS = 2
@@ -595,7 +595,7 @@ class ColorCorrectionEngine:
 
         # Generate LUT files
         t_start_lut = time.time()
-        lut_dir = Path(tempfile.mkdtemp(prefix='uwmedia_lut_'))
+        lut_dir = app_temp_dir('uwmedia_lut_')
         lut_paths = []
         lut_timestamps = []  # in seconds
 
@@ -836,7 +836,7 @@ class ColorCorrectionEngine:
         color_vf = None
         lut_dir = None
         if color_correct and len(filter_matrices) > 0:
-            lut_dir = Path(tempfile.mkdtemp(prefix='uwmedia_lut_'))
+            lut_dir = app_temp_dir('uwmedia_lut_')
             color_vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, lut_dir)
 
         # The HUD must not be colour-corrected: the lut3d filter runs on the

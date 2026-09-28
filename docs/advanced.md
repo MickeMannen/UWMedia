@@ -1,7 +1,7 @@
 # Advanced
 
 App-wide settings. Everything here is saved in `settings.json` (or
-`config.yaml` for sensor names) in the app's data folder - see
+`config.yaml` for sensor names) in the app's configuration folder - see
 [Configuration files](configuration.md).
 
 ## Flags
@@ -14,7 +14,9 @@ App-wide settings. Everything here is saved in `settings.json` (or
 ## Locations
 
 Where your own files are kept. **Change…** picks another folder, **Reset**
-goes back to the default in the app's data folder.
+goes back to the default (the app's data folder for layouts and templates,
+its configuration folder for colour profiles - see
+[Getting started](getting-started.md#where-your-files-live)).
 
 - **Layouts folder** - custom HUD layouts.
 - **Templates folder** - your overlay templates from the

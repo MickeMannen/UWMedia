@@ -46,22 +46,44 @@ python cli_main.py …   # command line - see cli.md
 
 ## Where your files live
 
-Everything you create or change - your own overlay templates, colour
-profiles, settings and remembered form values - is kept in a per-user data
-folder, so it survives reinstalls and updates:
+Everything you create or change is kept in per-user folders, so it survives
+reinstalls and updates. The app never writes into its install location.
 
-| OS | Folder |
+| OS | Configuration | Data | Cache |
+|---|---|---|---|
+| macOS | `~/Library/Application Support/org.christersson.uwmedia/` | same folder | `~/Library/Caches/org.christersson.uwmedia/` |
+| Windows | `%APPDATA%\Christersson\UWMedia\` | `%LOCALAPPDATA%\Christersson\UWMedia\` | `%LOCALAPPDATA%\Christersson\UWMedia\Cache\` |
+| Linux | `$XDG_CONFIG_HOME/uwmedia/` (default `~/.config/uwmedia/`) | `$XDG_DATA_HOME/uwmedia/` (default `~/.local/share/uwmedia/`) | `$XDG_CACHE_HOME/uwmedia/` (default `~/.cache/uwmedia/`) |
+
+What lives where:
+
+- **Configuration** - `settings.json` (settings and remembered form values),
+  `config.yaml` (sensor names) and `color.yaml` (your colour profiles). The
+  colour-profile folder can be moved on the [Advanced](advanced.md) page.
+- **Data** - `templates/` (your overlay templates) and `layouts/` (custom HUD
+  layouts). Both folders can be moved on the Advanced page.
+- **Cache** - `tmp/uwmedia_*` working folders of a run (rendered overlays,
+  LUT files, the overlay list handed to the CLI, template imports). Folders
+  older than a day are removed when the app or CLI starts.
+
+Earlier versions kept everything in one folder. The first time a newer
+version starts, its contents are copied into the folders above (never moved,
+so the old folder is left as it was):
+
+| OS | Old single folder |
 |---|---|
-| macOS | `~/Library/Application Support/org.christersson.uwmedia/` |
-| Windows | `%APPDATA%\org.christersson.uwmedia\` |
-| Linux | `$XDG_DATA_HOME/org.christersson.uwmedia/` (usually `~/.local/share/org.christersson.uwmedia/`) |
+| macOS | `~/Library/Application Support/UWMedia/` (the current folder already has the new name, so nothing moves) |
+| Windows | `%APPDATA%\org.christersson.uwmedia\`, then `%APPDATA%\UWMedia\` |
+| Linux | `~/.local/share/org.christersson.uwmedia/`, then `~/.local/share/UWMedia/` |
 
-Earlier versions used a folder named `UWMedia` in the same place; its
-contents are copied to the new folder the first time a newer version starts
-(the old folder is left as it was).
+On Windows and Linux the three configuration files go to the configuration
+folder and everything else to the data folder.
 
-Bundled templates and profiles are never overwritten. The template and
-colour-profile folders can be moved on the [Advanced](advanced.md) page. See
+The environment variables `UWMEDIA_CONFIG_DIR`, `UWMEDIA_DATA_DIR` and
+`UWMEDIA_CACHE_DIR` override the folders above, for a portable install or
+to keep a test run away from your real settings.
+
+Bundled templates and profiles are never overwritten. See
 [Configuration files](configuration.md) for what's in each file.
 
 ## Typical workflow

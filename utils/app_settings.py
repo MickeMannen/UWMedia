@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from utils.resource_paths import user_data_dir
+from utils.resource_paths import user_config_dir
 
 SETTINGS_FILENAME = "settings.json"
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
-    # None means "use the default user_data_dir() location"
+    # None means "use the default user_data_dir() / user_config_dir() location"
     "layouts_dir": None,
     "templates_dir": None,
     "color_profiles_dir": None,
@@ -23,7 +23,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
 
 
 def settings_path() -> Path:
-    return user_data_dir() / SETTINGS_FILENAME
+    return user_config_dir() / SETTINGS_FILENAME
 
 
 def load_settings() -> Dict[str, Any]:

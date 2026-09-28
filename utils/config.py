@@ -2,7 +2,7 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
-from utils.resource_paths import find_resource, user_data_dir
+from utils.resource_paths import find_resource, user_config_dir
 
 CONFIG_YAML_NAME = "config.yaml"
 
@@ -13,8 +13,8 @@ def bundled_config_yaml_path() -> Optional[Path]:
 
 
 def user_config_yaml_path() -> Path:
-    """Writable config.yaml alongside the app's other user data (settings.json, layouts, color profiles)."""
-    return user_data_dir() / CONFIG_YAML_NAME
+    """Writable config.yaml in the app's config folder (with settings.json and color.yaml)."""
+    return user_config_dir() / CONFIG_YAML_NAME
 
 
 class ConfigManager:
