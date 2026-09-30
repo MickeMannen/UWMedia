@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.2] - 2026-09-30
 
 ### Added
 - Color, Overlay Generator and Convertion show the time spent on a batch
@@ -203,8 +203,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   first start and left in place.
 - App bundle identifier is now `org.christersson.uwmedia` (was
   `com.mikaelchristersson.uwmedia`).
+- Dive Profile Builder logs: stops are held with the GF interpolated between
+  GF low and GF high (as End dive does), and the logged first stop shows whole
+  minutes, at least one - no more zero-length deep stops.
 
 ### Fixed
+- Windows: starting the app from the Start Menu, Explorer or a shortcut
+  no longer leaves a black console window open behind it for the whole
+  session; it closes a blink after it appears. Starting from a terminal
+  keeps the terminal attached as before.
 - Color page: the HUD is no longer colour-corrected along with the footage.
   The lut3d correction ran on the composited frame, so a neutral bezel (the
   Garmin X50i) came out red-tinted; the HUD's pixels are now masked out of
@@ -229,11 +236,6 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Dive Profile Builder NDL was judged at GF low instead of GF high, so it ran
   out far too early (18 m on air at GF 30/70: about 7 min instead of about 40)
   and showed NDL 0 while no deco was needed. Saved logs carry the corrected NDL.
-
-### Changed
-- Dive Profile Builder logs: stops are held with the GF interpolated between
-  GF low and GF high (as End dive does), and the logged first stop shows whole
-  minutes, at least one - no more zero-length deep stops.
 
 ## [0.7.0] - 2026-09-20
 
