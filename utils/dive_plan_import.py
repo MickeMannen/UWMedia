@@ -1,6 +1,10 @@
 """Rebuilding a DiveProfilePlan from a log the Dive Profile Builder wrote
 before it embedded the plan itself (parsers/plan_embed.py) - Open log's
-fallback for those older files.
+fallback for those older files - and from any other log Open log
+imports: another program's UDDF/FIT/SSRF (read by the same per-format
+code below, which doesn't depend on UWMedia's own layout) or a Shearwater
+Cloud XML/CSV / Subsurface CSV export (_shearwater_parts/
+_subsurface_csv_parts).
 
 The three writers (parsers/uddf_writer.py, subsurface_writer.py,
 fit_writer.py) lay their files out the same way every time, so this reads
@@ -249,9 +253,11 @@ def _subsurface_parts(path: Path) -> LoggedPlanParts:
         if idx in ref_of_cyl:
             parts.switches.append((_mmss_seconds(ev.get("time", "0:00 min")), ref_of_cyl[idx]))
     deco = divecomputer.xpath("string(extradata[@key='Deco model']/@value)")
-    gf = re.findall(r"[0-9.]+", deco or "")
-    if len(gf) >= 2:
-        parts.gf_low, parts.gf_high = float(gf[0]), float(gf[1])
+    # "GF 40/85" (UWMedia's writer) or "Buhlmann ZHL-16C 40/85" (Subsurface's
+    # own) - the pair around the slash, not the first two numbers.
+    gf = re.search(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", deco or "")
+    if gf:
+        parts.gf_low, parts.gf_high = float(gf.group(1)), float(gf.group(2))
     temp = divecomputer.xpath("string(temperature/@water)")
     parts.water_temp_c = float(re.sub(r"[^0-9.\-]", "", temp)) if temp else None
     return parts
@@ -312,6 +318,65 @@ def _fit_parts(path: Path) -> LoggedPlanParts:
 
 
 # ---------------------------------------------------------------------------
+# Shearwater Cloud XML/CSV, Subsurface CSV (imported, never written by UWMedia)
+# ---------------------------------------------------------------------------
+
+def _float(value) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _shearwater_parts(path: Path) -> LoggedPlanParts:
+    """Gases and switches from each record's O2/He fractions (one tank, T1
+    - the export doesn't say which transmitter breathes which gas), GF and
+    start pressure from the header/first record."""
+    from parsers.shearwater import PSI_TO_BAR, read_tables
+
+    header, rows = read_tables(path)
+    parts = LoggedPlanParts()
+    imperial = str(header.get("Imperial Units", "")).strip().lower() == "true"
+    gases: Dict[Tuple[float, float], str] = {}
+    current = None
+    ccr = False
+    for row in rows:
+        seconds = row.get("Time (sec)")
+        if seconds is None:
+            continue
+        o2 = round((_float(row.get("Fraction O2")) or 0.21) * 100.0, 1)
+        he = round((_float(row.get("Fraction He")) or 0.0) * 100.0, 1)
+        name = gases.setdefault((o2, he), mix_name(o2, he))
+        if name != current:
+            parts.switches.append((int(seconds), name))
+            current = name
+        mode = str(row.get("Current Circuit Mode", "")).strip().upper()
+        ccr = ccr or mode.startswith(("CC", "SC")) or mode == "0"
+    start_psi = next((p for p in (_float(r.get("Tank 1 pressure (PSI)")) for r in rows) if p), None)
+    for i, ((o2, he), name) in enumerate(gases.items()):
+        parts.gases.append(LoggedGas(
+            name=name, o2_percent=o2, he_percent=he, tank_ref="T1" if i == 0 else f"T{i + 1}",
+            start_pressure_bar=start_psi * PSI_TO_BAR if i == 0 and start_psi else None,
+            diluent=ccr and i == 0,
+        ))
+    parts.dive_type = "ccr" if ccr else "oc"
+    parts.gf_low, parts.gf_high = _float(header.get("GF Minimum")), _float(header.get("GF Maximum"))
+    temp = next((t for t in (_float(r.get("Water Temp")) for r in rows) if t is not None), None)
+    if temp is not None:
+        parts.water_temp_c = (temp - 32.0) * 5.0 / 9.0 if imperial else temp
+    return parts
+
+
+def _subsurface_csv_parts(dive: Dive) -> LoggedPlanParts:
+    """A Subsurface CSV profile has no gas, cylinder or GF information - the
+    builder's own settings stand for those, the water temperature comes
+    from the first sample that has one."""
+    parts = LoggedPlanParts()
+    parts.water_temp_c = next((wp.temp for wp in dive.waypoints if wp.temp is not None), None)
+    return parts
+
+
+# ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------
 
@@ -354,6 +419,12 @@ def profile_waypoints(dive: Dive, switches: Sequence[Tuple[int, str]], first_gas
     samples = sorted(((int(wp.time_since_start), round(float(wp.depth), 1)) for wp in dive.waypoints if wp.depth is not None))
     if not samples:
         return []
+    if samples[0][0] < 0:
+        # Times measured from a start the parser put after the samples (an
+        # older Garmin FIT): count from the first sample instead, which is
+        # what the FIT gas switches are measured from too.
+        offset = samples[0][0]
+        samples = [(t - offset, d) for t, d in samples]
     switches = sorted((max(0, t), g) for t, g in switches)
     depth_at = dict(samples)
 
@@ -405,8 +476,15 @@ def profile_waypoints(dive: Dive, switches: Sequence[Tuple[int, str]], first_gas
 # Entry point
 # ---------------------------------------------------------------------------
 
-def logged_plan_parts(path) -> LoggedPlanParts:
+def logged_plan_parts(path, dive: Optional[Dive] = None) -> LoggedPlanParts:
+    from parsers.registry import SHEARWATER_CSV, SHEARWATER_XML, SUBSURFACE_CSV, detect_log_format
+
     path = Path(path)
+    log_format = detect_log_format(path)
+    if log_format in (SHEARWATER_XML, SHEARWATER_CSV):
+        return _shearwater_parts(path)
+    if log_format == SUBSURFACE_CSV:
+        return _subsurface_csv_parts(dive) if dive is not None else LoggedPlanParts()
     suffix = path.suffix.lower()
     if suffix == ".uddf":
         return _uddf_parts(path)
@@ -414,17 +492,17 @@ def logged_plan_parts(path) -> LoggedPlanParts:
         return _subsurface_parts(path)
     if suffix == ".fit":
         return _fit_parts(path)
-    raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit or .ssrf")
+    raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf or a Shearwater/Subsurface .xml/.csv export")
 
 
 def plan_from_log(path, dive: Dive, base: Optional[DiveProfilePlan] = None) -> DiveProfilePlan:
-    """A DiveProfilePlan reproducing the UWMedia-written log at `path`
+    """A DiveProfilePlan reproducing the log at `path`
     (parsed as `dive` by the matching parser): its gases, tanks, gas
     switches, GF, computer, start time and simplified profile, with
     `base`'s settings for what the log doesn't record."""
     base = base or DiveProfilePlan()
     plan = base.model_copy(deep=True)
-    parts = logged_plan_parts(path)
+    parts = logged_plan_parts(path, dive)
 
     used: set = set()
     gases: List[PlannedGas] = []
@@ -478,7 +556,9 @@ def plan_from_log(path, dive: Dive, base: Optional[DiveProfilePlan] = None) -> D
     if dive.log_filename:
         plan.name = Path(dive.log_filename).stem.replace("_", " ") or plan.name
     if isinstance(dive.start_time, datetime):
-        plan.start_time = dive.start_time.replace(tzinfo=None, microsecond=0)
+        first = min(dive.waypoints, key=lambda wp: wp.time_since_start, default=None)
+        start = first.timestamp if first is not None and first.time_since_start < 0 else dive.start_time
+        plan.start_time = start.replace(tzinfo=None, microsecond=0)
     plan.computer = computer_label_for(dive, base.computer)
     max_depth = max((wp.depth_m for wp in plan.waypoints), default=0.0)
     if max_depth > 0:

@@ -32,6 +32,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
+from parsers.registry import LOG_FILE_FILTER
 from utils.app_settings import get_fields, set_field
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
@@ -265,7 +266,7 @@ class OverlayGeneratorBackend(QObject):
     def browseLogFile(self):
         from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(
-            None, "Select dive log", "", "Dive logs (*.uddf *.fit *.ssrf *.xml);;All files (*)"
+            None, "Select dive log", "", LOG_FILE_FILTER
         )
         if path:
             self.logFileText = path

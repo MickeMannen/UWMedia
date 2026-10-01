@@ -399,14 +399,56 @@ def test_open_log_restores_the_saved_plan_and_the_settings_texts(settings_file, 
     assert fields["dive_profile_computer"] == "Garmin Descent X50i"
 
 
-def test_open_log_refuses_logs_uwmedia_did_not_write(settings_file):
+@pytest.mark.parametrize("path, gf, gases", [
+    ("test_data/logs/fit/489 Camera Bay_new.fit", None, None),
+    ("test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf", (50, 85), ["CC1", "OC1", "OC2", "OC3"]),
+    # Subsurface's own "Buhlmann ZHL-16C 40/85" - not GF 16/40.
+    ("test_data/logs/ssrf/494.ssrf", (40, 85), ["Air"]),
+])
+def test_open_log_imports_logs_uwmedia_did_not_write(settings_file, path, gf, gases):
+    backend = DiveProfileBackend()
+    message = backend.load_log(path)
+    assert message.startswith("Imported")
+    if gf:
+        assert (backend.dive_plan.gf_low, backend.dive_plan.gf_high) == gf
+    if gases:
+        assert [g.id for g in backend.dive_plan.gases] == gases
+    assert backend.waypointRows
+    assert backend.dive_profile_samples
+
+
+def test_open_log_imports_fit_with_samples_before_its_start(settings_file):
+    # The parser gives this older FIT's samples negative times (-6346..-1 s).
+    backend = DiveProfileBackend()
+    backend.load_log("test_data/logs/fit/garmin_2023-10-21-12-13-38.fit")
+    plan = backend.dive_plan
+    assert plan.start_time == datetime(2023, 10, 21, 12, 13, 38)
+    assert min(w.runtime_sec for w in plan.waypoints) >= 0
+    assert max(w.runtime_sec for w in plan.waypoints) > 3600
+
+
+def test_open_log_refuses_files_it_cannot_read(settings_file, tmp_path):
     backend = DiveProfileBackend()
     before = backend.dive_plan.model_dump()
-    with pytest.raises(ValueError, match="not written by UWMedia"):
-        backend.load_log("test_data/logs/fit/489 Camera Bay_new.fit")
-    with pytest.raises(ValueError, match="not written by UWMedia"):
-        backend.load_log("test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf")
+    other = tmp_path / "notes.csv"
+    other.write_text("a,b\n1,2\n")
+    with pytest.raises(ValueError, match="Unknown log format"):
+        backend.load_log(other)
     assert backend.dive_plan.model_dump() == before
+
+
+@pytest.mark.parametrize("suffix", [".xml", ".csv"])
+def test_open_log_imports_a_shearwater_cloud_export(settings_file, suffix):
+    backend = DiveProfileBackend()
+    message = backend.load_log(f"test_data/logs/alternative_formats/Perdix 2[A5419AC1]#451 2025-10-19 11-42-39{suffix}")
+    assert message.startswith("Imported")
+    plan = backend.dive_plan
+    assert (plan.gf_low, plan.gf_high) == (40, 85)
+    assert [(g.id, g.o2_percent) for g in plan.gases] == [("Air", 21.0)]
+    assert plan.gases[0].start_pressure_bar == 194
+    assert plan.start_time == datetime(2025, 10, 19, 11, 42, 39)
+    assert backend.computerLabel == "Shearwater Perdix 2"
+    assert backend.waypointRows
 
 
 def test_open_log_rebuilds_an_older_uddf_without_embedded_plan(settings_file):

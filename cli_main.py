@@ -13,7 +13,7 @@ import zipfile
 from tqdm import tqdm
 from parsers.uddf import UDDFParser
 from parsers.garmin import GarminParser
-from parsers.subsurface import SubsurfaceParser
+from parsers.registry import FIT, UDDF, detect_log_format, parse_log_file
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint, Dive
 from models.manager import DiveManager
@@ -114,40 +114,35 @@ def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0, width:
         f.write(content)
     print(f"FCPXML generated: {xml_path.name}")
 
+def read_log_file(path: Path, args, shift_fit: bool = False):
+    """Dives in one log file (parsers.registry) with --tz-adjust applied,
+    or None when it isn't a log format UWMedia reads. A UDDF also gets the
+    offset written into it as <timezone>; FIT dives are only shifted where
+    `shift_fit` (the --export-json path), as before."""
+    log_format = detect_log_format(path)
+    if log_format is None:
+        return None
+    if log_format == UDDF and args.tz_adjust:
+        UDDFParser().update_timezone(path, args.tz_adjust * 60)
+    dives = parse_log_file(path, log_format)
+    if args.tz_adjust and (log_format != FIT or shift_fit):
+        for d in dives:
+            d.start_time += timedelta(hours=args.tz_adjust)
+            d.end_time += timedelta(hours=args.tz_adjust)
+            for wp in d.waypoints:
+                wp.timestamp += timedelta(hours=args.tz_adjust)
+            d.invalidate_timestamp_cache()
+    return dives
+
+
 def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_dir):
     """Generates a video from a dive log and layout on a black background."""
     print(f"\n--- Generating Video from Log: {log_path.name} ---")
     
     # 1. Parse the specific log file
-    suffix = log_path.suffix.lower()
-    dives = []
-    if suffix == ".uddf":
-        parser = UDDFParser()
-        if args.tz_adjust:
-            parser.update_timezone(log_path, args.tz_adjust * 60)
-        dives = parser.parse(log_path)
-        if args.tz_adjust:
-            for d in dives:
-                d.start_time += timedelta(hours=args.tz_adjust)
-                d.end_time += timedelta(hours=args.tz_adjust)
-                for wp in d.waypoints:
-                    wp.timestamp += timedelta(hours=args.tz_adjust)
-                d.invalidate_timestamp_cache()
-    elif suffix == ".fit":
-        parser = GarminParser()
-        dives = parser.parse(log_path)
-    elif suffix in (".ssrf", ".xml"):
-        parser = SubsurfaceParser()
-        dives = parser.parse(log_path)
-        if args.tz_adjust:
-            for d in dives:
-                d.start_time += timedelta(hours=args.tz_adjust)
-                d.end_time += timedelta(hours=args.tz_adjust)
-                for wp in d.waypoints:
-                    wp.timestamp += timedelta(hours=args.tz_adjust)
-                d.invalidate_timestamp_cache()
-    else:
-        print(f"Error: Unsupported log format {suffix}")
+    dives = read_log_file(log_path, args)
+    if dives is None:
+        print(f"Error: Unsupported log format {log_path.suffix.lower()}")
         sys.exit(1)
 
     if not dives:
@@ -1198,50 +1193,17 @@ def main():
         print(f"Reading logs from: {input_dir}")
         print(f"Exporting JSONs to: {output_dir}")
         
-        shearwater = UDDFParser()
-        garmin = GarminParser()
-        subsurface = SubsurfaceParser()
-        
         log_files = [f for f in sorted(input_dir.iterdir()) if f.is_file() and not f.name.startswith('.')]
         
         processed_count = 0
         for path in log_files:
-            suffix = path.suffix.lower()
-            if suffix not in (".uddf", ".fit", ".ssrf", ".xml"):
+            if detect_log_format(path) is None:
                 continue
             
             print(f"Processing log file: {path.name}")
             dives = []
             try:
-                if suffix == ".uddf":
-                    if args.tz_adjust:
-                        shearwater.update_timezone(path, args.tz_adjust * 60)
-                    dives = shearwater.parse(path)
-                    if args.tz_adjust:
-                        for d in dives:
-                            d.start_time += timedelta(hours=args.tz_adjust)
-                            d.end_time += timedelta(hours=args.tz_adjust)
-                            for wp in d.waypoints:
-                                wp.timestamp += timedelta(hours=args.tz_adjust)
-                            d.invalidate_timestamp_cache()
-                elif suffix == ".fit":
-                    dives = garmin.parse(path)
-                    if args.tz_adjust:
-                        for d in dives:
-                            d.start_time += timedelta(hours=args.tz_adjust)
-                            d.end_time += timedelta(hours=args.tz_adjust)
-                            for wp in d.waypoints:
-                                wp.timestamp += timedelta(hours=args.tz_adjust)
-                            d.invalidate_timestamp_cache()
-                elif suffix in (".ssrf", ".xml"):
-                    dives = subsurface.parse(path)
-                    if args.tz_adjust:
-                        for d in dives:
-                            d.start_time += timedelta(hours=args.tz_adjust)
-                            d.end_time += timedelta(hours=args.tz_adjust)
-                            for wp in d.waypoints:
-                                wp.timestamp += timedelta(hours=args.tz_adjust)
-                            d.invalidate_timestamp_cache()
+                dives = read_log_file(path, args, shift_fit=True)
             except Exception as e:
                 print(f"Error parsing {path.name}: {e}")
                 continue
@@ -1351,9 +1313,7 @@ def main():
     manager = DiveManager()
     found_garmin = False
     if args.logs:
-        shearwater = UDDFParser()
         garmin = GarminParser()
-        subsurface = SubsurfaceParser()
 
         if not args.logs.is_dir():
             print(f"Error: Log directory {args.logs} not found.")
@@ -1374,32 +1334,13 @@ def main():
             sys.exit(0)
 
         for path in args.logs.iterdir():
-            if path.suffix == ".uddf":
-                # ... (shearwater parsing)
-                if args.tz_adjust:
-                    shearwater.update_timezone(path, args.tz_adjust * 60)
-                dives = shearwater.parse(path)
-                if args.tz_adjust:
-                    for d in dives:
-                        d.start_time += timedelta(hours=args.tz_adjust)
-                        d.end_time += timedelta(hours=args.tz_adjust)
-                        for wp in d.waypoints:
-                            wp.timestamp += timedelta(hours=args.tz_adjust)
-                        d.invalidate_timestamp_cache()
-                manager.add_dives(dives)
-            elif path.suffix == ".fit":
-                found_garmin = True
-                manager.add_dives(garmin.parse(path))
-            elif path.suffix in (".ssrf", ".xml"):
-                dives = subsurface.parse(path)
-                if args.tz_adjust:
-                    for d in dives:
-                        d.start_time += timedelta(hours=args.tz_adjust)
-                        d.end_time += timedelta(hours=args.tz_adjust)
-                        for wp in d.waypoints:
-                            wp.timestamp += timedelta(hours=args.tz_adjust)
-                        d.invalidate_timestamp_cache()
-                manager.add_dives(dives)
+            if not path.is_file() or path.name.startswith("."):
+                continue
+            dives = read_log_file(path, args)
+            if dives is None:
+                continue
+            found_garmin = found_garmin or path.suffix.lower() == ".fit"
+            manager.add_dives(dives)
 
     # Warning for Garmin logs without config
     from utils.config import get_config

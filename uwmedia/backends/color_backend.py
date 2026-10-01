@@ -57,9 +57,7 @@ from gui.hud_renderer import draw_hud, overlay_pixel_bbox, resolve_overlay_insta
 from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 from models.manager import DiveManager
-from parsers.garmin import GarminParser
-from parsers.subsurface import SubsurfaceParser
-from parsers.uddf import UDDFParser
+from parsers.registry import parse_log_file
 from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
@@ -476,15 +474,13 @@ class ColorBackend(QObject):
         self.dive_manager = DiveManager()
         dir_path = Path(self._logs_text.strip()) if self._logs_text.strip() else None
         if dir_path and dir_path.is_dir():
-            uddf, garmin, subsurface = UDDFParser(), GarminParser(), SubsurfaceParser()
             for path in dir_path.iterdir():
+                if not path.is_file() or path.name.startswith("."):
+                    continue
                 try:
-                    if path.suffix == ".uddf":
-                        self.dive_manager.add_dives(uddf.parse(path))
-                    elif path.suffix == ".fit":
-                        self.dive_manager.add_dives(garmin.parse(path))
-                    elif path.suffix in (".ssrf", ".xml"):
-                        self.dive_manager.add_dives(subsurface.parse(path))
+                    dives = parse_log_file(path)
+                    if dives:
+                        self.dive_manager.add_dives(dives)
                 except Exception as e:
                     print(f"Error parsing {path.name}: {e}")
         self._match_dive_to_media()

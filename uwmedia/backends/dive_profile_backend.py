@@ -61,11 +61,9 @@ from gui.dive_profile_view import (
 )
 from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
 from parsers.fit_writer import write_fit
-from parsers.garmin import GarminParser
 from parsers.plan_embed import read_log_origin
-from parsers.subsurface import SubsurfaceParser
+from parsers.registry import detect_log_format, parse_log_file
 from parsers.subsurface_writer import write_subsurface
-from parsers.uddf import UDDFParser
 from parsers.uddf_writer import write_uddf
 from utils.app_settings import get_fields, set_field
 from utils.dive_computers import DIVE_COMPUTERS
@@ -91,9 +89,14 @@ LOG_FORMATS = {
     "Subsurface XML (*.ssrf)": (".ssrf", write_subsurface),
 }
 LOG_FORMAT_FIELD = "dive_profile_log_format"
-# Open dialog filter and the parser each extension is read back with.
-LOG_OPEN_FILTER = "Dive logs (*.uddf *.fit *.ssrf *.xml);;UDDF (*.uddf);;Garmin FIT (*.fit);;Subsurface XML (*.ssrf *.xml)"
-LOG_PARSERS = {".uddf": UDDFParser, ".fit": GarminParser, ".ssrf": SubsurfaceParser, ".xml": SubsurfaceParser}
+# Open dialog filter. A log the builder wrote with its plan embedded
+# opens as saved; any other log UWMedia reads (an older builder log,
+# another program's UDDF/FIT/SSRF, a Shearwater Cloud or Subsurface CSV
+# export) is imported, the plan rebuilt from its samples.
+LOG_OPEN_FILTER = (
+    "Dive logs (*.uddf *.fit *.ssrf *.xml *.csv);;UDDF (*.uddf);;Garmin FIT (*.fit);;"
+    "Subsurface (*.ssrf *.xml *.csv);;Shearwater Cloud (*.xml *.csv)"
+)
 START_TIME_FORMATS = ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S")
 # settings.json "fields" keys the last-used gradient factors are kept under.
 GF_LOW_FIELD = "dive_profile_gf_low"
@@ -314,35 +317,35 @@ class DiveProfileBackend(QObject):
         self._log_error_text = ""
 
     # ------------------------------------------------------------------
-    # Open log - a log the builder saved, back into the editor
+    # Open log - a log the builder saved back into the editor, or any
+    # other log imported as a plan
     # ------------------------------------------------------------------
 
     def load_log(self, path):
-        """Replaces the plan with the one in a UWMedia-written log: the
-        embedded plan as saved, or (older files) one rebuilt from the
-        log's gases, switches and samples. Returns a status line; raises
-        ValueError for a file UWMedia didn't write or can't read."""
+        """Replaces the plan with the one in `path`: the embedded plan as
+        saved for a log the builder wrote with it, otherwise one rebuilt
+        from the log's gases, switches and samples (an older builder log,
+        or any other program's log UWMedia reads). Returns a status line;
+        raises ValueError for a file it can't read."""
         path = Path(path)
-        parser = LOG_PARSERS.get(path.suffix.lower())
-        if parser is None:
-            raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit or .ssrf")
         if not path.is_file():
             raise ValueError(f"{path} does not exist")
-        origin = read_log_origin(path)
-        if not origin.created_by_uwmedia:
+        log_format = detect_log_format(path)
+        if log_format is None:
             raise ValueError(
-                f"{path.name} was not written by UWMedia's Dive Profile Builder - only logs it saved can be opened"
+                f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf or a Shearwater/Subsurface .xml/.csv export"
             )
+        origin = read_log_origin(path)
         if origin.plan is not None:
-            plan, how = origin.plan, "plan restored as saved"
-        else:
-            dives = parser().parse(path)
-            if not dives:
-                raise ValueError(f"No dive found in {path.name}")
-            plan = plan_from_log(path, dives[0], self.dive_plan)
-            how = "saved before UWMedia kept the plan, so rebuilt from its samples - check the waypoints"
-        self._apply_plan(plan)
-        return f"Opened {path.name}: {how}"
+            self._apply_plan(origin.plan)
+            return f"Opened {path.name}: plan restored as saved"
+        dives = parse_log_file(path, log_format)
+        if not dives:
+            raise ValueError(f"No dive found in {path.name}")
+        self._apply_plan(plan_from_log(path, dives[0], self.dive_plan))
+        if origin.created_by_uwmedia:
+            return f"Opened {path.name}: saved before UWMedia kept the plan, so rebuilt from its samples - check the waypoints"
+        return f"Imported {path.name}: plan rebuilt from its samples - check the gases and waypoints"
 
     def _apply_plan(self, plan):
         self.dive_plan = plan

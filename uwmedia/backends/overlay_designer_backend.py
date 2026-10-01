@@ -91,9 +91,7 @@ from gui.hud_renderer import (
 )
 from metadata.exif import MetadataHandler
 from models.manager import DiveManager
-from parsers.garmin import GarminParser
-from parsers.subsurface import SubsurfaceParser
-from parsers.uddf import UDDFParser
+from parsers.registry import LOG_FILE_FILTER, parse_log_file
 from utils.dummy_telemetry import (
     DUMMY_DURATION_S,
     STATE_LABELS,
@@ -2495,23 +2493,18 @@ class OverlayDesignerBackend(QObject):
         from PySide6.QtWidgets import QFileDialog
 
         path, _ = QFileDialog.getOpenFileName(
-            None, "Select dive log file", "", "Dive logs (*.uddf *.fit *.ssrf *.xml);;All files (*)",
+            None, "Select dive log file", "", LOG_FILE_FILTER,
         )
         if not path:
             return
         self._load_log_file(Path(path))
 
     def _parse_log_file(self, path: Path):
-        """Dives in one log file by its extension, or None when it isn't a
-        log format UWMedia reads."""
-        suffix = path.suffix.lower()
-        if suffix == ".uddf":
-            return UDDFParser().parse(path)
-        if suffix == ".fit":
-            return GarminParser().parse(path)
-        if suffix in (".ssrf", ".xml"):
-            return SubsurfaceParser().parse(path)
-        return None
+        """Dives in one log file (parsers.registry), or None when it isn't
+        a log format UWMedia reads."""
+        if not path.is_file() or path.name.startswith("."):
+            return None
+        return parse_log_file(path)
 
     def _load_log_file(self, path: Path):
         """Loads a single log file (e.g. one saved from the Dive Profile
@@ -2523,7 +2516,7 @@ class OverlayDesignerBackend(QObject):
             self._set_status(f"Error parsing {path.name}: {e}")
             return
         if dives is None:
-            self._set_status(f"Unsupported log file: {path.name} (use .uddf, .fit, .ssrf or .xml)")
+            self._set_status(f"Unsupported log file: {path.name} (use .uddf, .fit, .ssrf, or a Subsurface/Shearwater .xml or .csv export)")
             return
         if not dives:
             self._set_status(f"No dives found in {path.name}")

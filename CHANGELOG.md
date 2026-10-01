@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Dive logs: Shearwater Cloud's own XML and CSV exports and Subsurface's CSV
+  dive-profile export can now be read by Color, the Overlay Designer, the
+  Overlay Generator, the Log Viewer and the CLI, next to UDDF, FIT and SSRF.
+  The Shearwater files carry the computer's logged NDL, TTS, stops, ppO2,
+  SAC and gas time remaining.
+- Dive Profile Builder: **Open log** imports any log UWMedia reads, not only
+  ones the builder saved: UDDF, FIT and SSRF from a dive computer or other
+  software, and Shearwater Cloud XML/CSV or Subsurface CSV exports. The plan
+  (gases, switches, GF, start pressure, profile) is rebuilt from its samples.
+
+### Changed
+- Color, Overlay Designer and CLI: a folder holding the same dive in several
+  formats (e.g. its UDDF and Shearwater CSV) uses only the copy with the most
+  data instead of whichever file was read last. Two different computers'
+  logs of one dive are still both kept.
+
+### Fixed
+- A Shearwater Cloud `.xml` export was handed to the Subsurface reader and
+  came up as "no dives found".
+
 ## [0.7.2] - 2026-09-30
 
 ### Added

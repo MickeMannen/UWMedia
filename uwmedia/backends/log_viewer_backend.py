@@ -3,11 +3,11 @@ uwmedia/qml/LogViewerPage.qml as the "logViewerBackend" context
 property.
 
 Ported close to verbatim from uwmedia/pages/log_viewer_page.py
-(the old Widgets page, kept as reference only) - reuses UDDFParser/
-GarminParser/SubsurfaceParser (parsers.*) and get_config (utils.config)
-unchanged; parse_dive_log_file is duplicated here verbatim, same posture
-the old Widgets page's own docstring already documents (a small pure
-helper, no shared-module home).
+(the old Widgets page, kept as reference only) - reads logs through
+parsers.registry (every format UWMedia reads, .xml/.csv told apart by
+content) and get_config (utils.config) unchanged. Every log file in the
+directory is listed, including several exports of one dive - unlike the
+media pages' DiveManager, which keeps only the richest.
 
 Read-only page, no settings persistence - matches the old Widgets page's
 own docstring (checked directly against PERSISTED_TEXT_FIELDS/
@@ -22,26 +22,18 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-from parsers.garmin import GarminParser
-from parsers.subsurface import SubsurfaceParser
-from parsers.uddf import UDDFParser
+from parsers.registry import is_log_file, parse_log_file
 from utils.config import get_config
-
-LOG_VIEWER_EXTENSIONS = {".fit", ".uddf", ".ssrf", ".xml"}
 
 TABLE_COLUMNS = ["time", "depth", "temp", "ndl", "tts", "gas", "tanks"]
 TABLE_HEADERS = ["Time", "Depth (m)", "Temp (°C)", "NDL (s)", "TTS (s)", "Gas", "Tanks"]
 
 
 def parse_dive_log_file(path: Path):
-    suffix = path.suffix.lower()
-    if suffix == ".uddf":
-        return UDDFParser().parse(path)
-    if suffix == ".fit":
-        return GarminParser().parse(path)
-    if suffix in (".ssrf", ".xml"):
-        return SubsurfaceParser().parse(path)
-    raise ValueError(f"Unsupported log file type: {suffix}")
+    dives = parse_log_file(path)
+    if dives is None:
+        raise ValueError(f"Unsupported log file type: {path.suffix.lower()}")
+    return dives
 
 
 class LogViewerBackend(QObject):
@@ -96,7 +88,7 @@ class LogViewerBackend(QObject):
         self._dir_label = str(directory)
 
         self.log_viewer_files = sorted(
-            (f for f in directory.iterdir() if f.is_file() and f.suffix.lower() in LOG_VIEWER_EXTENSIONS),
+            (f for f in directory.iterdir() if f.is_file() and not f.name.startswith(".") and is_log_file(f)),
             key=lambda f: f.name.lower(),
         )
         self._clear()

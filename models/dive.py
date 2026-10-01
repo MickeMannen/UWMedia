@@ -145,6 +145,9 @@ class Dive(BaseModel):
     # Source Info
     log_filename: Optional[str] = None
     log_path: Optional[str] = None
+    log_format: Optional[str] = Field(
+        None, description="parsers.registry format key the dive was read from ('uddf', 'shearwater_csv', ...) - set by parse_log_file"
+    )
 
     def model_post_init(self, __context) -> None:
         """Set back-reference to parent dive on all waypoints."""
