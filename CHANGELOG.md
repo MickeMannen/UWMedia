@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.3] - 2026-10-01
 
 ### Added
 - Dive logs: Shearwater Cloud's own XML and CSV exports and Subsurface's CSV
