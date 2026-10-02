@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.4] - 2026-10-02
+
+### Changed
+- Log Viewer: redesigned after DiveSync's log view. Open files or a whole
+  folder into one list of dives (Remove / Clear take them off again), and
+  the selected dive is shown as a card of fields, a tanks and sensors table,
+  a depth profile chart, the data the log carries and its events. Sensor
+  serial numbers and GPS positions can be selected and copied (e.g. into
+  Advanced → Sensor names). The sample table is still there, folded under
+  **Samples**. The dialogs remember the last folder used.
+
 ## [0.7.3] - 2026-10-01
 
 ### Added
