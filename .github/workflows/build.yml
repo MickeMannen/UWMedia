@@ -5,9 +5,12 @@
 #
 # Typical flow: create the release from the GitHub UI (Releases -> Draft a
 # new release, picking/creating the tag) first, then come here and trigger
-# "Run workflow" - pick that same tag from the "Use workflow from" dropdown,
-# check "Build macOS (signed + notarized)" and "Create/update the GitHub
-# Release", and run it. That builds a real, Apple-notarized macOS build and
+# "Run workflow", check "Build macOS (signed + notarized)" and
+# "Create/update the GitHub Release", and run it. The tag to build is
+# resolved by the prepare job: the "Tag" input if filled in, else the
+# "Use workflow from" ref if it is a tag, else the v* tag on the tip of the
+# selected branch (so leaving the dropdown on main right after a release
+# commit works too). That builds a real, Apple-notarized macOS build and
 # attaches it straight to the release you just created.
 #
 # Signing requires five repo secrets, none of which this workflow can set
@@ -42,6 +45,10 @@ name: Release Build
 on:
   workflow_dispatch:
     inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.7.4). Leave empty to use the selected tag, or the tag on the selected branch''s latest commit'
+        type: string
+        default: ''
       build_macos_unsigned:
         description: 'Build macOS (ad-hoc/unsigned)'
         type: boolean
@@ -59,7 +66,7 @@ on:
         type: boolean
         default: true
       create_release:
-        description: 'Create/update the GitHub Release for the selected tag with whatever gets built (requires picking a tag above, not a branch)'
+        description: 'Create/update the GitHub Release for the resolved tag with whatever gets built'
         type: boolean
         default: false
 
@@ -72,12 +79,42 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      tag: ${{ steps.resolve-tag.outputs.tag }}
     steps:
-      - name: Require a tag ref when creating a release
-        if: inputs.create_release && github.ref_type != 'tag'
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Which tag this run builds: the "tag" input, else the selected ref if
+      # it is a tag, else a v* tag on the selected branch's tip commit.
+      # Empty means an untagged test build, which is refused when a release
+      # or a signed build was asked for (both must match a real version).
+      - id: resolve-tag
+        name: Resolve tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          NEEDS_TAG: ${{ inputs.create_release || inputs.build_macos_signed }}
         run: |
-          echo "::error::create_release requires a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
-          exit 1
+          TAG="$INPUT_TAG"
+          if [ -z "$TAG" ] && [ "$REF_TYPE" = "tag" ]; then
+            TAG="$REF_NAME"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG=$(git tag --points-at HEAD --list 'v*' --sort=-v:refname | head -1)
+          fi
+          if [ -n "$TAG" ] && ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag '$TAG' does not exist in the repository."
+            exit 1
+          fi
+          if [ -z "$TAG" ] && [ "$NEEDS_TAG" = "true" ]; then
+            echo "::error::No tag found: '$REF_NAME' has no v* tag on its latest commit. Fill in the 'Tag' input (e.g. v0.7.4) or pick a tag from 'Use workflow from'."
+            exit 1
+          fi
+          echo "Building tag: ${TAG:-<none, untagged test build of $REF_NAME>}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - id: set-matrix
         run: |
@@ -135,19 +172,13 @@ jobs:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     steps:
+      # Builds the tag resolved by the prepare job (which also refuses a
+      # signed build or a release without one); an empty ref falls back to
+      # the selected branch for untagged test builds.
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # A signed build should always correspond to a specific version tag -
-      # if "Run workflow" was triggered with the branch/tag dropdown left on
-      # a branch (e.g. main) instead of a tag, the version-stamping step
-      # below silently no-ops and the artifact ships with whatever stale
-      # version happens to be in pyproject.toml. Fail loudly instead.
-      - name: Require a tag ref for signed builds
-        if: matrix.sign_macos && github.ref_type != 'tag'
-        run: |
-          echo "::error::Signed builds must be run against a tag. Re-run 'Run workflow' and pick a tag (e.g. v0.5.1) from the 'Use workflow from' dropdown instead of a branch."
-          exit 1
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up Python
         if: matrix.platform != 'linux'
@@ -199,14 +230,14 @@ jobs:
         run: python scripts/fetch_vendored_binaries.py
 
       - name: Set app version from tag
-        if: startsWith(github.ref, 'refs/tags/')
+        if: needs.prepare.outputs.tag != ''
         shell: bash
         env:
-          TAG_REF: ${{ github.ref }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           python -c "
           import os, re, pathlib
-          tag_version = os.environ['TAG_REF'].removeprefix('refs/tags/v')
+          tag_version = os.environ['TAG'].removeprefix('v')
           p = pathlib.Path('pyproject.toml')
           content = re.sub(r'(?m)^version = \".*\"', f'version = \"{tag_version}\"', p.read_text(), count=1)
           p.write_text(content)
@@ -325,7 +356,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: build
+    needs: [prepare, build]
     # Only runs if you explicitly checked "Create/update the GitHub Release"
     # on a manual dispatch (against a tag) - releases themselves are always
     # created by hand from the GitHub UI first. Leaving this unchecked never
@@ -344,6 +375,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
           files: artifacts/*/*
           # The release is created first (from CHANGELOG.md, see CLAUDE.md
           # "Changelog and releases"); this only adds the file list under
