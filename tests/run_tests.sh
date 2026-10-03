@@ -22,17 +22,28 @@ elif [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-# Print Selection Menu
-echo -e "\nSelect a test suite to run:"
-echo -e "  ${YELLOW}1)${NC} Run ALL tests (Unit tests + Pre-release tests)"
-echo -e "  ${YELLOW}2)${NC} Run CLI Argument Unit Tests (Color, Legacy, Convert, Render Log, Video Log)"
-echo -e "  ${YELLOW}3)${NC} Run Parser & Utility Unit Tests (Garmin, UDDF, Subsurface, Metadata, HUD)"
-echo -e "  ${YELLOW}4)${NC} Run Pre-release Validation Suite (release_test.py)"
-echo -e "  ${YELLOW}5)${NC} Exit"
+# Usage: tests/run_tests.sh [1-5] - with a choice, run it without the menu
+# (for scripts and background runs); without one, ask as before.
+choice_arg="$1"
 
+# Print Selection Menu (only when asking)
+if [ -z "$choice_arg" ]; then
+    echo -e "\nSelect a test suite to run:"
+    echo -e "  ${YELLOW}1)${NC} Run ALL tests (Unit tests + Pre-release tests)"
+    echo -e "  ${YELLOW}2)${NC} Run CLI Argument Unit Tests (Color, Legacy, Convert, Render Log, Video Log)"
+    echo -e "  ${YELLOW}3)${NC} Run Parser & Utility Unit Tests (Garmin, UDDF, Subsurface, Metadata, HUD)"
+    echo -e "  ${YELLOW}4)${NC} Run Pre-release Validation Suite (release_test.py)"
+    echo -e "  ${YELLOW}5)${NC} Exit"
+fi
+
+status=0
 while true; do
-    echo -n "Choose a test suite to run [1-5]: "
-    read -r choice
+    if [ -n "$choice_arg" ]; then
+        choice="$choice_arg"
+    else
+        echo -n "Choose a test suite to run [1-5]: "
+        read -r choice
+    fi
     
     # Strip any trailing carriage return (\r or ^M) that IDEs like PyCharm send
     choice=$(echo "$choice" | tr -d '\r')
@@ -41,6 +52,7 @@ while true; do
         1)
             echo -e "\n${GREEN}[*] Running all tests in the codebase...${NC}"
             PYTHONPATH=. pytest -v
+            status=$?
             break
             ;;
         2)
@@ -50,6 +62,7 @@ while true; do
                 tests/test_convert.py \
                 tests/test_render_log.py \
                 tests/test_render_video_log.py -v
+            status=$?
             break
             ;;
         3)
@@ -63,11 +76,13 @@ while true; do
                 tests/test_hud_renderer.py \
                 tests/test_hud_rules.py \
                 tests/test_models.py -v
+            status=$?
             break
             ;;
         4)
             echo -e "\n${GREEN}[*] Running pre-release validation tests...${NC}"
             PYTHONPATH=. pytest tests/release_test.py -v
+            status=$?
             break
             ;;
         5)
@@ -76,6 +91,11 @@ while true; do
             ;;
         *)
             echo -e "${RED}Invalid selection '$choice'. Please choose a number between 1 and 5.${NC}"
+            # An invalid argument would otherwise loop forever
+            [ -n "$choice_arg" ] && exit 2
             ;;
     esac
 done
+
+# pytest's result, so callers can tell a failing run from a passing one
+exit $status
