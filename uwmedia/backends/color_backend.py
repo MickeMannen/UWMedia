@@ -1400,6 +1400,11 @@ class ColorBackend(QObject):
                 # specific file rather than being a bare, unattributable
                 # percentage. Drives progressCurrentFraction's aggregate.
                 self._file_progress[label] = pct
+                # The batch is under way once a file reports progress - not
+                # "Starting" until the first one finishes (the user saw
+                # "Starting" for 6+ minutes on an overlay batch)
+                if self._status_text.startswith("Starting") and self._progress_done < self._progress_total:
+                    self._status_text = f"Processing — {self._progress_done} of {self._progress_total} files done…"
                 self.runStateChanged.emit()
                 return True
 

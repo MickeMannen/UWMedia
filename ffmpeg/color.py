@@ -1,13 +1,10 @@
 import cv2
 import numpy as np
 import math
-import subprocess as sp
 import json
 import shutil
 import time
 import sys
-import threading
-from queue import Queue
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -24,30 +21,30 @@ SAMPLE_SECONDS = 2
 # Option 2: Adaptive Highlight Damping to prevent spotlight/flashlight oversaturation
 ENABLE_ADAPTIVE_DAMPING = False
 
-def hud_bypass_filter_complex(color_vf: str) -> str:
-    """FFmpeg filter graph for process_video's colour-corrected HUD runs:
-    input 0 is piped BGRA (hud_marked_bgra) - the frame with the HUD drawn
-    on, alpha 255 where the HUD is. The colour correction (`color_vf`, the
-    lut3d chain) runs on the RGB, then maskedmerge takes the *uncorrected*
-    pixels back wherever the alpha says HUD - the dive computer's bezel and
-    text keep their own colours instead of the underwater red boost."""
-    return (
-        "[0:v]format=rgba,split=2[src][keep];"
-        f"[src]format=gbrp,{color_vf}[corr];"
-        "[keep]alphaextract,format=gray,format=gbrp[mask];"
-        "[keep]format=gbrp[orig];"
-        "[corr][orig][mask]maskedmerge[out]"
-    )
+# Share of a file's UWMEDIA_FFMPEG_PROGRESS spent before the encode: the
+# frame-sampling analysis, then (overlay runs only) drawing the HUD layers
+ANALYSIS_PROGRESS_END = 10.0
+HUD_PROGRESS_END = 14.0
 
 
-def hud_marked_bgra(frame: np.ndarray, before: np.ndarray) -> np.ndarray:
-    """`frame` (BGR, HUD drawn on) as BGRA whose alpha is 255 wherever it
-    differs from `before` (the same frame before the HUD) - the HUD mask
-    hud_bypass_filter_complex() keys on."""
-    bgra = np.empty((frame.shape[0], frame.shape[1], 4), dtype=np.uint8)
-    bgra[:, :, :3] = frame
-    bgra[:, :, 3] = np.any(frame != before, axis=2).astype(np.uint8) * 255
-    return bgra
+class _FileProgress:
+    """Labeled UWMEDIA_FFMPEG_PROGRESS lines for the phases before the encode
+    (FfmpegClass.run_command reports the encode itself), throttled to 1%."""
+
+    def __init__(self, label):
+        self.label = label
+        self.last = -1.0
+
+    def report(self, pct):
+        if self.label and pct - self.last >= 1.0:
+            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f} {self.label}", flush=True)
+            self.last = pct
+
+
+def _show_bars() -> bool:
+    """tqdm bars only on a terminal - piped to the GUI they are noise
+    between the UWMEDIA_* lines it reads."""
+    return sys.stdout.isatty()
 
 
 class ColorCorrectionEngine:
@@ -511,7 +508,7 @@ class ColorCorrectionEngine:
         print(f"Generating {len(unique_filters)} 3D LUT(s) (64³)...")
         lut_paths = []
         lut_timestamps = []
-        with tqdm(total=len(unique_filters), desc="LUT Generation", unit="lut") as pbar:
+        with tqdm(total=len(unique_filters), desc="LUT Generation", unit="lut", disable=not _show_bars()) as pbar:
             for i, filt in enumerate(unique_filters):
                 lut = self.generate_3d_lut(filt)
                 lut_path = lut_dir / f"lut_{i:04d}.cube"
@@ -542,18 +539,14 @@ class ColorCorrectionEngine:
                 return cap
         return cv2.VideoCapture(str(input_path))
 
-    def process_video_lut(self, input_path: Path, output_path: Path, creation_date: datetime,
-                          tz_offset_mins: Optional[int] = None,
-                          color_correct: bool = True):
-        """Fast path: analyze video, generate 3D LUTs, and process natively via FFmpeg lut3d filter."""
+    def _probe(self, input_path: Path):
+        """fps, width, height, frame count and whether the source is 10-bit."""
         cap = self._open_video_capture(input_path)
-
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = total_frames / fps if fps else 0
-
+        cap.release()
         is_10bit = False
         try:
             if self.ffmpeg_tool:
@@ -563,10 +556,11 @@ class ColorCorrectionEngine:
                     print(f"Detected 10-bit input ({src_pix_fmt}). Enabling 10-bit preservation.")
         except Exception:
             pass
+        return fps, width, height, total_frames, is_10bit
 
-        # Analysis Phase
-        t_start_analysis = time.time()
-        filter_indices, filter_matrices = [], []
+    def _analyze(self, input_path: Path, fps: float, total_frames: int, progress: _FileProgress):
+        """Samples a frame every SAMPLE_SECONDS and returns (frame indices,
+        filter matrices, number of samples) for _build_lut3d_filter."""
         print(f"Analyzing {input_path.name}...")
         step = int(fps * SAMPLE_SECONDS)
         if step <= 0:
@@ -575,125 +569,114 @@ class ColorCorrectionEngine:
         if (total_frames - 1) not in sample_frames and total_frames > 0:
             sample_frames.append(total_frames - 1)
 
-        with tqdm(total=len(sample_frames), desc="Analysis", unit="frame") as pbar:
-            for idx in sample_frames:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-                ret, frame = cap.read()
-                if not ret:
-                    continue
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                filter_indices.append(idx)
-                filter_matrices.append(self.get_filter_matrix(rgb))
-                pbar.update(1)
-        cap.release()
-        filter_matrices = np.array(filter_matrices)
+        filter_indices, filter_matrices = [], []
+        cap = self._open_video_capture(input_path)
+        try:
+            with tqdm(total=len(sample_frames), desc="Analysis", unit="frame", disable=not _show_bars()) as pbar:
+                for n, idx in enumerate(sample_frames, start=1):
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                    ret, frame = cap.read()
+                    if ret:
+                        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        filter_indices.append(idx)
+                        filter_matrices.append(self.get_filter_matrix(rgb))
+                    pbar.update(1)
+                    progress.report(ANALYSIS_PROGRESS_END * n / len(sample_frames))
+        finally:
+            cap.release()
+        return filter_indices, np.array(filter_matrices), len(sample_frames)
+
+    def _output_args(self, input_path: Path, output_path: Path, creation_date: datetime,
+                     tz_offset_mins: Optional[int], is_10bit: bool) -> List[str]:
+        """Bitrate, metadata, colour tags and encoder - input 0 is the source."""
+        args = []
+        try:
+            bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
+            args.extend(["-b:v", str(bitrate)])
+        except Exception:
+            pass
+
+        args.extend(["-map_metadata", "0"])
+        args.extend(["-movflags", "+faststart+use_metadata_tags"])
+        args.extend(["-tag:v", "hvc1"])
+        args.extend([
+            "-color_primaries", "1",
+            "-color_trc", "1",
+            "-colorspace", "1"
+        ])
+
+        if tz_offset_mins is not None:
+            sign = "+" if tz_offset_mins >= 0 else "-"
+            hours = abs(tz_offset_mins) // 60
+            mins = abs(tz_offset_mins) % 60
+            tz_str = f"{sign}{hours:02}{mins:02}"
+            iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
+            args.extend(["-metadata", f"creation_time={iso_date}"])
+
+        # p010le (standard YUV 10-bit) for 10-bit color preservation, otherwise standard yuv420p
+        output_pix_fmt = 'p010le' if is_10bit else 'yuv420p'
+        args.extend([
+            "-vcodec", self.ffmpeg_tool.get_encoder(),
+            "-pix_fmt", output_pix_fmt,
+            "-acodec", "copy",
+            str(output_path)
+        ])
+        return args
+
+    def _input_args(self, input_path: Path) -> List[str]:
+        args = ["-y"]
+        if not self.ffmpeg_tool.debug:
+            args.extend(["-nostats", "-loglevel", "error"])
+        # Hardware-accelerated decoding of the source, when the decoder can take it
+        if self.ffmpeg_tool.hw_accel and self.ffmpeg_tool.hw_decodable(input_path):
+            if self.ffmpeg_tool.os_type == "Darwin":
+                args.extend(["-hwaccel", "videotoolbox"])
+            else:
+                args.extend(["-hwaccel", "auto"])
+        return args
+
+    def process_video_lut(self, input_path: Path, output_path: Path, creation_date: datetime,
+                          tz_offset_mins: Optional[int] = None,
+                          color_correct: bool = True):
+        """Fast path: analyze video, generate 3D LUTs, and process natively via FFmpeg lut3d filter."""
+        progress = _FileProgress(input_path.name)
+        fps, _width, _height, total_frames, is_10bit = self._probe(input_path)
+        duration = total_frames / fps if fps else 0
+
+        t_start_analysis = time.time()
+        filter_indices, filter_matrices, n_samples = self._analyze(input_path, fps, total_frames, progress)
         analysis_duration = time.time() - t_start_analysis
 
         if len(filter_matrices) == 0:
             print("Error: Could not analyze any frames.")
             return
 
-        # Generate LUT files
         t_start_lut = time.time()
         lut_dir = app_temp_dir('uwmedia_lut_')
-        lut_paths = []
-        lut_timestamps = []  # in seconds
-
         try:
-            # Deduplicate: group consecutive similar filter matrices
-            unique_filters = [filter_matrices[0]]
-            unique_indices = [filter_indices[0]]
-            for i in range(1, len(filter_matrices)):
-                if not np.allclose(filter_matrices[i], unique_filters[-1], atol=0.01):
-                    unique_filters.append(filter_matrices[i])
-                    unique_indices.append(filter_indices[i])
-
-            print(f"Generating {len(unique_filters)} 3D LUT(s) (64\u00b3)...")
-            with tqdm(total=len(unique_filters), desc="LUT Generation", unit="lut") as pbar:
-                for i, filt in enumerate(unique_filters):
-                    lut = self.generate_3d_lut(filt)
-                    lut_path = lut_dir / f"lut_{i:04d}.cube"
-                    self.write_cube_file(lut, lut_path)
-                    lut_paths.append(lut_path)
-                    lut_timestamps.append(unique_indices[i] / fps)
-                    pbar.update(1)
+            vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, lut_dir)
             lut_gen_duration = time.time() - t_start_lut
 
-            # Build video filter
-            first_lut = str(lut_paths[0]).replace('\\', '/').replace(':', '\\:')
-            if len(lut_paths) == 1:
-                vf = f"lut3d=file='{first_lut}':interp=trilinear"
-            else:
-                # Write sendcmd script for LUT switching
-                sendcmd_path = lut_dir / "sendcmd.txt"
-                with open(sendcmd_path, 'w') as f:
-                    for i, (lp, ts) in enumerate(zip(lut_paths, lut_timestamps)):
-                        lp_str = str(lp).replace('\\', '/').replace(':', '\\:')
-                        f.write(f"{ts:.3f} [enter] lut3d file '{lp_str}';\n")
-                sendcmd_str = str(sendcmd_path).replace('\\', '/').replace(':', '\\:')
-                vf = f"sendcmd=f='{sendcmd_str}',lut3d=file='{first_lut}':interp=trilinear"
-
-            args = ["-y"]
-
-            if not self.ffmpeg_tool.debug:
-                args.extend(["-nostats", "-loglevel", "error"])
-
-            # Enable hardware-accelerated decoding
-            if self.ffmpeg_tool.hw_accel:
-                if self.ffmpeg_tool.os_type == "Darwin":
-                    args.extend(["-hwaccel", "videotoolbox"])
-                else:
-                    args.extend(["-hwaccel", "auto"])
-
+            args = self._input_args(input_path)
             args.extend(["-i", str(input_path)])
             args.extend(["-vf", vf])
             args.extend(["-map", "0:v:0", "-map", "0:a?"])
-
-            try:
-                bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
-                args.extend(["-b:v", str(bitrate)])
-            except:
-                pass
-
-            args.extend(["-map_metadata", "0"])
-            args.extend(["-movflags", "+faststart+use_metadata_tags"])
-            args.extend(["-tag:v", "hvc1"])
-            args.extend([
-                "-color_primaries", "1",
-                "-color_trc", "1",
-                "-colorspace", "1"
-            ])
-
-            if tz_offset_mins is not None:
-                sign = "+" if tz_offset_mins >= 0 else "-"
-                hours = abs(tz_offset_mins) // 60
-                mins = abs(tz_offset_mins) % 60
-                tz_str = f"{sign}{hours:02}{mins:02}"
-                iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
-                args.extend(["-metadata", f"creation_time={iso_date}"])
-
-            output_pix_fmt = 'p010le' if is_10bit else 'yuv420p'
-            args.extend([
-                "-vcodec", self.ffmpeg_tool.get_encoder(),
-                "-pix_fmt", output_pix_fmt,
-                "-acodec", "copy",
-                str(output_path)
-            ])
+            args.extend(self._output_args(input_path, output_path, creation_date, tz_offset_mins, is_10bit))
 
             print(f"Processing {input_path.name} using fast LUT path...")
             t_start_render = time.time()
-            self.ffmpeg_tool.run_command(args, duration=duration, progress_label=input_path.name)
+            self.ffmpeg_tool.run_command(args, duration=duration, progress_label=input_path.name,
+                                         progress_range=(ANALYSIS_PROGRESS_END, 100.0))
             render_duration = time.time() - t_start_render
             print(f"\nProcessing complete: {output_path.name}")
 
-            total_to_process = total_frames
             return {
                 "total_frames": total_frames,
                 "analysis_time": analysis_duration,
-                "analysis_fps": len(sample_frames) / analysis_duration if analysis_duration > 0 else 0,
+                "analysis_fps": n_samples / analysis_duration if analysis_duration > 0 else 0,
                 "lut_gen_time": lut_gen_duration,
                 "render_time": render_duration,
-                "render_fps": total_to_process / render_duration if render_duration > 0 else 0,
+                "render_fps": total_frames / render_duration if render_duration > 0 else 0,
             }
 
         finally:
@@ -706,11 +689,11 @@ class ColorCorrectionEngine:
 
     def _preload_hud_skin(self, layout: dict, frame_width: int):
         """Loads+resizes a resolved layout's hud_skin image once, ahead of
-        the per-frame render loop - shared by process_video's single-layout
-        (layout_path) and multi-overlay (overlay_instances) paths so both
-        get the identical premultiplied-opacity preload draw_hud() expects
-        via its preloaded_skin param. Returns None for shape skins (nothing
-        to preload) or when the skin image can't be read."""
+        drawing it - shared by process_video's single-layout (layout_path)
+        and multi-overlay (overlay_instances) paths so both get the
+        identical premultiplied-opacity preload draw_hud() expects via its
+        preloaded_skin param. Returns None for shape skins (nothing to
+        preload) or when the skin image can't be read."""
         hud_skin = layout.get("hud_skin", {})
         skin_path = hud_skin.get("path")
         if not skin_path:
@@ -733,85 +716,18 @@ class ColorCorrectionEngine:
             preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
         return preloaded_skin
 
-    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime,
-                      dive: Optional[Dive] = None,
-                      overlay: bool = False,
-                      layout_path: Optional[Path] = None,
-                      overlay_instances: Optional[list] = None,
-                      tz_offset_mins: Optional[int] = None,
-                      color_correct: bool = True):
-        """Analyze video and process frames through OpenCV then pipe to FFmpeg."""
-        # Open video capture with hardware acceleration support and safe fallback
-        cap = self._open_video_capture(input_path)
-
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = int(total_frames / fps) if fps else 0
-
-        # 10-bit Color Preservation detection
-        is_10bit = False
-        try:
-            if self.ffmpeg_tool:
-                src_pix_fmt = self.ffmpeg_tool.get_video_pix_fmt(input_path)
-                if "10" in src_pix_fmt or "12" in src_pix_fmt or "p010" in src_pix_fmt:
-                    is_10bit = True
-                    print(f"Detected 10-bit/high bit-depth input ({src_pix_fmt}). Enabling 10-bit color preservation.")
-        except Exception as e:
-            pass
-
-        # 2. Analysis Phase (Seek-based fast analysis)
-        t_start_analysis = time.time()
-        filter_indices, filter_matrices = [], []
-        if color_correct:
-            print(f"Analyzing {input_path.name}...")
-            step = int(fps * SAMPLE_SECONDS)
-            if step <= 0:
-                step = 30
-            sample_frames = list(range(0, total_frames, step))
-            if (total_frames - 1) not in sample_frames and total_frames > 0:
-                sample_frames.append(total_frames - 1)
-            
-            with tqdm(total=len(sample_frames), desc="Analysis", unit="frame") as pbar:
-                for idx in sample_frames:
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-                    ret, frame = cap.read()
-                    if not ret:
-                        continue
-                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    filter_indices.append(idx)
-                    filter_matrices.append(self.get_filter_matrix(rgb))
-                    pbar.update(1)
-            cap.release()
-            filter_matrices = np.array(filter_matrices)
-            analysis_duration = time.time() - t_start_analysis
-        else:
-            cap.release()
-            # Identity/noop parameters fallback
-            filter_indices = [0]
-            filter_matrices = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.67]])
-            analysis_duration = 0.0
-
-        # HUD and overlay initialization - the skin/text are composited per
-        # frame in Python (see _process_worker's draw_hud calls below), not
-        # via a native FFmpeg filter. layout_path is the single-overlay path
-        # (Color page pre-Pass-2 / any other caller); overlay_instances is
-        # Pass 2's multi-overlay path (Color page's own N composited layers)
-        # - the two are independent and both may be given at once.
-        layout = {}
-        preloaded_skin = None
-
-        if layout_path and dive:
-            print(f"Generating telemetry overlay using layout: {layout_path.name}")
+    def _hud_layers(self, layout_path, overlay_instances, width, height):
+        """HudLayers in drawing order: the single --layout first, then each
+        overlay instance (last on top, the Color page's z-order)."""
+        from gui.hud_renderer import resolve_overlay_instance_layout
+        from ffmpeg.hud_layers import HudLayer
+        layers = []
+        if layout_path:
+            print(f"Generating telemetry overlay using layout: {Path(layout_path).name}")
             with open(layout_path, 'r') as f:
                 layout = json.load(f)
-            preloaded_skin = self._preload_hud_skin(layout, width)
-
-        overlay_layouts = []
-        overlay_skins = []
-        if overlay_instances and dive:
-            from gui.hud_renderer import resolve_overlay_instance_layout
+            layers.append(HudLayer(layout, self._preload_hud_skin(layout, width), width, height, resolved=False))
+        if overlay_instances:
             print(f"Generating telemetry overlay using {len(overlay_instances)} composited layer(s)")
             for inst in overlay_instances:
                 with open(Path(inst["layout_path"]), 'r') as f:
@@ -819,213 +735,81 @@ class ColorCorrectionEngine:
                 resolved = resolve_overlay_instance_layout(
                     raw_layout, inst.get("x", 0.0), inst.get("y", 0.0), inst.get("scale", 1.0), width, height
                 )
-                overlay_layouts.append(resolved)
-                overlay_skins.append(self._preload_hud_skin(resolved, width))
+                layers.append(HudLayer(resolved, self._preload_hud_skin(resolved, width), width, height, resolved=True))
+        return layers
 
-        # Re-open video capture for processing phase with hardware decoding and safe fallback
-        cap = self._open_video_capture(input_path)
+    def process_video(self, input_path: Path, output_path: Path, creation_date: datetime,
+                      dive: Optional[Dive] = None,
+                      overlay: bool = False,
+                      layout_path: Optional[Path] = None,
+                      overlay_instances: Optional[list] = None,
+                      tz_offset_mins: Optional[int] = None,
+                      color_correct: bool = True):
+        """Colour correction plus HUD overlays, all composited by FFmpeg.
 
-        total_to_process = total_frames
+        The HUD changes only when the dive sample does, so each layer is
+        drawn once per sample as a transparent PNG (ffmpeg/hud_layers.py)
+        rather than onto every frame in Python. FFmpeg then decodes the
+        source, applies the lut3d colour correction and overlays the layers
+        on top in one pass - after the correction, so the HUD keeps its own
+        colours (a neutral Garmin X50i bezel came out red-tinted when it was
+        corrected along with the footage, 2026-09-27)."""
+        from ffmpeg.hud_layers import hud_segments, overlay_filter_complex, write_layer_stream
 
-        # Color correction happens natively in FFmpeg (lut3d) rather than
-        # per-frame in Python - apply_filter's OKLCH pipeline costs ~35x more
-        # per 4K frame than this. Same LUT generation/dedup approach
-        # process_video_lut already uses for its overlay-free fast path, just
-        # applied to the piped (already HUD-composited) frames here instead
-        # of letting FFmpeg read the source file directly.
-        color_vf = None
-        lut_dir = None
-        if color_correct and len(filter_matrices) > 0:
-            lut_dir = app_temp_dir('uwmedia_lut_')
-            color_vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, lut_dir)
+        progress = _FileProgress(input_path.name)
+        fps, width, height, total_frames, is_10bit = self._probe(input_path)
+        duration = total_frames / fps if fps else 0
 
-        # The HUD must not be colour-corrected: the lut3d filter runs on the
-        # piped, already-composited frame, so a neutral bezel (Garmin X50i)
-        # came out red-tinted by the underwater correction (2026-09-27, per
-        # the user). With both a LUT and a HUD, the frames are piped as BGRA
-        # whose alpha marks the HUD's pixels, and hud_bypass_filter_complex()
-        # puts the uncorrected pixels back over the corrected frame.
-        hud_bypass = bool(color_vf) and bool((layout or overlay_layouts) and dive)
+        t_start_analysis = time.time()
+        filter_indices, filter_matrices, n_samples = [], np.array([]), 0
+        if color_correct:
+            filter_indices, filter_matrices, n_samples = self._analyze(input_path, fps, total_frames, progress)
+        analysis_duration = time.time() - t_start_analysis
 
-        # Build FFmpeg pipe
-        cmd = [
-            str(self.ffmpeg_tool.get_path()), '-y',
-            '-f', 'rawvideo', '-vcodec', 'rawvideo',
-            '-s', f'{width}x{height}', '-pix_fmt', 'bgra' if hud_bypass else 'bgr24', '-r', str(fps),
-            '-i', '-',
-            '-i', str(input_path)
-        ]
-
-        if not self.ffmpeg_tool.debug:
-            cmd.extend(["-nostats", "-loglevel", "error"])
-
-        if hud_bypass:
-            cmd.extend(['-filter_complex', hud_bypass_filter_complex(color_vf), '-map', '[out]', '-map', '1:a?'])
-        else:
-            if color_vf:
-                cmd.extend(['-vf', color_vf])
-            cmd.extend(['-map', '0:v', '-map', '1:a?'])
-        
+        work_dir = app_temp_dir('uwmedia_overlay_')
         try:
-            bitrate = self.ffmpeg_tool.get_video_bitrate(input_path)
-            cmd.extend(['-b:v', str(bitrate)])
-        except:
-            pass
+            color_vf = None
+            if color_correct and len(filter_matrices) > 0:
+                color_vf = self._build_lut3d_filter(filter_indices, filter_matrices, fps, work_dir)
 
-        cmd.extend(["-map_metadata", "1"])
-        cmd.extend(["-movflags", "+faststart+use_metadata_tags"])
-        cmd.extend(["-tag:v", "hvc1"])
-        cmd.extend([
-            "-color_primaries", "1",
-            "-color_trc", "1",
-            "-colorspace", "1"
-        ])
-        
-        if tz_offset_mins is not None:
-            sign = "+" if tz_offset_mins >= 0 else "-"
-            hours = abs(tz_offset_mins) // 60
-            mins = abs(tz_offset_mins) % 60
-            tz_str = f"{sign}{hours:02}{mins:02}"
-            iso_date = creation_date.strftime("%Y-%m-%dT%H:%M:%S") + tz_str
-            cmd.extend(["-metadata", f"creation_time={iso_date}"])
+            # HUD layers - nothing to draw without a matched dive
+            t_start_hud = time.time()
+            streams = []
+            if dive and dive.waypoints:
+                layers = self._hud_layers(layout_path, overlay_instances, width, height)
+                segments = hud_segments(dive, creation_date, fps, total_frames)
+                steps = max(1, len(layers) * len(segments))
+                for li, layer in enumerate(layers):
+                    def on_segment(i, li=li):
+                        done = li * len(segments) + i + 1
+                        progress.report(ANALYSIS_PROGRESS_END + (HUD_PROGRESS_END - ANALYSIS_PROGRESS_END) * done / steps)
+                    stream = write_layer_stream(layer, segments, dive.waypoints, fps, work_dir, li, on_segment)
+                    if stream:
+                        streams.append(stream)
+            hud_duration = time.time() - t_start_hud
 
-        # Use p010le (standard YUV 10-bit) for 10-bit color preservation, otherwise standard yuv420p
-        output_pix_fmt = 'p010le' if is_10bit else 'yuv420p'
-        cmd.extend([
-            '-vcodec', self.ffmpeg_tool.get_encoder(),
-            '-pix_fmt', output_pix_fmt,
-            '-acodec', 'copy',
-            str(output_path)
-        ])
+            args = self._input_args(input_path)
+            args.extend(["-i", str(input_path)])
+            for concat_path, _x, _y in streams:
+                args.extend(["-f", "concat", "-safe", "0", "-i", str(concat_path)])
+            graph, out_label = overlay_filter_complex(color_vf, [(x, y) for _c, x, y in streams])
+            args.extend(["-filter_complex", graph, "-map", out_label, "-map", "0:a?"])
+            args.extend(self._output_args(input_path, output_path, creation_date, tz_offset_mins, is_10bit))
 
-        process = sp.Popen(cmd, stdin=sp.PIPE)
-
-        # =====================================================================
-        # Phase 2: Threaded Pipeline (Decode → Process → Encode)
-        # Uses 3 threads with bounded queues to overlap I/O with computation.
-        # - Decode thread: reads frames from OpenCV VideoCapture
-        # - Process thread: applies HUD overlay (color correction is the
-        #   native FFmpeg lut3d filter built above, not done here)
-        # - Main thread: writes processed frames to FFmpeg stdin
-        # =====================================================================
-        QUEUE_SIZE = 4  # Bounded queue depth to limit memory usage
-        _SENTINEL = None  # Signals end-of-stream between threads
-
-        decode_q = Queue(maxsize=QUEUE_SIZE)   # (frame_index, bgr_frame) or _SENTINEL
-        process_q = Queue(maxsize=QUEUE_SIZE)  # (bgr_frame_bytes) or _SENTINEL
-        decode_error = [None]  # Shared error slot for decode thread
-        process_error = [None]  # Shared error slot for process thread
-
-        # Pre-import HUD renderer once (avoid per-frame import overhead)
-        hud_draw_func = None
-        if (layout or overlay_layouts) and dive:
-            from gui.hud_renderer import draw_hud
-            hud_draw_func = draw_hud
-
-        # --- Decode Thread ---
-        def _decode_worker():
-            """Reads frames from VideoCapture and pushes to decode_q."""
-            try:
-                local_count = 0
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    decode_q.put((local_count, frame))
-                    local_count += 1
-            except Exception as e:
-                decode_error[0] = e
-            finally:
-                decode_q.put(_SENTINEL)
-
-        # --- Process Thread ---
-        def _process_worker():
-            """Applies HUD overlay, pushes bytes to process_q."""
-            try:
-                while True:
-                    item = decode_q.get()
-                    if item is _SENTINEL:
-                        break
-                    frame_idx, frame = item
-
-                    # HUD overlay (operates on BGR frame directly). Single-
-                    # layout and multi-overlay layers composite onto the
-                    # same frame in order - last in overlay_layouts draws on
-                    # top, matching Pass 2's confirmed z-order rule.
-                    before = frame.copy() if hud_bypass else None
-                    if hud_draw_func and dive:
-                        elapsed_total = frame_idx / fps
-                        current_time = creation_date + timedelta(seconds=elapsed_total)
-                        wp = dive.get_waypoint_at(current_time)
-                        if wp:
-                            if layout:
-                                hud_draw_func(frame, layout, wp,
-                                              preloaded_skin=preloaded_skin,
-                                              waypoints=dive.waypoints)
-                            for layer_layout, layer_skin in zip(overlay_layouts, overlay_skins):
-                                hud_draw_func(frame, layer_layout, wp,
-                                              preloaded_skin=layer_skin,
-                                              waypoints=dive.waypoints)
-
-                    if hud_bypass:
-                        # BGRA: alpha 255 wherever the HUD touched the frame,
-                        # so the filter graph keeps those pixels uncorrected
-                        frame = hud_marked_bgra(frame, before)
-
-                    # Pre-serialize to bytes (avoids doing it in the write thread)
-                    process_q.put(frame.tobytes())
-            except Exception as e:
-                process_error[0] = e
-            finally:
-                process_q.put(_SENTINEL)
-
-        # --- Start worker threads ---
-        t_start_render = time.time()
-        decode_thread = threading.Thread(target=_decode_worker, name="decode", daemon=True)
-        process_thread = threading.Thread(target=_process_worker, name="process", daemon=True)
-        decode_thread.start()
-        process_thread.start()
-
-        # --- Encode (main thread): write processed frame bytes to FFmpeg stdin ---
-        frames_written = 0
-        try:
-            with tqdm(total=total_to_process, desc="Processing", unit="frame") as pbar:
-                while True:
-                    frame_bytes = process_q.get()
-                    if frame_bytes is _SENTINEL:
-                        break
-                    process.stdin.write(frame_bytes)
-                    pbar.update(1)
-                    frames_written += 1
+            print(f"Processing {input_path.name} with {len(streams)} HUD layer(s)...")
+            t_start_render = time.time()
+            self.ffmpeg_tool.run_command(args, duration=duration, progress_label=input_path.name,
+                                         progress_range=(HUD_PROGRESS_END, 100.0))
             render_duration = time.time() - t_start_render
-        except BaseException as e:
-            if process.poll() is None:
-                process.kill()
-            raise e
         finally:
-            # Ensure threads are joined before cleanup
-            decode_thread.join(timeout=5)
-            process_thread.join(timeout=5)
-            cap.release()
-            try:
-                process.stdin.close()
-            except Exception:
-                pass
-            process.wait()
-            if lut_dir:
-                shutil.rmtree(lut_dir, ignore_errors=True)
+            shutil.rmtree(work_dir, ignore_errors=True)
 
-        # Propagate any thread errors
-        if decode_error[0]:
-            raise decode_error[0]
-        if process_error[0]:
-            raise process_error[0]
-        
         print(f"\nProcessing complete: {output_path.name}")
         return {
             "total_frames": total_frames,
             "analysis_time": analysis_duration,
-            "analysis_fps": len(sample_frames) / analysis_duration if (color_correct and analysis_duration > 0) else 0,
+            "analysis_fps": n_samples / analysis_duration if analysis_duration > 0 else 0,
+            "hud_time": hud_duration,
             "render_time": render_duration,
-            "render_fps": total_to_process / render_duration if render_duration > 0 else 0,
+            "render_fps": total_frames / render_duration if render_duration > 0 else 0,
         }

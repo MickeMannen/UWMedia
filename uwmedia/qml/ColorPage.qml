@@ -462,7 +462,9 @@ ScrollView {
                                   : ""
                             color: "#9AA0A6"
                             font.pixelSize: 11
-                            Layout.preferredWidth: 55
+                            // Same width as the Current row's value label,
+                            // so the two bars line up at the same length
+                            Layout.preferredWidth: 70
                             horizontalAlignment: Text.AlignRight
                         }
                     }

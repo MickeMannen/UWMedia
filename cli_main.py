@@ -874,6 +874,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             if legacy_stats:
                 total_frames = legacy_stats.get("total_frames", 0)
                 stats["stages"].append({"name": "Analysis Phase", "time": legacy_stats["analysis_time"], "fps": legacy_stats["analysis_fps"]})
+                stats["stages"].append({"name": "HUD Rendering", "time": legacy_stats["hud_time"]})
                 stats["stages"].append({"name": "Processing/Encoding", "time": legacy_stats["render_time"], "fps": legacy_stats["render_fps"]})
                 if total_frames > 0:
                     stats["overall_fps"] = total_frames / proc_time

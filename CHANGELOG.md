@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- Color: videos with HUD overlays render about three times faster, close to
+  colour correction alone (a 10 s 4K clip with two overlays: 97 s → 34 s).
+- Color: the progress bar now moves during an overlay run: through the
+  analysis, the HUD drawing and the encode. The status reads "Processing"
+  once files are under way instead of staying at "Starting" until the first
+  file finishes.
+- Color: overlay videos now get the same colour correction as videos without
+  overlays (before, they came out lighter and more washed out), and keep
+  10-bit sources at full 10-bit precision. Translucent parts of a HUD, such as
+  the dive profile's background, now show the corrected footage behind them.
+
+### Fixed
+- Color: 10-bit 4:2:2 H.264 clips (e.g. Sony XAVC) lost some frames when
+  hardware acceleration was on (483 of 501 survived on a 10 s clip). They are
+  now decoded in software and keep every frame.
+- Color: the Current and Overall progress bars are now the same length.
+
 ## [0.7.4] - 2026-10-02
 
 ### Changed

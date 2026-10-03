@@ -221,3 +221,16 @@ def test_convertion_progress_fraction_counts_files_and_ffmpeg_percent():
     assert timing.text.startswith("Elapsed 0:00")
     timing.stop(ok=False)
     assert timing.text.startswith("Stopped after 0:00")
+
+
+def test_first_labeled_progress_moves_status_off_starting():
+    # A real batch prints "0/N start", then nothing until a file finishes -
+    # the label must not sit at "Starting" while files are encoding
+    app = _make_color_backend()
+    app._status_text = ""
+    app._handle_progress_line("UWMEDIA_PROGRESS 0/4 start -")
+    assert app.statusText.startswith("Starting")
+
+    app._handle_progress_line("UWMEDIA_FFMPEG_PROGRESS 3.0 a.mp4")
+
+    assert app.statusText == "Processing — 0 of 4 files done…"

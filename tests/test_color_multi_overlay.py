@@ -172,21 +172,10 @@ NEUTRAL_LAYOUT_DATA = {
 }
 
 
-def test_hud_mask_helpers():
-    from ffmpeg.color import hud_bypass_filter_complex, hud_marked_bgra
-    graph = hud_bypass_filter_complex("lut3d=file='x.cube':interp=trilinear")
-    assert graph.startswith("[0:v]format=rgba,split=2[src][keep];[src]format=gbrp,lut3d=") and graph.endswith("maskedmerge[out]")
-    before = np.zeros((4, 4, 3), dtype=np.uint8)
-    after = before.copy(); after[1, 2] = (10, 20, 30)
-    bgra = hud_marked_bgra(after, before)
-    assert bgra.shape == (4, 4, 4) and bgra[1, 2, 3] == 255 and bgra[:, :, 3].sum() == 255
-    assert tuple(bgra[1, 2, :3]) == (10, 20, 30)
-
-
 def test_colour_correction_leaves_the_hud_uncorrected():
-    # The lut3d colour correction runs in FFmpeg on the composited frame; a
+    # The HUD layers are overlaid after the lut3d colour correction; a
     # neutral grey HUD skin must still come out neutral (the Garmin X50i's
-    # bezel turned red-tinted before - see process_video's hud_bypass).
+    # bezel turned red-tinted before - see process_video).
     video_source = TEST_DATA_DIR / "20251019_M0284.MP4"
     assert video_source.exists()
     layout_path = RESULTS_DIR / "test_color_neutral_hud_layout.json"

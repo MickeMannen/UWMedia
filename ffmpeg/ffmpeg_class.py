@@ -1,5 +1,6 @@
 import platform
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional, List
@@ -29,8 +30,12 @@ class FfmpegClass:
         return self.executable_path
 
     def run_command(
-        self, args: List[str], duration: Optional[float] = None, progress_label: Optional[str] = None
+        self, args: List[str], duration: Optional[float] = None, progress_label: Optional[str] = None,
+        progress_range: tuple = (0.0, 100.0),
     ) -> subprocess.CompletedProcess:
+        """progress_range: the share of the file's whole run this encode is
+        (the colour paths analyse the clip first), so the UWMEDIA_FFMPEG_PROGRESS
+        percentage keeps climbing across the phases instead of restarting."""
         cmd = [str(self.executable_path)] + args
         
         if self.debug:
@@ -52,7 +57,10 @@ class FfmpegClass:
         try:
             # Custom bar_format to show percentage with one decimal (e.g. 50.1%)
             bar_fmt = "{desc}: {percentage:3.1f}%|{bar}| {elapsed}<{remaining}"
-            pbar = tqdm(total=100, desc="Encoding", disable=not duration, bar_format=bar_fmt)
+            # Off when piped: the GUI reads this output and only wants the
+            # UWMEDIA_FFMPEG_PROGRESS lines, not \r-redrawn bars
+            pbar = tqdm(total=100, desc="Encoding", disable=not duration or not sys.stdout.isatty(), bar_format=bar_fmt)
+            range_start, range_end = progress_range
             last_pct = 0.0
             last_emitted_pct = 0.0
 
@@ -82,10 +90,11 @@ class FfmpegClass:
                         # run concurrently in a real batch, instead of only
                         # trusting a bare percentage for a single-file run.
                         if pct - last_emitted_pct >= 1.0 or pct >= 100.0:
+                            overall = range_start + pct * (range_end - range_start) / 100.0
                             if progress_label:
-                                print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f} {progress_label}", flush=True)
+                                print(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f} {progress_label}", flush=True)
                             else:
-                                print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                                print(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f}", flush=True)
                             last_emitted_pct = pct
                     except:
                         pass
@@ -96,7 +105,14 @@ class FfmpegClass:
                 error_msg = "".join(stderr_content)
                 print(f"\nFFmpeg Error (Exit {process.returncode}):\n{error_msg}")
                 raise subprocess.CalledProcessError(process.returncode, cmd, stderr=error_msg)
-                
+            # ffmpeg's last out_time falls a frame short of `duration`, so the
+            # throttled loop above can stop just under the end of the range
+            if duration and last_emitted_pct < 100.0:
+                if progress_label:
+                    print(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f} {progress_label}", flush=True)
+                else:
+                    print(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f}", flush=True)
+
             return subprocess.CompletedProcess(cmd, process.returncode)
             
         except BaseException as e:
@@ -214,6 +230,22 @@ class FfmpegClass:
             str(input_path)
         ]
         return subprocess.check_output(cmd).decode().strip()
+
+    def hw_decodable(self, input_path: Path) -> bool:
+        """False for sources hardware decoders can't take: H.264 beyond 8-bit
+        4:2:0 (e.g. Sony's 10-bit 4:2:2 XAVC). VideoToolbox doesn't fall back
+        to software for those - it fails picture by picture and FFmpeg drops
+        the frames (483 of 501 survived on a 10 s clip)."""
+        cmd = [
+            str(self.ffprobe_path), "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=codec_name,pix_fmt", "-of", "default=noprint_wrappers=1",
+            str(input_path)
+        ]
+        try:
+            info = dict(line.split("=", 1) for line in subprocess.check_output(cmd).decode().split() if "=" in line)
+        except Exception:
+            return True
+        return not (info.get("codec_name") == "h264" and info.get("pix_fmt") not in ("yuv420p", "yuvj420p", "nv12"))
 
     def process_video(self, input_path: Path, output_path: Path, creation_date: datetime,
                       color_correct: bool = False,
