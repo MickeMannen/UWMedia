@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.5] - 2026-10-03
 
 ### Changed
 - Color: videos with HUD overlays render about three times faster, close to
