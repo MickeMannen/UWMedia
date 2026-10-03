@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.9] - 2026-10-03
 
 ### Fixed
 - Color: in the downloaded macOS app, one failing file no longer stops the
