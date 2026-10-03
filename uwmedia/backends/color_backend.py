@@ -62,6 +62,7 @@ from utils.app_settings import get_fields, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
+from utils.progress_lines import LineBuffer, finished_text
 from utils.run_timing import RunTiming
 from utils import filename_formats
 from utils.filename_formats import custom_filename_formats, example_filename, pattern_error
@@ -197,6 +198,7 @@ class ColorBackend(QObject):
         self._progress_pct = 0.0
         self._active_files = []
         self._file_progress = {}  # filename -> last-known percent (0-100)
+        self._line_buffer = LineBuffer()
         # Elapsed / estimated-remaining line under the bars (utils/run_timing.py)
         self.timing = RunTiming(self._batch_fraction, self)
         self.timing.changed.connect(self.runStateChanged.emit)
@@ -1253,7 +1255,7 @@ class ColorBackend(QObject):
         # progressCurrentDeterminate) - otherwise this is the older
         # single-value fallback for the (unlabeled) render-log paths.
         if self._file_progress and self._progress_total:
-            return sum(self._file_progress.values()) / (self._progress_total * 100.0)
+            return min(1.0, sum(self._file_progress.values()) / (self._progress_total * 100.0))
         return self._progress_pct / 100.0
 
     @Property(int, notify=runStateChanged)
@@ -1312,6 +1314,7 @@ class ColorBackend(QObject):
         self.dragBoxChanged.emit()
         self._set_status("Starting…")
 
+        self._line_buffer = LineBuffer()
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_process_output)
@@ -1323,9 +1326,8 @@ class ColorBackend(QObject):
     def _on_process_output(self):
         if self.process is None:
             return
-        text = bytes(self.process.readAllStandardOutput()).decode(errors="replace").strip()
-        if text:
-            for line in text.splitlines():
+        for line in self._line_buffer.feed(self.process.readAllStandardOutput()):
+            if line.strip():
                 # No raw-line fallback any more (used to be
                 # `self._set_status(line)` for anything _handle_progress_line
                 # didn't recognize) - that was the cause of the Progress
@@ -1419,12 +1421,13 @@ class ColorBackend(QObject):
 
         return False
 
-    def _on_process_finished(self, exit_code, _exit_status):
-        self._set_status(
-            f"Finished (exit code {exit_code})" if exit_code == 0 else f"Failed (exit code {exit_code})"
-        )
+    def _on_process_finished(self, exit_code, exit_status):
+        for line in self._line_buffer.flush():
+            self._handle_progress_line(line)
+        crashed = exit_status == QProcess.ExitStatus.CrashExit
+        self._set_status(finished_text(exit_code, crashed))
         self.process = None
-        self.timing.stop(ok=exit_code == 0)
+        self.timing.stop(ok=exit_code == 0 and not crashed)
         self.runStateChanged.emit()
 
     def _kill_process_tree(self):

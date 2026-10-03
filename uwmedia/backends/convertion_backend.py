@@ -30,6 +30,7 @@ from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 from ffmpeg.ffmpeg_class import FfmpegClass
 from utils.app_settings import get_fields, set_field
 from utils.display_paths import contract_home_path
+from utils.progress_lines import LineBuffer, finished_text
 from utils.run_timing import RunTiming
 
 CONVERT_RESOLUTIONS = [
@@ -61,6 +62,7 @@ class ConvertionBackend(QObject):
         self._hw_accel = get_fields().get("hw_accel_switch", True)
 
         self.process = None
+        self._line_buffer = LineBuffer()
         self._status_text = "No batch running"
         self._progress_total = 0
         self._progress_done = 0
@@ -306,6 +308,7 @@ class ConvertionBackend(QObject):
         self._progress_pct = 0.0
         self._set_status("Starting…")
 
+        self._line_buffer = LineBuffer()
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_process_output)
@@ -317,11 +320,10 @@ class ConvertionBackend(QObject):
     def _on_process_output(self):
         if self.process is None:
             return
-        text = bytes(self.process.readAllStandardOutput()).decode(errors="replace").strip()
-        if text:
-            for line in text.splitlines():
-                if not self._handle_progress_line(line):
-                    self._set_status(line)
+        for line in self._line_buffer.feed(self.process.readAllStandardOutput()):
+            line = line.strip()
+            if line and not self._handle_progress_line(line):
+                self._set_status(line)
 
     def _handle_progress_line(self, line):
         """Ported from uwmedia/app.py's own _handle_progress_line. Convertion
@@ -359,12 +361,13 @@ class ConvertionBackend(QObject):
 
         return False
 
-    def _on_process_finished(self, exit_code, _exit_status):
-        self._set_status(
-            f"Finished (exit code {exit_code})" if exit_code == 0 else f"Failed (exit code {exit_code})"
-        )
+    def _on_process_finished(self, exit_code, exit_status):
+        for line in self._line_buffer.flush():
+            self._handle_progress_line(line.strip())
+        crashed = exit_status == QProcess.ExitStatus.CrashExit
+        self._set_status(finished_text(exit_code, crashed))
         self.process = None
-        self.timing.stop(ok=exit_code == 0)
+        self.timing.stop(ok=exit_code == 0 and not crashed)
         self.runStateChanged.emit()
 
     def _kill_process_tree(self):

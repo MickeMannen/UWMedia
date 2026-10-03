@@ -20,6 +20,7 @@ from models.manager import DiveManager
 from ffmpeg import FfmpegClass
 from utils.dependency_check import check_dependencies
 from utils.resource_paths import app_temp_dir, prune_temp_dirs
+from utils.progress_lines import emit
 
 import cv2
 import numpy as np
@@ -284,7 +285,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 # attributing this percentage to "the current file" is unambiguous.
                 pct = ((i + 1) / total_frames) * 100 if total_frames else 100.0
                 if pct - last_emitted_pct >= 1.0 or i == total_frames - 1:
-                    print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                    emit(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}")
                     last_emitted_pct = pct
     finally:
         write_q.put(_SENTINEL)
@@ -458,7 +459,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
 
     total = len(args.convert)
-    print(f"UWMEDIA_PROGRESS 0/{total} start -", flush=True)
+    emit(f"UWMEDIA_PROGRESS 0/{total} start -")
     done = 0
     for res_name in args.convert:
         if res_name not in resolutions:
@@ -475,7 +476,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
         target_path = get_unique_path(target_path)
 
         print(f"\n--- Converting to {res_name} ({target_bitrate}): {target_path.name} ---")
-        print(f"UWMEDIA_PROGRESS {done}/{total} converting {target_path.name}", flush=True)
+        emit(f"UWMEDIA_PROGRESS {done}/{total} converting {target_path.name}")
 
         status = "done"
         try:
@@ -499,7 +500,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             print(f"Error converting to {res_name}: {e}")
         finally:
             done += 1
-            print(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}", flush=True)
+            emit(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}")
 
 def output_filename(source: Path, output_dir: Path, args, creation_date, forced_filename=None) -> str:
     """Output file name for `source`: --render-video-log's pattern, a forced
@@ -750,7 +751,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                         # file in the batch (see _handle_progress_line's comment).
                         pct = ((i + 1) / total_frames) * 100 if total_frames else 100.0
                         if pct - last_emitted_pct >= 1.0 or i == total_frames - 1:
-                            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}", flush=True)
+                            emit(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}")
                             last_emitted_pct = pct
             finally:
                 write_q.put(_SENTINEL)
@@ -1024,7 +1025,7 @@ def _parallel_worker(task):
     # waiting). Surfaced to the GUI (color_backend.py's ACTIVE_LINE_RE) so
     # the Progress card can show how many files are genuinely in flight at
     # once, not just an indeterminate "something is happening" spinner.
-    print(f"UWMEDIA_PROGRESS_ACTIVE {file.name}", flush=True)
+    emit(f"UWMEDIA_PROGRESS_ACTIVE {file.name}")
     # Re-initialize MetadataHandler locally inside the subprocess to prevent ExifTool locking/resource conflicts
     local_meta_handler = MetadataHandler()
     try:
@@ -1378,7 +1379,7 @@ def main():
         # Process all files in directory
         files = [f for f in sorted(args.source.iterdir()) if f.is_file() and not f.name.startswith('.')]
         stats_list = []
-        print(f"UWMEDIA_PROGRESS 0/{len(files)} start -", flush=True)
+        emit(f"UWMEDIA_PROGRESS 0/{len(files)} start -")
         if len(files) > 1:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             # Limit workers to min(4, CPU count) to avoid thrashing CPU/memory.
@@ -1402,11 +1403,11 @@ def main():
                     if not success:
                         print(f"Error processing {filename}: {result}")
                         stats_list.append({"file": filename, "error": result})
-                        print(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} error {filename}", flush=True)
+                        emit(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} error {filename}")
                     else:
                         stats_list.append(result)
                         status = "skipped" if result.get("skipped") else "done"
-                        print(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} {status} {filename}", flush=True)
+                        emit(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} {status} {filename}")
             except KeyboardInterrupt:
                 print("\n[!] KeyboardInterrupt received. Shutting down worker threads...")
                 shutdown_wait = False
@@ -1422,7 +1423,7 @@ def main():
                     status = "skipped" if res.get("skipped") else "done"
                 else:
                     status = "error"
-                print(f"UWMEDIA_PROGRESS {i}/{len(files)} {status} {file.name}", flush=True)
+                emit(f"UWMEDIA_PROGRESS {i}/{len(files)} {status} {file.name}")
     else:
         # Single file source
         forced_filename = None

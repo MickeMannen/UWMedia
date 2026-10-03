@@ -14,6 +14,7 @@ from ffmpeg.ffmpeg_class import FfmpegClass
 from models.dive import Dive, Waypoint
 from utils.color_profiles import load_merged_color_profiles
 from utils.resource_paths import app_temp_dir
+from utils.progress_lines import emit
 
 # Constants for analysis
 SAMPLE_SECONDS = 2
@@ -37,7 +38,7 @@ class _FileProgress:
 
     def report(self, pct):
         if self.label and pct - self.last >= 1.0:
-            print(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f} {self.label}", flush=True)
+            emit(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f} {self.label}")
             self.last = pct
 
 

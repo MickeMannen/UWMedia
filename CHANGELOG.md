@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Color: in the downloaded macOS app, one failing file no longer stops the
+  whole batch with "Failed (exit code 13)"; that file is marked as an error
+  and the rest carry on.
+- Color: when several files run in parallel, the Current bar and the time
+  estimate no longer jump past 100%.
+- Color, Overlay Generator, Convertion: progress no longer misses updates
+  that arrive split across reads, and a run killed by the system now says
+  so instead of showing a bare exit code.
+
 ## [0.7.6] - 2026-10-03
 
 ### Fixed

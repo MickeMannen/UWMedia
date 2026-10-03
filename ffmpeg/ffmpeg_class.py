@@ -7,6 +7,7 @@ from typing import Optional, List
 from datetime import datetime
 from tqdm import tqdm
 from utils.tool_paths import get_ffmpeg_path, get_ffprobe_path
+from utils.progress_lines import emit
 
 # @
 class FfmpegClass:
@@ -92,9 +93,9 @@ class FfmpegClass:
                         if pct - last_emitted_pct >= 1.0 or pct >= 100.0:
                             overall = range_start + pct * (range_end - range_start) / 100.0
                             if progress_label:
-                                print(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f} {progress_label}", flush=True)
+                                emit(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f} {progress_label}")
                             else:
-                                print(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f}", flush=True)
+                                emit(f"UWMEDIA_FFMPEG_PROGRESS {overall:.1f}")
                             last_emitted_pct = pct
                     except:
                         pass
@@ -109,9 +110,9 @@ class FfmpegClass:
             # throttled loop above can stop just under the end of the range
             if duration and last_emitted_pct < 100.0:
                 if progress_label:
-                    print(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f} {progress_label}", flush=True)
+                    emit(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f} {progress_label}")
                 else:
-                    print(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f}", flush=True)
+                    emit(f"UWMEDIA_FFMPEG_PROGRESS {range_end:.1f}")
 
             return subprocess.CompletedProcess(cmd, process.returncode)
             

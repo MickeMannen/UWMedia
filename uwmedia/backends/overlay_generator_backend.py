@@ -36,6 +36,7 @@ from parsers.registry import LOG_FILE_FILTER
 from utils.app_settings import get_fields, set_field
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
+from utils.progress_lines import LineBuffer, finished_text
 from utils.run_timing import RunTiming
 from utils.layouts import list_templates, page_display_name, resolve_template_state, load_layout_file, strip_variant_markers, variant_display_name
 
@@ -122,6 +123,7 @@ class OverlayGeneratorBackend(QObject):
         self._overlay_size = OVERLAY_SIZE_DEFAULT
 
         self.process = None
+        self._line_buffer = LineBuffer()
         self.abort_requested = False
         self._run_queue = []
         self._run_total = 0
@@ -808,6 +810,7 @@ class OverlayGeneratorBackend(QObject):
         args = self._build_log_args(overlay["layout_path"]) if self._log_mode else self._build_hud_args(overlay["layout_path"])
         cmd = self._build_command(args)
 
+        self._line_buffer = LineBuffer()
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_process_output)
@@ -817,9 +820,8 @@ class OverlayGeneratorBackend(QObject):
     def _on_process_output(self):
         if self.process is None:
             return
-        text = bytes(self.process.readAllStandardOutput()).decode(errors="replace")
         status = None
-        for line in text.splitlines():
+        for line in self._line_buffer.feed(self.process.readAllStandardOutput()):
             line = line.strip()
             if not line:
                 continue
@@ -828,12 +830,18 @@ class OverlayGeneratorBackend(QObject):
         if status is not None:
             self._set_status(status)
 
-    def _on_overlay_finished(self, exit_code, _exit_status):
+    def _on_overlay_finished(self, exit_code, exit_status):
+        for line in self._line_buffer.flush():
+            if line.strip():
+                self._handle_output_line(line.strip())
+        crashed = exit_status == QProcess.ExitStatus.CrashExit
+        if crashed and not self.abort_requested:
+            self._status_text = finished_text(exit_code, crashed)
         # A run that exits non-zero (e.g. the CLI refusing the layout) used
         # to vanish behind the next overlay's "Starting…" - remember it for
         # the final status instead (2026-09-27: three overlays added, only
         # two ran, nothing said why).
-        if exit_code != 0 and not self.abort_requested:
+        if (exit_code != 0 or crashed) and not self.abort_requested:
             self._failed_runs.append((self._overlay_progress_text.split(": ", 1)[-1], self._status_text))
         self.process = None
         self._run_next_overlay()

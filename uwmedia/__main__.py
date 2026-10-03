@@ -89,6 +89,22 @@ def _restore_console_stdio():
         pass
 
 
+def _ignore_sigpipe():
+    """Turn a write to a closed pipe back into BrokenPipeError for a CLI run.
+
+    A normal Python ignores SIGPIPE at startup, but the packaged app's
+    embedded Python does not, so one broken pipe (e.g. to an exiftool helper
+    that went away) killed the whole Color batch at once: the page showed
+    "Failed (exit code 13)", Qt's way of reporting death by signal 13. With
+    it ignored, the write raises in the thread doing it and that one file
+    fails with an error, as when run from source.
+    """
+    import signal
+
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+
+
 def main():
     # No args: launched normally -> GUI. Args present: the GUI's own
     # "Start" button (ColorPage._build_command) re-invoking this package's
@@ -99,6 +115,7 @@ def main():
     # dependency on uwmedia/toga at all, see pyside6_rework.md).
     if len(sys.argv) > 1:
         _restore_console_stdio()
+        _ignore_sigpipe()
         import multiprocessing
 
         multiprocessing.freeze_support()
