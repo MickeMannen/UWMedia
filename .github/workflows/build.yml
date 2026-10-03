@@ -146,13 +146,13 @@ jobs:
           fi
 
           if [ "$BUILD_MACOS_UNSIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
+            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
           fi
 
           if [ "$BUILD_MACOS_SIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
-            ENTRIES+=('{"os":"macos-14","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
+            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
+            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
           fi
 
           if [ ${#ENTRIES[@]} -eq 0 ]; then
