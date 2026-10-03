@@ -377,19 +377,8 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           files: artifacts/*/*
-          # The release is created first (from CHANGELOG.md, see CLAUDE.md
-          # "Changelog and releases"); this only adds the file list under
-          # those notes instead of replacing them.
-          append_body: true
-          body: |
-            - `UWMedia-*.dmg` - macOS app, drag to Applications. No terminal command.
-            - `UWMedia-Terminal-*.pkg` - macOS app + a `uwmedia` terminal command for scripted/batch use.
-            - `UWMedia-*.msi` - Windows installer. Also adds a `uwmedia` terminal command.
-            - `UWMedia-ubuntu-amd64-*.deb` - Linux package. Also adds a `uwmedia` terminal command.
-
-            Only the file(s) attached below are part of this release. macOS
-            files are only genuinely signed/notarized if "Build macOS
-            (signed + notarized)" was checked for this run - otherwise
-            they're ad-hoc and won't open until replaced.
+          # The release and its notes are created first (from CHANGELOG.md,
+          # see CLAUDE.md "Changelog and releases"); with no body given this
+          # only attaches the files and leaves those notes as they are.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
