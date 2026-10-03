@@ -43,6 +43,10 @@ Photo with Telemetry data (old overlay)
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 - **Dive Profile Builder**: Draw a synthetic open circuit, sidemount or CCR dive and save it as a UDDF, Garmin FIT or Subsurface log, to test overlays in situations like deco or gas switches. *Test data only - not for dive planning.*
 
+<p align="center">
+  <img src="media/video_pipeline.png" alt="Color page video pipeline: colour analysis and HUD layers in Python, then one FFmpeg pass that decodes, colour-corrects, overlays the HUD and encodes" width="800">
+</p>
+
 ### Workflow (how I do)
 - **Run Color Correction** for all videos and photos.
 - **Telemetry Creation**: for each corrected video, generate matching overlays (often several versions).
