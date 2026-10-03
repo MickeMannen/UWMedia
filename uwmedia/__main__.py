@@ -68,6 +68,27 @@ def _should_relaunch_for_gui() -> bool:
         return False
 
 
+def _restore_console_stdio():
+    """Undo the macOS app's stdout/stderr redirect for a CLI run.
+
+    The Briefcase macOS launcher installs std-nslog at startup, which swaps
+    sys.stdout/sys.stderr for writers into the system log - right for the
+    GUI, but the Color/Overlay Generator/Convertion pages run the CLI as a
+    child of this same binary and read its stdout for progress
+    (UWMEDIA_PROGRESS lines), and a terminal user expects to see output.
+    With the redirect, the packaged app's pages never left "Starting…".
+    The original streams on fds 1/2 are still in sys.__stdout__/__stderr__.
+    """
+    for name in ("stdout", "stderr"):
+        original = getattr(sys, f"__{name}__", None)
+        if original is not None and getattr(sys, name) is not original:
+            setattr(sys, name, original)
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
+
+
 def main():
     # No args: launched normally -> GUI. Args present: the GUI's own
     # "Start" button (ColorPage._build_command) re-invoking this package's
@@ -77,6 +98,7 @@ def main():
     # rooted in this package instead of the Toga one (this app has no
     # dependency on uwmedia/toga at all, see pyside6_rework.md).
     if len(sys.argv) > 1:
+        _restore_console_stdio()
         import multiprocessing
 
         multiprocessing.freeze_support()

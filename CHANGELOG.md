@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- macOS: in the downloaded app, Color, Overlay Generator and Convertion now
+  show live progress and status; they stayed at "Starting…" until the run
+  ended.
+
 ## [0.7.5] - 2026-10-03
 
 ### Changed
