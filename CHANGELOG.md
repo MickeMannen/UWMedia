@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.11] - 2026-10-05
 
 ### Fixed
 - Dive Profile: the Open and Save dive log dialogs start in your home folder
