@@ -81,6 +81,8 @@ from utils.dive_plan_import import plan_from_log
 DIVE_PLAN_GAS_TYPES = ("Air", "Nitrox", "Trimix")
 # DiveProfilePlan.dive_type <-> display label
 DIVE_TYPE_LABELS = {"oc": "Open circuit", "sidemount": "Sidemount", "ccr": "CCR"}
+# PlannedGas.side <-> the sidemount Side picker's label ("" = a stage tank)
+GAS_SIDE_LABELS = {"": "Stage", "left": "Left", "right": "Right"}
 # Save dialog filter -> (extension, writer). The chosen file's own
 # extension wins when it's one of these.
 LOG_FORMATS = {
@@ -260,7 +262,7 @@ class DiveProfileBackend(QObject):
         self._gas_o2_text = "21"
         self._gas_he_text = "0"
         self._gas_diluent = False
-        self._gas_sidemount_pair = False
+        self._gas_side = ""
         self._gas_tank_text = self._next_free_tank()
         self._gas_volume_text = DEFAULT_TANK_VOLUME_TEXT
         self._gas_start_pressure_text = DEFAULT_START_PRESSURE_TEXT
@@ -603,13 +605,15 @@ class DiveProfileBackend(QObject):
 
     def _apply_dive_type_defaults(self):
         """Makes the dive type do something straight away: a CCR dive needs
-        a diluent, a sidemount dive a pair - the first (bottom) gas."""
+        a diluent, a sidemount dive a left and a right tank - the first
+        (bottom) gas goes on the left, and the gas editor then offers its
+        right-hand twin (newGas)."""
         gases = self.dive_plan.gases
         if self.dive_plan.is_ccr and gases and self.dive_plan.diluent_gas() is None:
             gases[0].diluent = True
-        if self.dive_plan.dive_type == "sidemount" and gases and not any(g.sidemount_pair for g in gases):
+        if self.dive_plan.dive_type == "sidemount" and gases and not any(g.side for g in gases):
             bottom = next((g for g in gases if g.use_phase != "ascent"), gases[0])
-            bottom.sidemount_pair = True
+            bottom.side = "left"
 
     def _set_plan_number(self, attr, value, is_valid):
         """Applies a typed number to the plan (and remembers it) when
@@ -864,7 +868,9 @@ class DiveProfileBackend(QObject):
                 kind = "DIL" if g.diluent else "BAILOUT"
             else:
                 kind = g.gas_type.upper()
-            tanks = "+".join(plan.tank_refs_for(g))
+            tanks = g.tank_ref
+            if plan.dive_type == "sidemount" and g.side:
+                tanks += f" {GAS_SIDE_LABELS[g.side]}"
             rows.append([
                 g.id,
                 kind,
@@ -882,7 +888,7 @@ class DiveProfileBackend(QObject):
 
     @Property(list, notify=gasesChanged)
     def gasIdList(self):
-        return [g.id for g in self.dive_plan.gases]
+        return [g.id for g in self.dive_plan.breathed_gases()]
 
     @Property(str, notify=gasFieldsChanged)
     def gasNameText(self):
@@ -911,13 +917,17 @@ class DiveProfileBackend(QObject):
         self._gas_diluent = bool(value)
         self.gasFieldsChanged.emit()
 
-    @Property(bool, notify=gasFieldsChanged)
-    def gasSidemountPair(self):
-        return self._gas_sidemount_pair
+    @Property(list, constant=True)
+    def gasSideList(self):
+        return list(GAS_SIDE_LABELS.values())
 
-    @gasSidemountPair.setter
-    def gasSidemountPair(self, value):
-        self._gas_sidemount_pair = bool(value)
+    @Property(str, notify=gasFieldsChanged)
+    def gasSideLabel(self):
+        return GAS_SIDE_LABELS[self._gas_side]
+
+    @Slot(str)
+    def onGasSideSelected(self, label):
+        self._gas_side = next((k for k, v in GAS_SIDE_LABELS.items() if v == label), "")
         self.gasFieldsChanged.emit()
 
     @Property(str, notify=gasFieldsChanged)
@@ -1055,7 +1065,7 @@ class DiveProfileBackend(QObject):
         self._gas_o2_text = f"{g.o2_percent:g}"
         self._gas_he_text = f"{g.he_percent:g}"
         self._gas_diluent = g.diluent
-        self._gas_sidemount_pair = g.sidemount_pair
+        self._gas_side = g.side or ""
         self._gas_tank_text = g.tank_ref
         self._gas_volume_text = f"{g.tank_size_l:g}"
         self._gas_start_pressure_text = f"{g.start_pressure_bar:g}"
@@ -1082,11 +1092,22 @@ class DiveProfileBackend(QObject):
         self._gas_type = "Air"
         self._gas_o2_text = "21"
         self._gas_he_text = "0"
-        # A new gas is the diluent / a sidemount pair when the dive has none yet.
+        # A new gas is the diluent when the dive has none yet.
         self._gas_diluent = self.dive_plan.is_ccr and self.dive_plan.diluent_gas() is None
-        self._gas_sidemount_pair = (
-            self.dive_plan.dive_type == "sidemount" and not any(g.sidemount_pair for g in self.dive_plan.gases)
-        )
+        self._gas_side = ""
+        if self.dive_plan.dive_type == "sidemount":
+            # The sidemount side still missing: left first, then the right
+            # tank, offered as a twin of the left one so one Add completes it.
+            left = next((g for g in self.dive_plan.gases if g.side == "left"), None)
+            right = next((g for g in self.dive_plan.gases if g.side == "right"), None)
+            if left is None:
+                self._gas_side = "left"
+            elif right is None:
+                self._gas_side = "right"
+                self._gas_name_text = f"{left.id} R"
+                self._gas_type = next((t for t in DIVE_PLAN_GAS_TYPES if t.lower() == left.gas_type), "Air")
+                self._gas_o2_text = f"{left.o2_percent:g}"
+                self._gas_he_text = f"{left.he_percent:g}"
         self._gas_tank_text = self._next_free_tank()
         self._gas_volume_text = DEFAULT_TANK_VOLUME_TEXT
         self._gas_start_pressure_text = DEFAULT_START_PRESSURE_TEXT
@@ -1126,7 +1147,7 @@ class DiveProfileBackend(QObject):
                 o2_percent=float(self._gas_o2_text),
                 he_percent=float(self._gas_he_text or 0.0),
                 diluent=self._gas_diluent,
-                sidemount_pair=self._gas_sidemount_pair,
+                side=self._gas_side or None,
                 tank_ref=self._gas_tank_text.strip() or self._next_free_tank(),
                 tank_size_l=float(self._gas_volume_text),
                 start_pressure_bar=float(self._gas_start_pressure_text),
@@ -1146,6 +1167,12 @@ class DiveProfileBackend(QObject):
             self._gas_error(f"Could not {action} gas: {e}")
             return
 
+        if self.dive_plan.dive_type == "sidemount" and gas.side:
+            error = self._sidemount_side_error(gas, editing)
+            if error:
+                self._gas_error(f"Could not {action} gas: {error}")
+                return
+
         if gas.diluent:
             # One loop per dive - the new diluent replaces the old one.
             for other in self.dive_plan.gases:
@@ -1154,6 +1181,10 @@ class DiveProfileBackend(QObject):
         if editing >= 0:
             old_id = self.dive_plan.gases[editing].id
             self.dive_plan.gases[editing] = gas
+            twin = self._sidemount_twin(gas)
+            if twin is not None:
+                # Both sides hold the same gas - a new mix goes into both.
+                twin.gas_type, twin.o2_percent, twin.he_percent = gas.gas_type, gas.o2_percent, gas.he_percent
             if old_id != gas.id:
                 for wp in self.dive_plan.waypoints:
                     if wp.gas_id == old_id:
@@ -1179,6 +1210,32 @@ class DiveProfileBackend(QObject):
         self.statusChanged.emit()
         self.gasesChanged.emit()
         self._resimulate()
+
+    def _sidemount_twin(self, gas):
+        """The other sidemount tank of `gas` (by side), if there is one."""
+        if self.dive_plan.dive_type != "sidemount" or not gas.side:
+            return None
+        other = "right" if gas.side == "left" else "left"
+        return next((g for g in self.dive_plan.gases if g.side == other and g.id != gas.id), None)
+
+    def _sidemount_side_error(self, gas, editing):
+        """One left and one right tank per dive, of the same gas, in tanks
+        of their own."""
+        side = GAS_SIDE_LABELS[gas.side].lower()
+        taken = next((g for i, g in enumerate(self.dive_plan.gases) if g.side == gas.side and i != editing), None)
+        if taken is not None:
+            return f"{taken.id} is already the {side} tank"
+        twin = self._sidemount_twin(gas)
+        if twin is None:
+            return None
+        if twin.tank_ref == gas.tank_ref:
+            return f"the left and right tanks need tanks of their own ({twin.id} is in {twin.tank_ref})"
+        if editing < 0 and (twin.o2_percent, twin.he_percent) != (gas.o2_percent, gas.he_percent):
+            return (
+                f"the left and right tanks must hold the same gas - {twin.id} is "
+                f"{twin.o2_percent:g}/{twin.he_percent:g}"
+            )
+        return None
 
     @Slot(int)
     def removeGasAtRow(self, row):
@@ -1243,7 +1300,7 @@ class DiveProfileBackend(QObject):
 
     @Property(list, notify=gasesChanged)
     def wpGasChoices(self):
-        return [AUTO_GAS_LABEL] + [g.id for g in self.dive_plan.gases]
+        return [AUTO_GAS_LABEL] + [g.id for g in self.dive_plan.breathed_gases()]
 
     @Property(str, notify=waypointFieldsChanged)
     def wpGasText(self):
@@ -1296,7 +1353,7 @@ class DiveProfileBackend(QObject):
             if not self.dive_plan.gases:
                 raise ValueError("Define a gas first")
             gas_auto = self._wp_gas_text in ("", AUTO_GAS_LABEL)
-            gas_id = self.dive_plan.gases[0].id if gas_auto else self._wp_gas_text
+            gas_id = self.dive_plan.breathed_gases()[0].id if gas_auto else self._wp_gas_text
             rate_text = self._wp_rate_text.strip()
             rate = float(rate_text) if rate_text else None
             new_wp = PlannedWaypoint(
@@ -1382,7 +1439,7 @@ class DiveProfileBackend(QObject):
         runtime_sec, depth = point
         self.dive_plan.waypoints = [w for w in self.dive_plan.waypoints if w.runtime_sec != runtime_sec]
         self.dive_plan.waypoints.append(
-            PlannedWaypoint(runtime_sec=runtime_sec, depth_m=depth, gas_id=self.dive_plan.gases[0].id, gas_auto=True)
+            PlannedWaypoint(runtime_sec=runtime_sec, depth_m=depth, gas_id=self.dive_plan.breathed_gases()[0].id, gas_auto=True)
         )
         self._grow_runtime_for(runtime_sec)
         self._wp_status_text = ""

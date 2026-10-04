@@ -305,7 +305,12 @@ class UDDFParser(BaseParser):
                         res = deco_results.get(wp.time_since_start)
                         if res:
                             if wp.tts is None:
-                                wp.tts = res.tts_seconds
+                                if file_logs_stops and wp.deco_stop_depth == 0.0:
+                                    # The file says no stop here: a direct
+                                    # ascent, whatever our recompute still owes.
+                                    wp.tts = int(math.ceil(wp.depth / decompressor.ascent_rate_mps))
+                                else:
+                                    wp.tts = res.tts_seconds
                             wp.ceiling = res.ceiling_meters
                             if wp.deco_stop_depth is None:
                                 wp.deco_stop_depth = res.ceiling_meters

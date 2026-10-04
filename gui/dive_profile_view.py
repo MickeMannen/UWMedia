@@ -48,6 +48,16 @@ def gas_color(plan: DiveProfilePlan, gas_id: str) -> str:
     return DEPTH_LINE_COLOR
 
 
+def sample_color(plan: DiveProfilePlan, sample: SimulatedSample) -> str:
+    """The profile line's colour at a sample: the gas breathed, or on a
+    sidemount dive the colour of the tank in use, so each side switch shows."""
+    if plan.sidemount_tanks() is not None:
+        tank_gas = plan.gas_for_tank(sample.tank_ref)
+        if tank_gas is not None and plan.breathed_gas(tank_gas).id == sample.gas_id:
+            return gas_color(plan, tank_gas.id)
+    return gas_color(plan, sample.gas_id)
+
+
 def next_free_gas_color(plan: DiveProfilePlan) -> str:
     used = {gas_color(plan, g.id) for g in plan.gases}
     return next((c for c in GAS_COLORS if c not in used), GAS_COLORS[len(plan.gases) % len(GAS_COLORS)])
@@ -121,11 +131,20 @@ def nearest_sample(samples: List[SimulatedSample], time_sec: float) -> Optional[
 
 
 def _draw_gas_legend(draw, plan, samples, right, bottom, font, areas=()) -> None:
-    """Swatch + name per gas actually breathed, stacked up from the
-    bottom-right corner of the plot (usually empty - dives end shallow),
+    """Swatch + name per gas actually breathed (per tank for the two
+    sidemount tanks, which are drawn in their own colours), stacked up from
+    the bottom-right corner of the plot (usually empty - dives end shallow),
     then a filled swatch per shaded area in `areas` ((label, rgb))."""
     used = {s.gas_id for s in samples}
-    rows = [(g.id, gas_color(plan, g.id), False) for g in plan.gases if g.id in used]
+    pair = plan.sidemount_tanks()
+    rows = []
+    for g in plan.gases:
+        if pair is not None and g in pair:
+            if pair[0].id in used:
+                side = "L" if g.side == "left" else "R"
+                rows.append((f"{g.id} ({g.tank_ref} {side})", gas_color(plan, g.id), False))
+        elif g.id in used:
+            rows.append((g.id, gas_color(plan, g.id), False))
     rows += [(label, rgb, True) for label, rgb in areas]
     if not rows:
         return
@@ -260,7 +279,7 @@ def render_profile_image(
             draw = ImageDraw.Draw(img)
         points = [(x_of(s.time_sec), y_of(s.depth_m)) for s in samples]
         for i in range(len(points) - 1):
-            draw.line([points[i], points[i + 1]], fill=gas_color(plan, samples[i + 1].gas_id), width=3)
+            draw.line([points[i], points[i + 1]], fill=sample_color(plan, samples[i + 1]), width=3)
         areas = []
         if deco_schedules:
             areas.append(("Deco stops", DECO_STOP_RGB))

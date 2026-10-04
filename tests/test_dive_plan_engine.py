@@ -188,13 +188,13 @@ def _bottom_plan(depth, bottom_end_sec, gases=None):
 
 
 def test_plan_ascent_no_deco_adds_3m_3min_safety_stop():
-    plan = _bottom_plan(18, 1800)
+    plan = _bottom_plan(18, 1500)
     ascent, deco_needed, stops = plan_ascent(plan)
     assert not deco_needed
     assert stops == [(3.0, 180, "Air")]
     assert [wp.depth_m for wp in ascent] == [3.0, 0.0]
     # 15m at 9 m/min = 100s, then the 180s stop.
-    assert ascent[0].runtime_sec == 1800 + 100 + 180
+    assert ascent[0].runtime_sec == 1500 + 100 + 180
 
 
 def test_plan_ascent_deco_clears_ceiling_and_switches_gas():
@@ -217,6 +217,21 @@ def test_plan_ascent_deco_clears_ceiling_and_switches_gas():
     samples, warnings = simulate(plan, resolution_sec=10)
     assert warnings == []
     assert all(s.ceiling_m <= s.depth_m + 0.1 for s in samples)
+
+
+def test_plan_ascent_deco_cleared_by_deco_gas_still_stops_at_3m():
+    # Just into deco: EAN50 clears the obligation on the way up, but the
+    # ascent still ends with at least the 3m/3min a no-deco dive gets.
+    for gases in (
+        [PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0),
+         PlannedGas(id="EAN50", gas_type="nitrox", o2_percent=50.0)],
+        [PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0)],
+    ):
+        plan = _bottom_plan(40, 600, gases)
+        ascent, deco_needed, stops = plan_ascent(plan)
+        assert deco_needed
+        assert stops[-1][:2] == (3.0, 180)
+        assert [wp.depth_m for wp in ascent][-2:] == [3.0, 0.0]
 
 
 def test_plan_ascent_nothing_to_do_at_surface():
@@ -270,10 +285,10 @@ def test_plan_ascent_holds_one_minute_at_gas_switch():
         PlannedGas(id="Air", gas_type="air", o2_percent=21.0),
         PlannedGas(id="EAN50", gas_type="nitrox", o2_percent=50.0, use_max_depth_m=21, use_phase="ascent"),
     ]
-    plan = _bottom_plan(18, 1800, gases)  # no deco; EAN50 usable right where the ascent starts
+    plan = _bottom_plan(18, 1500, gases)  # no deco; EAN50 usable right where the ascent starts
     ascent, deco_needed, stops = plan_ascent(plan)
     assert not deco_needed
-    assert (ascent[0].depth_m, ascent[0].runtime_sec, ascent[0].gas_id) == (18.0, 1860, "EAN50")
+    assert (ascent[0].depth_m, ascent[0].runtime_sec, ascent[0].gas_id) == (18.0, 1560, "EAN50")
     assert stops == [(18.0, 60, "EAN50"), (3.0, 180, "EAN50")]
     # The switch waypoint sits at max depth but belongs to the ascent, so
     # re-deriving auto gases must keep EAN50 there.
@@ -381,7 +396,10 @@ def test_ccr_without_a_diluent_is_an_error():
 
 
 def _sidemount_plan(switch_bar=30.0) -> DiveProfilePlan:
-    gases = [PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, sidemount_pair=True, tank_size_l=11.1, start_pressure_bar=207)]
+    gases = [
+        PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, side="left", tank_size_l=11.1, start_pressure_bar=207),
+        PlannedGas(id="EAN32 R", gas_type="nitrox", o2_percent=32.0, side="right", tank_ref="T2", tank_size_l=11.1, start_pressure_bar=207),
+    ]
     waypoints = [
         PlannedWaypoint(runtime_sec=120, depth_m=20.0, gas_id="EAN32"),
         PlannedWaypoint(runtime_sec=2400, depth_m=20.0, gas_id="EAN32"),
@@ -391,13 +409,14 @@ def _sidemount_plan(switch_bar=30.0) -> DiveProfilePlan:
 
 def test_sidemount_pair_alternates_tanks_within_the_switch_pressure():
     plan = _sidemount_plan(switch_bar=30.0)
-    assert plan.tank_refs_for(plan.gases[0]) == ["T1L", "T1R"]
+    assert plan.tank_refs_for(plan.gases[0]) == plan.tank_refs_for(plan.gases[1]) == ["T1", "T2"]
     samples, _ = simulate(plan, resolution_sec=1)
-    assert samples[0].tank_ref == "T1L"
+    assert samples[0].tank_ref == "T1"
+    assert {s.gas_id for s in samples} == {"EAN32"}  # one gas, from either side
     switches = sum(1 for a, b in zip(samples, samples[1:]) if a.tank_ref != b.tank_ref)
     assert switches >= 3
     for s in samples:
-        assert abs(s.tank_pressures["T1L"] - s.tank_pressures["T1R"]) <= 30.0 + 0.5
+        assert abs(s.tank_pressures["T1"] - s.tank_pressures["T2"]) <= 30.0 + 0.5
     # Both tanks together cover the gas an OC diver would breathe from one.
     used = sum(207.0 - p for p in samples[-1].tank_pressures.values())
     single = DiveProfilePlan(gases=[PlannedGas(id="EAN32", o2_percent=32.0, start_pressure_bar=400)], waypoints=plan.waypoints)
@@ -408,8 +427,43 @@ def test_sidemount_pair_alternates_tanks_within_the_switch_pressure():
 def test_sidemount_pair_is_ignored_on_other_dive_types():
     plan = _sidemount_plan()
     plan.dive_type = "oc"
-    assert [t.ref for t in plan.tank_specs()] == ["T1"]
+    assert plan.tank_refs_for(plan.gases[0]) == ["T1"]
+    assert [(t.ref, t.gas_id) for t in plan.tank_specs()] == [("T1", "EAN32"), ("T2", "EAN32 R")]
 
+
+
+def test_sidemount_dive_needs_both_tanks_before_it_simulates():
+    plan = _sidemount_plan()
+    plan.gases.pop()
+    with pytest.raises(ValueError, match="Left.*Right"):
+        simulate(plan)
+
+
+def test_profile_line_takes_the_colour_of_the_sidemount_tank_in_use():
+    from gui.dive_profile_view import gas_color, sample_color
+
+    plan = _sidemount_plan()
+    plan.gases[0].color, plan.gases[1].color = "#0EA5A4", "#3B82F6"
+    samples, _ = simulate(plan, resolution_sec=1)
+    colors = {s.tank_ref: sample_color(plan, s) for s in samples}
+    assert colors == {"T1": "#0EA5A4", "T2": "#3B82F6"}
+    assert gas_color(plan, samples[0].gas_id) == "#0EA5A4"
+
+
+def test_older_plan_with_a_sidemount_pair_loads_as_left_and_right_tanks():
+    """Plans embedded in logs saved before tanks had a side."""
+    plan = DiveProfilePlan.model_validate({
+        "dive_type": "sidemount",
+        "gases": [
+            {"id": "EAN32", "o2_percent": 32.0, "tank_ref": "T1", "sidemount_pair": True, "color": "#0EA5A4"},
+            {"id": "EAN50", "o2_percent": 50.0, "tank_ref": "T2"},
+        ],
+    })
+    assert [(g.id, g.tank_ref, g.side, g.o2_percent) for g in plan.gases] == [
+        ("EAN32", "T1", "left", 32.0), ("EAN32 R", "T3", "right", 32.0), ("EAN50", "T2", None, 50.0),
+    ]
+    assert plan.gases[1].color is None  # a palette colour of its own
+    assert [g.id for g in plan.breathed_gases()] == ["EAN32", "EAN50"]
 
 # --- Ceiling at both GFs, logged stops, deco schedule timeline -------------
 
@@ -451,14 +505,14 @@ def test_deco_schedule_timeline_grows_with_bottom_time():
 
 
 def test_ndl_is_judged_at_gf_high_and_runs_out_when_the_ceiling_appears():
-    # 18m on air at GF 30/70: ~40 min, not the ~7 min GF low would give.
+    # 18m on air at GF 30/70: ~29 min (ZHL-16C), not the ~7 min GF low would give.
     plan = DiveProfilePlan(gf_low=30, gf_high=70, gases=[PlannedGas(id="Air")], waypoints=[
         PlannedWaypoint(runtime_sec=60, depth_m=18, gas_id="Air"),
         PlannedWaypoint(runtime_sec=3600, depth_m=18, gas_id="Air"),
     ])
     samples, _ = simulate(plan, resolution_sec=10)
     at_1_min = next(s for s in samples if s.time_sec == 60)
-    assert 35 * 60 <= at_1_min.ndl_sec <= 45 * 60
+    assert 25 * 60 <= at_1_min.ndl_sec <= 33 * 60
     # Never "NDL 0" while there is no ceiling, and the ceiling arrives about
     # when the NDL said it would.
     assert all(s.ndl_sec != 0 for s in samples if s.ceiling_m <= 0 and s.time_sec % 10 == 0)

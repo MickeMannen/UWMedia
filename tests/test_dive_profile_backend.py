@@ -287,18 +287,57 @@ def test_setpoints_apply_only_as_a_valid_pair(settings_file):
     assert DiveProfileBackend().dive_plan.ccr_high_setpoint == 1.5
 
 
-def test_sidemount_pairs_the_bottom_gas_and_shows_both_tanks(settings_file):
+def test_sidemount_needs_a_left_and_a_right_tank_before_the_dive_builds(settings_file):
     backend = DiveProfileBackend()
     _with_waypoint(backend, minutes="40")
     backend.onDiveTypeSelected("Sidemount")
-    assert backend.isSidemount and backend.dive_plan.gases[0].sidemount_pair
-    assert "T1L+T1R" in backend.gasTableRows[0][4]
+    assert backend.isSidemount and backend.dive_plan.gases[0].side == "left"
+    # One side only: nothing is simulated, and the status says why.
+    assert not backend.dive_profile_samples
+    assert "Left" in backend.statusText and "Right" in backend.statusText
+    # The editor offers the right-hand twin of the left tank, in a tank of its own.
+    assert backend.gasSideLabel == "Right"
+    assert (backend.gasNameText, backend.gasO2Text, backend.gasTankText) == ("Air R", "21", "T2")
+    backend.addGas()
+    assert backend.gasStatusText == ""
+    assert [r[4].split()[:2] for r in backend.gasTableRows] == [["T1", "Left"], ["T2", "Right"]]
+    assert backend.dive_profile_samples
+    # The right tank is part of the left tank's gas, not a gas of its own.
+    assert backend.wpGasChoices == ["Auto", "Air"]
     backend.sidemountSwitchText = "20"
     assert backend.dive_plan.sidemount_switch_bar == 20
     backend.dive_profile_cursor_time = 1200
     backend._update_cursor_info()
     tanks = next(row for row in backend.cursorInfo if row["label"] == "Tanks")
-    assert "T1L" in tanks["value"] and "T1R" in tanks["value"]
+    assert "T1" in tanks["value"] and "T2" in tanks["value"]
+
+
+def test_sidemount_sides_are_one_each_and_of_the_same_gas(settings_file):
+    backend = DiveProfileBackend()
+    backend.onDiveTypeSelected("Sidemount")
+    # A second left tank is refused.
+    backend.newGas()
+    backend.onGasSideSelected("Left")
+    backend.addGas()
+    assert "already the left tank" in backend.gasStatusText
+    # A right tank of another gas is refused.
+    backend.newGas()
+    backend.gasO2Text = "32"
+    backend.addGas()
+    assert "same gas" in backend.gasStatusText
+    assert len(backend.dive_plan.gases) == 1
+    # A stage is fine, and changing the left tank's gas changes the right one too.
+    backend.newGas()
+    backend.addGas()
+    backend.onGasSideSelected("Stage")
+    backend.gasNameText = "EAN50"
+    backend.gasO2Text = "50"
+    backend.addGas()
+    assert [(g.id, g.side) for g in backend.dive_plan.gases] == [("Air", "left"), ("Air R", "right"), ("EAN50", None)]
+    backend.selectGasRow(0)
+    backend.gasO2Text = "32"
+    backend.addGas()
+    assert backend.dive_plan.gases[1].o2_percent == 32
 
 
 def test_log_details_are_validated_and_computer_is_remembered(settings_file):

@@ -62,7 +62,8 @@ def write_fit(
     end_utc = datetime.fromtimestamp(start_utc.timestamp() + duration, tz=timezone.utc)
     tanks = plan.tank_specs()
     sensor_of = {t.ref: TANK_SENSOR_BASE + i for i, t in enumerate(tanks)}
-    gas_index = {g.id: i for i, g in enumerate(plan.gases)}
+    gases = plan.breathed_gases()  # a sidemount pair is one gas in two tanks
+    gas_index = {g.id: i for i, g in enumerate(gases)}
 
     encoder = Encoder()
 
@@ -96,7 +97,7 @@ def write_fit(
           ccr_low_setpoint_depth=plan.ccr_setpoint_switch_depth_m,
           ccr_high_setpoint_switch_mode="automatic", ccr_high_setpoint=plan.ccr_high_setpoint,
           ccr_high_setpoint_depth=plan.ccr_setpoint_switch_depth_m)
-    for gas in plan.gases:
+    for gas in gases:
         write("dive_gas", message_index=gas_index[gas.id], helium_content=round(gas.he_percent),
               oxygen_content=round(gas.o2_percent), status="enabled",
               mode="closed_circuit_diluent" if plan.on_loop(gas) else "open_circuit")
@@ -137,7 +138,7 @@ def write_fit(
     depths = [s.depth_m for s in samples]
     if plan.is_ccr:
         sub_sport = "ccr_diving"
-    elif len(plan.gases) > 1:
+    elif len(gases) > 1:
         sub_sport = "multi_gas_diving"
     else:
         sub_sport = "single_gas_diving"

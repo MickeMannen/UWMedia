@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- Dive Profile: sidemount tanks are set up one row per tank, with a Side
+  picker (Left, Right or Stage) in place of the "Sidemount pair" tick box, so
+  the second tank can be put on the right side.
+- Dive Profile: a sidemount dive needs both a left and a right tank of the
+  same gas before it is built or saved; the status line says what is missing.
+- Dive Profile: the profile line takes the colour of the sidemount tank in
+  use (T1 or T2), so every side switch shows in the graph and its legend.
+
+### Fixed
+- Dive Profile, log import: deco is now calculated with the standard Bühlmann
+  ZHL-16C tissue table. The previous table was wrong and gave deco stops that
+  were too short and NDLs that were too long (18 m on air at GF 70: about
+  29 min, not 40). Recomputed TTS and ceilings on imported logs change with it.
+- Dive Profile: a deco ascent always ends with at least a 3 m / 3 min stop.
+  When a deco gas such as EAN50 cleared the obligation on the way up, the
+  plan had no stops left after the gas switch.
+
 ## [0.7.9] - 2026-10-03
 
 ### Fixed

@@ -29,15 +29,18 @@ WRITERS = {
 START = datetime(2026, 9, 27, 10, 0, 0)
 
 
-def _deco_plan(dive_type="sidemount"):
-    """A 45 m dive that needs deco and switches to EAN50 on the way up."""
+def _deco_plan():
+    """A sidemount dive (EAN32 left in T1, right in T2) to 33 m that needs
+    deco and switches to an EAN50 stage (T3) on the way up."""
     plan = DiveProfilePlan(
-        name="Embed test", dive_type=dive_type, gf_low=40, gf_high=85, sac_lpm=15, water_temp_c=27.0,
+        name="Embed test", dive_type="sidemount", gf_low=40, gf_high=85, sac_lpm=15, water_temp_c=27.0,
         computer="Garmin Descent X50i", computer_serial="4242", start_time=START,
         gases=[
-            PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, sidemount_pair=dive_type == "sidemount",
+            PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, side="left",
                        start_pressure_bar=200, use_max_depth_m=33.0),
-            PlannedGas(id="EAN50", gas_type="nitrox", o2_percent=50.0, tank_ref="T2", use_max_depth_m=21.0,
+            PlannedGas(id="EAN32 R", gas_type="nitrox", o2_percent=32.0, side="right", tank_ref="T2",
+                       start_pressure_bar=200, use_max_depth_m=33.0),
+            PlannedGas(id="EAN50", gas_type="nitrox", o2_percent=50.0, tank_ref="T3", use_max_depth_m=21.0,
                        use_phase="ascent", start_pressure_bar=180),
         ],
         waypoints=[
@@ -132,10 +135,11 @@ def test_rebuilt_plan_from_a_log_without_the_embedded_plan(fmt, tmp_path):
     assert rebuilt.sac_lpm == 17.0  # not in a log - the base plan's
     assert rebuilt.water_temp_c == 27.0
     gases = {g.id: g for g in rebuilt.gases}
-    assert set(gases) == {"EAN32", "EAN50"}
-    assert gases["EAN32"].sidemount_pair and gases["EAN32"].tank_ref == "T1"
-    assert gases["EAN32"].start_pressure_bar == 200
-    assert gases["EAN50"].tank_ref == "T2" and not gases["EAN50"].sidemount_pair
+    assert set(gases) == {"EAN32", "EAN32 R", "EAN50"}
+    assert (gases["EAN32"].side, gases["EAN32"].tank_ref) == ("left", "T1")
+    assert (gases["EAN32 R"].side, gases["EAN32 R"].tank_ref) == ("right", "T2")
+    assert gases["EAN32"].start_pressure_bar == gases["EAN32 R"].start_pressure_bar == 200
+    assert gases["EAN50"].tank_ref == "T3" and gases["EAN50"].side is None
     assert gases["EAN50"].start_pressure_bar == 180
     assert gases["EAN50"].use_phase == "ascent"
 

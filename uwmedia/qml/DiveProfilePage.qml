@@ -37,9 +37,11 @@ Item {
         + "for your GF settings (3 m levels, whole minutes), switching to each deco gas as soon as "
         + "its range and MOD allow, with a 1 min hold at each gas switch (counted as part of a "
         + "deco stop at the same depth).<br><br>"
-        + "<b>6. Dive type.</b> Open circuit breathes each gas from its own tank. Sidemount breathes a "
-        + "gas ticked \"Sidemount pair\" from two tanks, left and right, switching side whenever the "
-        + "one in use gets the set pressure below the other. CCR makes the gas ticked \"Diluent\" the "
+        + "<b>6. Dive type.</b> Open circuit breathes each gas from its own tank. Sidemount needs two "
+        + "tanks of the same gas, one with Side set to Left and one to Right (usually T1 and T2); the "
+        + "dive starts on the left one and switches side whenever the one in use gets the set pressure "
+        + "below the other, and the profile line takes the colour of the tank in use. Other tanks are "
+        + "stages. CCR makes the gas ticked \"Diluent\" the "
         + "loop, held at the low setpoint above the switch depth and the high one below it, with an O2 "
         + "cylinder drawn at a metabolic rate; every other gas is open-circuit bailout, only used where "
         + "you pick it for a waypoint.<br><br>"
@@ -565,14 +567,18 @@ Item {
                                 ToolTip.delay: 500
                                 ToolTip.text: "Unticked gases are open-circuit bailout"
                             }
-                            CheckBox {
-                                text: "Sidemount pair (left/right)"
+                            Label { text: "Side"; visible: diveProfileBackend.isSidemount }
+                            ComboBox {
+                                Layout.preferredWidth: 110
+                                Layout.preferredHeight: 34
+                                font.pixelSize: 15
                                 visible: diveProfileBackend.isSidemount
-                                checked: diveProfileBackend.gasSidemountPair
-                                onToggled: diveProfileBackend.gasSidemountPair = checked
+                                model: diveProfileBackend.gasSideList
+                                currentIndex: model.indexOf(diveProfileBackend.gasSideLabel)
+                                onActivated: (index) => diveProfileBackend.onGasSideSelected(model[index])
                                 ToolTip.visible: hovered
                                 ToolTip.delay: 500
-                                ToolTip.text: "Breathed from two tanks, <tank>L and <tank>R, each with this volume and start pressure"
+                                ToolTip.text: "Left and Right: the two sidemount tanks, same gas, breathed alternately. Stage: any other tank"
                             }
                             Item { Layout.fillWidth: true }
                         }

@@ -14,7 +14,7 @@ tank a gas is in and when it was switched):
 
 - gases and tanks: UDDF <gasdefinitions>/<tankdata>, Subsurface
   <cylinder>s, FIT dive_gas + the tank pods' device_info descriptors
-  (assigned to gases in tank_specs() order, a sidemount pair as <ref>L/
+  (assigned to gases in tank_specs() order, an older sidemount pair as <ref>L/
   <ref>R); a CCR dive's diluent and O2 cylinder are recognised too.
 - gas switches: UDDF <switchmix>, Subsurface gaschange events, FIT
   dive_gas_switched events - each becomes a waypoint, so the profile is
@@ -39,7 +39,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from lxml import etree
 
 from models.dive import Dive
-from models.dive_plan import CCR_O2_TANK_REF, DiveProfilePlan, PlannedGas, PlannedWaypoint
+from models.dive_plan import CCR_O2_TANK_REF, DiveProfilePlan, PlannedGas, PlannedWaypoint, split_sidemount_pair
 from utils.dive_computers import DIVE_COMPUTERS
 
 PROFILE_TOLERANCE_M = 0.6
@@ -59,6 +59,7 @@ class LoggedGas:
     tank_size_l: Optional[float] = None
     start_pressure_bar: Optional[float] = None
     sidemount_pair: bool = False
+    right_tank_ref: Optional[str] = None  # a sidemount pair's right tank; None = the next free T<n>
     diluent: bool = False
 
 
@@ -124,18 +125,29 @@ def _mmss_seconds(text: str) -> int:
     return int(float(text or 0))
 
 
-def _pair_up(refs: List[str]) -> List[Tuple[str, bool]]:
-    """Tank refs in file order -> (gas tank_ref, is_pair) per gas, joining
-    a <ref>L immediately followed by its <ref>R - the writers' own order."""
-    out: List[Tuple[str, bool]] = []
+def _pair_up(refs: List[str], mixes: Optional[List[object]] = None) -> List[Tuple[str, Optional[str], bool]]:
+    """Tank refs in file order -> (gas tank_ref, right tank_ref, is_pair)
+    per gas. A sidemount pair is two tanks in a row: the writers' own order
+    for the left tank and then the right one - holding the same mix (when
+    `mixes`, one per ref, is given), or as older versions named them, <ref>L
+    followed by <ref>R (right tank_ref None: named afresh). One pair per
+    dive."""
+    out: List[Tuple[str, Optional[str], bool]] = []
+    paired = False
     i = 0
     while i < len(refs):
         ref = refs[i]
-        if ref.endswith("L") and i + 1 < len(refs) and refs[i + 1] == ref[:-1] + "R":
-            out.append((ref[:-1], True))
+        nxt = refs[i + 1] if i + 1 < len(refs) else None
+        if not paired and nxt is not None and ref.endswith("L") and nxt == ref[:-1] + "R":
+            out.append((ref[:-1], None, True))
+            paired = True
+            i += 2
+        elif not paired and nxt is not None and mixes is not None and mixes[i] == mixes[i + 1]:
+            out.append((ref, nxt, True))
+            paired = True
             i += 2
         else:
-            out.append((ref, False))
+            out.append((ref, None, False))
             i += 1
     return out
 
@@ -180,9 +192,9 @@ def _uddf_parts(path: Path) -> LoggedPlanParts:
     for mix_id, (name, o2, he) in mixes.items():
         own = by_mix.get(mix_id) or []
         refs = [ref for ref, _, _ in own] or ["T1"]
-        tank_ref, pair = _pair_up(refs)[0]
+        tank_ref, right_ref, pair = _pair_up(refs, [mix_id] * len(refs))[0]
         parts.gases.append(LoggedGas(
-            name=name, o2_percent=o2, he_percent=he, tank_ref=tank_ref, sidemount_pair=pair,
+            name=name, o2_percent=o2, he_percent=he, tank_ref=tank_ref, sidemount_pair=pair, right_tank_ref=right_ref,
             tank_size_l=own[0][1] if own else None, start_pressure_bar=own[0][2] if own else None,
         ))
     if any(g.sidemount_pair for g in parts.gases) and not ccr:
@@ -232,15 +244,18 @@ def _subsurface_parts(path: Path) -> LoggedPlanParts:
     if o2_cyl:
         parts.ccr_o2_tank_size_l, parts.ccr_o2_start_pressure_bar = o2_cyl["size"], o2_cyl["start"]
     gas_cyls = [c for c in cylinders if c is not o2_cyl]
-    # Cylinders of one mix, in order: a <ref>L/<ref>R pair is one gas.
+    # Cylinders in order: a sidemount pair (two in a row of one mix, or an
+    # older <ref>L/<ref>R) is one gas.
     refs = [c["ref"] for c in gas_cyls]
+    mixes = [(c["o2"], c["he"], c["use"]) for c in gas_cyls]
     ref_of_cyl: Dict[int, str] = {}
     i = 0
-    for tank_ref, pair in _pair_up(refs):
+    for tank_ref, right_ref, pair in _pair_up(refs, None if ccr else mixes):
         c = gas_cyls[i]
         name = mix_name(c["o2"], c["he"])
         parts.gases.append(LoggedGas(
             name=name, o2_percent=c["o2"], he_percent=c["he"], tank_ref=tank_ref, sidemount_pair=pair,
+            right_tank_ref=right_ref,
             tank_size_l=c["size"], start_pressure_bar=c["start"], diluent=c["use"] == "diluent",
         ))
         for _ in range(2 if pair else 1):
@@ -284,13 +299,17 @@ def _fit_parts(path: Path) -> LoggedPlanParts:
         parts.ccr_o2_start_pressure_bar = start_of_ref.get(CCR_O2_TANK_REF)
         refs = refs[1:]
     assignments = _pair_up(refs)
+    if not ccr and not any(pair for _, _, pair in assignments) and len(refs) == len(gases) + 1 >= 2:
+        # FIT doesn't say which gas a tank holds - one tank more than gases
+        # is a sidemount pair, the first gas's (the writers' order).
+        assignments = [(refs[0], refs[1], True)] + [(r, None, False) for r in refs[2:]]
     for i, g in enumerate(gases):
         o2, he = float(g.get("oxygen_content", 21) or 21), float(g.get("helium_content", 0) or 0)
-        tank_ref, pair = assignments[i] if i < len(assignments) else (f"T{i + 1}", False)
+        tank_ref, right_ref, pair = assignments[i] if i < len(assignments) else (f"T{i + 1}", None, False)
         name = mix_name(o2, he)
         parts.gases.append(LoggedGas(
-            name=name, o2_percent=o2, he_percent=he, tank_ref=tank_ref, sidemount_pair=pair,
-            start_pressure_bar=start_of_ref.get(f"{tank_ref}L" if pair else tank_ref),
+            name=name, o2_percent=o2, he_percent=he, tank_ref=tank_ref, sidemount_pair=pair, right_tank_ref=right_ref,
+            start_pressure_bar=start_of_ref.get(f"{tank_ref}L" if pair and right_ref is None else tank_ref),
             diluent=str(g.get("mode", "")).startswith("closed_circuit"),
         ))
     if any(g.sidemount_pair for g in parts.gases) and not ccr:
@@ -514,13 +533,22 @@ def plan_from_log(path, dive: Dive, base: Optional[DiveProfilePlan] = None) -> D
             n += 1
         used.add(name)
         rename[lg.name] = name
-        gases.append(PlannedGas(
+        fields = dict(
             id=name, gas_type=gas_type_for(lg.o2_percent, lg.he_percent),
             o2_percent=round(lg.o2_percent, 1), he_percent=round(lg.he_percent, 1),
-            tank_ref=lg.tank_ref, sidemount_pair=lg.sidemount_pair, diluent=lg.diluent,
+            tank_ref=lg.tank_ref, diluent=lg.diluent,
             tank_size_l=lg.tank_size_l or PlannedGas.model_fields["tank_size_l"].default,
             start_pressure_bar=round(lg.start_pressure_bar) if lg.start_pressure_bar else PlannedGas.model_fields["start_pressure_bar"].default,
-        ))
+        )
+        if lg.sidemount_pair:
+            # A left/right pair: this gas on the left, "<name> R" on the right.
+            taken = [g.tank_ref for g in parts.gases] + [g.tank_ref for g in gases]
+            first = not any(g.side for g in gases)
+            for split in split_sidemount_pair(fields, taken, first=first, right_ref=lg.right_tank_ref):
+                used.add(split["id"])
+                gases.append(PlannedGas(**split))
+        else:
+            gases.append(PlannedGas(**fields))
     if not gases:
         gases = [PlannedGas(id="Air", gas_type="air", o2_percent=21.0)]
     switches = [(t, rename.get(g, g)) for t, g in parts.switches if rename.get(g, g) in used]

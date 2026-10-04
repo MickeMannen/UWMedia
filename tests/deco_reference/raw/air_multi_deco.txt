@@ -1,0 +1,67 @@
+surface_interval_ok: 0:03 interval in Subsurface's title; tissues taken as fresh (not checked)
+known_gap: Subsurface's plan carries an earlier dive's tissue load (surface interval 0:03); replan with no dive before it
+Subsurface (6.0.5576-CICD-release) dive plan (surface interval 0:03) created on 2026-10-04
+Runtime: 41min
+
+
+depth
+duration
+runtime
+gas
+➘
+15m
+0min
+0min
+air
+➘
+30m
+30min
+30min
+
+➚
+12m
+2min
+32min
+
+-
+12m
+1min
+33min
+EAN50
+➚
+6m
+1min
+34min
+
+-
+6m
+1min
+35min
+
+➚
+3m
+0min
+35min
+
+-
+3m
+6min
+41min
+
+➚
+0m
+0min
+41min
+
+
+
+CNS: 10%
+OTU: 19
+
+Deco model: Bühlmann ZHL-16C with GFLow = 40% and GFHigh = 85%
+ATM pressure: 1 013mbar (0m)
+
+Gas consumption (based on SAC 20|17L/min):
+2 054L/90bar of air (107L/5bar in planned ascent)
+ — Minimum gas (based on 4,0xSAC/+4min@30m): 1 716L/71bar/Δ:76bar
+227L/23bar of EAN50 (227L/25bar in planned ascent)

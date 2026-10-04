@@ -1,0 +1,50 @@
+{
+  "name": "nx32_no_deco",
+  "source": "raw/nx32_no_deco.txt",
+  "subsurface_version": "6.0.5576-CICD-release",
+  "notes": "",
+  "surface_interval_ok": "0:03 interval in Subsurface's title; tissues taken as fresh (not checked)",
+  "known_gap": "",
+  "settings": {
+    "gf_low": 40.0,
+    "gf_high": 85.0,
+    "ascent_rate": 9.0,
+    "descent_rate": 18.0,
+    "surface_pressure_mbar": 1013.0
+  },
+  "gases": [
+    {
+      "name": "EAN32",
+      "o2_percent": 32.0,
+      "he_percent": 0.0,
+      "switch_depth_m": null
+    }
+  ],
+  "bottom": [
+    {
+      "depth_m": 15.0,
+      "runtime_min": 0.0
+    },
+    {
+      "depth_m": 30.0,
+      "runtime_min": 20.0
+    }
+  ],
+  "expected": {
+    "stops": [
+      {
+        "depth_m": 3.0,
+        "minutes": 3.0,
+        "gas": "EAN32"
+      }
+    ],
+    "runtime_min": 26.0,
+    "cns_pct": 10.0,
+    "otu": 23.0
+  },
+  "tolerance": {
+    "first_stop_m": 3.0,
+    "stop_min": 2.0,
+    "runtime_pct": 10.0
+  }
+}

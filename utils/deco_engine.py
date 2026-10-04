@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 @dataclass(frozen=True)
 class CompartmentConstants:
-    """ZH-L16B constants for a single tissue compartment."""
+    """ZH-L16C constants for a single tissue compartment."""
     n2_half_life: float
     n2_a: float
     n2_b: float
@@ -60,38 +60,43 @@ class TTSDataPoint(BaseModel):
 
 # --- 2. Bühlmann ZH-L16 Engine Implementation ---
 
+# Alveolar water vapour pressure at 37°C (47 mmHg), taken off the ambient
+# pressure before the inspired inert-gas pressure.
+WATER_VAPOUR_BAR = 0.0627
+
 class BuhlmannEngine:
     """
     Core decompression engine implementing the Bühlmann ZH-L16 algorithm.
-    Uses ZH-L16B coefficients (typical for dive computers).
+    Uses ZH-L16C coefficients (typical for dive computers).
     """
     
-    # ZH-L16B coefficients (N2 and He)
+    # ZH-L16C coefficients (N2 and He), the set Subsurface and most dive
+    # computers use.
     # Format: (N2 HalfLife, N2 A, N2 B, He HalfLife, He A, He B)
     COEFFICIENTS = [
-        CompartmentConstants(4.0, 1.2599, 0.5050, 1.51, 1.7424, 0.4245),
-        CompartmentConstants(8.0, 1.0000, 0.5659, 3.03, 1.3830, 0.4902),
-        CompartmentConstants(12.5, 0.8618, 0.6122, 4.72, 1.1919, 0.5404),
-        CompartmentConstants(18.5, 0.7562, 0.6469, 6.99, 1.0458, 0.5818),
-        CompartmentConstants(27.0, 0.6667, 0.6751, 10.21, 0.9220, 0.6171),
-        CompartmentConstants(38.3, 0.5933, 0.6972, 14.48, 0.8205, 0.6453),
-        CompartmentConstants(54.3, 0.5282, 0.7154, 20.53, 0.7305, 0.6693),
-        CompartmentConstants(77.0, 0.4701, 0.7303, 29.11, 0.6502, 0.6901),
-        CompartmentConstants(109.0, 0.4187, 0.7424, 41.20, 0.5789, 0.7081),
-        CompartmentConstants(146.0, 0.3798, 0.7523, 55.19, 0.5251, 0.7233),
-        CompartmentConstants(187.0, 0.3497, 0.7603, 70.69, 0.4835, 0.7366),
-        CompartmentConstants(239.0, 0.3223, 0.7680, 90.34, 0.4457, 0.7490),
-        CompartmentConstants(305.0, 0.2971, 0.7760, 115.29, 0.4109, 0.7612),
-        CompartmentConstants(390.0, 0.2737, 0.7850, 147.42, 0.3785, 0.7753),
-        CompartmentConstants(498.0, 0.2523, 0.7950, 188.24, 0.3489, 0.7891),
-        CompartmentConstants(635.0, 0.2327, 0.8060, 240.03, 0.3219, 0.8034),
+        CompartmentConstants(5.0, 1.1696, 0.5578, 1.88, 1.6189, 0.4770),
+        CompartmentConstants(8.0, 1.0000, 0.6514, 3.02, 1.3830, 0.5747),
+        CompartmentConstants(12.5, 0.8618, 0.7222, 4.72, 1.1919, 0.6527),
+        CompartmentConstants(18.5, 0.7562, 0.7825, 6.99, 1.0458, 0.7223),
+        CompartmentConstants(27.0, 0.6200, 0.8126, 10.21, 0.9220, 0.7582),
+        CompartmentConstants(38.3, 0.5043, 0.8434, 14.48, 0.8205, 0.7957),
+        CompartmentConstants(54.3, 0.4410, 0.8693, 20.53, 0.7305, 0.8279),
+        CompartmentConstants(77.0, 0.4000, 0.8910, 29.11, 0.6502, 0.8553),
+        CompartmentConstants(109.0, 0.3750, 0.9092, 41.20, 0.5950, 0.8757),
+        CompartmentConstants(146.0, 0.3500, 0.9222, 55.19, 0.5545, 0.8903),
+        CompartmentConstants(187.0, 0.3295, 0.9319, 70.69, 0.5333, 0.8997),
+        CompartmentConstants(239.0, 0.3065, 0.9403, 90.34, 0.5189, 0.9073),
+        CompartmentConstants(305.0, 0.2835, 0.9477, 115.29, 0.5181, 0.9122),
+        CompartmentConstants(390.0, 0.2610, 0.9544, 147.42, 0.5176, 0.9171),
+        CompartmentConstants(498.0, 0.2480, 0.9602, 188.24, 0.5172, 0.9217),
+        CompartmentConstants(635.0, 0.2327, 0.9653, 240.03, 0.5119, 0.9267),
     ]
 
     def __init__(self, surface_pressure_bar: float = 1.01325):
         self.surface_pressure = surface_pressure_bar
         # Initialize tissues with partial pressures of Air at surface
         self.tissues = [
-            CompartmentState(p_n2=(surface_pressure_bar - 0.00627) * 0.79, p_he=0.0)
+            CompartmentState(p_n2=(surface_pressure_bar - WATER_VAPOUR_BAR) * 0.79, p_he=0.0)
             for _ in range(16)
         ]
         self.cns = 0.0
@@ -106,8 +111,8 @@ class BuhlmannEngine:
         
         # 2. Update Tissues
         f_n2 = 1.0 - f_o2 - f_he
-        pi_n2 = (ambient_pressure - 0.00627) * f_n2
-        pi_he = (ambient_pressure - 0.00627) * f_he
+        pi_n2 = (ambient_pressure - WATER_VAPOUR_BAR) * f_n2
+        pi_he = (ambient_pressure - WATER_VAPOUR_BAR) * f_he
         
         time_minutes = time_seconds / 60.0
 

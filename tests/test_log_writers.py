@@ -39,8 +39,13 @@ def _plan(dive_type):
             PlannedGas(id="Dil", gas_type="trimix", o2_percent=21.0, he_percent=35.0, diluent=True, tank_size_l=3, tank_ref="D"),
             PlannedGas(id="BO", gas_type="nitrox", o2_percent=32.0, tank_ref="T2"),
         ]
+    elif dive_type == "sidemount":
+        gases = [
+            PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, side="left", start_pressure_bar=232),
+            PlannedGas(id="EAN32 R", gas_type="nitrox", o2_percent=32.0, side="right", tank_ref="T2", start_pressure_bar=232),
+        ]
     else:
-        gases = [PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, sidemount_pair=True, start_pressure_bar=232)]
+        gases = [PlannedGas(id="EAN32", gas_type="nitrox", o2_percent=32.0, start_pressure_bar=232)]
     return DiveProfilePlan(
         dive_type=dive_type, gases=gases, waypoints=_waypoints(gases[0].id),
         start_time=START, computer="Garmin Descent Mk3i", computer_serial="3486870757",
@@ -159,7 +164,7 @@ def test_uddf_logged_ndl_means_no_deco_stop_yet(tmp_path):
     for s, wp in zip(samples, dive.waypoints):
         if s.ndl_sec:
             assert not wp.deco_stop_depth
-        if s.ceiling_m > 0:
+        if s.ceiling_m > 0 and s.depth_m > 0:
             assert s.stop_depth_m > 0  # recomputed the moment deco starts
 
 

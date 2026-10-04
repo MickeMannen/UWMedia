@@ -58,8 +58,9 @@ def write_uddf(
     006_ccr_petrel3_shearwater-cloud-export.uddf) closely enough that
     parsers/uddf.py's UDDFParser reads it back correctly (see
     tests/test_uddf_writer.py's round-trip tests). Like those exports,
-    every waypoint lists every tank's pressure, so a sidemount pair or a
-    CCR's O2/diluent cylinders all come through.
+    every waypoint lists every tank's pressure, so both sidemount tanks
+    (one mix, linked from two tanks) or a CCR's O2/diluent cylinders all
+    come through.
 
     The device is plan.computer (utils.dive_computers); the generator's
     manufacturer is set to the computer's too, since UDDFParser reads a
@@ -92,7 +93,7 @@ def write_uddf(
 
     gasdefs = _el(root, "gasdefinitions")
     mix_ids = {}
-    for gas in plan.gases:
+    for gas in plan.breathed_gases():
         mix_id = _gas_mix_id(gas)
         mix_ids[gas.id] = mix_id
         mix = _el(gasdefs, "mix", id=mix_id)

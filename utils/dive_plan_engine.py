@@ -71,7 +71,7 @@ def auto_gas_for_waypoint(plan: DiveProfilePlan, depth_m: float, phase: str) -> 
     loop = plan.diluent_gas()
     if loop is not None:
         return loop
-    candidates = [g for g in plan.gases if plan.gas_usable_at(g, depth_m, phase)]
+    candidates = [g for g in plan.breathed_gases() if plan.gas_usable_at(g, depth_m, phase)]
     if not candidates:
         return None
     return max(candidates, key=lambda g: (g.has_depth_range, g.use_phase == phase, g.o2_percent))
@@ -86,7 +86,7 @@ def apply_auto_gases(plan: DiveProfilePlan) -> List[str]:
     if not plan.gases:
         return warnings
     wps = plan.sorted_waypoints()
-    previous_gas_id = plan.gases[0].id
+    previous_gas_id = plan.breathed_gases()[0].id
     for wp, phase in zip(wps, waypoint_phases(wps)):
         when = f"{wp.runtime_sec // 60}:{wp.runtime_sec % 60:02d}"
         if wp.gas_auto:
@@ -119,7 +119,9 @@ def expand_plan(plan: DiveProfilePlan) -> Tuple[List[Tuple[int, float, str]], Li
     spent holding at waypoint i's depth. The gas assigned to a waypoint
     takes effect once that depth is reached (not during the transit itself)
     - this matches real Perdix 2 export evidence, where a <switchmix> always
-    lands on the waypoint already at the new depth, not mid-ascent."""
+    lands on the waypoint already at the new depth, not mid-ascent.
+    A waypoint on a sidemount dive's right tank is on the pair's gas (the
+    left tank's id) - simulate picks the side."""
     warnings: List[str] = []
     wps = plan.sorted_waypoints()
     if not wps:
@@ -133,7 +135,8 @@ def expand_plan(plan: DiveProfilePlan) -> Tuple[List[Tuple[int, float, str]], Li
     if points[0].runtime_sec > 0:
         points.insert(0, PlannedWaypoint(runtime_sec=0, depth_m=0.0, gas_id=points[0].gas_id))
 
-    timeline: List[Tuple[int, float, str]] = [(points[0].runtime_sec, points[0].depth_m, points[0].gas_id)]
+    gas_of = {wp.gas_id: plan.breathed_gas_id(wp.gas_id) for wp in points}
+    timeline: List[Tuple[int, float, str]] = [(points[0].runtime_sec, points[0].depth_m, gas_of[points[0].gas_id])]
     for prev, cur in zip(points, points[1:]):
         dt_total = cur.runtime_sec - prev.runtime_sec
         if dt_total <= 0:
@@ -161,10 +164,10 @@ def expand_plan(plan: DiveProfilePlan) -> Tuple[List[Tuple[int, float, str]], Li
             absolute_t = prev.runtime_sec + t
             if transit_sec > 0 and t <= transit_sec:
                 depth = prev.depth_m + depth_delta * (t / transit_sec)
-                gas_id = prev.gas_id
+                gas_id = gas_of[prev.gas_id]
             else:
                 depth = cur.depth_m
-                gas_id = cur.gas_id
+                gas_id = gas_of[cur.gas_id]
             timeline.append((absolute_t, depth, gas_id))
 
     return timeline, warnings
@@ -267,6 +270,8 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
         raise ValueError("Define at least one gas before simulating a profile")
     if plan.is_ccr and plan.diluent_gas() is None:
         raise ValueError("A CCR dive needs a diluent - mark one gas as the diluent")
+    if plan.sidemount_error():
+        raise ValueError(plan.sidemount_error())
 
     timeline, warnings = expand_plan(plan)
     if not timeline:
@@ -278,7 +283,8 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
     tank_specs = plan.tank_specs()
     tank_pressure = {t.ref: t.start_pressure_bar for t in tank_specs}
     o2_tank = next((t for t in tank_specs if t.role == "oxygen"), None)
-    breathing_from = {g.id: plan.tank_refs_for(g)[0] for g in plan.gases}
+    tank_size = {t.ref: t.size_l for t in tank_specs}
+    breathing_from = {g.id: plan.tank_refs_for(g)[0] for g in plan.breathed_gases()}
 
     samples: List[SimulatedSample] = []
     last_ndl: Optional[int] = None
@@ -298,7 +304,7 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
         tank = breathing_from[gas_id]
         sac = CCR_LOOP_LPM if plan.on_loop(gas) else plan.sac_for(gas)
         if sac > 0:
-            drop_bar = (sac / 60.0 * ambient) / gas.tank_size_l
+            drop_bar = (sac / 60.0 * ambient) / tank_size[tank]
             tank_pressure[tank] = max(0.0, tank_pressure[tank] - drop_bar)
         if o2_tank is not None and plan.on_loop(gas):
             drop_bar = CCR_METABOLIC_O2_LPM / 60.0 / o2_tank.size_l
@@ -407,6 +413,7 @@ def plan_ascent(plan: DiveProfilePlan) -> Tuple[List[PlannedWaypoint], bool, Lis
     low, stops on 3m levels (last at 3m), each held until the ceiling for
     the next level clears with the GF interpolated between GF low at the
     first stop and GF high at the surface, rounded up to whole minutes.
+    The 3m stop lasts at least the safety stop's 3 minutes.
 
     Unlike _mandatory_stop_schedule (which models a dive computer that can't
     see ahead), this is a plan, so it switches gas on the way up: each
@@ -425,7 +432,7 @@ def plan_ascent(plan: DiveProfilePlan) -> Tuple[List[PlannedWaypoint], bool, Lis
     apply_auto_gases(plan)
     last = wps[-1]
     engine, _ = _loaded_engine(plan)
-    return _ascent_from(plan, engine, last.depth_m, last.runtime_sec, plan.gas_by_id(last.gas_id), last.gas_auto)
+    return _ascent_from(plan, engine, last.depth_m, last.runtime_sec, plan.breathed_gas(plan.gas_by_id(last.gas_id)), last.gas_auto)
 
 
 def ascent_from_time(plan: DiveProfilePlan, time_sec: float) -> Tuple[bool, List[Tuple[float, int, str]], int]:
@@ -522,7 +529,7 @@ def _ascent_from(
         if not auto or plan.is_ccr:
             return []
         found = {
-            plan.gas_deepest_use_m(g, "ascent") for g in plan.gases
+            plan.gas_deepest_use_m(g, "ascent") for g in plan.breathed_gases()
             if g.use_phase in ("any", "ascent")
         }
         return sorted((d for d in found if shallow < d < deep), reverse=True)
@@ -610,6 +617,13 @@ def _ascent_from(
             breathe(depth, 10.0)
             t += 10.0
         held = t - arrive
+        if next_level <= 0 and held < SAFETY_STOP_SEC:
+            # The last stop is never shorter than a no-deco dive's safety
+            # stop - a small obligation a deco gas clears on the way up
+            # would otherwise leave no stop at all.
+            breathe(depth, SAFETY_STOP_SEC - held)
+            t = arrive + SAFETY_STOP_SEC
+            held = SAFETY_STOP_SEC
         rounded = math.ceil(held / 60.0) * 60.0 if held > 0 else 0.0
         if rounded > held:
             breathe(depth, rounded - held)

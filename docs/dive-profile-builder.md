@@ -62,7 +62,7 @@ and planned runtime can also be changed under *Dive settings*.
 
 Moving the mouse over the profile shows, for that point: time, depth, gas,
 PO2 (red if above your limit), CNS and tank pressure - every tank of the gas
-being breathed, the one in use marked with ▸ on a sidemount pair, plus the O2
+being breathed, the one in use marked with ▸ on a sidemount dive, plus the O2
 cylinder on a CCR loop. A CCR dive also shows the **loop** setpoint, or
 *Bailout (OC)*. Then either:
 
@@ -113,13 +113,26 @@ Each gas is breathed from its own tank.
 
 ### Sidemount
 
-A gas ticked **Sidemount pair (left/right)** is breathed from two tanks,
-`<tank>L` and `<tank>R` (e.g. `T1L` and `T1R`), each with the gas's volume and
-start pressure. The dive starts on the left tank and switches side whenever
-the one in use is *Switch tanks every* bar (default 30) below the other, so
-the two stay balanced. Stages - e.g. a deco gas - are left unticked and stay
-single tanks. Switching the dive type to Sidemount ticks the bottom gas for
-you if nothing is ticked yet.
+A sidemount dive needs two tanks of the same gas, one row each in the gas
+table: one with **Side** set to *Left* and one set to *Right*, usually `T1` and
+`T2`. Until both are there the chart stays empty, the status line says what is
+missing, and Save log refuses. The dive starts on the left tank and switches
+side whenever the one in use is *Switch tanks every* bar (default 30) below
+the other, so the two stay balanced. Each tank has its own colour, and the
+profile line takes the colour of the tank in use, so every side switch shows;
+the legend lists both.
+
+The two tanks count as one gas: waypoints, Auto and End dive pick the left
+tank's gas, and the right tank is breathed as part of it, so it isn't offered
+in the Waypoints editor. Changing the left or right tank's mix changes the
+other's too, and a second Left or Right tank, or a right tank of a different
+gas, is refused. Every other tank - e.g. a deco gas - is a *Stage*.
+
+Switching the dive type to Sidemount puts the bottom gas on the left and fills
+the gas editor in as its right-hand twin (named `<gas> R`, in the next free
+tank), so one **Add** completes the pair. Saved logs record the pair as one
+gas in two cylinders, as a sidemount dive computer does; logs saved by older
+versions (tanks `T1L`/`T1R`) open as a left and a right tank.
 
 ### CCR
 
@@ -131,8 +144,8 @@ for a waypoint in the Waypoints editor - Auto always stays on the loop, and End
 dive ascends on the loop without gas switches. Only one gas can be the diluent;
 switching the dive type to CCR makes the first gas the diluent if none is.
 
-The table's *Type* column shows `DIL` / `BAILOUT` on a CCR dive, and the tank
-column shows both tanks of a sidemount pair (`T1L+T1R`).
+The table's *Type* column shows `DIL` / `BAILOUT` on a CCR dive, and on a
+sidemount dive the tank column shows each tank's side (`T1 Left`, `T2 Right`).
 
 ## Log details
 
@@ -197,7 +210,8 @@ default ascent rate:
 - **Deco needed** → the deco stops for your GF settings: on 3 m levels (last
   stop at 3 m), each held until the next level is clear, rounded up to whole
   minutes. The GF moves from GF low at the first stop to GF high at the
-  surface.
+  surface. The 3 m stop is never shorter than the 3 minute safety stop, even
+  when a deco gas clears the deeper stops on the way up.
 - **Gas switches** happen as soon as a deco gas's range and MOD allow it, with
   a **1 minute hold** at each switch. A switch at a stop depth counts towards
   that stop.
