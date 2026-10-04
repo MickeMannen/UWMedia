@@ -1,7 +1,7 @@
 [tool.briefcase]
 project_name = "UWMedia"
 bundle = "org.christersson"
-version = "0.7.9"
+version = "0.7.10"
 license = "MIT"
 license-files = ["LICENSE"]
 author = "Mikael Christersson"

@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.10] - 2026-10-04
 
 ### Changed
 - Dive Profile: sidemount tanks are set up one row per tank, with a Side
