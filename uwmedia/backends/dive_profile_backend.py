@@ -65,7 +65,7 @@ from parsers.plan_embed import read_log_origin
 from parsers.registry import detect_log_format, parse_log_file
 from parsers.subsurface_writer import write_subsurface
 from parsers.uddf_writer import write_uddf
-from utils.app_settings import get_fields, set_field
+from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
 from utils.dive_computers import DIVE_COMPUTERS
 from utils.dive_plan_engine import (
     DECO_SCHEDULE_INTERVAL_SEC,
@@ -91,6 +91,8 @@ LOG_FORMATS = {
     "Subsurface XML (*.ssrf)": (".ssrf", write_subsurface),
 }
 LOG_FORMAT_FIELD = "dive_profile_log_format"
+# Folder the Open and Save dialogs start in: the last one used, else home.
+LOG_DIR_FIELD = "dive_profile_log_dir"
 # Open dialog filter. A log the builder wrote with its plan embedded
 # opens as saved; any other log UWMedia reads (an older builder log,
 # another program's UDDF/FIT/SSRF, a Shearwater Cloud or Subsurface CSV
@@ -370,9 +372,10 @@ class DiveProfileBackend(QObject):
     def openLog(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-        path, _ = QFileDialog.getOpenFileName(None, "Open dive log", "", LOG_OPEN_FILTER)
+        path, _ = QFileDialog.getOpenFileName(None, "Open dive log", str(dialog_dir(LOG_DIR_FIELD)), LOG_OPEN_FILTER)
         if not path:
             return
+        remember_dialog_dir(LOG_DIR_FIELD, Path(path).parent)
         try:
             message = self.load_log(path)
         except Exception as e:
@@ -1725,10 +1728,12 @@ class DiveProfileBackend(QObject):
             chosen = next(iter(LOG_FORMATS))
         base = self._name_text.strip().replace(" ", "_") or "dive_profile"
         path, chosen = QFileDialog.getSaveFileName(
-            None, "Save dive log", base + LOG_FORMATS[chosen][0], ";;".join(LOG_FORMATS), chosen,
+            None, "Save dive log", str(dialog_dir(LOG_DIR_FIELD) / (base + LOG_FORMATS[chosen][0])),
+            ";;".join(LOG_FORMATS), chosen,
         )
         if not path:
             return
+        remember_dialog_dir(LOG_DIR_FIELD, Path(path).parent)
         if chosen in LOG_FORMATS:
             set_field(LOG_FORMAT_FIELD, chosen)
             if Path(path).suffix.lower() not in {ext for ext, _ in LOG_FORMATS.values()}:

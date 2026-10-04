@@ -1272,3 +1272,42 @@ def test_graph_box_colour_and_opacity_round_trip():
     app.setSelectedAttr("background_opacity", "0.15")
     elem = app.document.element(app.selectedIndex)
     assert (elem["background_color"], elem["background_opacity"]) == ("#202030", 0.15)
+
+
+# -- File dialog start folders ------------------------------------------------
+
+def test_file_dialogs_start_in_home_then_remember_the_last_folder(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    home, zips, logs = tmp_path / "home", tmp_path / "zips", tmp_path / "logs"
+    for d in (home, zips, logs):
+        d.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    starts = []
+
+    def fake_save(parent, title, start, *rest):
+        starts.append(Path(start).parent)
+        return str(zips / "page.zip"), ""
+
+    def fake_open(parent, title, start="", *rest):
+        starts.append(Path(start))
+        return "", ""
+
+    def fake_dir(parent, title, start=""):
+        starts.append(Path(start))
+        return str(logs)
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", fake_save)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", fake_open)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", fake_dir)
+    app = OverlayDesignerBackend()
+    _select_garmin_x50i_main(app)
+    monkeypatch.setattr(app, "_export_zip_to", lambda path: True)
+    monkeypatch.setattr(app, "_load_logs_from_path", lambda path: None)
+
+    app.exportZip()      # home; remembers zips
+    app.importZip()      # zips
+    app.loadLogs()       # home; remembers the chosen folder itself
+    app.loadLogFile()    # logs
+    app.browseImageFile()  # home: images have their own folder
+    assert starts == [home, zips, home, logs, home]

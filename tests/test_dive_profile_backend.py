@@ -498,3 +498,33 @@ def test_open_log_rebuilds_an_older_uddf_without_embedded_plan(settings_file):
     assert backend.dive_plan.dive_type == "sidemount"
     assert backend.waypointRows
     assert backend.dive_profile_samples
+
+
+def test_log_dialogs_start_in_home_then_remember_the_last_folder(settings_file, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+    home, logs = tmp_path / "home", tmp_path / "logs"
+    home.mkdir()
+    logs.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a: None)
+    starts = []
+
+    def fake_save(parent, title, start, *rest):
+        starts.append(Path(start).parent)
+        return str(logs / "dive.uddf"), rest[1]
+
+    def fake_open(parent, title, start, *rest):
+        starts.append(Path(start))
+        return "", ""
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", fake_save)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", fake_open)
+    backend = DiveProfileBackend()
+    monkeypatch.setattr(backend, "write_log", lambda path: [])
+
+    backend.saveLog()
+    backend.openLog()
+    assert starts == [home, logs]

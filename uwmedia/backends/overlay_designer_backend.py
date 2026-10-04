@@ -92,6 +92,7 @@ from gui.hud_renderer import (
 from metadata.exif import MetadataHandler
 from models.manager import DiveManager
 from parsers.registry import LOG_FILE_FILTER, parse_log_file
+from utils.app_settings import dialog_dir, remember_dialog_dir
 from utils.dummy_telemetry import (
     DUMMY_DURATION_S,
     STATE_LABELS,
@@ -182,6 +183,14 @@ _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill"}
 DEFAULT_STOPS_COLOR = "#FFA500"
 _NUMERIC_SKIN_ATTRS = {"scale", "opacity", "ref_offset_x", "ref_offset_y", "width", "height", "corner_radius"}
 _INT_SKIN_ATTRS = {"width", "height", "corner_radius"}
+
+
+# Folders the file dialogs start in (utils.app_settings.dialog_dir): the
+# last one used for that kind of file, else the home directory.
+IMAGE_DIR_FIELD = "overlay_designer_image_dir"
+ZIP_DIR_FIELD = "overlay_designer_zip_dir"
+BACKGROUND_DIR_FIELD = "overlay_designer_background_dir"
+LOG_DIR_FIELD = "overlay_designer_log_dir"
 
 
 def _prettify(key: str) -> str:
@@ -1048,8 +1057,11 @@ class OverlayDesignerBackend(QObject):
     def replaceSkinImage(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getOpenFileName(None, "Select skin image", "", "Images (*.png *.jpg *.jpeg *.webp *.bmp)")
+        path, _ = QFileDialog.getOpenFileName(
+            None, "Select skin image", str(dialog_dir(IMAGE_DIR_FIELD)), "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
+        )
         if path:
+            remember_dialog_dir(IMAGE_DIR_FIELD, Path(path).parent)
             self._replace_skin_image_from_path(Path(path))
 
     def _replace_skin_image_from_path(self, path: Path) -> bool:
@@ -1086,8 +1098,10 @@ class OverlayDesignerBackend(QObject):
         from PySide6.QtWidgets import QFileDialog
 
         path, _ = QFileDialog.getOpenFileName(
-            None, "Select background image", "", "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
+            None, "Select background image", str(dialog_dir(IMAGE_DIR_FIELD)), "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
         )
+        if path:
+            remember_dialog_dir(IMAGE_DIR_FIELD, Path(path).parent)
         return path or ""
 
     @Slot(int, str, str, str, str, str, float, float, str, result=str)
@@ -1898,8 +1912,11 @@ class OverlayDesignerBackend(QObject):
         if doc is None:
             return
         suggested = f"{doc.ref.computer}_{doc.ref.page}.zip" if doc.ref else "overlay_page.zip"
-        path, _ = QFileDialog.getSaveFileName(None, "Export overlay page", suggested, "Zip archives (*.zip)")
+        path, _ = QFileDialog.getSaveFileName(
+            None, "Export overlay page", str(dialog_dir(ZIP_DIR_FIELD) / suggested), "Zip archives (*.zip)"
+        )
         if path:
+            remember_dialog_dir(ZIP_DIR_FIELD, Path(path).parent)
             self._export_zip_to(Path(path))
 
     def _export_zip_to(self, path: Path) -> bool:
@@ -1938,9 +1955,12 @@ class OverlayDesignerBackend(QObject):
         unreadable) - the QML then opens the Save-as popup in import mode."""
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getOpenFileName(None, "Import overlay page", "", "Zip archives (*.zip)")
+        path, _ = QFileDialog.getOpenFileName(
+            None, "Import overlay page", str(dialog_dir(ZIP_DIR_FIELD)), "Zip archives (*.zip)"
+        )
         if not path:
             return ""
+        remember_dialog_dir(ZIP_DIR_FIELD, Path(path).parent)
         error = self._read_import_zip(Path(path))
         if error:
             self._set_status(error)
@@ -2399,9 +2419,10 @@ class OverlayDesignerBackend(QObject):
     def loadBackground(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getOpenFileName(None, "Select background")
+        path, _ = QFileDialog.getOpenFileName(None, "Select background", str(dialog_dir(BACKGROUND_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(BACKGROUND_DIR_FIELD, Path(path).parent)
         self._load_background_from_path(Path(path))
 
     @Slot()
@@ -2483,9 +2504,10 @@ class OverlayDesignerBackend(QObject):
     def loadLogs(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path = QFileDialog.getExistingDirectory(None, "Select dive log directory")
+        path = QFileDialog.getExistingDirectory(None, "Select dive log directory", str(dialog_dir(LOG_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(LOG_DIR_FIELD, path)
         self._load_logs_from_path(Path(path))
 
     @Slot()
@@ -2493,10 +2515,11 @@ class OverlayDesignerBackend(QObject):
         from PySide6.QtWidgets import QFileDialog
 
         path, _ = QFileDialog.getOpenFileName(
-            None, "Select dive log file", "", LOG_FILE_FILTER,
+            None, "Select dive log file", str(dialog_dir(LOG_DIR_FIELD)), LOG_FILE_FILTER,
         )
         if not path:
             return
+        remember_dialog_dir(LOG_DIR_FIELD, Path(path).parent)
         self._load_log_file(Path(path))
 
     def _parse_log_file(self, path: Path):

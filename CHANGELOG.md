@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Dive Profile: the Open and Save dive log dialogs start in your home folder
+  instead of the drive root (/ on macOS), and remember the last folder used.
+- Overlay Designer: file dialogs (skin and background images, preview
+  background, dive logs, page export and import) start in your home folder
+  instead of the drive root (/ on macOS), and remember the last folder used.
+
 ## [0.7.10] - 2026-10-04
 
 ### Changed

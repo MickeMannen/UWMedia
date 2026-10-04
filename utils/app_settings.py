@@ -67,6 +67,21 @@ def get_fields() -> Dict[str, Any]:
     return load_settings().get("fields") or {}
 
 
+def dialog_dir(key: str) -> Path:
+    """The folder a file dialog starts in: the one last remembered under the
+    form field `key`, else the home directory when unset or gone - never the
+    process's working directory, which is / for an app launched from Finder."""
+    saved = get_fields().get(key)
+    if saved and Path(saved).is_dir():
+        return Path(saved)
+    return Path.home()
+
+
+def remember_dialog_dir(key: str, folder: Any) -> None:
+    """Persist `folder` as where the file dialogs behind `key` start next time."""
+    set_field(key, str(folder))
+
+
 def add_unique(key: str, value: str) -> Dict[str, Any]:
     """Append `value` to the settings list at `key` if it isn't already present."""
     data = load_settings()
