@@ -36,6 +36,8 @@ delegate's *property binding* (cheap) without ever destroying/recreating
 the 26 delegate Items themselves (expensive) the way swapping `groups`
 itself on every move would have.
 """
+from pathlib import Path
+
 import numpy as np
 from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtGui import QImage
@@ -43,10 +45,13 @@ from PySide6.QtQuick import QQuickImageProvider
 
 import ffmpeg.color as color_module
 from ffmpeg.color import ColorCorrectionEngine
+from utils.app_settings import dialog_dir, remember_dialog_dir
 from utils.color_params import PARAM_GROUPS, PARAMS_BY_KEY
 from utils.color_profiles import load_merged_color_profiles, save_user_profile
 
 TUNING_PREVIEW_MAX_DIM = 600
+# Folder the Select image dialog starts in: the last one used, else home.
+IMAGE_DIR_FIELD = "color_tuning_image_dialog_dir"
 NEW_PROFILE_NAME_MAX_LEN = 10
 FLOAT_SLIDER_SCALE = 10000
 
@@ -219,9 +224,10 @@ class ColorTuningBackend(QObject):
 
         import cv2
 
-        path, _ = QFileDialog.getOpenFileName(None, "Select image")
+        path, _ = QFileDialog.getOpenFileName(None, "Select image", str(dialog_dir(IMAGE_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(IMAGE_DIR_FIELD, Path(path).parent)
         image = cv2.imread(path)
         if image is None:
             self._set_status(f"Could not load: {path}")

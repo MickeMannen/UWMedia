@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Color: new output filename option "Date + time + overlay"
+  (20260905_143000_garmin_mk3i_main), named after the first overlay.
+
+### Fixed
+- Color: the source, output and dive log browse dialogs start in your home
+  folder instead of the drive root (/ on macOS), and remember the last folder
+  used for each.
+- Color: on a photo that isn't 16:9, the box shown while moving or resizing
+  an overlay now lines up with the overlay instead of running off the frame.
+- Overlay Generator, Convertion, Color Tuning, Tag Editor and Advanced: file
+  and folder dialogs start in your home folder instead of the drive root
+  (/ on macOS), and remember the last folder used.
+
 ## [0.7.11] - 2026-10-05
 
 ### Fixed

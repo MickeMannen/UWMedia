@@ -58,7 +58,7 @@ from metadata.exif import MetadataHandler
 from models.dive import Waypoint
 from models.manager import DiveManager
 from parsers.registry import parse_log_file
-from utils.app_settings import get_fields, set_field
+from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
@@ -106,6 +106,12 @@ ACTIVE_LINE_RE = re.compile(r"UWMEDIA_PROGRESS_ACTIVE (.*)$")
 # real batch pipeline's own implicit classification.
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".mkv", ".avi"}
 
+# Folders the browse dialogs start in (utils.app_settings.dialog_dir): the
+# last one used for that field, else the home directory.
+SOURCE_DIR_FIELD = "color_source_dialog_dir"
+OUTPUT_DIR_FIELD = "color_output_dialog_dir"
+LOGS_DIR_FIELD = "color_logs_dialog_dir"
+
 # Output filename presets (2026-09-28, per the user): "Date taken" (date
 # only) is gone, "Keep original filename" is "Original", and "Original +
 # color" is new - its "{filename}" token is the source name (cli_main.py's
@@ -115,6 +121,8 @@ FILENAME_FORMAT_PRESETS = [
     ("Original + color (DSC06641_color)", "{filename}_color"),
     ("Date + time (20260905_143000)", "%Y%m%d_%H%M%S"),
     ("Date + time + color (20260905_143000_color)", "%Y%m%d_%H%M%S_color"),
+    # "{hud}": the first overlay's name; left out when there is no overlay.
+    ("Date + time + overlay (20260905_143000_garmin_mk3i_main)", "%Y%m%d_%H%M%S_{hud}"),
 ]
 # Labels saved in settings.json by earlier versions -> today's label.
 LEGACY_PRESET_LABELS = {
@@ -408,40 +416,45 @@ class ColorBackend(QObject):
     def browseSourceFile(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getOpenFileName(None, "Select file")
+        path, _ = QFileDialog.getOpenFileName(None, "Select file", str(dialog_dir(SOURCE_DIR_FIELD)))
         if path:
+            remember_dialog_dir(SOURCE_DIR_FIELD, Path(path).parent)
             self.sourceText = path
 
     @Slot()
     def browseSourceFolder(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(SOURCE_DIR_FIELD)))
         if path:
+            remember_dialog_dir(SOURCE_DIR_FIELD, path)
             self.sourceText = path
 
     @Slot()
     def browseOutputFile(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getOpenFileName(None, "Select file")
+        path, _ = QFileDialog.getOpenFileName(None, "Select file", str(dialog_dir(OUTPUT_DIR_FIELD)))
         if path:
+            remember_dialog_dir(OUTPUT_DIR_FIELD, Path(path).parent)
             self.outputText = path
 
     @Slot()
     def browseOutputFolder(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(OUTPUT_DIR_FIELD)))
         if path:
+            remember_dialog_dir(OUTPUT_DIR_FIELD, path)
             self.outputText = path
 
     @Slot()
     def browseLogsFolder(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(LOGS_DIR_FIELD)))
         if path:
+            remember_dialog_dir(LOGS_DIR_FIELD, path)
             self.logsText = path
 
     @Slot(str, result=str)
@@ -925,13 +938,16 @@ class ColorBackend(QObject):
         x0, y0, x1, y1 = overlay_pixel_bbox(
             raw_layout, instance["x"], instance["y"], instance["scale"], frame_w, frame_h
         )
-        to_display = PREVIEW_DISPLAY_WIDTH / frame_w
+        # The preview box is a fixed 16:9 the frame is stretched into, so a
+        # photo of any other shape scales differently across and down.
+        to_display_x = PREVIEW_DISPLAY_WIDTH / frame_w
+        to_display_y = PREVIEW_DISPLAY_HEIGHT / frame_h
         self._drag_box = {
             "visible": True,
-            "x": x0 * to_display,
-            "y": y0 * to_display,
-            "w": (x1 - x0) * to_display,
-            "h": (y1 - y0) * to_display,
+            "x": x0 * to_display_x,
+            "y": y0 * to_display_y,
+            "w": (x1 - x0) * to_display_x,
+            "h": (y1 - y0) * to_display_y,
             "label": instance["label"],
         }
         self.dragBoxChanged.emit()

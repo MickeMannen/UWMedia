@@ -33,7 +33,7 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
 from parsers.registry import LOG_FILE_FILTER
-from utils.app_settings import get_fields, set_field
+from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
 from utils.progress_lines import LineBuffer, finished_text
@@ -41,6 +41,13 @@ from utils.run_timing import RunTiming
 from utils.layouts import list_templates, page_display_name, resolve_template_state, load_layout_file, strip_variant_markers, variant_display_name
 
 LAYOUT_CUSTOM = "Custom…"
+
+# Folders the browse dialogs start in (utils.app_settings.dialog_dir): the
+# last one used for that field, else the home directory.
+SOURCE_DIR_FIELD = "hudpage_source_dialog_dir"
+OUTPUT_DIR_FIELD = "hudpage_output_dialog_dir"
+LOGS_DIR_FIELD = "hudpage_logs_dialog_dir"
+CUSTOM_PATH_DIR_FIELD = "hudpage_custom_path_dialog_dir"
 # The CLI's machine-readable progress lines (cli_main.py's batch loop and
 # render loops; the same protocol convertion_backend.py reads):
 #   UWMEDIA_PROGRESS <done>/<total> <start|done|skipped|error> <file>
@@ -268,9 +275,10 @@ class OverlayGeneratorBackend(QObject):
     def browseLogFile(self):
         from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(
-            None, "Select dive log", "", LOG_FILE_FILTER
+            None, "Select dive log", str(dialog_dir(LOGS_DIR_FIELD)), LOG_FILE_FILTER
         )
         if path:
+            remember_dialog_dir(LOGS_DIR_FIELD, Path(path).parent)
             self.logFileText = path
 
     @Property(str, notify=fieldsChanged)
@@ -337,50 +345,57 @@ class OverlayGeneratorBackend(QObject):
     @Slot()
     def browseSourceFile(self):
         from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(None, "Select file")
+        path, _ = QFileDialog.getOpenFileName(None, "Select file", str(dialog_dir(SOURCE_DIR_FIELD)))
         if path:
+            remember_dialog_dir(SOURCE_DIR_FIELD, Path(path).parent)
             self.sourceText = path
 
     @Slot()
     def browseSourceFolder(self):
         from PySide6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(SOURCE_DIR_FIELD)))
         if path:
+            remember_dialog_dir(SOURCE_DIR_FIELD, path)
             self.sourceText = path
 
     @Slot()
     def browseOutputFile(self):
         from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(None, "Select file")
+        path, _ = QFileDialog.getOpenFileName(None, "Select file", str(dialog_dir(OUTPUT_DIR_FIELD)))
         if path:
+            remember_dialog_dir(OUTPUT_DIR_FIELD, Path(path).parent)
             self.outputText = path
 
     @Slot()
     def browseOutputFolder(self):
         from PySide6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(OUTPUT_DIR_FIELD)))
         if path:
+            remember_dialog_dir(OUTPUT_DIR_FIELD, path)
             self.outputText = path
 
     @Slot()
     def browseLogsFolder(self):
         from PySide6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(LOGS_DIR_FIELD)))
         if path:
+            remember_dialog_dir(LOGS_DIR_FIELD, path)
             self.logsText = path
 
     @Slot()
     def browseCustomPathFile(self):
         from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(None, "Select file")
+        path, _ = QFileDialog.getOpenFileName(None, "Select file", str(dialog_dir(CUSTOM_PATH_DIR_FIELD)))
         if path:
+            remember_dialog_dir(CUSTOM_PATH_DIR_FIELD, Path(path).parent)
             self.customPathText = path
 
     @Slot()
     def browseCustomPathFolder(self):
         from PySide6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(None, "Select folder")
+        path = QFileDialog.getExistingDirectory(None, "Select folder", str(dialog_dir(CUSTOM_PATH_DIR_FIELD)))
         if path:
+            remember_dialog_dir(CUSTOM_PATH_DIR_FIELD, path)
             self.customPathText = path
 
     @Slot(str, result=str)

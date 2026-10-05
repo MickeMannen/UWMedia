@@ -32,6 +32,7 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from metadata.exif import MetadataHandler
+from utils.app_settings import dialog_dir, remember_dialog_dir
 from utils.tag_editor import (
     TAG_EDITOR_EXTENSIONS,
     TAG_GUIDE,
@@ -43,6 +44,9 @@ from utils.tag_editor import (
     filter_metadata_rows,
     local_tz_offset_string,
 )
+
+# Folder the media folder dialog starts in: the last one picked, else home.
+MEDIA_DIR_FIELD = "tag_editor_media_dialog_dir"
 
 
 class TagEditorBackend(QObject):
@@ -124,9 +128,10 @@ class TagEditorBackend(QObject):
     def selectDirectory(self):
         from PySide6.QtWidgets import QFileDialog
 
-        path = QFileDialog.getExistingDirectory(None, "Select media directory")
+        path = QFileDialog.getExistingDirectory(None, "Select media directory", str(dialog_dir(MEDIA_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(MEDIA_DIR_FIELD, path)
         directory = Path(path)
         self._dir_label = str(directory)
 

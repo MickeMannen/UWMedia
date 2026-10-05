@@ -41,6 +41,7 @@ from gui.hud_renderer import overlay_pixel_bbox
 from utils.layouts import list_templates
 from uwmedia.backends.color_backend import (
     _OPPOSITE_CORNER,
+    PREVIEW_DISPLAY_HEIGHT,
     PREVIEW_DISPLAY_WIDTH,
     PREVIEW_WORKING_WIDTH,
     ColorBackend,
@@ -267,6 +268,19 @@ def _make_drag_test_app(tmp_path):
 # Overlay's frame-pixel bbox: x0=192,y0=108 (0.1*1920, 0.1*1080), w=200,
 # h=100 (design_width==frame_w so res_scale==1) -> x1=392,y1=208.
 _DISPLAY_SCALE = PREVIEW_DISPLAY_WIDTH / 1920.0
+
+
+def test_drag_box_stays_inside_the_preview_for_a_3_2_photo(tmp_path):
+    """The preview box is a fixed 16:9 the frame is stretched into: a 3:2
+    photo's overlay at the bottom edge must draw its drag box at the
+    bottom edge, not below it (it used the width ratio for both axes)."""
+    app, instance = _make_drag_test_app(tmp_path)
+    app.preview_view_h = 1280.0
+    instance["y"] = 1.0 - 100 / 1280.0  # flush with the bottom
+    app._update_drag_box(instance)
+    box = app._drag_box
+    assert box["y"] + box["h"] == pytest.approx(PREVIEW_DISPLAY_HEIGHT, abs=0.5)
+    assert box["w"] == pytest.approx(200 * PREVIEW_DISPLAY_WIDTH / 1920.0)
 
 
 def test_hit_test_body_hit_when_nothing_selected(tmp_path):

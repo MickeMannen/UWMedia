@@ -502,6 +502,15 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             done += 1
             emit(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}")
 
+def first_overlay_name(args):
+    """The name of the first overlay drawn on the output - the --layout's
+    stem, else the first --overlays-file entry's - or None without one."""
+    if getattr(args, "original_layout_stem", None):
+        return args.original_layout_stem
+    instances = getattr(args, "overlay_instances", None) or []
+    return Path(instances[0]["layout_path"]).stem if instances else None
+
+
 def output_filename(source: Path, output_dir: Path, args, creation_date, forced_filename=None) -> str:
     """Output file name for `source`: --render-video-log's pattern, a forced
     name (single file to an explicit output path), --keep-filename, a
@@ -531,9 +540,16 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
         if format_to_use:
             try:
                 # "{filename}" is the source name (the Color page's
-                # "Original + color" preset: "{filename}_color"), the rest
-                # strftime codes of the date taken.
-                filename = creation_date.strftime(format_to_use).replace("{filename}", source.stem) + source.suffix.lower()
+                # "Original + color" preset: "{filename}_color"), "{hud}"
+                # the first overlay's name (dropped, with the separator
+                # before it, when there is no overlay), the rest strftime
+                # codes of the date taken.
+                hud = first_overlay_name(args)
+                pattern = format_to_use if hud else re.sub(r"[_\- ]?\{hud\}", "", format_to_use)
+                filename = (
+                    creation_date.strftime(pattern).replace("{filename}", source.stem).replace("{hud}", hud or "")
+                    + source.suffix.lower()
+                )
             except Exception as e:
                 print(f"Error formatting filename with pattern '{format_to_use}': {e}")
                 filename = source.stem + source.suffix.lower()
@@ -1087,7 +1103,7 @@ def main():
     parser.add_argument("--modify-quicktime", nargs='+', help="Manually modify QuickTime tags (e.g., 'QuickTime:CreateDate=2021:11:12 11:03:02')")
     parser.add_argument("--debug", action="store_true", help="Show verbose FFmpeg output and debugging info")
     naming_group = parser.add_mutually_exclusive_group()
-    naming_group.add_argument("--filename-format", help='Template for output filename: strftime codes of the date taken, plus "{filename}" for the source name (e.g. "%%Y%%m%%d_%%H%%M%%S_color", "{filename}_color")')
+    naming_group.add_argument("--filename-format", help='Template for output filename: strftime codes of the date taken, plus "{filename}" for the source name and "{hud}" for the first overlay\'s name (e.g. "%%Y%%m%%d_%%H%%M%%S_color", "{filename}_color", "%%Y%%m%%d_%%H%%M%%S_{hud}")')
     naming_group.add_argument("--keep-filename", action="store_true", help="Keep the source file's name for the output (only the extension is lower-cased). Without this or --filename-format, batch runs and runs into another folder name files by date taken (%%Y%%m%%d_%%H%%M%%S).")
     overwrite_group = parser.add_mutually_exclusive_group()
     overwrite_group.add_argument("--no-overwrite", action="store_true", help="Skip processing if target file exists (only when running --color or --layout)")

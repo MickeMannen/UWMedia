@@ -113,3 +113,38 @@ def test_original_plus_color_passes_the_filename_token(settings_file):
     args = color._build_args()
     assert "--keep-filename" not in args
     assert args[args.index("--filename-format") + 1] == "{filename}_color"
+
+
+def test_browse_dialogs_start_in_home_then_remember_the_last_folder(settings_file, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from PySide6.QtWidgets import QFileDialog
+
+    home, photos, out = tmp_path / "home", tmp_path / "photos", tmp_path / "out"
+    for d in (home, photos, out):
+        d.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    starts = []
+
+    def fake_open(parent, title, start=""):
+        starts.append(Path(start))
+        return str(photos / "IMG_0001.jpg"), ""
+
+    def fake_dir(parent, title, start=""):
+        starts.append(Path(start))
+        return str(out)
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", fake_open)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", fake_dir)
+    color = ColorBackend()
+
+    color.browseSourceFile()    # home; remembers photos
+    color.browseSourceFile()    # photos
+    color.browseOutputFolder()  # home: output has its own folder; remembers out
+    color.browseOutputFolder()  # out
+    color.browseLogsFolder()    # home
+    assert starts == [home, photos, home, out, home]
+    # Remembered across backend instances (i.e. app restarts).
+    starts.clear()
+    ColorBackend().browseSourceFolder()
+    assert starts == [photos]

@@ -28,7 +28,7 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
 from ffmpeg.ffmpeg_class import FfmpegClass
-from utils.app_settings import get_fields, set_field
+from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
 from utils.display_paths import contract_home_path
 from utils.progress_lines import LineBuffer, finished_text
 from utils.run_timing import RunTiming
@@ -43,6 +43,11 @@ CONVERT_RESOLUTION_NAME_RE = re.compile(r"(?i)[ _](4k|2160p|1080p|720p|480p|360p
 
 PROGRESS_LINE_RE = re.compile(r"UWMEDIA_PROGRESS (\d+)/(\d+) (\S+) (.*)$")
 FFMPEG_PROGRESS_RE = re.compile(r"UWMEDIA_FFMPEG_PROGRESS (\d+(?:\.\d+)?)")
+
+# Folders the browse dialogs start in (utils.app_settings.dialog_dir): the
+# last one used for that field, else the home directory.
+SOURCE_DIR_FIELD = "convertion_source_dialog_dir"
+DEST_DIR_FIELD = "convertion_dest_dialog_dir"
 
 
 class ConvertionBackend(QObject):
@@ -113,9 +118,10 @@ class ConvertionBackend(QObject):
     @Slot()
     def browseSource(self):
         from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(None, "Select video file to convert")
+        path, _ = QFileDialog.getOpenFileName(None, "Select video file to convert", str(dialog_dir(SOURCE_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(SOURCE_DIR_FIELD, Path(path).parent)
         self._source_text = path
         self._refresh_source_resolution(Path(path))
         self.fieldsChanged.emit()
@@ -124,8 +130,9 @@ class ConvertionBackend(QObject):
     @Slot()
     def browseDest(self):
         from PySide6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(None, "Select destination folder")
+        path = QFileDialog.getExistingDirectory(None, "Select destination folder", str(dialog_dir(DEST_DIR_FIELD)))
         if path:
+            remember_dialog_dir(DEST_DIR_FIELD, path)
             self._dest_text = path
             self.fieldsChanged.emit()
             self._refresh_output_preview()

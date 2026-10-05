@@ -95,3 +95,18 @@ def test_keep_filename_and_filename_format_are_exclusive():
     )
     assert result.returncode != 0
     assert "not allowed with argument" in result.stdout + result.stderr  # the CLI prints errors to stdout
+
+
+def test_hud_token_is_the_first_overlay_name(tmp_path, photo):
+    """"%Y%m%d_%H%M%S_{hud}" (the Color page's Date + time + overlay
+    preset): the first --overlays-file entry's name, or the --layout's."""
+    overlays = [{"layout_path": "/tmp/x/garmin_mk3i_main.json"}, {"layout_path": "/tmp/x/shearwater_perdix.json"}]
+    args = _args(photo.parent, filename_format="%Y%m%d_%H%M%S_{hud}", overlay_instances=overlays)
+    assert output_filename(photo, tmp_path / "out", args, TAKEN) == "20260905_143000_garmin_mk3i_main_123.jpg"
+    args = _args(photo.parent, filename_format="%Y%m%d_%H%M%S_{hud}", original_layout_stem="my_hud")
+    assert output_filename(photo, tmp_path / "out", args, TAKEN) == "20260905_143000_my_hud_123.jpg"
+
+
+def test_hud_token_without_an_overlay_is_left_out(tmp_path, photo):
+    args = _args(photo.parent, filename_format="%Y%m%d_%H%M%S_{hud}")
+    assert output_filename(photo, tmp_path / "out", args, TAKEN) == "20260905_143000_123.jpg"

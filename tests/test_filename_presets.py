@@ -18,13 +18,14 @@ def test_filename_format_presets_are_pairwise_distinct():
 
 def test_preset_lineup():
     labels = [label for label, _ in FILENAME_FORMAT_PRESETS]
-    assert [l.split(" (")[0] for l in labels] == ["Original", "Original + color", "Date + time", "Date + time + color"]
+    assert [l.split(" (")[0] for l in labels] == ["Original", "Original + color", "Date + time", "Date + time + color", "Date + time + overlay"]
     presets = dict(FILENAME_FORMAT_PRESETS)
     assert presets[labels[0]] == ""  # --keep-filename
     assert presets[labels[1]] == "{filename}_color"
     fixed = datetime(2026, 9, 5, 14, 30, 0)
     assert fixed.strftime(presets[labels[2]]) == "20260905_143000"
     assert fixed.strftime(presets[labels[3]]) == "20260905_143000_color"
+    assert fixed.strftime(presets[labels[4]]) == "20260905_143000_{hud}"
 
 
 def test_legacy_labels_map_to_current_presets():

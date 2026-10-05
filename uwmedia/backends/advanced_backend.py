@@ -43,7 +43,7 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from parsers.garmin import GarminParser
-from utils.app_settings import get_fields, set_field, update_settings
+from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field, update_settings
 from utils import filename_formats
 from utils.filename_formats import (
     add_filename_format,
@@ -56,6 +56,12 @@ from utils.color_profiles import user_color_yaml_path
 from utils.config import get_config, user_config_yaml_path
 from utils.layouts import user_layouts_dir, user_templates_dir
 from utils.tool_paths import get_exiftool_path, get_ffmpeg_path, is_valid_exiftool, is_valid_ffmpeg
+
+# Folders the browse dialogs start in (utils.app_settings.dialog_dir): the
+# last one used, else the home directory. The location folders use
+# "advanced_<kind>_dialog_dir".
+TOOL_DIR_FIELD = "advanced_tool_dialog_dir"
+FIT_LOGS_DIR_FIELD = "advanced_fit_logs_dialog_dir"
 
 
 class AdvancedBackend(QObject):
@@ -149,15 +155,18 @@ class AdvancedBackend(QObject):
                 "templates": "Select templates folder",
                 "color": "Select color profiles folder",
             }[kind]
-            path = QFileDialog.getExistingDirectory(None, title)
+            dir_field = f"advanced_{kind}_dialog_dir"
+            path = QFileDialog.getExistingDirectory(None, title, str(dialog_dir(dir_field)))
             if not path:
                 return
+            remember_dialog_dir(dir_field, path)
             update_settings(**{f"{kind if kind != 'color' else 'color_profiles'}_dir": path})
             self.locationsChanged.emit()
         elif kind == "ffmpeg":
-            path, _ = QFileDialog.getOpenFileName(None, "Select ffmpeg executable")
+            path, _ = QFileDialog.getOpenFileName(None, "Select ffmpeg executable", str(dialog_dir(TOOL_DIR_FIELD)))
             if not path:
                 return
+            remember_dialog_dir(TOOL_DIR_FIELD, Path(path).parent)
             if not is_valid_ffmpeg(path):
                 QMessageBox.critical(
                     None, "Not a valid ffmpeg executable",
@@ -168,9 +177,10 @@ class AdvancedBackend(QObject):
             update_settings(ffmpeg_path=path)
             self.toolsChanged.emit()
         elif kind == "exiftool":
-            path, _ = QFileDialog.getOpenFileName(None, "Select exiftool executable")
+            path, _ = QFileDialog.getOpenFileName(None, "Select exiftool executable", str(dialog_dir(TOOL_DIR_FIELD)))
             if not path:
                 return
+            remember_dialog_dir(TOOL_DIR_FIELD, Path(path).parent)
             if not is_valid_exiftool(path):
                 QMessageBox.critical(
                     None, "Not a valid exiftool executable",
@@ -308,9 +318,10 @@ class AdvancedBackend(QObject):
     def scanLogsFolder(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-        path = QFileDialog.getExistingDirectory(None, "Select folder with Garmin .fit logs")
+        path = QFileDialog.getExistingDirectory(None, "Select folder with Garmin .fit logs", str(dialog_dir(FIT_LOGS_DIR_FIELD)))
         if not path:
             return
+        remember_dialog_dir(FIT_LOGS_DIR_FIELD, path)
         folder = Path(path)
         garmin = GarminParser()
         found = set()
