@@ -201,11 +201,11 @@ sources = ["resources/bin_linux"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-# The default run is the fast suite; tests/run_tests.sh has the full and
-# release runs (a later -m on the command line replaces this one).
-addopts = ["-m", "not render and not release"]
+# The default run is everything except release_test.py (the full 4K media);
+# tests/run_tests.sh has the other runs (a later -m replaces this one).
+addopts = ["-m", "not release"]
 markers = [
-    "render: renders real media through cli_main.py (slow; needs test_data/)",
+    "render: renders the fixture media through cli_main.py (slower; tests/fixtures + synthetic logs)",
     "release: tests/release_test.py pre-release validation on the full 4K media",
     "requires_media: reads the local test_data/ media or logs; skipped when it is missing",
     "windows: Windows-only checks (skipped on other platforms)",

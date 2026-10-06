@@ -10,10 +10,9 @@ import cv2
 import numpy as np
 import pytest
 
-from conftest import LOGS_DIR, RELEASE_MEDIA, run_cli
+from conftest import SONY_CLIP, run_cli
 from gui.hud_renderer import overlay_pixel_bbox, resolve_overlay_instance_layout
 
-UDDF_LOGS = LOGS_DIR / "uddf"
 
 # Two small, self-contained "shape" skins (no external skin PNG, no
 # validate_layout complications from a real template's extra virtual
@@ -90,9 +89,8 @@ def test_overlay_pixel_bbox_matches_render():
 # --- End-to-end CLI: --overlays-file composites N layers in one run --------
 
 @pytest.mark.render
-def test_overlays_file_composites_two_layers(tmp_path):
-    video_source = RELEASE_MEDIA / "20251019_M0284.MP4"
-    assert video_source.exists()
+def test_overlays_file_composites_two_layers(tmp_path, synthetic_logs):
+    video_source = SONY_CLIP
 
     layout_a_path = tmp_path / "test_color_multi_overlay_layout_a.json"
     layout_b_path = tmp_path / "test_color_multi_overlay_layout_b.json"
@@ -104,7 +102,7 @@ def test_overlays_file_composites_two_layers(tmp_path):
     instance_b = {"layout_path": str(layout_b_path), "x": 0.55, "y": 0.6, "scale": 1.0}
     overlays_json.write_text(json.dumps([instance_a, instance_b]))
 
-    result = run_cli(video_source, tmp_path, "--logs", UDDF_LOGS, "--overlays-file", overlays_json,
+    result = run_cli(video_source, tmp_path, "--logs", synthetic_logs, "--overlays-file", overlays_json,
                      "--filename-format", "test_color_multi_overlay_result", "--tz-adjust", "0")
     assert result.returncode == 0, f"CLI command failed: {result.stderr}"
 
@@ -150,19 +148,18 @@ NEUTRAL_LAYOUT_DATA = {
 
 
 @pytest.mark.render
-def test_colour_correction_leaves_the_hud_uncorrected(tmp_path):
+def test_colour_correction_leaves_the_hud_uncorrected(tmp_path, synthetic_logs):
     # The HUD layers are overlaid after the lut3d colour correction; a
     # neutral grey HUD skin must still come out neutral (the Garmin X50i's
     # bezel turned red-tinted before - see process_video).
-    video_source = RELEASE_MEDIA / "20251019_M0284.MP4"
-    assert video_source.exists()
+    video_source = SONY_CLIP
     layout_path = tmp_path / "test_color_neutral_hud_layout.json"
     layout_path.write_text(json.dumps(NEUTRAL_LAYOUT_DATA))
     overlays_json = tmp_path / "test_color_neutral_hud_instances.json"
     instance = {"layout_path": str(layout_path), "x": 0.6, "y": 0.1, "scale": 1.0}
     overlays_json.write_text(json.dumps([instance]))
 
-    result = run_cli(video_source, tmp_path, "--logs", UDDF_LOGS, "--overlays-file", overlays_json,
+    result = run_cli(video_source, tmp_path, "--logs", synthetic_logs, "--overlays-file", overlays_json,
                      "--color", "default", "--filename-format", "test_color_neutral_hud_result", "--tz-adjust", "0")
     assert result.returncode == 0, f"CLI command failed: {result.stderr}\n{result.stdout[-800:]}"
     output_path = tmp_path / f"test_color_neutral_hud_result{video_source.suffix.lower()}"

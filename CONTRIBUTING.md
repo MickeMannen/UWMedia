@@ -17,15 +17,15 @@ commit.
 
 | When | Command | Time | What runs |
 |---|---|---|---|
-| Before every commit | `tests/run_tests.sh` (Enter) or `pytest` | ~1.5 min | Everything except media renders and the release run |
-| When you change rendering, colour, overlays or the CLI | `tests/run_tests.sh 2` | ~17 min | Fast suite + media render tests |
-| Before a release | `tests/run_tests.sh 4` | ~22 min | Everything, including `release_test.py` on the full 4K media |
+| Before every commit | `tests/run_tests.sh` (Enter) or `pytest` | ~3 min | Everything except the release run, including render tests on the small media in `tests/fixtures/` |
+| A quicker check while working | `tests/run_tests.sh 2` | ~1.5 min | The same without the render tests |
+| Before a release | `tests/run_tests.sh 4` | ~8 min | Everything, including `release_test.py` on the full 4K media |
 
 `tests/run_tests.sh 3` runs only `release_test.py`.
 
 ### Pre-commit hook (recommended)
 
-A hook in `.githooks/` runs the fast suite before each commit and stops the
+A hook in `.githooks/` runs the default suite before each commit and stops the
 commit if a test fails. Turn it on once per clone:
 
 ```bash
@@ -42,8 +42,10 @@ commit.
   git, so on a fresh clone the tests that need it skip themselves rather
   than fail. To use a copy stored somewhere else, set
   `UWMEDIA_TEST_DATA=/path/to/test_data`.
-- `tests/fixtures/` holds the small media files that are in git (see
-  `testing_plan.md`, "Fixture layout").
+- `tests/fixtures/` holds the small media files that are in git; its
+  `README.md` lists each file and its review. The render tests use them,
+  with synthetic logs from `write_synthetic_log()` / the `synthetic_logs`
+  fixture in `tests/conftest.py`.
 - **Dive logs are never committed.** FIT, UDDF, SSRF, Shearwater XML/CSV and
   other dive-profile files contain device serial numbers and personal IDs.
   A test that needs a log builds a synthetic one at run time with the app's
@@ -59,7 +61,7 @@ commit.
   `LOGS_DIR` for paths, and `run_cli(...)` to run `cli_main.py` with the
   current interpreter from the repo root.
 - Markers (registered in `pyproject.toml`):
-  - `render`: renders real media through `cli_main.py` (slow).
+  - `render`: renders the fixture media through `cli_main.py` (slower).
   - `release`: `release_test.py`.
   - `requires_media`: reads `test_data/`; skipped when it is missing.
   - `windows`: Windows-only checks.

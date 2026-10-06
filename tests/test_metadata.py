@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from conftest import RELEASE_MEDIA, run_cli
+from conftest import PHOTO, run_cli
 from metadata.exif import MetadataHandler
 
 
@@ -25,13 +25,12 @@ class TestMetadata:
         assert calculated["EXIF:DateTimeOriginal"] == "2026:05:02 10:06:59"
         assert calculated["EXIF:CreateDate"] == "2026:05:02 10:06:59"
 
-    @pytest.mark.requires_media
     def test_batch_timezone_setting(self, tmp_path):
         import shutil
         from utils.tag_editor import apply_batch_timezone_to_file
 
         # Copy a test photo to tmp_path
-        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
+        src_photo = PHOTO
         dest_photo = tmp_path / "test_photo.jpg"
         shutil.copy2(src_photo, dest_photo)
 
@@ -73,7 +72,7 @@ class TestMetadata:
     def test_cli_no_overwrite_and_move_original(self, tmp_path):
         import shutil
         
-        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
+        src_photo = PHOTO
         
         # 1. Setup temp source and output dirs
         src_dir = tmp_path / "src"
@@ -126,7 +125,7 @@ class TestMetadata:
         import shutil
         from PIL import Image, JpegImagePlugin
 
-        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
+        src_photo = PHOTO
         
         # 1. Setup temp source and output dirs
         src_dir = tmp_path / "src"
@@ -167,7 +166,7 @@ class TestMetadata:
     def test_summary_output(self, tmp_path):
         import shutil
 
-        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
+        src_photo = PHOTO
         
         # Setup temp source and output dirs
         src_dir = tmp_path / "src"

@@ -60,4 +60,4 @@ When the owner says "prepare a release" (or "prepare for release 0.7.1"): do the
    ```
 5. Report the release URL and stop. The owner then runs the "Release Build" workflow from the tag on GitHub (Actions, "Run workflow", "Use workflow from" set to the tag, "Create/update the GitHub Release" checked), which builds the installers and attaches them to the release without touching the notes; Claude does not trigger that workflow.
 
-Tagging and creating the release are public and hard to undo, so if the tree is dirty, the complete test run (`tests/run_tests.sh 4`, "Everything" - the default fast run is not enough) has not passed this session, or the version already exists as a tag, say so and stop instead of proceeding.
+Tagging and creating the release are public and hard to undo, so if the tree is dirty, the complete test run (`tests/run_tests.sh 4`, "Everything" - the default run is not enough) has not passed this session, or the version already exists as a tag, say so and stop instead of proceeding.

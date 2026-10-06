@@ -22,7 +22,7 @@ Codex, Cursor, Gemini, Antigravity and others).
 
 ## Tests
 Follow `CONTRIBUTING.md`:
-- Run the fast suite (`tests/run_tests.sh 1`) before saying work is done,
+- Run the default suite (`tests/run_tests.sh 1`) before saying work is done,
   and `tests/run_tests.sh 4` before a release.
 - Always pass `tests/run_tests.sh` a choice (1-5) when there is no
   terminal.

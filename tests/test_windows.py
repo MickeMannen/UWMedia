@@ -1,32 +1,23 @@
 """Windows-only checks: Pillow photo saving, NVENC / D3D11 hardware
 acceleration, paths with spaces, exiftool and --convert. Skipped on other
-platforms; on Windows the media tests also need test_data/ (render)."""
+platforms. They use the small fixture media in tests/fixtures."""
 import shutil
-import subprocess
 import sys
 
 import pytest
 
-from conftest import RELEASE_MEDIA, run_cli
+from conftest import DJI_CLIP, PHOTO, run_cli
 
 pytestmark = [pytest.mark.windows,
               pytest.mark.skipif(sys.platform != "win32", reason="Windows specific test suite")]
 
-RAW_VIDEO = RELEASE_MEDIA / "DJI_20260502110658_0002_D_A001.MP4"
-RAW_PHOTO = RELEASE_MEDIA / "DSC03491.JPG"
+RAW_PHOTO = PHOTO
 
 
-@pytest.fixture(scope="module")
-def short_video(tmp_path_factory):
-    """The first 2 s of the DJI clip, stream-copied with its metadata."""
-    assert RAW_VIDEO.exists(), f"Source video not found at {RAW_VIDEO}"
-    out = tmp_path_factory.mktemp("windows") / RAW_VIDEO.name
-    cmd = [shutil.which("ffmpeg") or "ffmpeg", "-y", "-ss", "0", "-t", "2", "-i", str(RAW_VIDEO),
-           "-c", "copy", "-map", "0:v:0", "-map", "0:a?", "-map_metadata", "0",
-           "-movflags", "+faststart+use_metadata_tags", str(out)]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    assert res.returncode == 0, f"Failed to cut the short video: {res.stderr}"
-    return out
+@pytest.fixture
+def short_video():
+    """The 2 s HEVC fixture clip (tests/fixtures/README.md)."""
+    return DJI_CLIP
 
 
 @pytest.mark.render

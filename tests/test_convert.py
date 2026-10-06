@@ -1,13 +1,17 @@
+import shutil
+
 import pytest
 
-from conftest import RELEASE_MEDIA, run_cli
+from conftest import SONY_CLIP, run_cli
 
 
 @pytest.mark.render
 def test_convert_video_resolution(tmp_path):
-    """Scenario 1: Test --convert downscaling on a video file. Confirms 1080p resolution folder output."""
-    source_video = RELEASE_MEDIA / "20251019_M0284.MP4"
-    assert source_video.exists()
+    """Scenario 1: Test --convert on a video file. Confirms the 1080p output file and folder."""
+    # A neutral name: the fixture's own "_720p" would be swapped for the
+    # target resolution (see test_convert_resolution_replacement_naming).
+    source_video = tmp_path / "dive_clip.mp4"
+    shutil.copy2(SONY_CLIP, source_video)
 
     output_subfolder = tmp_path / "test_convert_1080p"
     result = run_cli(source_video, output_subfolder, "--convert", "1080p")

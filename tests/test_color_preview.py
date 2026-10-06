@@ -38,7 +38,7 @@ from models.dive import Dive, Waypoint
 from models.manager import DiveManager
 from uwmedia.backends.color_backend import PREVIEW_WORKING_WIDTH, ColorBackend
 
-from conftest import RELEASE_MEDIA as TEST_DATA_DIR
+from conftest import PHOTO
 
 
 def make_fake_backend(source_value=""):
@@ -89,9 +89,8 @@ def test_first_source_file_picks_sorted_first_in_directory(tmp_path):
     assert result == src_dir / "a_first.jpg"
 
 
-@pytest.mark.requires_media
 def test_first_source_file_single_file():
-    single_file = TEST_DATA_DIR / "DSC03491.JPG"
+    single_file = PHOTO
     assert single_file.exists()
     app = make_fake_backend(str(single_file))
     assert app._first_source_file() == single_file
@@ -130,9 +129,8 @@ def test_extract_preview_frame_falls_back_to_last_frame_when_short(tmp_path):
     assert app.preview_frame[0, 0, 0] == pytest.approx(60, abs=5)
 
 
-@pytest.mark.requires_media
 def test_extract_preview_frame_loads_still_image_directly():
-    photo_path = TEST_DATA_DIR / "DSC03491.JPG"
+    photo_path = PHOTO
     assert photo_path.exists()
 
     app = make_fake_backend(str(photo_path))
@@ -189,13 +187,12 @@ def test_extract_preview_frame_matches_real_waypoint_for_video(tmp_path, monkeyp
     assert app.preview_current_waypoint.time_since_start == 1
 
 
-@pytest.mark.requires_media
 def test_extract_preview_frame_matches_real_waypoint_for_photo(monkeypatch):
     fixed_date = datetime(2026, 1, 1, 8, 0, 0)
     monkeypatch.setattr(MetadataHandler, "get_local_creation_date", lambda self, path: fixed_date)
     monkeypatch.setattr(ColorBackend, "_load_dive_logs", lambda self: None)
 
-    photo_path = TEST_DATA_DIR / "DSC03491.JPG"
+    photo_path = PHOTO
     assert photo_path.exists()
 
     app = make_fake_backend(str(photo_path))
@@ -213,7 +210,7 @@ def test_extract_preview_frame_no_matching_dive_leaves_waypoint_none(monkeypatch
     monkeypatch.setattr(MetadataHandler, "get_local_creation_date", lambda self, path: fixed_date)
     monkeypatch.setattr(ColorBackend, "_load_dive_logs", lambda self: None)
 
-    photo_path = TEST_DATA_DIR / "DSC03491.JPG"
+    photo_path = PHOTO
     app = make_fake_backend(str(photo_path))
     # dive_manager left empty - nothing to match against
     app._extract_preview_frame()

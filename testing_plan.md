@@ -178,14 +178,27 @@ tests don't need that much video.
 - [ ] Phase 6 note: `cli_main.py`'s `--convert` repeats that naming code
       inline instead of sharing it with the backend.
 
-### Phase 2 - small test media (owner reviews every file first)
-- [ ] Prepare 2 s, 720p versions of the two clips (keep the 10-bit 4:2:2
-      format and the metadata the tests need) and ~2 MP JPEG copies with the
-      needed EXIF; strip anything personal. Owner reviews -> `tests/fixtures/`.
-- [ ] Synthetic dive logs generated at test time by the app's own writers
-      (no real logs in git).
-- [ ] Switch the render tests to the fixtures; keep the 4K media for
-      `release_test` only.
+### Phase 2 - small test media (2026-10-06)
+- [x] `scripts/make_test_fixtures.py` builds 2 s 720p clips (Sony 10-bit
+      4:2:2 H.264, DJI HEVC Main 10) and a 1800x1200 JPEG from
+      `test_data/release_test`: all metadata stripped, only an allowlist of
+      date / time-zone / make-model tags copied back. 2.6 MB in all. Owner
+      reviewed pictures and metadata; record + SHA-256 in
+      `tests/fixtures/README.md`.
+- [x] Synthetic dive logs: `write_synthetic_log()` (UDDF / FIT / SSRF via
+      the app's writers) and the session fixture `synthetic_logs` (UDDF
+      dives covering every fixture clip and photo) in `tests/conftest.py`.
+- [x] All render tests use the fixtures + synthetic logs; the overlay tests
+      also assert the dive was matched (the CLI writes an output file even
+      when no dive matches). `render` no longer needs `test_data/`;
+      `release_test.py` keeps the full 4K media.
+- [x] Adjusted for the short clips: `test_convert` copies the clip to a
+      neutral name (the fixture's own "_720p" would be renamed);
+      `test_hud_layers` expects >= 3 progress updates (a 2 s clip reports
+      ~5; the 10 s one reported > 10).
+- [x] Times: full run without release (`run_tests.sh 2`) 2m46s, was ~17 min;
+      with `test_data/` hidden 597 passed, 53 skipped in 2m11s (all render
+      tests run).
 
 ### Phase 4 - parallel
 - [ ] Add `pytest-xdist` (dev requirement); run with `-n auto`; fix any
@@ -213,3 +226,6 @@ tests don't need that much video.
   Complete run after Phase 3: 658 passed, 6 skipped (Windows-only), 3 xfailed in 22m02s.
 - 2026-10-06: CONTRIBUTING.md, AGENTS.md and `.githooks/pre-commit` (fast suite before
   each commit; Markdown-only commits skip it) added; hook enabled in the owner's clone.
+- 2026-10-06: Phase 2 done; full run without release 2m46s (was ~17 min).
+- 2026-10-06: render tests joined the default run (`addopts = -m "not release"`);
+  `run_tests.sh` 1 = default (~3 min), 2 = quick without renders (~1.5 min).

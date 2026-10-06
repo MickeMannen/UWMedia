@@ -24,17 +24,17 @@ fi
 
 # Usage: tests/run_tests.sh [1-5] - with a choice, run it without the menu
 # (for scripts and background runs); without one, ask (Enter = 1).
-# Markers (pyproject.toml): plain `pytest` skips `render` and `release`; a
-# later -m replaces that default.
+# Markers (pyproject.toml): plain `pytest` skips `release`; a later -m
+# replaces that default.
 choice_arg="$1"
 
 # Print Selection Menu (only when asking)
 if [ -z "$choice_arg" ]; then
     echo -e "\nSelect a test suite to run:"
-    echo -e "  ${YELLOW}1)${NC} Fast: everything except media renders and release tests (default, ~1.5 min)"
-    echo -e "  ${YELLOW}2)${NC} Full: fast + media render tests (~17 min, needs test_data/)"
+    echo -e "  ${YELLOW}1)${NC} Default: everything except the release run, renders included (~3 min)"
+    echo -e "  ${YELLOW}2)${NC} Quick: also skip the render tests (~1.5 min)"
     echo -e "  ${YELLOW}3)${NC} Release: pre-release validation on the full 4K media (release_test.py, ~5 min)"
-    echo -e "  ${YELLOW}4)${NC} Everything: full + release (~22 min) - run this before a release"
+    echo -e "  ${YELLOW}4)${NC} Everything: default + release (~8 min) - run this before a release"
     echo -e "  ${YELLOW}5)${NC} Exit"
 fi
 
@@ -55,14 +55,14 @@ while true; do
 
     case "$choice" in
         1)
-            echo -e "\n${GREEN}[*] Running the fast suite...${NC}"
+            echo -e "\n${GREEN}[*] Running the default suite (everything except release)...${NC}"
             pytest -v
             status=$?
             break
             ;;
         2)
-            echo -e "\n${GREEN}[*] Running the full suite (with media renders)...${NC}"
-            pytest -v -m "not release"
+            echo -e "\n${GREEN}[*] Running the quick suite (no renders, no release)...${NC}"
+            pytest -v -m "not render and not release"
             status=$?
             break
             ;;

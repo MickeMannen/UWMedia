@@ -2,24 +2,18 @@ import shutil
 
 import pytest
 
-from conftest import LOGS_DIR, RELEASE_MEDIA, REPO_ROOT, run_cli
+from conftest import PHOTO, REPO_ROOT, SONY_CLIP, run_cli
 from metadata.exif import MetadataHandler
 
 LAYOUT_PATH = REPO_ROOT / "overlays" / "Shearwater_Perdix2_simple.zip"
-UDDF_LOGS = LOGS_DIR / "uddf"
 
 pytestmark = pytest.mark.render
 
 
-def test_render_video_log_feature(tmp_path):
+def test_render_video_log_feature(tmp_path, synthetic_logs):
     """Scenario 1: Test --render-video-log batch telemetry video/photo generation from source media and matching logs."""
-    video_source = RELEASE_MEDIA / "20251019_M0284.MP4"
-    photo_source = RELEASE_MEDIA / "DSC03491.JPG"
-
-    assert video_source.exists()
-    assert photo_source.exists()
-    assert LAYOUT_PATH.exists()
-    assert UDDF_LOGS.exists()
+    video_source = SONY_CLIP
+    photo_source = PHOTO
 
     # An input folder with just these two files
     input_dir = tmp_path / "input"
@@ -29,7 +23,7 @@ def test_render_video_log_feature(tmp_path):
     output_dir = tmp_path / "output"
 
     result = run_cli(input_dir, output_dir, "--render-video-log", "--layout", LAYOUT_PATH,
-                     "--logs", UDDF_LOGS, "--tz-adjust", "0")
+                     "--logs", synthetic_logs, "--tz-adjust", "0")
     assert result.returncode == 0, f"CLI command failed: {result.stderr}"
 
     # Verify filenames conform to format: original stem + '_' + layout stem + original suffix

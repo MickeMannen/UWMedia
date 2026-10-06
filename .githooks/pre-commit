@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs the fast test suite before each commit (see CONTRIBUTING.md).
+# Runs the default test suite (everything except release) before each commit (see CONTRIBUTING.md).
 # Enable once per clone:  git config core.hooksPath .githooks
 # Skip in an emergency:   git commit --no-verify
 
@@ -18,7 +18,7 @@ else
     PYTHON=$(command -v python3 || command -v python)
 fi
 
-echo "pre-commit: running the fast test suite (~1.5 min; skip with --no-verify)"
+echo "pre-commit: running the test suite (~3 min; skip with --no-verify)"
 if ! "$PYTHON" -m pytest -q -x; then
     echo "pre-commit: tests failed - commit stopped." >&2
     exit 1

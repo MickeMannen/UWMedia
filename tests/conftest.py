@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -21,8 +22,58 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TEST_DATA = Path(os.environ.get("UWMEDIA_TEST_DATA") or REPO_ROOT / "test_data")
 RELEASE_MEDIA = TEST_DATA / "release_test"
 LOGS_DIR = TEST_DATA / "logs"
-# Markers whose tests read TEST_DATA - skipped when it is missing.
-MEDIA_MARKERS = ("requires_media", "render", "release")
+# Markers whose tests read TEST_DATA - skipped when it is missing. (The
+# render tests use the tracked fixtures below and synthetic logs instead.)
+MEDIA_MARKERS = ("requires_media", "release")
+
+# Small reviewed media in git (tests/fixtures/README.md)
+FIXTURE_MEDIA = REPO_ROOT / "tests" / "fixtures" / "media"
+SONY_CLIP = FIXTURE_MEDIA / "video" / "h264_10bit_422_720p_2s.mp4"   # 10-bit 4:2:2, 2025-10-19 10:21:31 +08:00
+DJI_CLIP = FIXTURE_MEDIA / "video" / "hevc_10bit_420_720p_2s.mp4"    # HEVC Main 10, 2026-05-02 10:06:59 +07:00
+PHOTO = FIXTURE_MEDIA / "photo" / "jpeg_3x2_2mp.jpg"                  # 2025-12-03 09:15:48.980 +08:00
+# Synthetic dives (local time) that cover the fixture media above
+FIXTURE_DIVE_STARTS = (datetime(2025, 10, 19, 10, 0), datetime(2025, 12, 3, 9, 0), datetime(2026, 5, 2, 10, 0))
+
+
+def synthetic_plan(start, computer="Shearwater Perdix 2", bottom_min=40, depth_m=18.0):
+    """A plain air dive to `depth_m` starting at `start` (local time) - the
+    stand-in for a real dive log, which never goes into git."""
+    from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
+    from utils.dive_plan_engine import plan_ascent
+
+    plan = DiveProfilePlan(
+        name="Synthetic test dive", dive_type="oc", gf_low=40, gf_high=85, sac_lpm=15, water_temp_c=28.0,
+        computer=computer, start_time=start,
+        gases=[PlannedGas(id="Air", gas_type="air", o2_percent=21.0, start_pressure_bar=200)],
+        waypoints=[PlannedWaypoint(runtime_sec=120, depth_m=depth_m, gas_id="Air"),
+                   PlannedWaypoint(runtime_sec=bottom_min * 60, depth_m=depth_m, gas_id="Air")])
+    ascent, _, _ = plan_ascent(plan)
+    plan.waypoints.extend(ascent)
+    return plan
+
+
+def write_synthetic_log(path, start, computer="Shearwater Perdix 2"):
+    """Writes a synthetic dive as UDDF, FIT or Subsurface (by `path`'s
+    suffix: .uddf / .fit / .ssrf) with the app's own writers."""
+    from parsers.fit_writer import write_fit
+    from parsers.subsurface_writer import write_subsurface
+    from parsers.uddf_writer import write_uddf
+    from utils.dive_plan_engine import simulate
+
+    writer = {".uddf": write_uddf, ".fit": write_fit, ".ssrf": write_subsurface}[Path(path).suffix]
+    plan = synthetic_plan(start, computer)
+    samples, _ = simulate(plan, resolution_sec=2)
+    writer(plan, samples, Path(path))
+    return Path(path)
+
+
+@pytest.fixture(scope="session")
+def synthetic_logs(tmp_path_factory):
+    """A folder of synthetic UDDF dives covering every fixture clip and photo."""
+    folder = tmp_path_factory.mktemp("synthetic_logs")
+    for start in FIXTURE_DIVE_STARTS:
+        write_synthetic_log(folder / f"synthetic_{start:%Y%m%d_%H%M}.uddf", start)
+    return folder
 
 
 def run_cli(*args):
