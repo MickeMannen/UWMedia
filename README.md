@@ -25,7 +25,7 @@ Photo with Telemetry data (old overlay)
 ![DSC06641_color_garmin_overlay.jpg](media/DSC06641_color_garmin_overlay.jpg)
 
 
-## [Example (YouTube)](https://youtu.be/8r8_4H4iOMg) (will be updated)
+## [Example (YouTube)](https://youtu.be/DB6rSu5umzI)
 
 ## Key Features
 
