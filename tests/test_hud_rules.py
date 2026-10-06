@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
+from conftest import LOGS_DIR
 from utils.hud_rules_engine import (
     get_dynamic_color,
     get_safety_stop_text,
@@ -272,6 +273,7 @@ def test_garmin_safety_stop_timeline_follows_the_computers_own_alerts():
     assert resolve_state("Garmin", "x50i", at[850], wps) == "normal"
     assert resolve_state("Garmin", "x50i", at[990], wps) == "normal"
 
+@pytest.mark.requires_media
 def test_garmin_no_safety_stop_after_deco_in_a_real_mk3i_log():
     # test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases.fit: the
     # computer fires deco_complete at 6.9 m and no safety_stop_started for the
@@ -281,7 +283,7 @@ def test_garmin_no_safety_stop_after_deco_in_a_real_mk3i_log():
     from pathlib import Path
     from parsers.garmin import GarminParser
     with contextlib.redirect_stdout(io.StringIO()):
-        dive = GarminParser().parse(Path("test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases.fit"))[0]
+        dive = GarminParser().parse(LOGS_DIR / "submersion_dives/005_oc-trimix-two-deco-gases.fit")[0]
     wps = dive.waypoints
     states = [(wp.time_since_start, resolve_state("Garmin", "Descent Mk3i", wp, wps)) for wp in wps]
     complete = next(t for t, wp in zip((s[0] for s in states), wps) if "deco_complete" in wp.dive_alerts)

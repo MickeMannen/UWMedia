@@ -1,50 +1,47 @@
-import pytest
-import os
+"""Pre-release validation on the full-size media in test_data/release_test
+(4K video, 20 MB photos) and real dive logs: metadata, parsers, colour
+correction, overlays, --render-log and --export-json end to end.
+
+Run it with `tests/run_tests.sh 3` (or 4, everything); plain `pytest`
+skips it. Its outputs stay in test_data/test_results/release_test for a
+look afterwards, and are replaced on the next run."""
+import json
 import shutil
-import subprocess
-from pathlib import Path
 from datetime import datetime
 
+import pytest
+
+from conftest import LOGS_DIR, RELEASE_MEDIA, REPO_ROOT, TEST_DATA, run_cli
+from metadata.exif import MetadataHandler
 from parsers.garmin import GarminParser
 from parsers.uddf import UDDFParser
-from metadata.exif import MetadataHandler
 
-# Paths
-BASE_DIR = Path(__file__).parent.parent
-TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
-TEST_DATA_COLOR_DIR = BASE_DIR / "test_data" / "color_correction"
-FIT_DIR = BASE_DIR / "test_data" / "logs" / "fit"
-UDDF_DIR = BASE_DIR / "test_data" / "logs" / "uddf"
-SSRF_DIR = BASE_DIR / "test_data" / "logs" / "ssrf"
-OUTPUT_DIR = BASE_DIR / "test_data" / "test_results"  # Unified test output target
-OVERLAYS_DIR = BASE_DIR / "overlays"
+TEST_DATA_DIR = RELEASE_MEDIA
+FIT_DIR = LOGS_DIR / "fit"
+UDDF_DIR = LOGS_DIR / "uddf"
+SSRF_DIR = LOGS_DIR / "ssrf"
+OUTPUT_DIR = TEST_DATA / "test_results" / "release_test"
+OVERLAYS_DIR = REPO_ROOT / "overlays"
+
+pytestmark = pytest.mark.release
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_output_dir():
-    """Ensure the target output/results directory exists and is clean before release tests."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    # Clean previous release test outputs to avoid duplication/collision
-    for file in OUTPUT_DIR.glob("release_test_*"):
-        try:
-            if file.is_file():
-                file.unlink()
-            elif file.is_dir():
-                shutil.rmtree(file)
-        except Exception:
-            pass
+    """A fresh output folder for this run."""
+    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+    OUTPUT_DIR.mkdir(parents=True)
     yield
 
 
+def _cli(*args):
+    result = run_cli(*args)
+    assert result.returncode == 0, f"cli_main.py {' '.join(map(str, args))} failed:\n{result.stderr[-2000:]}"
+    return result
+
+
 class TestRelease:
-    """
-    Release Test suite designed to quickly verify core end-to-end functionality
-    of the package (Metadata reading, Log parsers, Color Correction, Video Overlay,
-    Convert downscaling, Standalone Log rendering, and JSON exports) before deployment.
-    
-    All video tests are constrained to 15-second segments using --start-time and --end-time
-    to ensure the entire release validation suite completes in seconds rather than minutes.
-    """
+    """End-to-end checks on the full-size media (whole clips, not segments)."""
 
     # 1. Metadata Verification Tests
     def test_01_metadata_video(self):
@@ -109,14 +106,14 @@ class TestRelease:
 
     # 4. Color Correction (Fast LUT Path)
     def test_05_color_correction_video(self):
-        """Verify video color correction (fast LUT path) on a short 1-second segment."""
+        """Verify video color correction (fast LUT path)."""
         src = TEST_DATA_DIR / "20251019_M0284.MP4"
         cmd = [
-            "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+            str(src), str(OUTPUT_DIR),
             "--color", "--filename-format", "release_test_test05_color",
             "--hw-accel"
         ]
-        subprocess.run(cmd, check=True)
+        _cli(*cmd)
 
         found = list(OUTPUT_DIR.glob("release_test_test05_color.mp4"))
         assert len(found) == 1
@@ -131,10 +128,10 @@ class TestRelease:
         for file in sorted(TEST_DATA_DIR.glob("*.JPG")):
             i += 1
             cmd = [
-                "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
+                str(file), str(OUTPUT_DIR),
                 "--color", "--filename-format", f"release_test_test06_color_{file.stem}"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
 
         found = list(OUTPUT_DIR.glob("release_test_test06_color_*.jpg"))
         assert len(found) == i
@@ -148,69 +145,29 @@ class TestRelease:
 
         for profile in ["vivid", "subtle"]:
             cmd = [
-                "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
+                str(file), str(OUTPUT_DIR),
                 "--color", profile, "--filename-format", f"release_test_test06c_{profile}"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
             found = list(OUTPUT_DIR.glob(f"release_test_test06c_{profile}_*.jpg"))
             assert len(found) == 1
 
     def test_05b_color_correction_video_profiles(self):
-        """Verify video color correction profiles on short 1-second segments."""
+        """Verify video color correction profiles."""
         src = TEST_DATA_DIR / "20251019_M0284.MP4"
         for profile in ["vivid", "subtle"]:
             cmd = [
-                "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+                str(src), str(OUTPUT_DIR),
                 "--color", profile, "--filename-format", f"release_test_test05_profile_{profile}",
                 "--hw-accel"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
             found = list(OUTPUT_DIR.glob(f"release_test_test05_profile_{profile}.mp4"))
             assert len(found) == 1
 
-    def test_06b_color_correction_photo_sidebyside(self):
-        """Verify side-by-side JPG photo comparisons generated correctly."""
-        import cv2
-        import numpy as np
-
-        i = 0
-        for file in TEST_DATA_COLOR_DIR.glob("*.JPG"):
-            edited_path = TEST_DATA_COLOR_DIR / f"{file.stem}_Edited.JPEG"
-            if not edited_path.exists():
-                continue
-
-            i += 1
-            temp_format = f"release_test_temp_sidebyside_{file.stem}"
-            cmd = [
-                "python3", "cli_main.py", str(file), str(OUTPUT_DIR),
-                "--color", "--filename-format", temp_format
-            ]
-            subprocess.run(cmd, check=True)
-
-            corrected_files = list(OUTPUT_DIR.glob(f"*{temp_format}*.jpg"))
-            assert len(corrected_files) == 1
-            corrected_path = corrected_files[0]
-
-            edit_img = cv2.imread(str(edited_path))
-            corr_img = cv2.imread(str(corrected_path))
-
-            assert edit_img is not None
-            assert corr_img is not None
-
-            h, w = corr_img.shape[:2]
-            edit_img_resized = cv2.resize(edit_img, (w, h))
-            sidebyside = np.hstack([edit_img_resized, corr_img])
-
-            target_path = OUTPUT_DIR / f"release_test_{file.stem}_color_sidebyside.jpg"
-            cv2.imwrite(str(target_path), sidebyside)
-            corrected_path.unlink()
-
-        found = list(OUTPUT_DIR.glob("release_test_*_color_sidebyside.jpg"))
-        assert len(found) == i
-
     # 5. Color Correction with Overlay
     def test_07_overlay_video(self):
-        """Verify video overlay (threaded processing) works on short 1-second clips for different layouts."""
+        """Verify video overlay works for different layouts."""
         src = TEST_DATA_DIR / "DJI_20260502110658_0002_D_A001.MP4"
         logs = FIT_DIR
 
@@ -220,12 +177,12 @@ class TestRelease:
         for layout in layouts:
             target_list.append(layout.stem)
             cmd = [
-                "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+                str(src), str(OUTPUT_DIR),
                 "--color", "--layout", str(layout), "--logs", str(logs),
                 "--filename-format", f"release_test_test07_{layout.stem}",
                 "--hw-accel"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
 
         for t in target_list:
             n = len(list(OUTPUT_DIR.glob(f"release_test_test07_{t}.mp4")))
@@ -245,11 +202,11 @@ class TestRelease:
         for layout in layouts:
             target_list.append(layout.stem)
             cmd = [
-                "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+                str(src), str(OUTPUT_DIR),
                 "--color", "--layout", str(layout), "--logs", str(logs),
                 "--filename-format", f"release_test_test08_{layout.stem}", "--hw-accel"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
 
         for t in target_list:
             n = len(list(OUTPUT_DIR.glob(f"release_test_test08_{t}_*.jpg")))
@@ -264,11 +221,11 @@ class TestRelease:
             output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_{file.stem}.mp4"
 
             cmd = [
-                "python3", "cli_main.py", str(output_file),
+                str(output_file),
                 "--render-log", str(log), "20",  # Limit waypoints to speed up test execution
                 "--layout", str(file), "--hw-accel"
             ]
-            subprocess.run(cmd, check=True)
+            _cli(*cmd)
             assert output_file.exists()
 
     def test_10_render_log_uddf(self):
@@ -278,11 +235,11 @@ class TestRelease:
         output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_generic.mp4"
 
         cmd = [
-            "python3", "cli_main.py", str(output_file),
+            str(output_file),
             "--render-log", str(log), "20",  # Limit waypoints
             "--layout", str(layout)
         ]
-        subprocess.run(cmd, check=True)
+        _cli(*cmd)
         assert output_file.exists()
 
     def test_11_overlay_photo(self):
@@ -291,11 +248,11 @@ class TestRelease:
         layout = OVERLAYS_DIR / "generic_depth_temp.zip"
         logs = SSRF_DIR
         cmd = [
-            "python3", "cli_main.py", str(src), str(OUTPUT_DIR),
+            str(src), str(OUTPUT_DIR),
             "--color", "--layout", str(layout), "--logs", str(logs),
             "--filename-format", "release_test_test11_overlay_generic"
         ]
-        subprocess.run(cmd, check=True)
+        _cli(*cmd)
 
         target = list(OUTPUT_DIR.glob("release_test_test11_overlay_generic_*.jpg"))[0]
         assert target.exists()
@@ -316,10 +273,9 @@ class TestRelease:
         shutil.copy2(ssrf_src, temp_log_dir)
 
         cmd = [
-            "python3", "cli_main.py",
             "--export-json", str(temp_log_dir)
         ]
-        subprocess.run(cmd, check=True)
+        _cli(*cmd)
 
         fit_json = temp_log_dir / "488 Phuket, Camera Bay.json"
         uddf_json = temp_log_dir / "Perdix 2 453 2025-10-19 16-44-12.json"
@@ -329,7 +285,6 @@ class TestRelease:
         assert uddf_json.exists()
         assert ssrf_json.exists()
 
-        import json
         with open(fit_json, "r") as f:
             waypoints = json.load(f)
 
@@ -343,6 +298,5 @@ class TestRelease:
         assert isinstance(first_wp["depth"], float)
 
         datetime.strptime(first_wp["timestamp"], "%Y-%m-%d %H:%M:%S")
-        
-        # Clean up temporary logs folder
+
         shutil.rmtree(temp_log_dir)

@@ -2,51 +2,11 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
+from conftest import RELEASE_MEDIA, run_cli
 from metadata.exif import MetadataHandler
 
 
 class TestMetadata:
-
-    def test_datetaken(self):
-        # Use relative path for better portability
-        path = Path("test_data/videos_original")
-        meta = MetadataHandler()
-        
-        files = list(path.glob("*.[mM][pP]4"))
-        print(f"\nDEBUG: Found {len(files)} files in {path}")
-        
-        for file in files:
-            try:
-                if file.name == "20251019_M0281.MP4":
-                    pass
-                print(f"DEBUG: Processing {file.name}...")
-                utc_time = meta.get_standardized_creation_date(file_path=file)
-                local_time = meta.get_local_creation_date(file_path=file)
-                print(f"RESULT: {file.name} -> UTC: {utc_time} | Local: {local_time}")
-            except Exception as e:
-                print(f"ERROR: {file.name} -> {e}")
-
-    def test_debug_datetaken(self):
-        # Use relative path for better portability
-        file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/test01.mp4")
-        # file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_M0281_color.MP4")
-        file = Path("/Users/mikael/development/UWMedia/test_data/videos_corrected/20251019_102131_1.mp4")
-        file = Path("/Users/mikael/DivingMedia/20260501_Phuket/videos_original/DJI_20260502110658_0002_D_A001.MP4")
-        file = Path("/Users/mikael/development/UWMedia/test_data/videos_wrong_tz/DJI_20260502110658_0002_D_A001_correct_tz.mp4")
-        file = Path("/Users/mikael/DivingMedia/20260501_Phuket/videos_original_corrected/DJI_20260503123846_0017_D_A001.mp4")
-        file = Path("/Users/mikael/DivingMedia/20260524_Sipadan/original_photo/DSC06413.JPG")
-
-        meta = MetadataHandler()
-
-
-        try:
-            metadata = meta.get_metadata(src=file)
-            print(f"DEBUG: Processing {file.name}...")
-            utc_time = meta.get_standardized_creation_date(file_path=file)
-            local_time = meta.get_local_creation_date(file_path=file)
-            print(f"RESULT: {file.name} -> UTC: {utc_time} | Local: {local_time}")
-        except Exception as e:
-            print(f"ERROR: {file.name} -> {e}")
 
     def test_dji_timezone_calculation(self):
         from utils.tag_editor import calculate_dji_datetimes
@@ -65,12 +25,13 @@ class TestMetadata:
         assert calculated["EXIF:DateTimeOriginal"] == "2026:05:02 10:06:59"
         assert calculated["EXIF:CreateDate"] == "2026:05:02 10:06:59"
 
+    @pytest.mark.requires_media
     def test_batch_timezone_setting(self, tmp_path):
         import shutil
         from utils.tag_editor import apply_batch_timezone_to_file
 
         # Copy a test photo to tmp_path
-        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
         dest_photo = tmp_path / "test_photo.jpg"
         shutil.copy2(src_photo, dest_photo)
 
@@ -108,11 +69,11 @@ class TestMetadata:
         visible = filter_metadata_rows(rows, "")
         assert len(visible) == 4
 
+    @pytest.mark.render
     def test_cli_no_overwrite_and_move_original(self, tmp_path):
-        import subprocess
         import shutil
         
-        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
         
         # 1. Setup temp source and output dirs
         src_dir = tmp_path / "src"
@@ -128,11 +89,9 @@ class TestMetadata:
         # 2. Run first time: should process and output the file with milliseconds
         expected_output = out_dir / "20251203_091548_980.jpg"
         
-        cmd = [
-            "python3", "cli_main.py", str(temp_src), str(out_dir),
-            "--color", "--filename-format", "%Y%m%d_%H%M%S"
-        ]
-        subprocess.run(cmd, check=True)
+        cmd = [temp_src, out_dir, "--color", "--filename-format", "%Y%m%d_%H%M%S"]
+        result = run_cli(*cmd)
+        assert result.returncode == 0, result.stderr
         assert expected_output.exists()
         
         # Modify the output file content slightly so we can detect if it got overwritten
@@ -141,7 +100,8 @@ class TestMetadata:
             
         # 3. Run second time with --no-overwrite: should skip because target exists
         cmd_no_overwrite = cmd + ["--no-overwrite"]
-        subprocess.run(cmd_no_overwrite, check=True)
+        result = run_cli(*cmd_no_overwrite)
+        assert result.returncode == 0, result.stderr
         
         # Verify it skipped (the file should still have our mocked content instead of being overwritten with a real image)
         with open(expected_output, "r") as f:
@@ -152,20 +112,21 @@ class TestMetadata:
         # and then move the original file to move_dir
         expected_output.unlink() # delete the target so it processes
         
-        cmd_move = cmd + ["--move-original", str(move_dir)]
-        subprocess.run(cmd_move, check=True)
+        cmd_move = cmd + ["--move-original", move_dir]
+        result = run_cli(*cmd_move)
+        assert result.returncode == 0, result.stderr
         
         # Verify the original source has been moved to move_dir
         expected_moved_src = move_dir / "DSC03491.JPG"
         assert expected_moved_src.exists()
         assert not temp_src.exists()
 
+    @pytest.mark.render
     def test_jpeg_quality_and_subsampling(self, tmp_path):
-        import subprocess
         import shutil
         from PIL import Image, JpegImagePlugin
 
-        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
         
         # 1. Setup temp source and output dirs
         src_dir = tmp_path / "src"
@@ -181,11 +142,9 @@ class TestMetadata:
             original_subsampling = JpegImagePlugin.get_sampling(img)
         
         # 3. Run cli_main.py with --color
-        cmd = [
-            "python3", "cli_main.py", str(temp_src), str(out_dir),
-            "--color", "--filename-format", "%Y%m%d_%H%M%S"
-        ]
-        subprocess.run(cmd, check=True)
+        cmd = [temp_src, out_dir, "--color", "--filename-format", "%Y%m%d_%H%M%S"]
+        result = run_cli(*cmd)
+        assert result.returncode == 0, result.stderr
         
         # 4. Verify output file exists
         expected_output = out_dir / "20251203_091548_980.jpg"
@@ -204,11 +163,11 @@ class TestMetadata:
         
         assert quantization == original_quantization
 
+    @pytest.mark.render
     def test_summary_output(self, tmp_path):
-        import subprocess
         import shutil
 
-        src_photo = Path("test_data/release_test/DSC03491.JPG")
+        src_photo = RELEASE_MEDIA / "DSC03491.JPG"
         
         # Setup temp source and output dirs
         src_dir = tmp_path / "src"
@@ -220,11 +179,9 @@ class TestMetadata:
         shutil.copy2(src_photo, temp_src)
         
         # Run cli_main.py with --color and --summary
-        cmd = [
-            "python3", "cli_main.py", str(temp_src), str(out_dir),
-            "--color", "--summary"
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        cmd = [temp_src, out_dir, "--color", "--summary"]
+        result = run_cli(*cmd)
+        assert result.returncode == 0, result.stderr
         
         # Verify output exists
         expected_output = out_dir / "20251203_091548_980.jpg"

@@ -13,6 +13,7 @@ from ffmpeg.color import ColorCorrectionEngine
 from ffmpeg.hud_layers import (HudLayer, hud_segments, matte, overlay_filter_complex,
                                write_layer_stream)
 from gui.hud_renderer import draw_hud, resolve_overlay_instance_layout
+from conftest import LOGS_DIR, RELEASE_MEDIA, run_cli
 from models.dive import Dive, Waypoint
 
 BASE_DIR = Path(__file__).parent.parent
@@ -124,17 +125,19 @@ def test_overlay_filter_complex_overlays_layers_in_order_after_colour():
     assert overlay_filter_complex(None, []) == ("[0:v]null[v0]", "[v0]")
 
 
+@pytest.mark.requires_media
 def test_hw_decodable_rejects_10bit_422_h264():
     # VideoToolbox drops frames of Sony's 10-bit 4:2:2 H.264 instead of
     # falling back to software decoding
     from ffmpeg.ffmpeg_class import FfmpegClass
     ff = FfmpegClass()
-    assert ff.hw_decodable(BASE_DIR / "test_data" / "release_test" / "20251019_M0284.MP4") is False
-    assert ff.hw_decodable(BASE_DIR / "test_data" / "release_test" / "DJI_20260502110658_0002_D_A001.MP4") is True
+    assert ff.hw_decodable(RELEASE_MEDIA / "20251019_M0284.MP4") is False
+    assert ff.hw_decodable(RELEASE_MEDIA / "DJI_20260502110658_0002_D_A001.MP4") is True
 
 
+@pytest.mark.render
 def test_overlay_render_keeps_every_frame_and_reports_progress(tmp_path):
-    video_source = BASE_DIR / "test_data" / "release_test" / "20251019_M0284.MP4"
+    video_source = RELEASE_MEDIA / "20251019_M0284.MP4"
     layout_path = tmp_path / "layout.json"
     layout_path.write_text(json.dumps({
         "design_width": 1920,
@@ -144,10 +147,8 @@ def test_overlay_render_keeps_every_frame_and_reports_progress(tmp_path):
     }))
     overlays = tmp_path / "overlays.json"
     overlays.write_text(json.dumps([{"layout_path": str(layout_path), "x": 0.1, "y": 0.1, "scale": 1.0}]))
-    cmd = ["python3", "cli_main.py", str(video_source), str(tmp_path),
-           "--logs", str(BASE_DIR / "test_data" / "logs" / "uddf"), "--overlays-file", str(overlays),
-           "--color", "default", "--filename-format", "result", "--tz-adjust", "0", "--hw-accel"]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR)
+    result = run_cli(video_source, tmp_path, "--logs", LOGS_DIR / "uddf", "--overlays-file", overlays,
+                     "--color", "default", "--filename-format", "result", "--tz-adjust", "0", "--hw-accel")
     assert result.returncode == 0, result.stdout[-800:] + result.stderr
 
     progress = [float(line.split()[1]) for line in result.stdout.splitlines()

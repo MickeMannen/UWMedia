@@ -22,6 +22,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from conftest import TEST_DATA
 from models.dive import Dive, Waypoint
 from models.manager import DiveManager
 from utils.dummy_telemetry import DUMMY_DURATION_S
@@ -209,11 +210,12 @@ def test_element_list_and_template_title_describe_document():
 
 # -- Media loading (migrated) -------------------------------------------------
 
+@pytest.mark.requires_media
 def test_load_image_falls_back_to_pillow_for_cv2_unreadable_bmp():
     # Some real-world BMP exports decode fine in Pillow but return None from
     # cv2.imread - _load_image should fall back rather than give up.
     app = OverlayDesignerBackend()
-    bmp_path = Path("test_data/dive_computers/garmin_x50i/x50i_page1_single_tank.bmp")
+    bmp_path = TEST_DATA / "dive_computers/garmin_x50i/x50i_page1_single_tank.bmp"
     assert bmp_path.exists()
 
     app._load_image(bmp_path)

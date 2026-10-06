@@ -25,7 +25,6 @@ the dive-matching tests below so a directly-injected fake DiveManager
 survives the call, same effect as the old test never routing through an
 equivalent load step.
 """
-import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -39,9 +38,7 @@ from models.dive import Dive, Waypoint
 from models.manager import DiveManager
 from uwmedia.backends.color_backend import PREVIEW_WORKING_WIDTH, ColorBackend
 
-BASE_DIR = Path(__file__).parent.parent
-TEST_DATA_DIR = BASE_DIR / "test_data" / "release_test"
-TMP_DIR = BASE_DIR / "test_data" / "test_results" / "test_color_preview_tmp"
+from conftest import RELEASE_MEDIA as TEST_DATA_DIR
 
 
 def make_fake_backend(source_value=""):
@@ -67,15 +64,6 @@ def make_fake_backend(source_value=""):
     return app
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_tmp_dir():
-    if TMP_DIR.exists():
-        shutil.rmtree(TMP_DIR)
-    TMP_DIR.mkdir(parents=True, exist_ok=True)
-    yield
-    shutil.rmtree(TMP_DIR, ignore_errors=True)
-
-
 def write_short_video(path, num_frames, size=(64, 48), fourcc="mp4v"):
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*fourcc), 10.0, size)
     for i in range(num_frames):
@@ -89,8 +77,8 @@ def write_short_video(path, num_frames, size=(64, 48), fourcc="mp4v"):
 
 # --- _first_source_file: directory vs single file, sorted, dotfiles skipped
 
-def test_first_source_file_picks_sorted_first_in_directory():
-    src_dir = TMP_DIR / "dir_source"
+def test_first_source_file_picks_sorted_first_in_directory(tmp_path):
+    src_dir = tmp_path / "dir_source"
     src_dir.mkdir(parents=True, exist_ok=True)
     (src_dir / ".hidden.mp4").write_bytes(b"not a real video")
     (src_dir / "b_second.jpg").write_bytes(b"fake")
@@ -101,6 +89,7 @@ def test_first_source_file_picks_sorted_first_in_directory():
     assert result == src_dir / "a_first.jpg"
 
 
+@pytest.mark.requires_media
 def test_first_source_file_single_file():
     single_file = TEST_DATA_DIR / "DSC03491.JPG"
     assert single_file.exists()
@@ -108,15 +97,15 @@ def test_first_source_file_single_file():
     assert app._first_source_file() == single_file
 
 
-def test_first_source_file_empty_or_missing():
+def test_first_source_file_empty_or_missing(tmp_path):
     assert make_fake_backend("")._first_source_file() is None
-    assert make_fake_backend(str(TMP_DIR / "does_not_exist"))._first_source_file() is None
+    assert make_fake_backend(str(tmp_path / "does_not_exist"))._first_source_file() is None
 
 
 # --- _extract_preview_frame: frame 10, and <10-frame fallback --------------
 
-def test_extract_preview_frame_uses_frame_10_for_a_long_video():
-    video_path = TMP_DIR / "long.mp4"
+def test_extract_preview_frame_uses_frame_10_for_a_long_video(tmp_path):
+    video_path = tmp_path / "long.mp4"
     write_short_video(video_path, num_frames=20)
 
     app = make_fake_backend(str(video_path))
@@ -128,8 +117,8 @@ def test_extract_preview_frame_uses_frame_10_for_a_long_video():
     assert app.preview_frame[0, 0, 0] == pytest.approx(200, abs=5)
 
 
-def test_extract_preview_frame_falls_back_to_last_frame_when_short():
-    video_path = TMP_DIR / "short.mp4"
+def test_extract_preview_frame_falls_back_to_last_frame_when_short(tmp_path):
+    video_path = tmp_path / "short.mp4"
     write_short_video(video_path, num_frames=4)
 
     app = make_fake_backend(str(video_path))
@@ -141,6 +130,7 @@ def test_extract_preview_frame_falls_back_to_last_frame_when_short():
     assert app.preview_frame[0, 0, 0] == pytest.approx(60, abs=5)
 
 
+@pytest.mark.requires_media
 def test_extract_preview_frame_loads_still_image_directly():
     photo_path = TEST_DATA_DIR / "DSC03491.JPG"
     assert photo_path.exists()
@@ -181,12 +171,12 @@ def _make_dive(start_time, seconds_offsets):
     )
 
 
-def test_extract_preview_frame_matches_real_waypoint_for_video(monkeypatch):
+def test_extract_preview_frame_matches_real_waypoint_for_video(tmp_path, monkeypatch):
     fixed_date = datetime(2026, 1, 1, 8, 0, 0)
     monkeypatch.setattr(MetadataHandler, "get_local_creation_date", lambda self, path: fixed_date)
     monkeypatch.setattr(ColorBackend, "_load_dive_logs", lambda self: None)
 
-    video_path = TMP_DIR / "matched.mp4"
+    video_path = tmp_path / "matched.mp4"
     write_short_video(video_path, num_frames=20)  # 10 fps -> frame 10 = 1.0s elapsed
 
     app = make_fake_backend(str(video_path))
@@ -199,6 +189,7 @@ def test_extract_preview_frame_matches_real_waypoint_for_video(monkeypatch):
     assert app.preview_current_waypoint.time_since_start == 1
 
 
+@pytest.mark.requires_media
 def test_extract_preview_frame_matches_real_waypoint_for_photo(monkeypatch):
     fixed_date = datetime(2026, 1, 1, 8, 0, 0)
     monkeypatch.setattr(MetadataHandler, "get_local_creation_date", lambda self, path: fixed_date)
@@ -231,12 +222,12 @@ def test_extract_preview_frame_no_matching_dive_leaves_waypoint_none(monkeypatch
     assert app.preview_current_waypoint is None
 
 
-def test_time_change_reseeks_frame_and_rematches_waypoint(monkeypatch):
+def test_time_change_reseeks_frame_and_rematches_waypoint(tmp_path, monkeypatch):
     fixed_date = datetime(2026, 1, 1, 8, 0, 0)
     monkeypatch.setattr(MetadataHandler, "get_local_creation_date", lambda self, path: fixed_date)
     monkeypatch.setattr(ColorBackend, "_load_dive_logs", lambda self: None)
 
-    video_path = TMP_DIR / "scrub.mp4"
+    video_path = tmp_path / "scrub.mp4"
     write_short_video(video_path, num_frames=20)  # 10 fps
 
     app = make_fake_backend(str(video_path))

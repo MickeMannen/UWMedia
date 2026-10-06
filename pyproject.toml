@@ -197,3 +197,16 @@ sources = ["resources/bin_linux"]
 # [tool.briefcase.app.uwmedia-terminal.linux.system.rhel]
 # system_requires = [...]
 # system_runtime_requires = [...]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# The default run is the fast suite; tests/run_tests.sh has the full and
+# release runs (a later -m on the command line replaces this one).
+addopts = ["-m", "not render and not release"]
+markers = [
+    "render: renders real media through cli_main.py (slow; needs test_data/)",
+    "release: tests/release_test.py pre-release validation on the full 4K media",
+    "requires_media: reads the local test_data/ media or logs; skipped when it is missing",
+    "windows: Windows-only checks (skipped on other platforms)",
+]

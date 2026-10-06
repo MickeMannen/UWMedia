@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from conftest import LOGS_DIR
 from parsers.subsurface import SubsurfaceParser
 from models.dive import Dive, Waypoint, TankData
 
@@ -8,9 +9,10 @@ def test_missing_file():
     dives = parser.parse(Path("non_existent_file.ssrf"))
     assert dives == []
 
+@pytest.mark.requires_media
 def test_parse_494_ssrf():
     parser = SubsurfaceParser()
-    path = Path("test_data/logs/ssrf/494.ssrf")
+    path = LOGS_DIR / "ssrf/494.ssrf"
     dives = parser.parse(path)
     
     assert len(dives) == 1
@@ -105,9 +107,10 @@ def test_cylinder_pressure_interpolates_when_no_live_samples(tmp_path):
     mid = next(wp for wp in waypoints if wp.time_since_start == 300)
     assert mid.tanks[tank_key].pressure_bar == pytest.approx(160.0)
 
+@pytest.mark.requires_media
 def test_parse_495_ssrf():
     parser = SubsurfaceParser()
-    path = Path("test_data/logs/ssrf/495.ssrf")
+    path = LOGS_DIR / "ssrf/495.ssrf"
     dives = parser.parse(path)
     
     assert len(dives) == 1

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import LOGS_DIR
 from models.dive import Dive, Waypoint
 from models.manager import DiveManager
 from parsers.registry import (
@@ -18,9 +19,9 @@ from parsers.registry import (
 )
 from parsers.uddf import UDDFParser
 
-ALT = Path("test_data/logs/alternative_formats")
+ALT = LOGS_DIR / "alternative_formats"
 PERDIX_451 = "Perdix 2[A5419AC1]#451 2025-10-19 11-42-39"
-PERDIX_451_UDDF = Path("test_data/logs/uddf/Perdix 2 451 2025-10-19 11-42-39.uddf")
+PERDIX_451_UDDF = LOGS_DIR / "uddf/Perdix 2 451 2025-10-19 11-42-39.uddf"
 
 
 @pytest.mark.parametrize("name, expected", [
@@ -30,6 +31,7 @@ PERDIX_451_UDDF = Path("test_data/logs/uddf/Perdix 2 451 2025-10-19 11-42-39.udd
     ("subsurfac_496.csv", SUBSURFACE_CSV),
     ("subsurfac_496.ssrf", SUBSURFACE_XML),
 ])
+@pytest.mark.requires_media
 def test_detect_real_exports(name, expected):
     assert detect_log_format(ALT / name) == expected
 
@@ -44,6 +46,7 @@ def test_detect_other_csv_and_xml(tmp_path):
     assert detect_log_format(subsurface) == SUBSURFACE_XML
 
 
+@pytest.mark.requires_media
 @pytest.mark.parametrize("suffix", [".xml", ".csv"])
 def test_shearwater_export_matches_same_dives_uddf(suffix):
     dive = parse_log_file(ALT / f"{PERDIX_451}{suffix}")[0]
@@ -100,6 +103,7 @@ def test_shearwater_start_date_in_day_month_locale(tmp_path):
     assert parse_log_file(path)[0].start_time == datetime(2025, 10, 3, 9, 15, 0)
 
 
+@pytest.mark.requires_media
 def test_subsurface_csv_real_export():
     dives = parse_log_file(ALT / "subsurfac_496.csv")
     assert len(dives) == 1
@@ -173,6 +177,7 @@ def test_manager_keeps_two_computers_on_one_dive():
     assert len(manager.dives) == 3
 
 
+@pytest.mark.requires_media
 def test_real_folder_of_one_dive_in_every_format():
     manager = DiveManager()
     for path in sorted(ALT.iterdir()):

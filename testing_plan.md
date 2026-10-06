@@ -1,0 +1,215 @@
+# Testing plan
+
+Working doc for the test-suite review started 2026-10-06 on the
+`verification` branch. Tick items off as they land; add findings at the end.
+
+## Rules for anything that goes into git (owner decisions, 2026-10-06)
+
+- **Photos and videos:** the owner reviews every photo and video before it is
+  committed or pushed. Claude prepares candidates in the scratchpad (or an
+  ignored folder), lists them with size and content, and waits for an OK per
+  file. Nothing media goes into `tests/fixtures/` without that OK.
+- **Dive logs are never committed.** FIT, UDDF, SSRF, Shearwater XML/CSV and
+  other dive-profile files carry device serial numbers and personal IDs.
+  Tests that need a log in git-tracked form must build a synthetic one at
+  test time with the app's own writers (`parsers/fit_writer.py`, the UDDF and
+  SSRF writers) from `utils/dummy_telemetry.py`-style data, or be marked
+  `requires_media` and run only where `test_data/` exists.
+- Check exported fixtures for metadata too: EXIF/XMP on photos and videos can
+  hold camera serial numbers, owner names and GPS. Strip or confirm with the
+  owner as part of the review.
+- Already tracked and OK: `tests/deco_reference/` (Subsurface planner output,
+  no device or personal data).
+
+## Fixture layout (agreed 2026-10-06)
+
+Tracked test data lives in `tests/fixtures/` (target total ~5 MB, plain git):
+
+```
+tests/fixtures/
+  README.md          one row per file: what, source, how cut/scaled, metadata
+                     kept/stripped, reviewed by owner + date
+  media/video/       h264_8bit_720p_2s.mp4, h264_10bit_422_720p_2s.mp4
+  media/photo/       jpeg_3x2_2mp.jpg (+ others only if a test needs them)
+```
+
+- Names describe the property a test needs, not the source file.
+- No dive logs: tests that need one get a synthetic log written into
+  `tmp_path` by the app's own writers (a conftest fixture).
+- `tests/deco_reference/` stays where it is.
+- `test_data/` stays in the repo folder (git-ignored) for now; it still
+  feeds `release_test.py` (full 4K media) and the `requires_media` tests
+  (real-format logs). Cleanup later - options then: move it outside the repo
+  and point `UWMEDIA_TEST_DATA` at it, or delete it and accept those tests
+  skipping. Anonymised real logs in git: not planned unless the owner decides
+  otherwise.
+
+## Decisions (owner, 2026-10-06)
+
+1. Small media fixtures in git under `tests/fixtures/`: yes (after review, see
+   rules above).
+2. Default `run_tests.sh` run is the fast suite: yes.
+3. CI on GitHub for `main` and tag pushes: yes.
+4. Delete the old output in `test_data/test_results` (4.8 GB): yes.
+5. Keep `release_test.py` as a separate pre-release run on the real 4K media:
+   yes.
+
+Order: Phase 1, 3, 2, 4, 5, 6.
+
+## Baseline (2026-10-06, macOS, single process)
+
+653 passed, 3 xfailed in 22m11s. About 20 render tests take about 20 min
+(90%); the other ~635 take about 1.5 min.
+
+| File | Time | Why |
+|---|---|---|
+| test_color_multi_overlay.py | 494 s | 2 full 4K renders, ~4 min each |
+| release_test.py | 324 s | 14 CLI runs on full 4K clips and 20 MB JPEGs |
+| test_color.py | 238 s | `test_color_and_layout_video` renders all 5 overlay zips (201 s) |
+| test_hud_layers.py | 112 s | full render + `ffprobe -count_frames` |
+| test_convert.py | 32 s | 4K -> 1080p |
+| test_metadata.py | 19 s | CLI runs on 20 MB photos |
+| everything else | ~90 s | |
+
+Source clips are 10 s 4K (82 MB DJI, 253 MB 10-bit 4:2:2 Sony); the render
+tests don't need that much video.
+
+## Findings
+
+1. `test_data/` (14 GB) is git-ignored, so ~18 test files only run on the
+   owner's Mac; CI runs no tests at all.
+2. `test_data/test_results` holds 4.8 GB of accumulated output; most tests
+   write there instead of `tmp_path`.
+3. Not parallel-safe: `test_color.py`'s cleanup glob `test_color_*` also
+   deletes `test_color_multi_overlay_*` and `test_color_preview_tmp/`;
+   `temp_render_video_log_input` and `release_test`'s session cleanup are
+   fixed paths.
+4. Dead / misnamed: `tests/tests_windows.py` (never collected, its input video
+   doesn't exist, module fixture would run ffmpeg on any OS);
+   `tests/generate_readme_content.py` (a script -> `scripts/`);
+   `tests/release_test_prompt.txt` (stray); `test_metadata.py`
+   `test_datetaken` / `test_debug_datetaken` (debug scripts, hard-code
+   `/Users/mikael/DivingMedia`, assert nothing).
+5. `release_test.py` runs in every plain `pytest`; its docstrings promise 1 s
+   segments that are never used; `test_06b` checks 0 == 0; most of it repeats
+   other tests.
+6. Fragility: subprocess calls use `"python3"` instead of `sys.executable` and
+   rely on cwd = repo root; module caches (`_font_cache`, font registry
+   `lru_cache`, rules/timeline caches) never reset; `BASE_DIR` / results-dir
+   fixtures / backend builders copied across 6-8 files.
+7. `run_tests.sh` lists were stale and option 1 claimed "Unit + Pre-release"
+   while being a plain run.
+8. The 3 xfails (`test_deco_reference.py`: `air_long_deco`, `nx32_deco`,
+   `air_multi_deco`): the Subsurface reference plans carry tissue load from an
+   earlier dive; re-plan them in Subsurface with no previous dive.
+
+### Coverage gaps (riskiest first)
+
+1. `ffmpeg/color.py` - only "a file came out" is checked, never filter values.
+2. `utils/color_profiles.py`, `utils/color_params.py`,
+   `uwmedia/backends/color_tuning_backend.py` - no tests.
+3. Tag Editor (`uwmedia/backends/tag_editor_backend.py`, `utils/tag_editor.py`)
+   rewrites user files' metadata - 3 helpers tested.
+4. `ffmpeg/ffmpeg_class.py` command building / hw-accel - thin.
+5. `cli_main.py`: `get_unique_path`, `generate_fcpxml`, parallel worker,
+   `print_summary` - none.
+6. QML: nothing loads a `.qml` file; `pyside6-qmllint` installed but unused.
+7. `utils/tool_paths.py`, `utils/config.py`, `utils/dive_plan_import.py`,
+   Windows/Linux path resolution in `utils/resource_paths.py` - none / thin.
+
+## Phases
+
+### Phase 1 - fast default run (done 2026-10-06)
+- [x] `[tool.pytest.ini_options]` in `pyproject.toml`: `testpaths`,
+      `pythonpath` (no more `PYTHONPATH=.`), markers `render` and `release`,
+      default `-m "not render and not release"`.
+- [x] Marked 13 render tests `render` (`test_color.py`, `test_render_log.py`,
+      `test_render_video_log.py` whole modules; two in
+      `test_color_multi_overlay.py`; one each in `test_hud_layers.py` and
+      `test_convert.py`; three CLI tests in `test_metadata.py`) and
+      `release_test.py` `release`.
+- [x] `run_tests.sh` menu: 1 Fast (Enter = default) / 2 Full (fast + renders)
+      / 3 Release / 4 Everything. Without a terminal and no argument it now
+      exits instead of spinning on the prompt forever.
+- [x] `test_color.py` cleanup only deletes its own outputs.
+- [x] Fast run: 625 passed, 28 deselected, 3 xfailed in 1m40s (was 22m11s
+      for everything). Selection counts: fast 628, full 641, release 15,
+      everything 656.
+- [ ] Owner: CLAUDE.md's release checklist says "the tests
+      (`tests/run_tests.sh`) have been run"; decide whether that means option
+      4 (everything) before a release.
+
+### Phase 3 - clean up (2026-10-06)
+- [x] Test output to `tmp_path` everywhere except `release_test.py`, whose
+      outputs stay in `test_data/test_results/release_test` for a look
+      afterwards (replaced each run). Deleted the old 4.7 GB in
+      `test_data/test_results`.
+- [x] `conftest.py`: `TEST_DATA` (override with `UWMEDIA_TEST_DATA`),
+      `RELEASE_MEDIA`, `LOGS_DIR`, and `run_cli()` (this interpreter, not
+      `python3`; cwd = repo root). No test builds a `test_data/...` path
+      itself or calls `python3` any more.
+- [x] `requires_media` marker on the 51 non-render tests that read
+      `test_data/` (found by running with `UWMEDIA_TEST_DATA` pointing at a
+      missing folder); `render`, `release` and `requires_media` tests skip
+      when `test_data/` is missing. Without media: 575 passed, 52 skipped,
+      0 failed.
+- [x] Module caches: checked, no reset needed (`_timeline_cache` holds the
+      waypoint list it is keyed on, the rules and font caches only read
+      files that tests never change).
+- [x] Backend builders (`make_fake_backend` etc.): kept per file - each sets
+      the attributes its own feature needs; no common subset worth sharing.
+- [x] `tests_windows.py` -> `test_windows.py` (now collected; `windows`
+      marker, skipped off Windows; uses the release_test media and a 2 s cut
+      in `tmp_path`, no module fixture writing into `test_data/`);
+      `generate_readme_content.py` -> `scripts/`; removed
+      `release_test_prompt.txt`; removed the two debug "tests" in
+      `test_metadata.py`.
+- [x] `release_test.py`: kept every render (after Phase 2 it is the only
+      run on the full 4K media); removed the vacuous `test_06b`; fixed the
+      docstrings that promised 1 s segments; failures now show the CLI's
+      stderr.
+- [x] Found while converting: `test_uddf.py`'s `test_parse_atmos_uddf` and
+      `test_parse_perdix_uddf` had silently passed without testing anything
+      (their files had moved; the tests returned early when a file was
+      missing). They now use the right paths and pass for real.
+- [x] `test_convert_resolution_replacement_naming` tested its own copy of
+      the naming code; it now tests the Convertion backend's real
+      `_convert_output_filename`.
+- [ ] Phase 6 note: `cli_main.py`'s `--convert` repeats that naming code
+      inline instead of sharing it with the backend.
+
+### Phase 2 - small test media (owner reviews every file first)
+- [ ] Prepare 2 s, 720p versions of the two clips (keep the 10-bit 4:2:2
+      format and the metadata the tests need) and ~2 MP JPEG copies with the
+      needed EXIF; strip anything personal. Owner reviews -> `tests/fixtures/`.
+- [ ] Synthetic dive logs generated at test time by the app's own writers
+      (no real logs in git).
+- [ ] Switch the render tests to the fixtures; keep the 4K media for
+      `release_test` only.
+
+### Phase 4 - parallel
+- [ ] Add `pytest-xdist` (dev requirement); run with `-n auto`; fix any
+      remaining collisions.
+
+### Phase 5 - CI
+- [ ] GitHub Actions job: fast suite on macOS, Windows, Linux on `main` and
+      tag pushes (no development branches on GitHub).
+- [ ] Fix font / path differences it turns up.
+
+### Phase 6 - coverage
+- [ ] `pytest-cov` to measure.
+- [ ] Pure tests of colour-filter building (`ffmpeg/color.py`), colour
+      profiles / params, Color Tuning backend.
+- [ ] Tag Editor backend and `utils/tag_editor.py` (on copies in `tmp_path`).
+- [ ] `ffmpeg_class.py` command building; `cli_main.py` gaps.
+- [ ] QML smoke test (load every page with `QQmlApplicationEngine`, no
+      errors) + `pyside6-qmllint`.
+- [ ] Re-plan the 3 xfail Subsurface references.
+
+## Log
+
+- 2026-10-06: review done, plan written, Phase 1 done (fast run 1m40s).
+- 2026-10-06: Phase 3 done; CLAUDE.md release check now requires `tests/run_tests.sh 4`.
+  Complete run after Phase 3: 658 passed, 6 skipped (Windows-only), 3 xfailed in 22m02s.
+- 2026-10-06: CONTRIBUTING.md, AGENTS.md and `.githooks/pre-commit` (fast suite before
+  each commit; Markdown-only commits skip it) added; hook enabled in the owner's clone.

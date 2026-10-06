@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import LOGS_DIR
 from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
 from parsers.fit_writer import write_fit
 from parsers.garmin import GarminParser
@@ -81,12 +82,13 @@ def test_saved_log_carries_the_plan_and_restores_it_exactly(fmt, tmp_path):
 
 
 @pytest.mark.parametrize("path", [
-    "test_data/logs/fit/489 Camera Bay_new.fit",
-    "test_data/logs/submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf",
-    "test_data/logs/submersion_dives/001_short_deco_single_gas_switch.ssrf.xml",
+    "fit/489 Camera Bay_new.fit",
+    "submersion_dives/005_oc-trimix-two-deco-gases--perdix2.uddf",
+    "submersion_dives/001_short_deco_single_gas_switch.ssrf.xml",
 ])
+@pytest.mark.requires_media
 def test_real_computer_logs_are_not_uwmedias(path):
-    origin = read_log_origin(path)
+    origin = read_log_origin(LOGS_DIR / path)
     assert not origin.created_by_uwmedia
     assert origin.plan is None
 
@@ -98,9 +100,10 @@ def test_unknown_or_missing_file_is_not_uwmedias(tmp_path):
     assert not read_log_origin(junk).created_by_uwmedia
 
 
+@pytest.mark.requires_media
 def test_older_uddf_without_embedded_plan_is_still_uwmedias():
     # Saved by 0.7's builder: generator name only.
-    origin = read_log_origin("test_data/logs/DecoTest.uddf")
+    origin = read_log_origin(str(LOGS_DIR / "DecoTest.uddf"))
     assert origin.created_by_uwmedia
     assert origin.plan is None
 

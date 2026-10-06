@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
+from conftest import LOGS_DIR
 import uwmedia.backends.log_viewer_backend as lvb
 from uwmedia.backends.log_viewer_backend import LAST_FOLDER_FIELD, LogViewerBackend
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-LOGS = REPO_ROOT / "test_data" / "logs"
+LOGS = LOGS_DIR
 FIT = LOGS / "fit" / "451 Tioman Island, Palau Labas.fit"
 UDDF = LOGS / "uddf" / "Perdix 2 451 2025-10-19 11-42-39.uddf"
 SSRF = LOGS / "ssrf" / "494.ssrf"
@@ -32,6 +32,7 @@ def backend(settings_file, monkeypatch):
     return LogViewerBackend(background=False)
 
 
+@pytest.mark.requires_media
 def test_add_files_lists_dives_sorted_and_selects_first(backend):
     backend.addFiles([str(SSRF), str(FIT)])
     assert backend.diveCount == 2
@@ -44,6 +45,7 @@ def test_add_files_lists_dives_sorted_and_selects_first(backend):
     assert backend.message == "Added 2 dives."
 
 
+@pytest.mark.requires_media
 def test_details_of_a_garmin_fit(backend):
     backend.addFiles([str(FIT)])
     sel = backend.selected
@@ -69,6 +71,7 @@ def test_details_of_a_garmin_fit(backend):
     assert sel["samples"][-1]["time"] == backend._dives[0].waypoints[-1].time_since_start
 
 
+@pytest.mark.requires_media
 @pytest.mark.parametrize("path, fmt", [(UDDF, "UDDF"), (SSRF, "Subsurface"), (CSV, "Subsurface CSV")])
 def test_details_of_other_formats(backend, path, fmt):
     backend.addFiles([str(path)])
@@ -79,6 +82,7 @@ def test_details_of_other_formats(backend, path, fmt):
     assert len(sel["samples"]) > 1
 
 
+@pytest.mark.requires_media
 def test_empty_values_are_blank_strings(backend):
     backend.addFiles([str(CSV)])
     sel = backend.selected
@@ -89,6 +93,7 @@ def test_empty_values_are_blank_strings(backend):
     assert sel["tanks"] == []
 
 
+@pytest.mark.requires_media
 def test_reopening_a_file_skips_its_dives(backend):
     backend.addFiles([str(FIT)])
     backend.addFiles([str(FIT), str(UDDF)])
@@ -96,6 +101,7 @@ def test_reopening_a_file_skips_its_dives(backend):
     assert backend.message == "Added 1 dive, 1 already in the list."
 
 
+@pytest.mark.requires_media
 def test_one_dive_in_two_files_opened_together(backend, tmp_path):
     # Two copies of one dive compare equal field by field; pydantic's == on
     # them recursed through Waypoint._dive until RecursionError.
@@ -110,6 +116,7 @@ def test_one_dive_in_two_files_opened_together(backend, tmp_path):
     assert backend.diveCount == 1
 
 
+@pytest.mark.requires_media
 def test_selection_is_kept_when_dives_are_added(backend):
     backend.addFiles([str(SSRF)])
     backend.addFiles([str(FIT)])  # an earlier dive, sorts in above
@@ -118,6 +125,7 @@ def test_selection_is_kept_when_dives_are_added(backend):
     assert backend.selected["file"] == SSRF.name
 
 
+@pytest.mark.requires_media
 def test_select_ignores_rows_out_of_range(backend):
     backend.addFiles([str(FIT), str(SSRF)])
     backend.select(1)
@@ -126,6 +134,7 @@ def test_select_ignores_rows_out_of_range(backend):
     assert backend.currentRow == 1
 
 
+@pytest.mark.requires_media
 def test_remove_selected_moves_to_the_next_dive(backend):
     backend.addFiles([str(FIT), str(UDDF), str(SSRF)])
     backend.select(1)
@@ -154,6 +163,7 @@ def test_clear_empties_everything(backend, tmp_path):
     assert backend.selected == {}
 
 
+@pytest.mark.requires_media
 def test_unreadable_file_gives_a_warning(backend, tmp_path):
     bad = tmp_path / "broken.fit"
     bad.write_bytes(b"not a fit file")
@@ -163,6 +173,7 @@ def test_unreadable_file_gives_a_warning(backend, tmp_path):
     assert backend.warnings[0].startswith("broken.fit:")
 
 
+@pytest.mark.requires_media
 def test_add_folder_reads_every_log_and_remembers_it(backend, settings_file):
     folder = LOGS / "ssrf"
     backend.addFolder(str(folder))
@@ -178,6 +189,7 @@ def test_add_folder_without_logs(backend, tmp_path):
     assert backend.message == f"No dive logs in {tmp_path.name}."
 
 
+@pytest.mark.requires_media
 def test_sample_table_and_filter(backend):
     backend.addFiles([str(FIT)])
     rows = backend.tableRows
@@ -192,6 +204,7 @@ def test_sample_table_and_filter(backend):
     assert backend.filterText == ""
 
 
+@pytest.mark.requires_media
 def test_chart_samples_are_thinned_but_keep_both_ends(backend):
     backend.addFiles([str(SSRF)])
     dive = backend._dives[0]

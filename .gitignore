@@ -216,7 +216,6 @@ uwmedia/**/*_ui.py
 !/resources/bin_macos/README.md
 !/resources/bin_windows/README.md
 !/resources/bin_linux/README.md
-/CLAUDE.md
 /completed.md
 /pyside6_rework.md
 /qml_development.md

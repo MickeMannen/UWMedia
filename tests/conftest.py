@@ -2,8 +2,14 @@
 bundled overlays/templates tree plus an empty user templates dir, patched
 into both utils.layouts and utils.template_store, so persistence tests never
 touch the real repo files or the real ~/Library/Application Support tree
-(CLAUDE.md rule: never write outside the repo/scratch)."""
+(CLAUDE.md rule: never write outside the repo/scratch).
+
+Also the shared paths and helpers for tests that use the local test media:
+TEST_DATA (git-ignored, so absent on a fresh clone or in CI; the
+UWMEDIA_TEST_DATA environment variable points it elsewhere) and run_cli()."""
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -12,6 +18,27 @@ import pytest
 import utils.app_settings as app_settings
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+TEST_DATA = Path(os.environ.get("UWMEDIA_TEST_DATA") or REPO_ROOT / "test_data")
+RELEASE_MEDIA = TEST_DATA / "release_test"
+LOGS_DIR = TEST_DATA / "logs"
+# Markers whose tests read TEST_DATA - skipped when it is missing.
+MEDIA_MARKERS = ("requires_media", "render", "release")
+
+
+def run_cli(*args):
+    """cli_main.py in a subprocess with this interpreter (not whatever
+    `python3` is on PATH), from the repo root, output captured."""
+    return subprocess.run([sys.executable, str(REPO_ROOT / "cli_main.py"), *map(str, args)],
+                          capture_output=True, text=True, cwd=REPO_ROOT)
+
+
+def pytest_collection_modifyitems(config, items):
+    if TEST_DATA.is_dir():
+        return
+    skip = pytest.mark.skip(reason=f"needs the local test media in {TEST_DATA} (not in git)")
+    for item in items:
+        if any(item.get_closest_marker(name) for name in MEDIA_MARKERS):
+            item.add_marker(skip)
 
 
 @pytest.fixture

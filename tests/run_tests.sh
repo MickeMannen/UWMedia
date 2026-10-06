@@ -23,16 +23,18 @@ elif [ -d "venv" ]; then
 fi
 
 # Usage: tests/run_tests.sh [1-5] - with a choice, run it without the menu
-# (for scripts and background runs); without one, ask as before.
+# (for scripts and background runs); without one, ask (Enter = 1).
+# Markers (pyproject.toml): plain `pytest` skips `render` and `release`; a
+# later -m replaces that default.
 choice_arg="$1"
 
 # Print Selection Menu (only when asking)
 if [ -z "$choice_arg" ]; then
     echo -e "\nSelect a test suite to run:"
-    echo -e "  ${YELLOW}1)${NC} Run ALL tests (Unit tests + Pre-release tests)"
-    echo -e "  ${YELLOW}2)${NC} Run CLI Argument Unit Tests (Color, Legacy, Convert, Render Log, Video Log)"
-    echo -e "  ${YELLOW}3)${NC} Run Parser & Utility Unit Tests (Garmin, UDDF, Subsurface, Metadata, HUD)"
-    echo -e "  ${YELLOW}4)${NC} Run Pre-release Validation Suite (release_test.py)"
+    echo -e "  ${YELLOW}1)${NC} Fast: everything except media renders and release tests (default, ~1.5 min)"
+    echo -e "  ${YELLOW}2)${NC} Full: fast + media render tests (~17 min, needs test_data/)"
+    echo -e "  ${YELLOW}3)${NC} Release: pre-release validation on the full 4K media (release_test.py, ~5 min)"
+    echo -e "  ${YELLOW}4)${NC} Everything: full + release (~22 min) - run this before a release"
     echo -e "  ${YELLOW}5)${NC} Exit"
 fi
 
@@ -41,47 +43,38 @@ while true; do
     if [ -n "$choice_arg" ]; then
         choice="$choice_arg"
     else
-        echo -n "Choose a test suite to run [1-5]: "
-        read -r choice
+        echo -n "Choose a test suite to run [1-5, Enter = 1]: "
+        # No terminal to answer (e.g. started in the background): stop instead
+        # of asking forever.
+        read -r choice || { echo -e "\n${RED}No input; pass a choice: tests/run_tests.sh 1${NC}"; exit 2; }
+        [ -z "$choice" ] && choice=1
     fi
-    
+
     # Strip any trailing carriage return (\r or ^M) that IDEs like PyCharm send
     choice=$(echo "$choice" | tr -d '\r')
 
     case "$choice" in
         1)
-            echo -e "\n${GREEN}[*] Running all tests in the codebase...${NC}"
-            PYTHONPATH=. pytest -v
+            echo -e "\n${GREEN}[*] Running the fast suite...${NC}"
+            pytest -v
             status=$?
             break
             ;;
         2)
-            echo -e "\n${GREEN}[*] Running CLI argument unit tests...${NC}"
-            PYTHONPATH=. pytest \
-                tests/test_color.py \
-                tests/test_convert.py \
-                tests/test_render_log.py \
-                tests/test_render_video_log.py -v
+            echo -e "\n${GREEN}[*] Running the full suite (with media renders)...${NC}"
+            pytest -v -m "not release"
             status=$?
             break
             ;;
         3)
-            echo -e "\n${GREEN}[*] Running parser and utility unit tests...${NC}"
-            PYTHONPATH=. pytest \
-                tests/test_garmin.py \
-                tests/test_uddf.py \
-                tests/test_subsurface.py \
-                tests/test_metadata.py \
-                tests/test_hud_manager.py \
-                tests/test_hud_renderer.py \
-                tests/test_hud_rules.py \
-                tests/test_models.py -v
+            echo -e "\n${GREEN}[*] Running pre-release validation tests...${NC}"
+            pytest -v -m release
             status=$?
             break
             ;;
         4)
-            echo -e "\n${GREEN}[*] Running pre-release validation tests...${NC}"
-            PYTHONPATH=. pytest tests/release_test.py -v
+            echo -e "\n${GREEN}[*] Running every test...${NC}"
+            pytest -v -m ""
             status=$?
             break
             ;;
