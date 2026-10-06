@@ -135,9 +135,8 @@ tests don't need that much video.
 - [x] Fast run: 625 passed, 28 deselected, 3 xfailed in 1m40s (was 22m11s
       for everything). Selection counts: fast 628, full 641, release 15,
       everything 656.
-- [ ] Owner: CLAUDE.md's release checklist says "the tests
-      (`tests/run_tests.sh`) have been run"; decide whether that means option
-      4 (everything) before a release.
+- [x] Owner decided: a release needs option 4 (everything);
+      CLAUDE.md's release check says so.
 
 ### Phase 3 - clean up (2026-10-06)
 - [x] Test output to `tmp_path` everywhere except `release_test.py`, whose
@@ -200,9 +199,26 @@ tests don't need that much video.
       with `test_data/` hidden 597 passed, 53 skipped in 2m11s (all render
       tests run).
 
-### Phase 4 - parallel
-- [ ] Add `pytest-xdist` (dev requirement); run with `-n auto`; fix any
-      remaining collisions.
+### Phase 4 - parallel (2026-10-06)
+- [x] `pytest-xdist` in `requirements.txt` (the dev environment; the app's
+      bundled packages come from `pyproject.toml`); `addopts` runs on all
+      cores (`-n auto`). `pytest -n0` for a single process / debugger.
+- [x] No collisions after Phase 3: three default runs in a row all green
+      (53-55 s); without `test_data/` 597 passed, 53 skipped in 45 s.
+- [x] `release_test.py`: each test writes to its own
+      `test_results/release_test/<test name>` folder instead of one folder
+      cleared by a session fixture, so it runs in parallel too.
+- [x] Times on the owner's Mac (8 cores):
+
+      | Run | Before Phase 1 | Single process | Parallel |
+      |---|---|---|---|
+      | 2 Quick (no renders) | - | 1m40s | 28 s |
+      | 1 Default (hook) | - | 2m46s | ~54 s |
+      | 3 Release only | 5m24s | 5m28s | 3m27s |
+      | 4 Everything | 22m11s | ~8m | 5m50s |
+
+      Everything is CPU-bound now: the 4K release renders and the fixture
+      renders share the cores, so it is about the release run plus the rest.
 
 ### Phase 5 - CI
 - [ ] GitHub Actions job: fast suite on macOS, Windows, Linux on `main` and
@@ -229,3 +245,4 @@ tests don't need that much video.
 - 2026-10-06: Phase 2 done; full run without release 2m46s (was ~17 min).
 - 2026-10-06: render tests joined the default run (`addopts = -m "not release"`);
   `run_tests.sh` 1 = default (~3 min), 2 = quick without renders (~1.5 min).
+- 2026-10-06: Phase 4 done; parallel runs: default ~1 min, everything 5m50s.

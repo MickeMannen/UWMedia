@@ -17,9 +17,9 @@ commit.
 
 | When | Command | Time | What runs |
 |---|---|---|---|
-| Before every commit | `tests/run_tests.sh` (Enter) or `pytest` | ~3 min | Everything except the release run, including render tests on the small media in `tests/fixtures/` |
-| A quicker check while working | `tests/run_tests.sh 2` | ~1.5 min | The same without the render tests |
-| Before a release | `tests/run_tests.sh 4` | ~8 min | Everything, including `release_test.py` on the full 4K media |
+| Before every commit | `tests/run_tests.sh` (Enter) or `pytest` | ~1 min | Everything except the release run, including render tests on the small media in `tests/fixtures/` |
+| A quicker check while working | `tests/run_tests.sh 2` | ~30 s | The same without the render tests |
+| Before a release | `tests/run_tests.sh 4` | ~6 min | Everything, including `release_test.py` on the full 4K media |
 
 `tests/run_tests.sh 3` runs only `release_test.py`.
 
@@ -67,6 +67,10 @@ commit.
   - `windows`: Windows-only checks.
 - Never write to the real app folders (Application Support, `~/.config`,
   caches). `tests/conftest.py` already points them at temporary folders.
+- Tests run in parallel on all CPU cores (pytest-xdist, set in
+  `pyproject.toml`), so a test must not depend on another test or share a
+  fixed file path with one. Use `pytest -n0` to run in a single process,
+  e.g. under a debugger.
 
 ## Code rules
 

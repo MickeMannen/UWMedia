@@ -201,9 +201,11 @@ sources = ["resources/bin_linux"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-# The default run is everything except release_test.py (the full 4K media);
-# tests/run_tests.sh has the other runs (a later -m replaces this one).
-addopts = ["-m", "not release"]
+# The default run is everything except release_test.py (the full 4K media),
+# spread over all CPU cores (pytest-xdist; `-n0` runs in one process, e.g.
+# for a debugger). tests/run_tests.sh has the other runs; a later -m or -n on
+# the command line replaces these.
+addopts = ["-m", "not release", "-n", "auto"]
 markers = [
     "render: renders the fixture media through cli_main.py (slower; tests/fixtures + synthetic logs)",
     "release: tests/release_test.py pre-release validation on the full 4K media",

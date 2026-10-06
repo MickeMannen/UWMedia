@@ -26,12 +26,14 @@ OVERLAYS_DIR = REPO_ROOT / "overlays"
 pytestmark = pytest.mark.release
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_output_dir():
-    """A fresh output folder for this run."""
-    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
-    OUTPUT_DIR.mkdir(parents=True)
-    yield
+@pytest.fixture
+def out(request):
+    """This test's own output folder, OUTPUT_DIR/<test name>, emptied first -
+    so the tests can run in parallel and the last run's files stay for a look."""
+    folder = OUTPUT_DIR / request.node.name
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    return folder
 
 
 def _cli(*args):
@@ -105,22 +107,22 @@ class TestRelease:
         assert len(dive.waypoints) > 100
 
     # 4. Color Correction (Fast LUT Path)
-    def test_05_color_correction_video(self):
+    def test_05_color_correction_video(self, out):
         """Verify video color correction (fast LUT path)."""
         src = TEST_DATA_DIR / "20251019_M0284.MP4"
         cmd = [
-            str(src), str(OUTPUT_DIR),
+            str(src), str(out),
             "--color", "--filename-format", "release_test_test05_color",
             "--hw-accel"
         ]
         _cli(*cmd)
 
-        found = list(OUTPUT_DIR.glob("release_test_test05_color.mp4"))
+        found = list(out.glob("release_test_test05_color.mp4"))
         assert len(found) == 1
 
-    def test_06_color_correction_photo(self):
+    def test_06_color_correction_photo(self, out):
         """Verify photo color correction works on all JPGs in release_test directory."""
-        for f in OUTPUT_DIR.glob("release_test_test06_color_*.jpg"):
+        for f in out.glob("release_test_test06_color_*.jpg"):
             try: f.unlink()
             except Exception: pass
 
@@ -128,45 +130,45 @@ class TestRelease:
         for file in sorted(TEST_DATA_DIR.glob("*.JPG")):
             i += 1
             cmd = [
-                str(file), str(OUTPUT_DIR),
+                str(file), str(out),
                 "--color", "--filename-format", f"release_test_test06_color_{file.stem}"
             ]
             _cli(*cmd)
 
-        found = list(OUTPUT_DIR.glob("release_test_test06_color_*.jpg"))
+        found = list(out.glob("release_test_test06_color_*.jpg"))
         assert len(found) == i
 
-    def test_06c_color_correction_photo_profiles(self):
+    def test_06c_color_correction_photo_profiles(self, out):
         """Verify photo color correction profiles (vivid, subtle) are correctly parsed and run."""
         file = TEST_DATA_DIR / "DSC03491.JPG"
-        for f in OUTPUT_DIR.glob("release_test_test06c_*.jpg"):
+        for f in out.glob("release_test_test06c_*.jpg"):
             try: f.unlink()
             except Exception: pass
 
         for profile in ["vivid", "subtle"]:
             cmd = [
-                str(file), str(OUTPUT_DIR),
+                str(file), str(out),
                 "--color", profile, "--filename-format", f"release_test_test06c_{profile}"
             ]
             _cli(*cmd)
-            found = list(OUTPUT_DIR.glob(f"release_test_test06c_{profile}_*.jpg"))
+            found = list(out.glob(f"release_test_test06c_{profile}_*.jpg"))
             assert len(found) == 1
 
-    def test_05b_color_correction_video_profiles(self):
+    def test_05b_color_correction_video_profiles(self, out):
         """Verify video color correction profiles."""
         src = TEST_DATA_DIR / "20251019_M0284.MP4"
         for profile in ["vivid", "subtle"]:
             cmd = [
-                str(src), str(OUTPUT_DIR),
+                str(src), str(out),
                 "--color", profile, "--filename-format", f"release_test_test05_profile_{profile}",
                 "--hw-accel"
             ]
             _cli(*cmd)
-            found = list(OUTPUT_DIR.glob(f"release_test_test05_profile_{profile}.mp4"))
+            found = list(out.glob(f"release_test_test05_profile_{profile}.mp4"))
             assert len(found) == 1
 
     # 5. Color Correction with Overlay
-    def test_07_overlay_video(self):
+    def test_07_overlay_video(self, out):
         """Verify video overlay works for different layouts."""
         src = TEST_DATA_DIR / "DJI_20260502110658_0002_D_A001.MP4"
         logs = FIT_DIR
@@ -177,7 +179,7 @@ class TestRelease:
         for layout in layouts:
             target_list.append(layout.stem)
             cmd = [
-                str(src), str(OUTPUT_DIR),
+                str(src), str(out),
                 "--color", "--layout", str(layout), "--logs", str(logs),
                 "--filename-format", f"release_test_test07_{layout.stem}",
                 "--hw-accel"
@@ -185,40 +187,40 @@ class TestRelease:
             _cli(*cmd)
 
         for t in target_list:
-            n = len(list(OUTPUT_DIR.glob(f"release_test_test07_{t}.mp4")))
+            n = len(list(out.glob(f"release_test_test07_{t}.mp4")))
             assert n == 1
 
-    def test_08_overlay_photo(self):
+    def test_08_overlay_photo(self, out):
         """Verify photo layout overlays work for different layout styles."""
         src = TEST_DATA_DIR / "DSC03491.JPG"
         layouts = [OVERLAYS_DIR / "Garmin_x50_simple.zip", OVERLAYS_DIR / "generic_depth_temp.zip"]
         logs = FIT_DIR
         target_list = []
 
-        for f in OUTPUT_DIR.glob("release_test_test08_*.jpg"):
+        for f in out.glob("release_test_test08_*.jpg"):
             try: f.unlink()
             except Exception: pass
 
         for layout in layouts:
             target_list.append(layout.stem)
             cmd = [
-                str(src), str(OUTPUT_DIR),
+                str(src), str(out),
                 "--color", "--layout", str(layout), "--logs", str(logs),
                 "--filename-format", f"release_test_test08_{layout.stem}", "--hw-accel"
             ]
             _cli(*cmd)
 
         for t in target_list:
-            n = len(list(OUTPUT_DIR.glob(f"release_test_test08_{t}_*.jpg")))
+            n = len(list(out.glob(f"release_test_test08_{t}_*.jpg")))
             assert n == 1
 
     # 6. Standalone Log Rendering
-    def test_09_render_log_fit(self):
+    def test_09_render_log_fit(self, out):
         """Verify standalone telemetry video generation from Garmin FIT log files."""
         log = FIT_DIR / "488 Phuket, Camera Bay.fit"
 
         for file in OVERLAYS_DIR.glob("*.zip"):
-            output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_{file.stem}.mp4"
+            output_file = out / f"release_test_render_log_{log.stem}_{file.stem}.mp4"
 
             cmd = [
                 str(output_file),
@@ -228,11 +230,11 @@ class TestRelease:
             _cli(*cmd)
             assert output_file.exists()
 
-    def test_10_render_log_uddf(self):
+    def test_10_render_log_uddf(self, out):
         """Verify standalone telemetry video generation from UDDF log files."""
         log = UDDF_DIR / "Perdix 2 453 2025-10-19 16-44-12.uddf"
         layout = OVERLAYS_DIR / "generic_depth_temp.zip"
-        output_file = OUTPUT_DIR / f"release_test_render_log_{log.stem}_generic.mp4"
+        output_file = out / f"release_test_render_log_{log.stem}_generic.mp4"
 
         cmd = [
             str(output_file),
@@ -242,24 +244,24 @@ class TestRelease:
         _cli(*cmd)
         assert output_file.exists()
 
-    def test_11_overlay_photo(self):
+    def test_11_overlay_photo(self, out):
         """Verify photo overlays with SSRF logs."""
         src = TEST_DATA_DIR / "DSC06422.JPG"
         layout = OVERLAYS_DIR / "generic_depth_temp.zip"
         logs = SSRF_DIR
         cmd = [
-            str(src), str(OUTPUT_DIR),
+            str(src), str(out),
             "--color", "--layout", str(layout), "--logs", str(logs),
             "--filename-format", "release_test_test11_overlay_generic"
         ]
         _cli(*cmd)
 
-        target = list(OUTPUT_DIR.glob("release_test_test11_overlay_generic_*.jpg"))[0]
+        target = list(out.glob("release_test_test11_overlay_generic_*.jpg"))[0]
         assert target.exists()
 
-    def test_12_export_json(self):
+    def test_12_export_json(self, out):
         """Verify JSON telemetry exports from log files."""
-        temp_log_dir = OUTPUT_DIR / "release_test_export_logs_test"
+        temp_log_dir = out / "release_test_export_logs_test"
         if temp_log_dir.exists():
             shutil.rmtree(temp_log_dir)
         temp_log_dir.mkdir(parents=True)

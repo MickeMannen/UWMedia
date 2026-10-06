@@ -31,10 +31,10 @@ choice_arg="$1"
 # Print Selection Menu (only when asking)
 if [ -z "$choice_arg" ]; then
     echo -e "\nSelect a test suite to run:"
-    echo -e "  ${YELLOW}1)${NC} Default: everything except the release run, renders included (~3 min)"
-    echo -e "  ${YELLOW}2)${NC} Quick: also skip the render tests (~1.5 min)"
-    echo -e "  ${YELLOW}3)${NC} Release: pre-release validation on the full 4K media (release_test.py, ~5 min)"
-    echo -e "  ${YELLOW}4)${NC} Everything: default + release (~8 min) - run this before a release"
+    echo -e "  ${YELLOW}1)${NC} Default: everything except the release run, renders included (~1 min)"
+    echo -e "  ${YELLOW}2)${NC} Quick: also skip the render tests (~30 s)"
+    echo -e "  ${YELLOW}3)${NC} Release: pre-release validation on the full 4K media (release_test.py, ~3.5 min)"
+    echo -e "  ${YELLOW}4)${NC} Everything: default + release (~6 min) - run this before a release"
     echo -e "  ${YELLOW}5)${NC} Exit"
 fi
 

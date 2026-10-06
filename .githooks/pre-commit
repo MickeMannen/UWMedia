@@ -18,7 +18,7 @@ else
     PYTHON=$(command -v python3 || command -v python)
 fi
 
-echo "pre-commit: running the test suite (~3 min; skip with --no-verify)"
+echo "pre-commit: running the test suite (~1 min; skip with --no-verify)"
 if ! "$PYTHON" -m pytest -q -x; then
     echo "pre-commit: tests failed - commit stopped." >&2
     exit 1
