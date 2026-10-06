@@ -434,22 +434,22 @@ def test_inspector_attribute_edits_store_non_defaults_only():
     app.setSelectedAttr("valign", "middle")
     app.setSelectedAttr("bold", True)
     app.setSelectedAttr("font_family", "Roboto")
-    app.setSelectedAttr("outline", False)
+    app.setSelectedAttr("outline", True)
     app.setSelectedAttr("font_size", "90.4")
     app.setSelectedAttr("scale", "1.25")
     app.setSelectedAttr("color", "#00ADED")
     assert elem["align"] == "right" and elem["valign"] == "middle"
-    assert elem["font_weight"] == "bold" and elem["font_family"] == "Roboto" and elem["outline"] is False
+    assert elem["font_weight"] == "bold" and elem["font_family"] == "Roboto" and elem["outline"] is True
     assert elem["font_size"] == 90 and elem["scale"] == 1.25 and elem["color"] == "#00ADED"
     sel = app.selectedElement
-    assert sel["bold"] is True and sel["font_family"] == "Roboto" and sel["outline"] is False
+    assert sel["bold"] is True and sel["font_family"] == "Roboto" and sel["outline"] is True
 
     # back to defaults -> keys removed, not written as defaults
     app.setSelectedAttr("align", "left")
     app.setSelectedAttr("valign", "top")
     app.setSelectedAttr("bold", False)
     app.setSelectedAttr("font_family", "Arial")
-    app.setSelectedAttr("outline", True)
+    app.setSelectedAttr("outline", False)
     for key in ("align", "valign", "font_weight", "font_family", "outline"):
         assert key not in elem
     app.setSelectedAttr("align", "diagonal")  # rejected

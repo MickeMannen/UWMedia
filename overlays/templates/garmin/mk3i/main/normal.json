@@ -97,7 +97,6 @@
         "value_font_size": 92,
         "depth_font": "label",
         "depth_unit": "m",
-        "outline": false,
         "label": "Stop / deco (↑ceiling + timer)",
         "timer_format": "m:ss"
       },

@@ -699,6 +699,9 @@ def _draw_deco_history(frame, elem, waypoints, reveal_t, x_for_time, y_for_depth
 
 
 CHECK_MARK = "✓ "  # prefix badge_lines puts on a title shown with the Perdix's check mark
+# A text element without an "outline" key draws no black outline: at the
+# small sizes most HUD text ends up at, the outline made it look blurry.
+TEXT_OUTLINE_DEFAULT = False
 
 
 def _draw_check_mark(draw, x, y, size, color_rgb, outline=True):
@@ -897,7 +900,7 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
     family, weight = elem.get("font_family"), elem.get("font_weight")
     label_font = get_font(label_size, family, weight)
     value_font = get_font(value_size, family, weight)
-    outline = elem.get("outline", True)
+    outline = elem.get("outline", TEXT_OUTLINE_DEFAULT)
     align = elem.get("align", "left")
     valign = elem.get("valign", "top")
 
@@ -1508,7 +1511,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         if final_size < 1: final_size = 1
         
         font = get_font(final_size, elem.get("font_family"), elem.get("font_weight"))
-        outline = elem.get("outline", True)
+        outline = elem.get("outline", TEXT_OUTLINE_DEFAULT)
 
         val_str = str(val)
         main_str, suffix_str, suffix_scale = text_parts(field, val_str, elem)

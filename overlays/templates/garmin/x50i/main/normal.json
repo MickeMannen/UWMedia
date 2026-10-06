@@ -10,7 +10,7 @@
     "ref_offset_y": -16.0,
     "opacity": 1.0,
     "path": "normal.png",
-    "scale": 0.3,
+    "scale": 0.5,
     "linked_elements": [
       {
         "id": "n2_tissue_load",

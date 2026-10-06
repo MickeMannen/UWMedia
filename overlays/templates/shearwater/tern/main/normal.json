@@ -33,7 +33,6 @@
         "value_font_size": 44,
         "scale": 1.0,
         "depth_unit": "m",
-        "outline": false,
         "label": "Stop / deco (replaces NDL)"
       },
       {

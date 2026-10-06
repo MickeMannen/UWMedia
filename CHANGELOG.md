@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- Overlays: text no longer gets a black outline by default, so small text
+  stays crisp. It applies to every template and your own pages; turn it back
+  on per element with "Black outline" in the Overlay Designer.
+- Garmin x50i: the overlay is drawn larger by default, so its numbers and
+  labels are no longer tiny and blurry in the video.
+
 ## [0.7.12] - 2026-10-05
 
 ### Added
