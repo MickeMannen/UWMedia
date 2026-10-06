@@ -174,8 +174,9 @@ tests don't need that much video.
 - [x] `test_convert_resolution_replacement_naming` tested its own copy of
       the naming code; it now tests the Convertion backend's real
       `_convert_output_filename`.
-- [ ] Phase 6 note: `cli_main.py`'s `--convert` repeats that naming code
-      inline instead of sharing it with the backend.
+- [x] Phase 6 note: `cli_main.py`'s `--convert` repeats that naming code
+      inline instead of sharing it with the backend. Done in Phase 6
+      (`utils/convert_naming.py`).
 
 ### Phase 2 - small test media (2026-10-06)
 - [x] `scripts/make_test_fixtures.py` builds 2 s 720p clips (Sony 10-bit
@@ -220,20 +221,66 @@ tests don't need that much video.
       Everything is CPU-bound now: the 4K release renders and the fixture
       renders share the cores, so it is about the release run plus the rest.
 
-### Phase 5 - CI
-- [ ] GitHub Actions job: fast suite on macOS, Windows, Linux on `main` and
-      tag pushes (no development branches on GitHub).
-- [ ] Fix font / path differences it turns up.
+### Phase 5 - CI (2026-10-06)
+- [x] `.github/workflows/tests.yml`: the default suite on macOS 15, Windows and
+      Ubuntu (Python 3.12, Qt off screen, the vendored ffmpeg/exiftool from
+      `scripts/fetch_vendored_binaries.py`) on pushes to `main`, `v*` tags and
+      by hand. Development branches never reach GitHub, so it first runs when
+      `main` is pushed.
+- [x] Linux tried locally in Docker first (Ubuntu 24.04 image, no `test_data/`,
+      apt's ffmpeg/exiftool since the vendored Linux build is amd64-only and
+      Docker Hub pulls hung here). Results in the log below.
+- [x] Font difference found: two read-only text boxes (Log Viewer events,
+      Overlay Designer waypoint JSON) asked for "Menlo", which only macOS has;
+      Windows now gets Consolas and Linux the system monospace font.
+- [x] Linux run found 5 failures, all fixed:
+      - "Move original" lowercased the moved file's extension (DSC03491.JPG ->
+        DSC03491.jpg); hidden on macOS, whose file names ignore case. Fixed in
+        `cli_main.py`; the test now lists the folder instead of `.exists()`.
+      - Linux drew "Arial" with the system DejaVu Sans (wider) before the bundled
+        Liberation Sans; `utils/fonts.py` now takes Liberation first.
+        Showed as a 7 px right-align miss in `test_hud_renderer.py`.
+      - `test_output_naming.py` assumed a case-insensitive file system.
+      - Two Tag Editor tests need exiftool 13 (reads DJI's OriginalFilePath);
+        Ubuntu's apt exiftool 12.76 can't. CI uses the vendored 13.59.
+- [ ] Windows and macOS runners: first real result when `main` is pushed.
 
-### Phase 6 - coverage
-- [ ] `pytest-cov` to measure.
-- [ ] Pure tests of colour-filter building (`ffmpeg/color.py`), colour
-      profiles / params, Color Tuning backend.
-- [ ] Tag Editor backend and `utils/tag_editor.py` (on copies in `tmp_path`).
-- [ ] `ffmpeg_class.py` command building; `cli_main.py` gaps.
-- [ ] QML smoke test (load every page with `QQmlApplicationEngine`, no
-      errors) + `pyside6-qmllint`.
-- [ ] Re-plan the 3 xfail Subsurface references.
+### Phase 6 - coverage (2026-10-06)
+- [x] `pytest-cov` (requirements.txt) with `[tool.coverage]` in pyproject.toml:
+      `python -m pytest --cov`. `patch = ["subprocess"]` also measures the
+      cli_main.py runs of the render tests (without it cli_main.py showed 14%
+      instead of 74%). The old widget pages in `uwmedia/pages/` are left out.
+      Default run: 67% as first measured -> 78% with subprocesses -> see log.
+- [x] Colour: `ffmpeg/color.py` is 94% covered by the render tests.
+      `test_color_tuning_backend.py` covers the Color Tuning backend, the
+      colour profiles (save, merge, override) and the parameter table.
+- [x] Tag Editor: `test_tag_editor.py`, helpers and backend, on copies of the
+      fixture media in `tmp_path`.
+- [x] `test_ffmpeg_class.py`: encoder per platform, ffprobe helpers, progress
+      lines, errors, the command `process_video` builds, one small real encode.
+- [x] `cli_main.py`'s `--convert` naming now shares `utils/convert_naming.py`
+      with the Convertion page (the table, the name rule, the CLI choices).
+      `test_convertion_backend.py` and `test_about_backend.py` added.
+- [x] `test_qml_smoke.py`: the app's own wiring (`uwmedia.app.create_engine`)
+      loads main.qml off screen with no QML warnings, every `.qml` file
+      compiles, and `pyside6-qmllint` reports nothing. qmllint's
+      "unqualified" check is off: the pages reach their backends through
+      context properties, which it can't see (710 reports, all that).
+- [x] Coverage gaps 5 and 7: `test_cli_helpers.py` (`get_unique_path`,
+      `print_summary`; the FCPXML export was removed instead), `test_tool_paths.py` (settings
+      override vs. search, ffprobe next to ffmpeg, validity checks),
+      `test_config.py` (tank mapping: load order, save, rename, remove, broken
+      YAML) and the real Windows / Linux (XDG and no-XDG) folders in
+      `test_resource_paths.py`, using platformdirs' own Windows / Unix classes.
+      `dive_plan_import` was already covered by `test_plan_embed.py`.
+- [ ] Re-plan the 3 xfail Subsurface references (owner, in Subsurface):
+      `air_long_deco`, `nx32_deco`, `air_multi_deco` were planned 3 minutes
+      after another dive. Plan each again with no dive before it (empty
+      logbook or a far-off date), paste over `tests/deco_reference/raw/<name>.txt`,
+      drop the `known_gap` line, run `python scripts/deco_reference.py convert`.
+      Meanwhile `test_planner_matches_the_subsurface_port` checks
+      `air_long_deco` and `nx32_deco` against the fresh-tissue port and they
+      pass; `air_multi_deco` has two gases, which the port doesn't do yet.
 
 ## Log
 
@@ -246,3 +293,10 @@ tests don't need that much video.
 - 2026-10-06: render tests joined the default run (`addopts = -m "not release"`);
   `run_tests.sh` 1 = default (~3 min), 2 = quick without renders (~1.5 min).
 - 2026-10-06: Phase 4 done; parallel runs: default ~1 min, everything 5m50s.
+- 2026-10-06: Phase 5 + 6: CI workflow, Linux tried in Docker, 7 new test files.
+  Coverage of the default run 78% -> 85%. Everything (`run_tests.sh 4`) on macOS:
+  739 passed, 6 skipped (Windows-only), 3 xfailed in 5m41s. Linux (Docker): 676 passed,
+  53 skipped (no test_data), 2 failed (the exiftool 12.76 Tag Editor pair).
+- 2026-10-07: coverage gaps 5 and 7 closed (3 new test files and test_resource_paths.py, 20 new tests); FCPXML
+  export removed (owner no longer uses it); default run
+  745 passed, 6 skipped (Windows-only), 3 xfailed in 1m06s.

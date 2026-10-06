@@ -96,8 +96,6 @@ This is how the author uses UWMedia with Final Cut Pro:
    videos with the [Overlay Generator](overlay-generator.md), often several
    different overlays per video.
 3. **Import** - import videos and overlays into one folder in the editor.
-   (Overlays rendered straight from a log with the CLI's `--render-log` also
-   get an FCPXML `.xml` for direct import into Final Cut Pro.)
 4. **Sync** - create a synchronized clip for each video and pick the overlay
    you want for that clip.
 5. **Edit** as normal. Keeping the overlay as a separate layer makes things

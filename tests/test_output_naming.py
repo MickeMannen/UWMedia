@@ -60,12 +60,16 @@ def test_filename_token_keeps_source_name_without_milliseconds(tmp_path, photo):
 
 
 def test_keep_filename_into_source_folder_never_overwrites_source(photo):
+    # The output is DSC06641.jpg. Where file names ignore case (macOS, Windows)
+    # that is the source DSC06641.JPG itself, so it gets _1; on Linux it's another file.
+    case_insensitive = photo.with_name("DSC06641.jpg").exists()
     for overwrite in (False, True):
         args = _args(photo.parent, keep_filename=True, overwrite=overwrite)
         name = output_filename(photo, photo.parent, args, TAKEN)
         target, skipped = resolve_target_path(photo.parent / name, photo, args)
         assert not skipped
-        assert target.name == "DSC06641_1.jpg"  # the source itself is left alone
+        assert target.name == ("DSC06641_1.jpg" if case_insensitive else "DSC06641.jpg")
+        assert not (target.exists() and target.samefile(photo))  # the source itself is left alone
     assert photo.read_bytes() == b"x"
 
 

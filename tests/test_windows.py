@@ -62,7 +62,7 @@ def test_windows_path_handling_and_escaping(tmp_path):
     expected_out = out_dir / "Test_Photo_Space.jpg"
     expected_moved = orig_dir / "Test Photo Space.JPG"
     assert expected_out.exists(), f"Output file missing: {expected_out}"
-    assert expected_moved.exists(), f"Original file not moved to: {expected_moved}"
+    assert [p.name for p in orig_dir.iterdir()] == [expected_moved.name], f"Original file not moved to: {expected_moved}"
     assert not src_copy.exists(), "Source file was not moved from original location"
 
 

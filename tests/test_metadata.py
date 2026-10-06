@@ -116,8 +116,9 @@ class TestMetadata:
         assert result.returncode == 0, result.stderr
         
         # Verify the original source has been moved to move_dir
-        expected_moved_src = move_dir / "DSC03491.JPG"
-        assert expected_moved_src.exists()
+        # Listed, not .exists(): macOS and Windows file names ignore case, and
+        # the original must keep its own name (it once came out as .jpg).
+        assert [p.name for p in move_dir.iterdir()] == ["DSC03491.JPG"]
         assert not temp_src.exists()
 
     @pytest.mark.render

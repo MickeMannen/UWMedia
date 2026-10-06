@@ -25,7 +25,7 @@ Item {
 
     // Opening the sample table scrolls it into view: it sits below the fold.
     function scrollToSamples() {
-        var flick = detailScroll.contentItem
+        var flick = detailScroll.contentItem as Flickable
         flick.contentY = Math.max(0, Math.min(samplesCard.y, flick.contentHeight - flick.height))
     }
 
@@ -253,7 +253,7 @@ Item {
                 contentWidth: availableWidth
                 clip: true
                 Component.onCompleted: {
-                    var flick = detailScroll.contentItem
+                    var flick = detailScroll.contentItem as Flickable
                     flick.boundsBehavior = Flickable.StopAtBounds
                     flick.pixelAligned = true
                 }
@@ -369,7 +369,7 @@ Item {
                                     text: modelData
                                     color: root.textColor
                                     font.pixelSize: 11
-                                    font.family: "Menlo"
+                                    font.family: Qt.platform.os === "osx" ? "Menlo" : Qt.platform.os === "windows" ? "Consolas" : "monospace"
                                 }
                             }
                         }

@@ -3,6 +3,7 @@ lxml
 garmin-fit-sdk
 pytest
 pytest-xdist
+pytest-cov
 numpy
 opencv-python
 PySide6-Essentials~=6.8

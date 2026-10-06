@@ -212,3 +212,17 @@ markers = [
     "requires_media: reads the local test_data/ media or logs; skipped when it is missing",
     "windows: Windows-only checks (skipped on other platforms)",
 ]
+
+# Coverage (pytest-cov): `python -m pytest --cov` measures the default run.
+# `patch = ["subprocess"]` also measures the cli_main.py processes the render
+# tests start. The old widget pages under uwmedia/pages/ are left out: the
+# QML app no longer loads them (only add_hud_dialog's presets are imported).
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "scripts/*", "scratch/*", "build/*", "dist/*", "uwmedia/prototypes/*", "uwmedia/pages/*", "shibokensupport/*"]
+patch = ["subprocess"]
+parallel = true
+
+[tool.coverage.report]
+skip_covered = true
+skip_empty = true

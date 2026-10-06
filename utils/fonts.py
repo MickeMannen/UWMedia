@@ -49,17 +49,17 @@ def _system_arial_candidates() -> Dict[str, List[str]]:
             WEIGHT_BOLD: ["/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/Library/Fonts/Arial Bold.ttf"],
         }
     return {
-        WEIGHT_REGULAR: [
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/TTF/DejaVuSans.ttf",
-        ],
-        WEIGHT_BOLD: [
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
-        ],
+        WEIGHT_REGULAR: ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"],
+        WEIGHT_BOLD: ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"],
     }
+
+
+# Linux only, after the bundled Liberation Sans: DejaVu is wider than Arial,
+# so text laid out for Arial would not fit the same way.
+_LAST_RESORT_CANDIDATES = {
+    WEIGHT_REGULAR: ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"],
+    WEIGHT_BOLD: ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"],
+}
 
 
 def bundled_fonts_dir() -> Optional[Path]:
@@ -105,6 +105,11 @@ def registry() -> Dict[str, Dict[str, str]]:
     for weight in WEIGHTS:
         if weight not in arial and weight in liberation:
             arial[weight] = liberation[weight]
+    if platform.system() == "Linux":
+        for weight, candidates in _LAST_RESORT_CANDIDATES.items():
+            if weight not in arial:
+                arial[weight] = next((c for c in candidates if os.path.exists(c)), None)
+        arial = {weight: path for weight, path in arial.items() if path}
     families: Dict[str, Dict[str, str]] = {}
     if arial:
         families[DEFAULT_FAMILY] = arial

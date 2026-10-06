@@ -39,7 +39,6 @@ Photo with Telemetry data (old overlay)
 - **Overlay Templates & Designer**: Built-in overlay templates per dive computer (Garmin x50i/mk3i, Shearwater Perdix 2/3, Petrel, Peregrine, Teric, Tern, generic) with live state badges, colour rules and each brand's own ascent-rate arrows, plus a full designer to modify them or build your own from any background image - readouts with small decimals or seconds as on the real screens, vertical labels, and adjustable colour and opacity for every shaded area of the dive-profile graph.
 - **Log-to-Video Generation**: Create HEVC telemetry-only videos directly from dive logs on a black background - for a dive with no footage, e.g. one built in the Dive Profile Builder - at the same 1080p / 4K / full-frame sizes.
 - **Overlays keep their colours**: when overlays are burned in with colour correction, the correction applies to the footage only; the dive computer's bezel and text come out exactly as designed.
-- **FCPXML Support**: Automatically generates `.xml` files for rendered telemetry videos for instant import into Final Cut Pro.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 - **Dive Profile Builder**: Draw a synthetic open circuit, sidemount or CCR dive and save it as a UDDF, Garmin FIT or Subsurface log, to test overlays in situations like deco or gas switches. *Test data only - not for dive planning.*
 

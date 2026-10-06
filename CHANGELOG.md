@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Color: "Move original" keeps the original's file name as it was; a photo
+  called DSC03491.JPG was moved as DSC03491.jpg.
+- Linux: overlay text uses the bundled Arial-compatible font when Arial and
+  Liberation Sans aren't installed, instead of the wider DejaVu Sans, so
+  text fits the templates as on macOS and Windows.
+- Windows, Linux: the Log Viewer's event list and the Overlay Designer's
+  waypoint data now use a fixed-width font, as on macOS, so columns line up.
+
+### Removed
+- CLI: `--render-log` no longer writes a Final Cut Pro `.xml` (FCPXML) next to
+  the rendered video; import the video itself.
+
 ## [0.7.13] - 2026-10-06
 
 ### Changed

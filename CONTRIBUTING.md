@@ -23,6 +23,13 @@ commit.
 
 `tests/run_tests.sh 3` runs only `release_test.py`.
 
+The default suite also runs on GitHub Actions (`.github/workflows/tests.yml`)
+on macOS, Windows and Linux for every push to `main` and every release tag.
+
+To see what the tests cover, run `pytest --cov`. It includes the
+`cli_main.py` runs the render tests start, and `coverage html` writes a
+browsable report to `htmlcov/`.
+
 ### Pre-commit hook (recommended)
 
 A hook in `.githooks/` runs the default suite before each commit and stops the
@@ -67,6 +74,8 @@ commit.
   - `windows`: Windows-only checks.
 - Never write to the real app folders (Application Support, `~/.config`,
   caches). `tests/conftest.py` already points them at temporary folders.
+- `tests/test_qml_smoke.py` loads every QML page off screen and runs
+  `pyside6-qmllint`; a QML warning fails it, so run it after changing a page.
 - Tests run in parallel on all CPU cores (pytest-xdist, set in
   `pyproject.toml`), so a test must not depend on another test or share a
   fixed file path with one. Use `pytest -n0` to run in a single process,

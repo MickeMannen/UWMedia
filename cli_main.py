@@ -21,6 +21,7 @@ from ffmpeg import FfmpegClass
 from utils.dependency_check import check_dependencies
 from utils.resource_paths import app_temp_dir, prune_temp_dirs
 from utils.progress_lines import emit
+from utils.convert_naming import CONVERT_RESOLUTIONS, convert_output_filename
 
 import cv2
 import numpy as np
@@ -73,47 +74,6 @@ def overlay_canvas(layout: dict, args) -> tuple:
             width, height = _even(img_temp.shape[1] * user_scale), _even(img_temp.shape[0] * user_scale)
     return width, height, True, layout
 
-
-def generate_fcpxml(video_path: Path, duration: float, fps: float = 30.0, width: int = 1920, height: int = 1080):
-    """Generates a minimal FCPXML 1.10 file for the given video."""
-    xml_path = video_path.with_suffix(".xml")
-    
-    # FCP uses fractional durations for precision
-    # For exactly 30fps, 1/30s is correct.
-    frame_duration = "1/30s"
-    if fps == 24.0: frame_duration = "1/24s"
-    elif fps == 60.0: frame_duration = "1/60s"
-    
-    # Duration in rational format or simple seconds with 's' suffix
-    dur_str = f"{duration}s"
-    
-    # File URL must be absolute and prefixed with file:///
-    abs_path = video_path.resolve()
-    # file:// + absolute path (which starts with /) = file:///
-    file_url = f"file://{abs_path}"
-
-    # Resource name should reflect resolution
-    res_name = f"{width}x{height}"
-    if width == 1920 and height == 1080: res_name = "1080p"
-    elif width == 3840 and height == 2160: res_name = "4K"
-
-    content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE fcpxml>
-<fcpxml version="1.10">
-    <resources>
-        <format id="r1" name="FFVideoFormat{res_name}{int(fps)}" frameDuration="{frame_duration}" width="{width}" height="{height}"/>
-        <asset id="r2" name="{video_path.stem}" start="0s" duration="{dur_str}" hasVideo="1" format="r1" src="{file_url}"/>
-    </resources>
-    <library>
-        <event name="UWMedia Import">
-            <asset-clip name="{video_path.stem}" ref="r2" offset="0s" start="0s" duration="{dur_str}" format="r1"/>
-        </event>
-    </library>
-</fcpxml>"""
-
-    with open(xml_path, "w") as f:
-        f.write(content)
-    print(f"FCPXML generated: {xml_path.name}")
 
 def read_log_file(path: Path, args, shift_fit: bool = False):
     """Dives in one log file (parsers.registry) with --tz-adjust applied,
@@ -297,10 +257,7 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     if write_error[0]:
         raise write_error[0]
 
-    # 5. Generate FCPXML
-    generate_fcpxml(target_path, duration, fps=fps, width=width, height=height)
-
-    # 6. Write Date Taken / Creation Date metadata to matching Log Time
+    # 5. Write Date Taken / Creation Date metadata to matching Log Time
     print("Writing creation date metadata...")
     try:
         from metadata.exif import MetadataHandler
@@ -428,10 +385,11 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         if missing_serials:
             print(f"Warning: Layout references tank serials not found in loaded logs: {', '.join(missing_serials)}")
 
-def get_unique_path(path: Path) -> Path:
-    """If file exists, append _1, _2, etc. Always returns lowercase extension."""
-    suffix = path.suffix.lower()
-    path = path.with_suffix(suffix)
+def get_unique_path(path: Path, lower_suffix: bool = True) -> Path:
+    """If file exists, append _1, _2, etc. The extension is lowercased unless
+    lower_suffix is False (a moved original keeps its own name)."""
+    if lower_suffix:
+        path = path.with_suffix(path.suffix.lower())
     
     if not path.exists():
         return path
@@ -441,20 +399,14 @@ def get_unique_path(path: Path) -> Path:
     counter = 1
     
     while True:
-        new_path = directory / f"{stem}_{counter}{suffix}"
+        new_path = directory / f"{stem}_{counter}{path.suffix}"
         if not new_path.exists():
             return new_path
         counter += 1
 
 def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_offset_mins, meta_handler):
     """Handles multi-resolution conversion for a video with optimized bitrates."""
-    # Resolutions and their target bitrates for HEVC
-    resolutions = {
-        '1080p': (1920, 1080, "24M"),
-        '720p': (1280, 720, "12M"),
-        '480p': (854, 480, "7M"),
-        '360p': (640, 360, "4M")
-    }
+    resolutions = {name: (w, h, bitrate) for name, w, h, bitrate in CONVERT_RESOLUTIONS}
 
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
 
@@ -466,13 +418,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
             continue
 
         target_w, target_h, target_bitrate = resolutions[res_name]
-        stem = source.stem
-        if re.search(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', stem):
-            new_stem = re.sub(r'(?i)[ _](4k|2160p|1080p|720p|480p|360p)', f" {res_name}", stem)
-        else:
-            new_stem = f"{stem} {res_name}"
-        filename = f"{new_stem}{source.suffix.lower()}"
-        target_path = output_dir / filename
+        target_path = output_dir / convert_output_filename(source, res_name)
         target_path = get_unique_path(target_path)
 
         print(f"\n--- Converting to {res_name} ({target_bitrate}): {target_path.name} ---")
@@ -1020,7 +966,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         try:
             dest_dir.mkdir(parents=True, exist_ok=True)
             dest_path = dest_dir / source.name
-            dest_path = get_unique_path(dest_path)
+            dest_path = get_unique_path(dest_path, lower_suffix=False)
             print(f"Moving original file to: {dest_path}")
             t_move = time.time()
             shutil.move(str(source), str(dest_path))
@@ -1110,7 +1056,7 @@ def main():
     overwrite_group.add_argument("--overwrite", action="store_true", help="Replace the target file in place if it already exists, instead of appending _1/_2/etc. (only when running --color or --layout)")
     parser.add_argument("--summary", action="store_true", default=False, help="Show detailed summary of the activity at the end, including stage timings and FPS")
     parser.add_argument("--move-original", type=Path, help="Directory to move original source file to after successful processing (only when running --color or --layout)")
-    parser.add_argument("--convert", nargs='+', choices=['1080p', '720p', '480p', '360p'], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
+    parser.add_argument("--convert", nargs='+', choices=[name for name, *_ in CONVERT_RESOLUTIONS], help="Downscale to selected resolutions (multi allowed). Output will be a directory.")
     parser.add_argument("--render-log", nargs='+', help="Create a telemetry-only video from a specific dive log file (requires --layout). Can optionally take a second argument for number of waypoints.")
     parser.add_argument("--export-json", type=Path, help="Read logs from a directory and create a JSON file for each log file using same filename but json extension.")
     parser.add_argument("--render-video-log", action="store_true", default=False, help="Create a telemetry-only video/photo on a black background for all files in the input folder (requires --layout and --logs).")

@@ -31,9 +31,9 @@ def test_convert_video_resolution(tmp_path):
 ])
 def test_convert_resolution_replacement_naming(source, res_name, expected):
     """'_4k' or ' 4k' (case insensitive) is replaced by the target resolution -
-    the Convertion page's own naming (cli_main.py's --convert repeats it inline)."""
+    the one naming rule both --convert and the Convertion page use."""
     from pathlib import Path
 
-    from uwmedia.backends.convertion_backend import ConvertionBackend
+    from utils.convert_naming import convert_output_filename
 
-    assert ConvertionBackend._convert_output_filename(None, Path(source), res_name) == expected
+    assert convert_output_filename(Path(source), res_name) == expected

@@ -1,4 +1,9 @@
 """utils/fonts.py - the bundled/system font registry (overlay_rework.md Phase 2)."""
+import os
+
+import pytest
+
+import utils.fonts as fonts
 from utils.fonts import DEFAULT_FAMILY, bundled_fonts_dir, fallback_font_path, font_path, list_families, registry
 from gui.hud_renderer import get_font
 
@@ -35,3 +40,32 @@ def test_get_font_caches_per_family_and_size():
     assert get_font(40, "Roboto", "bold") is not get_font(40, "Roboto")
     assert get_font(41) is not default
     assert get_font(40, "No Such Family") is default  # unknown family -> the default path
+
+
+@pytest.fixture
+def fresh_registry():
+    fonts.registry.cache_clear()
+    yield
+    fonts.registry.cache_clear()
+
+
+@pytest.mark.parametrize("installed, expected", [
+    # A Linux with only DejaVu: Arial falls back to the bundled, metric-compatible Liberation Sans
+    ({"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"}, "resources/fonts/LiberationSans-Regular.ttf"),
+    # the system's own Liberation Sans is used first
+    ({"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"},
+     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+])
+def test_linux_arial_prefers_liberation_over_dejavu(monkeypatch, fresh_registry, installed, expected):
+    real_exists = os.path.exists
+    monkeypatch.setattr(fonts.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(fonts.os.path, "exists",
+                        lambda p: p in installed or (not str(p).startswith("/usr/share") and real_exists(p)))
+    assert fonts.font_path().replace("\\", "/").endswith(expected)
+
+
+def test_linux_falls_back_to_dejavu_without_any_liberation(monkeypatch, fresh_registry):
+    monkeypatch.setattr(fonts.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(fonts, "_scan_bundled", lambda: {})
+    monkeypatch.setattr(fonts.os.path, "exists", lambda p: p == "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    assert fonts.font_path() == "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"

@@ -29,17 +29,12 @@ from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
 from ffmpeg.ffmpeg_class import FfmpegClass
 from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
+from utils.convert_naming import CONVERT_RESOLUTIONS as RESOLUTION_TABLE, convert_output_filename
 from utils.display_paths import contract_home_path
 from utils.progress_lines import LineBuffer, finished_text
 from utils.run_timing import RunTiming
 
-CONVERT_RESOLUTIONS = [
-    ("1080p", 1920, 1080),
-    ("720p", 1280, 720),
-    ("480p", 854, 480),
-    ("360p", 640, 360),
-]
-CONVERT_RESOLUTION_NAME_RE = re.compile(r"(?i)[ _](4k|2160p|1080p|720p|480p|360p)")
+CONVERT_RESOLUTIONS = [(name, w, h) for name, w, h, _bitrate in RESOLUTION_TABLE]
 
 PROGRESS_LINE_RE = re.compile(r"UWMEDIA_PROGRESS (\d+)/(\d+) (\S+) (.*)$")
 FFMPEG_PROGRESS_RE = re.compile(r"UWMEDIA_FFMPEG_PROGRESS (\d+(?:\.\d+)?)")
@@ -201,16 +196,9 @@ class ConvertionBackend(QObject):
 
     # ------------------------------------------------------------------
     # Output filename preview - ported close to verbatim from
-    # _convert_output_filename/_refresh_convert_output_preview.
+    # _convert_output_filename/_refresh_convert_output_preview (the names
+    # come from utils/convert_naming.py, shared with cli_main.py).
     # ------------------------------------------------------------------
-
-    def _convert_output_filename(self, source_path: Path, res_name: str) -> str:
-        stem = source_path.stem
-        if CONVERT_RESOLUTION_NAME_RE.search(stem):
-            new_stem = CONVERT_RESOLUTION_NAME_RE.sub(f" {res_name}", stem)
-        else:
-            new_stem = f"{stem} {res_name}"
-        return f"{new_stem}{source_path.suffix.lower()}"
 
     def _refresh_output_preview(self):
         source = self._source_text.strip()
@@ -225,7 +213,7 @@ class ConvertionBackend(QObject):
         source_path = Path(source)
         lines = []
         for res_name in selected:
-            filename = self._convert_output_filename(source_path, res_name)
+            filename = convert_output_filename(source_path, res_name)
             lines.append(str(Path(dest) / filename) if dest else filename)
         self._output_preview_text = "\n".join(lines)
         self.outputPreviewChanged.emit()

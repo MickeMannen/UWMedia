@@ -42,9 +42,10 @@ from utils.resource_paths import prune_temp_dirs
 QML_MAIN = Path(__file__).resolve().parent / "qml" / "main.qml"
 
 
-def main():
-    prune_temp_dirs()  # yesterday's working folders under the cache dir
-    app = QApplication(sys.argv)
+def create_engine():
+    """A QQmlApplicationEngine with every page's backend and image provider
+    registered, before main.qml is loaded. Needs a QApplication. Also used by
+    tests/test_qml_smoke.py, so the test loads the same wiring as the app."""
     engine = QQmlApplicationEngine()
 
     color_backend = ColorBackend()
@@ -95,7 +96,20 @@ def main():
 
     about_backend = AboutBackend()
     engine.rootContext().setContextProperty("aboutBackend", about_backend)
+    # The context properties don't keep the Python objects alive; the engine does.
+    engine._backends = [
+        color_backend, overlay_generator_backend, convertion_backend, color_tuning_backend,
+        tag_editor_backend, log_viewer_backend, overlay_designer_backend, dive_profile_backend,
+        advanced_backend, about_backend,
+    ]
+    return engine
 
+
+def main():
+    prune_temp_dirs()  # yesterday's working folders under the cache dir
+    app = QApplication(sys.argv)
+    engine = create_engine()
+    backends = engine._backends  # outlive the engine, see the teardown note below
     engine.load(QUrl.fromLocalFile(str(QML_MAIN)))
     if not engine.rootObjects():
         sys.exit(-1)
@@ -112,4 +126,5 @@ def main():
     # engine here, while every backend is still alive, tears down the
     # whole QML component tree cleanly first.
     del engine
+    del backends
     sys.exit(exit_code)

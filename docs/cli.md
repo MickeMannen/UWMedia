@@ -59,7 +59,7 @@ python cli_main.py ./raw/ --force-media-tz +8 --fix-tz
 | `--logs DIR` | Folder with dive logs: `.fit` (Garmin), `.uddf` (Shearwater), `.xml`/`.ssrf` (Subsurface) - Dive Profile Builder logs in any of the three. Avoid duplicate logs of the same dive. |
 | `--layout FILE` | JSON layout or ZIP HUD package to overlay. Turns the overlay on. |
 | `--overlays-file FILE` | JSON list `[{layout_path, x, y, scale}, …]` of several overlays composited onto one colour-correction run (what the Color page does). Each `layout_path` must be a JSON layout, not a ZIP. |
-| `--render-log LOG [N]` | Telemetry-only video from one log (needs `--layout`). Optional `N` renders only the first N samples. An FCPXML `.xml` is written next to the video for direct import into Final Cut Pro. |
+| `--render-log LOG [N]` | Telemetry-only video from one log (needs `--layout`). Optional `N` renders only the first N samples. |
 | `--render-video-log` | Telemetry-only video/photo on a black background for every file in `source`, matched to the logs by time (needs `--layout` and `--logs`). |
 | `--overlay-size {1080p,4k}` | Size of telemetry-only renders: `1080p` (default) is the template's size in its 1920×1080 design frame, `4k` twice that for 4K footage. |
 | `--overlay-full-frame` | Render telemetry-only videos/photos as the whole frame (1920×1080, or 3840×2160 with `4k`) with the overlay placed as the layout anchors it. |

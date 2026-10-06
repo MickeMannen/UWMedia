@@ -11,6 +11,9 @@ import pytest
 
 import utils.resource_paths as rp
 
+# conftest patches _legacy_data_base for every test; keep the real one.
+_real_legacy_data_base = rp._legacy_data_base
+
 
 @pytest.fixture
 def split(tmp_path, monkeypatch):
@@ -127,3 +130,74 @@ def test_environment_overrides_win(tmp_path, monkeypatch):
     assert rp.user_config_dir() == tmp_path / "c"
     assert rp.user_data_dir() == tmp_path / "d"
     assert rp.app_temp_dir("x_").parent == tmp_path / "k" / rp.TEMP_DIR_NAME
+
+
+# --- Real per-OS resolution (no patched bases) -------------------------------
+# platformdirs picks its class for the running OS at import; the tests swap in
+# the Windows / Linux class and point their environment variables at tmp_path,
+# so each OS's folders are checked from any OS.
+
+@pytest.fixture
+def no_overrides(monkeypatch):
+    for name in (rp.ENV_CONFIG_DIR, rp.ENV_DATA_DIR, rp.ENV_CACHE_DIR):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_windows_folders(tmp_path, monkeypatch, no_overrides):
+    import platformdirs.windows as pw
+    monkeypatch.setattr(pw, "get_win_folder", pw.get_win_folder_from_env_vars)
+    monkeypatch.setattr(rp, "PlatformDirs", pw.Windows)
+    monkeypatch.setattr(rp, "_platform", lambda: "win")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
+
+    assert rp._config_base() == tmp_path / "Roaming" / "Christersson" / "UWMedia"
+    assert rp._data_base() == tmp_path / "Local" / "Christersson" / "UWMedia"
+    assert rp._cache_base() == tmp_path / "Local" / "Christersson" / "UWMedia" / "Cache"
+
+
+def test_linux_folders_follow_xdg(tmp_path, monkeypatch, no_overrides):
+    import platformdirs.unix as pu
+    monkeypatch.setattr(rp, "PlatformDirs", pu.Unix)
+    monkeypatch.setattr(rp, "_platform", lambda: "linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xc"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xd"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xk"))
+
+    assert rp._config_base() == tmp_path / "xc" / "uwmedia"
+    assert rp._data_base() == tmp_path / "xd" / "uwmedia"
+    assert rp._cache_base() == tmp_path / "xk" / "uwmedia"
+
+
+def test_linux_folders_without_xdg_use_home(tmp_path, monkeypatch, no_overrides):
+    import platformdirs.unix as pu
+    monkeypatch.setattr(rp, "PlatformDirs", pu.Unix)
+    monkeypatch.setattr(rp, "_platform", lambda: "linux")
+    for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert rp._config_base() == tmp_path / ".config" / "uwmedia"
+    assert rp._data_base() == tmp_path / ".local" / "share" / "uwmedia"
+    assert rp._cache_base() == tmp_path / ".cache" / "uwmedia"
+
+
+def test_legacy_base_per_os(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "_legacy_data_base", _real_legacy_data_base)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xd"))
+    monkeypatch.setattr(rp, "_platform", lambda: "win")
+    assert rp._legacy_data_base() == tmp_path / "Roaming"
+    monkeypatch.setattr(rp, "_platform", lambda: "linux")
+    assert rp._legacy_data_base() == tmp_path / "xd"
+    monkeypatch.delenv("XDG_DATA_HOME")
+    monkeypatch.setattr(rp.Path, "home", classmethod(lambda cls: tmp_path))
+    assert rp._legacy_data_base() == tmp_path / ".local" / "share"
+    monkeypatch.setattr(rp, "_platform", lambda: "darwin")
+    assert rp._legacy_data_base() == tmp_path / "Library" / "Application Support"
+
+
+def test_blank_override_is_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv(rp.ENV_DATA_DIR, "  ")
+    monkeypatch.setattr(rp, "PlatformDirs", lambda **kw: type("D", (), {"user_data_dir": str(tmp_path / "pd")})())
+    assert rp._data_base() == tmp_path / "pd"

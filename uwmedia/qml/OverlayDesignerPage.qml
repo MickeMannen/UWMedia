@@ -708,7 +708,7 @@ Item {
                     readOnly: true
                     text: overlayDesignerBackend.waypointJson
                     color: "#E0E0E0"
-                    font.family: "Menlo"
+                    font.family: Qt.platform.os === "osx" ? "Menlo" : Qt.platform.os === "windows" ? "Consolas" : "monospace"
                     wrapMode: Text.Wrap
                 }
             }
