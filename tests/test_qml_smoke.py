@@ -60,8 +60,11 @@ def test_main_qml_loads_every_page_without_warnings():
     assert result.returncode == 0, out
     messages = [line[4:] for line in result.stdout.splitlines() if line.startswith("MSG ")]
     # The offscreen platform's default font is named "Sans Serif", which Qt
-    # then looks up (and warns about); that is the test setup, not our QML.
-    messages = [m for m in messages if 'missing font family "Sans Serif"' not in m]
+    # then looks up (and warns about); on Windows it also looks for a font
+    # folder PySide6 doesn't ship (the real app uses the system fonts). Both
+    # are the test setup, not our QML.
+    messages = [m for m in messages if 'missing font family "Sans Serif"' not in m
+                and "QFontDatabase: Cannot find font directory" not in m]
     assert not messages, "\n".join(messages)
     assert "ROOTS 1" in result.stdout, out
     compiled = {line.split()[1] for line in result.stdout.splitlines() if line.startswith("COMPILED ")}

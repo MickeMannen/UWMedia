@@ -44,8 +44,9 @@ def test_overlay_generator_builds_render_from_log_arguments(isolated_template_ro
     gen.outputText = str(tmp_path / "out")
     gen.logFileText = str(tmp_path / "dive.uddf")
     gen.hwAccel = False
-    args = gen._build_log_args(Path("/tmp/layout.json"))
-    assert args == [str(tmp_path / "out"), "--render-log", str(tmp_path / "dive.uddf"), "--layout", "/tmp/layout.json", "--overlay-size", "4k"]
+    layout = tmp_path / "layout.json"
+    args = gen._build_log_args(layout)
+    assert args == [str(tmp_path / "out"), "--render-log", str(tmp_path / "dive.uddf"), "--layout", str(layout), "--overlay-size", "4k"]
     # the Log file switch decides what Start runs: on, it refuses to start
     # without a real log file, and says so
     gen.addOverlay()

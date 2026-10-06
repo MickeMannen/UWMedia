@@ -54,5 +54,13 @@ jobs:
       - name: Fetch vendored ffmpeg/exiftool binaries
         run: python scripts/fetch_vendored_binaries.py
 
+      # Run from source, the app finds the tools on PATH only (the bundled
+      # folder is looked up in a packaged build), so put that folder first.
+      - name: Put the vendored binaries on PATH
+        run: >-
+          python -c "import os, platform, pathlib;
+          d = {'Darwin': 'bin_macos', 'Windows': 'bin_windows', 'Linux': 'bin_linux'}[platform.system()];
+          open(os.environ['GITHUB_PATH'], 'a').write(str(pathlib.Path('resources', d).resolve()) + '\n')"
+
       - name: Run tests
         run: python -m pytest -q

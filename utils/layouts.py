@@ -241,7 +241,7 @@ def merge_variant_layout(base: Dict[str, Any], overlay: Dict[str, Any], base_dir
     skin = layout.setdefault("hud_skin", {})
     raw = skin.get("path")
     if raw and not Path(raw).is_absolute():
-        skin["path"] = os.path.relpath((Path(base_dir) / raw).resolve(), Path(overlay_dir).resolve())
+        skin["path"] = os.path.relpath((Path(base_dir) / raw).resolve(), Path(overlay_dir).resolve()).replace(os.sep, "/")
     overrides = overlay.get(VARIANT_OVERRIDES_FIELD) or {}
     removed = set(overlay.get(VARIANT_REMOVE_FIELD) or [])
     merged: List[Dict[str, Any]] = []

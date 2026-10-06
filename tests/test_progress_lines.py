@@ -11,6 +11,8 @@ import signal
 import sys
 import threading
 
+import pytest
+
 from PySide6.QtCore import QObject, QProcess
 
 import uwmedia.__main__ as entry
@@ -64,6 +66,7 @@ def test_finished_text():
     assert "signal 13" in finished_text(13, True)
 
 
+@pytest.mark.skipif(not hasattr(signal, "SIGPIPE"), reason="no SIGPIPE on Windows")
 def test_cli_run_ignores_sigpipe():
     previous = signal.getsignal(signal.SIGPIPE)
     try:

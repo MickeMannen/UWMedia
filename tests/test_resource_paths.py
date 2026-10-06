@@ -5,6 +5,7 @@ one-time copy from the old single folder ("org.christersson.uwmedia", and
 is patched to tmp_path so nothing touches the real Application Support /
 %APPDATA% / ~/.local/share tree."""
 import os
+import sys
 import time
 
 import pytest
@@ -156,6 +157,7 @@ def test_windows_folders(tmp_path, monkeypatch, no_overrides):
     assert rp._cache_base() == tmp_path / "Local" / "Christersson" / "UWMedia" / "Cache"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="platformdirs' Linux rules only apply off Windows")
 def test_linux_folders_follow_xdg(tmp_path, monkeypatch, no_overrides):
     import platformdirs.unix as pu
     monkeypatch.setattr(rp, "PlatformDirs", pu.Unix)
@@ -169,6 +171,7 @@ def test_linux_folders_follow_xdg(tmp_path, monkeypatch, no_overrides):
     assert rp._cache_base() == tmp_path / "xk" / "uwmedia"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="platformdirs' Linux rules only apply off Windows")
 def test_linux_folders_without_xdg_use_home(tmp_path, monkeypatch, no_overrides):
     import platformdirs.unix as pu
     monkeypatch.setattr(rp, "PlatformDirs", pu.Unix)

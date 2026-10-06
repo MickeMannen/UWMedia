@@ -244,6 +244,15 @@ tests don't need that much video.
       - Two Tag Editor tests need exiftool 13 (reads DJI's OriginalFilePath);
         Ubuntu's apt exiftool 12.76 can't. CI uses the vendored 13.59.
 - [ ] Windows and macOS runners: first real result when `main` is pushed.
+- [x] First GitHub run (2026-10-07) failed on all three: the fetched
+      binaries in `resources/bin_<os>/` are only looked up in a packaged
+      build, so from source nothing found ffmpeg/exiftool (locally they come
+      from PATH). The workflow now puts that folder on PATH; checked locally
+      with only `resources/bin_macos` on PATH. Windows also found:
+      a variant layout's skin path written with `\` (now always `/`); and
+      three test faults (Linux folder tests and SIGPIPE skipped on Windows,
+      a hard-coded `/tmp` path); the QML smoke test now ignores the
+      off-screen font-folder warning Qt gives on Windows.
 
 ### Phase 6 - coverage (2026-10-06)
 - [x] `pytest-cov` (requirements.txt) with `[tool.coverage]` in pyproject.toml:
