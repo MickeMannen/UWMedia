@@ -30,7 +30,7 @@ from models.manager import DiveManager
 DIVE_START = datetime(2025, 12, 3, 9, 0)            # synthetic dive: 09:00-09:45
 IN_DIVE = datetime(2025, 12, 3, 9, 15, 48)
 AFTER_DIVE = datetime(2025, 12, 3, 10, 20, 0)      # inside it only with --tz-adjust 1
-LAYOUT_ZIP = REPO_ROOT / "overlays" / "generic_depth_temp_small.zip"
+LAYOUT_ZIP = REPO_ROOT / "overlays" / "generic_depth_temp.zip"
 PROGRESS_RE = re.compile(r"^UWMEDIA_PROGRESS \d+/(\d+) (\S+) (.*)$", re.M)
 
 
@@ -673,7 +673,7 @@ def test_render_video_log_photo_with_bad_name_pattern(cli, tmp_path, synthetic_l
     assert "Error formatting render-log filename with pattern '{filename}_{nope}'" in out
     assert "Warning: Failed to copy metadata: exiftool missing" in out
     names = sorted(p.name for p in (tmp_path / "out").iterdir())
-    assert names == ["a_generic_depth_temp_small.jpg", "b_generic_depth_temp_small.jpg"]
+    assert names == ["a_generic_depth_temp.jpg", "b_generic_depth_temp.jpg"]
 
 
 @pytest.mark.render
@@ -686,11 +686,11 @@ def test_render_log_to_a_folder_names_the_file_after_log_and_layout(cli, tmp_pat
     log = write_synthetic_log(tmp_path / "dive.uddf", DIVE_START)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    (out_dir / "dive_generic_depth_temp_small.mp4").write_bytes(b"earlier render")
+    (out_dir / "dive_generic_depth_temp.mp4").write_bytes(b"earlier render")
 
     code, out = cli.run(out_dir, "--render-log", log, "3", "--layout", LAYOUT_ZIP)
     assert code == 0, out
-    rendered = out_dir / "dive_generic_depth_temp_small_1.mp4"
+    rendered = out_dir / "dive_generic_depth_temp_1.mp4"
     assert rendered.stat().st_size > 1000
     assert "Warning: Failed to write creation date metadata: exiftool missing" in out
 
