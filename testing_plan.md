@@ -243,7 +243,8 @@ tests don't need that much video.
       - `test_output_naming.py` assumed a case-insensitive file system.
       - Two Tag Editor tests need exiftool 13 (reads DJI's OriginalFilePath);
         Ubuntu's apt exiftool 12.76 can't. CI uses the vendored 13.59.
-- [ ] Windows and macOS runners: first real result when `main` is pushed.
+- [x] Windows and macOS runners: first real result when `main` is pushed.
+      Green on all three from the third run (2026-10-07, 726cf32).
 - [x] First GitHub run (2026-10-07) failed on all three: the fetched
       binaries in `resources/bin_<os>/` are only looked up in a packaged
       build, so from source nothing found ffmpeg/exiftool (locally they come
@@ -316,3 +317,5 @@ tests don't need that much video.
 - 2026-10-07: coverage gaps 5 and 7 closed (3 new test files and test_resource_paths.py, 20 new tests); FCPXML
   export removed (owner no longer uses it); default run
   745 passed, 6 skipped (Windows-only), 3 xfailed in 1m06s.
+- 2026-10-07: GitHub CI green on all three (run 37550357960): Windows 702 passed,
+  50 skipped; macOS and Ubuntu 699 passed, 53 skipped (no test_data); 3 xfailed each.
