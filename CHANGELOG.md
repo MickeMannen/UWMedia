@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.15] - 2026-10-07
 
 ### Fixed
 - Color: photos taken in the same second (with no fractions of a second in
