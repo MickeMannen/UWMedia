@@ -7,6 +7,7 @@ import shutil
 import copy
 import json
 import multiprocessing
+import threading
 from pathlib import Path
 from datetime import timedelta, datetime
 from typing import List
@@ -386,24 +387,30 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         if missing_serials:
             print(f"Warning: Layout references tank serials not found in loaded logs: {', '.join(missing_serials)}")
 
+# Names get_unique_path() has handed out in this run. The batch runs files on
+# parallel threads: two photos taken in the same second get the same date
+# name, and without this both threads found it free and wrote over each other.
+_reserved_paths = set()
+_reserved_lock = threading.Lock()
+
+
 def get_unique_path(path: Path, lower_suffix: bool = True) -> Path:
-    """If file exists, append _1, _2, etc. The extension is lowercased unless
-    lower_suffix is False (a moved original keeps its own name)."""
+    """If file exists (or was already handed out in this run), append _1, _2,
+    etc. The extension is lowercased unless lower_suffix is False (a moved
+    original keeps its own name)."""
     if lower_suffix:
         path = path.with_suffix(path.suffix.lower())
-    
-    if not path.exists():
-        return path
-    
+
     stem = path.stem
     directory = path.parent
-    counter = 1
-    
-    while True:
-        new_path = directory / f"{stem}_{counter}{path.suffix}"
-        if not new_path.exists():
-            return new_path
-        counter += 1
+    with _reserved_lock:
+        candidate, counter = path, 1
+        # Lower-cased: on case-insensitive file systems "A.jpg" is "a.jpg".
+        while candidate.exists() or str(candidate).lower() in _reserved_paths:
+            candidate = directory / f"{stem}_{counter}{path.suffix}"
+            counter += 1
+        _reserved_paths.add(str(candidate).lower())
+        return candidate
 
 def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_offset_mins, meta_handler) -> List[str]:
     """Handles multi-resolution conversion for a video with optimized bitrates.
@@ -824,7 +831,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 stats["stages"].append({"name": "Analysis Phase", "time": lut_stats["analysis_time"], "fps": lut_stats["analysis_fps"]})
                 stats["stages"].append({"name": "LUT Generation", "time": lut_stats["lut_gen_time"]})
                 stats["stages"].append({"name": "Processing/Encoding", "time": lut_stats["render_time"], "fps": lut_stats["render_fps"]})
-                if total_frames > 0:
+                if total_frames > 0 and proc_time > 0:
                     stats["overall_fps"] = total_frames / proc_time
         elif needs_color or needs_overlay:
             from ffmpeg.color import ColorCorrectionEngine
@@ -847,7 +854,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 stats["stages"].append({"name": "Analysis Phase", "time": legacy_stats["analysis_time"], "fps": legacy_stats["analysis_fps"]})
                 stats["stages"].append({"name": "HUD Rendering", "time": legacy_stats["hud_time"]})
                 stats["stages"].append({"name": "Processing/Encoding", "time": legacy_stats["render_time"], "fps": legacy_stats["render_fps"]})
-                if total_frames > 0:
+                if total_frames > 0 and proc_time > 0:
                     stats["overall_fps"] = total_frames / proc_time
         else:
             ff_stats = ff.process_video(
@@ -862,7 +869,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             if ff_stats:
                 total_frames = ff_stats.get("total_frames", 0)
                 stats["stages"].append({"name": "FFmpeg Native Processing", "time": ff_stats["render_time"], "fps": ff_stats["render_fps"]})
-                if total_frames > 0:
+                if total_frames > 0 and proc_time > 0:
                     stats["overall_fps"] = total_frames / proc_time
     else:
         # Photo Processing with optional Color/Overlay

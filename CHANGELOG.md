@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Color: photos taken in the same second (with no fractions of a second in
+  their date) are all saved in a batch; until now they could overwrite each
+  other's output, leaving fewer files than photos.
+- Windows: a video no longer fails at the end with a division error when its
+  processing was measured as taking no time (Windows' coarse clock).
+
 ## [0.7.14] - 2026-10-07
 
 ### Added

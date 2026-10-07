@@ -8,6 +8,7 @@ from datetime import datetime
 
 import pytest
 
+import cli_main
 from cli_main import output_filename, resolve_target_path
 
 TAKEN = datetime(2026, 9, 5, 14, 30, 0, 123456)
@@ -64,6 +65,7 @@ def test_keep_filename_into_source_folder_never_overwrites_source(photo):
     # that is the source DSC06641.JPG itself, so it gets _1; on Linux it's another file.
     case_insensitive = photo.with_name("DSC06641.jpg").exists()
     for overwrite in (False, True):
+        cli_main._reserved_paths.clear()  # each pass is a run of its own
         args = _args(photo.parent, keep_filename=True, overwrite=overwrite)
         name = output_filename(photo, photo.parent, args, TAKEN)
         target, skipped = resolve_target_path(photo.parent / name, photo, args)

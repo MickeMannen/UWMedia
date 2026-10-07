@@ -133,6 +133,17 @@ def _isolated_user_dirs(tmp_path, monkeypatch):
     monkeypatch.setenv(rp.ENV_CACHE_DIR, str(tmp_path / "user_cache"))
 
 
+@pytest.fixture(autouse=True)
+def _fresh_cli_run():
+    """cli_main remembers the output names it handed out in a run (so parallel
+    files never pick the same one); a test calling it in-process is a run of
+    its own."""
+    yield
+    cli_main = sys.modules.get("cli_main")
+    if cli_main is not None:
+        cli_main._reserved_paths.clear()
+
+
 @pytest.fixture
 def settings_file(tmp_path, monkeypatch):
     """A throwaway settings.json for backends that persist form fields

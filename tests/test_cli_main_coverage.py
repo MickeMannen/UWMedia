@@ -621,10 +621,23 @@ def test_photo_overlay_without_a_dive_is_left_plain(cli, tmp_path):
 
 # --- videos (ffmpeg faked) ------------------------------------------------------------
 
-def test_plain_video_goes_through_ffmpeg(cli, tmp_path):
+def _clock(monkeypatch, step):
+    """cli_main's time.time(): advances `step` seconds per call (0 = frozen,
+    as Windows' coarse clock can be for a fast step)."""
+    now = [1000.0]
+
+    def tick():
+        now[0] += step
+        return now[0]
+
+    monkeypatch.setattr(cli_main.time, "time", tick)
+
+
+def test_plain_video_goes_through_ffmpeg(cli, tmp_path, monkeypatch):
     source = tmp_path / "clip.MP4"
     source.write_bytes(b"fake video")
     cli.default_date = datetime(2025, 12, 3, 9, 15, 48, 500000)   # no ms suffix on videos
+    _clock(monkeypatch, 1.0)
 
     code, out = cli.run(source, tmp_path / "out", "--summary")
     assert code == 0
@@ -632,6 +645,15 @@ def test_plain_video_goes_through_ffmpeg(cli, tmp_path):
     plain = re.sub(r"\033\[[0-9;]*m", "", out)
     assert "File: clip.MP4 (Video)" in plain and "FFmpeg Native Processing" in plain
     assert "Overall FPS:" in plain
+
+
+def test_a_zero_processing_time_does_not_crash(cli, tmp_path, monkeypatch):
+    source = tmp_path / "clip.MP4"
+    source.write_bytes(b"fake video")
+    _clock(monkeypatch, 0.0)
+    code, out = cli.run(source, tmp_path / "out", "--summary")
+    assert code == 0, out
+    assert "Overall FPS:" not in re.sub(r"\033\[[0-9;]*m", "", out)
 
 
 def test_convert_carries_on_after_a_failed_resolution(cli, tmp_path, monkeypatch):
@@ -805,3 +827,14 @@ def test_an_explicit_output_file_name_is_used_as_given(cli, tmp_path, extra):
     code, out = cli.run(tmp_path / "a.jpg", tmp_path / "out" / "Picked.jpg", "--color", *extra)
     assert code == 0, out
     assert [p.name for p in (tmp_path / "out").iterdir()] == ["Picked.jpg"]
+
+
+def test_same_second_photos_in_a_batch_both_survive(cli, tmp_path):
+    """Photos with the same date (no subseconds) processed in parallel get
+    distinct names; neither overwrites the other."""
+    names = [f"p{i}.jpg" for i in range(8)]
+    for name in names:
+        _photo(tmp_path / "in" / name)
+    code, out = cli.run(tmp_path / "in", tmp_path / "out")
+    assert code == 0, out
+    assert len(list((tmp_path / "out").iterdir())) == len(names)
