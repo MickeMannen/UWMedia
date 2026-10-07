@@ -37,7 +37,8 @@ def test_missing_ffprobe_is_a_clear_error(ff):
     (True, "Windows", "hevc_nvenc", ["-rc", "vbr", "-cq", "20", "-b:v", "0"]),
     (True, "Linux", "libx265", ["-crf", "18"]),
 ])
-def test_encoder_and_quality_flags_per_platform(ff, hw, os_type, encoder, quality):
+def test_encoder_and_quality_flags_per_platform(ff, monkeypatch, hw, os_type, encoder, quality):
+    monkeypatch.setattr(ff, "nvenc_available", lambda: True)
     ff.hw_accel = hw
     ff.os_type = os_type
     assert ff.get_encoder() == encoder
@@ -158,3 +159,31 @@ def test_process_video_encodes_a_smaller_copy(ff, tmp_path):
     assert tuple(ff.get_video_dimensions(out)) == (320, 180)
     assert ff.get_video_pix_fmt(out) == "yuv420p"
     assert stats["render_time"] > 0
+
+
+def test_windows_without_nvenc_falls_back_to_libx265(ff, monkeypatch):
+    """A Windows PC with no NVIDIA GPU can't open NVENC: software encode."""
+    monkeypatch.setattr(ff, "nvenc_available", lambda: False)
+    ff.hw_accel, ff.os_type = True, "Windows"
+    assert ff.get_encoder() == "libx265"
+    assert ff.quality_args() == ["-crf", "18"]
+
+
+def test_nvenc_check_runs_once_per_ffmpeg(ff, monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 1)
+
+    monkeypatch.setattr(ffc, "_NVENC_AVAILABLE", {})
+    monkeypatch.setattr(ffc.subprocess, "run", fake_run)
+    assert not ff.nvenc_available() and not ff.nvenc_available()
+    assert len(calls) == 1 and "hevc_nvenc" in calls[0]
+
+    def missing(cmd, **kwargs):
+        raise OSError("gone")
+
+    monkeypatch.setattr(ffc, "_NVENC_AVAILABLE", {})
+    monkeypatch.setattr(ffc.subprocess, "run", missing)
+    assert not ff.nvenc_available()

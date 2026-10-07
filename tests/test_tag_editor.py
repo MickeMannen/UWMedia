@@ -4,6 +4,7 @@ backend (uwmedia/backends/tag_editor_backend.py). Every write goes to copies
 of the fixture media in tmp_path. The folder dialog is stubbed, so no window
 opens.
 """
+import json
 import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -207,7 +208,7 @@ def test_backend_lists_media_and_shows_dji_fixes(backend, media_dir, settings_fi
     assert backend.viewMetadataEnabled
     assert not backend.djiVisible
     assert backend.tagValues["EXIF:DateTimeOriginal"] == "2025:12:03 09:15:48"
-    assert str(media_dir) in settings_file.read_text()  # folder remembered
+    assert str(media_dir) in json.loads(settings_file.read_text())["fields"].values()  # folder remembered
 
     backend.selectFileAtIndex(1)
     assert backend.djiVisible

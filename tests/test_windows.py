@@ -24,10 +24,10 @@ def short_video():
 def test_windows_photo_pillow_processing(tmp_path):
     """Photo processing uses Pillow on Windows, with no PIL errors or cv2 fallbacks."""
     assert RAW_PHOTO.exists()
-    out_photo = tmp_path / "photo_win_out.jpg"
-    res = run_cli(RAW_PHOTO, out_photo, "--color")
+    res = run_cli(RAW_PHOTO, tmp_path, "--color", "--filename-format", "photo_win_out")
     assert res.returncode == 0, f"Photo processing failed: {res.stderr}"
-    assert out_photo.exists()
+    # _980: the photo's milliseconds, as in test_color.py's test_color_photo
+    assert (tmp_path / "photo_win_out_980.jpg").exists(), res.stdout[-2000:]
     assert "No module named 'PIL'" not in res.stderr
     assert "Error saving image with PIL" not in res.stderr
 
@@ -59,9 +59,9 @@ def test_windows_path_handling_and_escaping(tmp_path):
                   "--move-original", orig_dir)
     assert res.returncode == 0, f"Path with spaces processing failed: {res.stderr}"
 
-    expected_out = out_dir / "Test_Photo_Space.jpg"
+    expected_out = out_dir / "Test_Photo_Space_980.jpg"
     expected_moved = orig_dir / "Test Photo Space.JPG"
-    assert expected_out.exists(), f"Output file missing: {expected_out}"
+    assert expected_out.exists(), f"Output file missing: {expected_out}\n{res.stdout[-2000:]}"
     assert [p.name for p in orig_dir.iterdir()] == [expected_moved.name], f"Original file not moved to: {expected_moved}"
     assert not src_copy.exists(), "Source file was not moved from original location"
 
@@ -78,11 +78,14 @@ def test_windows_exiftool_metadata_tags(tmp_path):
 @pytest.mark.render
 def test_windows_convert_resolution(tmp_path, short_video):
     """Resolution conversion (--convert 1080p)."""
+    # A neutral name: the fixture's own "_720p" would be swapped for the target.
+    source = tmp_path / "dji_clip.mp4"
+    shutil.copy2(short_video, source)
     out_subfolder = tmp_path / "convert_1080p_out"
-    res = run_cli(short_video, out_subfolder, "--convert", "1080p")
+    res = run_cli(source, out_subfolder, "--convert", "1080p")
     assert res.returncode == 0, f"Resolution conversion failed: {res.stderr}"
-    expected_file = out_subfolder / f"{short_video.stem} 1080p{short_video.suffix.lower()}"
-    assert expected_file.exists(), f"Converted file missing: {expected_file}"
+    expected_file = out_subfolder / "dji_clip 1080p.mp4"
+    assert expected_file.exists(), f"Converted file missing: {expected_file}\n{res.stdout[-2000:]}"
 
 
 def test_windows_hud_rendering_and_fonts():

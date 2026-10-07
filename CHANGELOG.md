@@ -13,6 +13,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   text fits the templates as on macOS and Windows.
 - Windows, Linux: the Log Viewer's event list and the Overlay Designer's
   waypoint data now use a fixed-width font, as on macOS, so columns line up.
+- Windows: videos render on PCs without an NVIDIA graphics card (Intel or AMD
+  graphics, virtual machines); the app now falls back to software encoding
+  instead of failing every video.
 
 ### Removed
 - CLI: `--render-log` no longer writes a Final Cut Pro `.xml` (FCPXML) next to

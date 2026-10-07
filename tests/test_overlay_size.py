@@ -43,6 +43,7 @@ def test_quality_flags_follow_the_encoder():
     ff.hw_accel, ff.os_type = True, "Darwin"
     assert ff.get_encoder() == "hevc_videotoolbox" and ff.quality_args() == ["-q:v", "65"]
     ff.os_type = "Windows"
+    ff.nvenc_available = lambda: True
     assert ff.get_encoder() == "hevc_nvenc" and "-cq" in ff.quality_args()
 
 

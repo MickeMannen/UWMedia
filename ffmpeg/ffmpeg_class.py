@@ -9,6 +9,9 @@ from tqdm import tqdm
 from utils.tool_paths import get_ffmpeg_path, get_ffprobe_path
 from utils.progress_lines import emit
 
+# ffmpeg path -> whether hevc_nvenc opens (FfmpegClass.nvenc_available).
+_NVENC_AVAILABLE: dict = {}
+
 # @
 class FfmpegClass:
     """
@@ -131,9 +134,26 @@ class FfmpegClass:
             return "libx265"
         if self.os_type == "Darwin":
             return "hevc_videotoolbox"
-        elif self.os_type == "Windows":
+        elif self.os_type == "Windows" and self.nvenc_available():
             return "hevc_nvenc"
         return "libx265"
+
+    def nvenc_available(self) -> bool:
+        """Whether this ffmpeg can open NVENC here. A Windows PC without an
+        NVIDIA GPU (Intel / AMD graphics, a VM) can't, and every encode would
+        fail, so get_encoder() falls back to libx265. Checked once per ffmpeg
+        with a one-frame test encode."""
+        key = str(self.executable_path)
+        if key not in _NVENC_AVAILABLE:
+            cmd = [key, "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+                   "-i", "color=c=black:s=256x256:d=0.1", "-frames:v", "1",
+                   "-c:v", "hevc_nvenc", "-f", "null", "-"]
+            try:
+                ok = subprocess.run(cmd, capture_output=True, timeout=30).returncode == 0
+            except (OSError, subprocess.TimeoutExpired):
+                ok = False
+            _NVENC_AVAILABLE[key] = ok
+        return _NVENC_AVAILABLE[key]
 
     def quality_args(self) -> list:
         """Constant-quality flags for get_encoder(), for renders with no

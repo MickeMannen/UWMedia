@@ -253,6 +253,13 @@ tests don't need that much video.
       three test faults (Linux folder tests and SIGPIPE skipped on Windows,
       a hard-coded `/tmp` path); the QML smoke test now ignores the
       off-screen font-folder warning Qt gives on Windows.
+- [x] Second run (2026-10-07): macOS and Ubuntu green (697 passed). Windows
+      11 failed: the app always picked NVENC on Windows, which a PC without
+      an NVIDIA GPU can't open (every video failed) - now a one-frame check
+      with a libx265 fallback; `test_windows.py` was stale since the fixture
+      switch (photo names carry the `_980` milliseconds, the 720p clip needs
+      a neutral name for `--convert`); a Tag Editor test searched the raw
+      JSON text for a Windows path.
 
 ### Phase 6 - coverage (2026-10-06)
 - [x] `pytest-cov` (requirements.txt) with `[tool.coverage]` in pyproject.toml:
