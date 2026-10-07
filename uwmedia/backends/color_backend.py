@@ -552,6 +552,7 @@ class ColorBackend(QObject):
             if not ret:
                 cap.release()
                 self.preview_frame = None
+                self._set_scrub(enabled=False, minimum=0, maximum=0, value=0, time_text="--")
                 self._redraw_preview()
                 return
             self.preview_video_cap = cap
@@ -563,6 +564,7 @@ class ColorBackend(QObject):
             frame = cv2.imread(str(source_file))
             if frame is None:
                 self.preview_frame = None
+                self._set_scrub(enabled=False, minimum=0, maximum=0, value=0, time_text="--")
                 self._redraw_preview()
                 return
             self._set_scrub(enabled=False, minimum=0, maximum=0, value=0, time_text="Photo")
@@ -1307,6 +1309,10 @@ class ColorBackend(QObject):
     def onStartClicked(self):
         if self.process is not None:
             self._kill_process_tree()
+            return
+
+        if not self._source_text.strip() or not self._output_text.strip():
+            self._set_status("Nothing to run: select a source file or folder and an output first.")
             return
 
         args = self._build_args()

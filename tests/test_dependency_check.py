@@ -48,8 +48,10 @@ def test_installation_instructions_linux():
     assert "sudo dnf install ffmpeg perl-Image-ExifTool" in instructions
     assert "sudo pacman -S ffmpeg perl-image-exiftool" in instructions
 
-def test_check_dependencies_success():
-    # Should complete without error when all tools are found
+def test_check_dependencies_success(monkeypatch):
+    # Should complete without error when all tools are found. It prepends the
+    # tools' folders to PATH; monkeypatch puts the real PATH back afterwards.
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
     found = check_dependencies(is_gui=False)
     assert "ffmpeg" in found
     assert "ffprobe" in found

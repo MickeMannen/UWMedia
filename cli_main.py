@@ -9,6 +9,7 @@ import json
 import multiprocessing
 from pathlib import Path
 from datetime import timedelta, datetime
+from typing import List
 import zipfile
 from tqdm import tqdm
 from parsers.uddf import UDDFParser
@@ -404,8 +405,9 @@ def get_unique_path(path: Path, lower_suffix: bool = True) -> Path:
             return new_path
         counter += 1
 
-def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_offset_mins, meta_handler):
-    """Handles multi-resolution conversion for a video with optimized bitrates."""
+def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_offset_mins, meta_handler) -> List[str]:
+    """Handles multi-resolution conversion for a video with optimized bitrates.
+    Returns the resolutions that failed."""
     resolutions = {name: (w, h, bitrate) for name, w, h, bitrate in CONVERT_RESOLUTIONS}
 
     ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
@@ -413,6 +415,7 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
     total = len(args.convert)
     emit(f"UWMEDIA_PROGRESS 0/{total} start -")
     done = 0
+    failed = []
     for res_name in args.convert:
         if res_name not in resolutions:
             continue
@@ -443,10 +446,12 @@ def process_conversions(source: Path, output_dir: Path, args, creation_date, tz_
                 print(f"Warning: Failed to copy metadata: {e}")
         except Exception as e:
             status = "error"
+            failed.append(res_name)
             print(f"Error converting to {res_name}: {e}")
         finally:
             done += 1
             emit(f"UWMEDIA_PROGRESS {done}/{total} {status} {target_path.name}")
+    return failed
 
 def first_overlay_name(args):
     """The name of the first overlay drawn on the output - the --layout's
@@ -504,13 +509,14 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
 
     # Add milliseconds to photo filenames (limit to 3 digits) - keeps
     # date-named photos taken in the same second apart; not wanted when the
-    # original name is kept.
+    # original name is kept or an output file was named explicitly (that
+    # name is used as given).
     is_video = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
     keep_name = (
-        (getattr(args, "keep_filename", False) or "{filename}" in (getattr(args, "filename_format", None) or ""))
-        and not args.render_video_log and not forced_filename
+        getattr(args, "keep_filename", False) or "{filename}" in (getattr(args, "filename_format", None) or "")
     )
-    if not args.render_video_log and not keep_name and not is_video and creation_date.microsecond > 0:
+    if (not args.render_video_log and not forced_filename and not keep_name and not is_video
+            and creation_date.microsecond > 0):
         ms = creation_date.microsecond // 1000
         p = Path(filename)
         filename = f"{p.stem}_{ms:03d}{p.suffix}"
@@ -785,9 +791,11 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
     if is_video and args.convert:
         # Multi-resolution conversion mode
         t_conv_start = time.time()
-        process_conversions(source, output_dir, args, creation_date, tz_offset_mins, meta_handler)
+        failed = process_conversions(source, output_dir, args, creation_date, tz_offset_mins, meta_handler)
         conv_time = time.time() - t_conv_start
         stats["stages"].append({"name": "Multi-res Conversion", "time": conv_time})
+        if failed:
+            stats["error"] = f"Conversion failed: {', '.join(failed)}"
         stats["total_time"] = time.time() - t_file_start
         return stats
 
@@ -1368,7 +1376,7 @@ def main():
                         emit(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} error {filename}")
                     else:
                         stats_list.append(result)
-                        status = "skipped" if result.get("skipped") else "done"
+                        status = _progress_status(result)
                         emit(f"UWMEDIA_PROGRESS {len(stats_list)}/{len(files)} {status} {filename}")
             except KeyboardInterrupt:
                 print("\n[!] KeyboardInterrupt received. Shutting down worker threads...")
@@ -1380,11 +1388,8 @@ def main():
         else:
             for i, file in enumerate(tqdm(files, desc="Batch Processing", unit="file", disable=not sys.stdout.isatty()), start=1):
                 res = process_single_file(file, args.output, args, manager, meta_handler, tmp_hud_dir)
-                if res:
-                    stats_list.append(res)
-                    status = "skipped" if res.get("skipped") else "done"
-                else:
-                    status = "error"
+                stats_list.append(res)
+                status = _progress_status(res)
                 emit(f"UWMEDIA_PROGRESS {i}/{len(files)} {status} {file.name}")
     else:
         # Single file source
@@ -1395,10 +1400,10 @@ def main():
                 args.output.mkdir(parents=True)
             output_dir = args.output
         else:
-            # Output is a specific file path
+            # Output is a specific file path: that name is used as given,
+            # over any --filename-format.
             output_dir = args.output.parent
-            if not args.filename_format:
-                forced_filename = args.output.name
+            forced_filename = args.output.name
 
         stats = process_single_file(args.source, output_dir, args, manager, meta_handler, tmp_hud_dir, forced_filename=forced_filename)
         stats_list = [stats] if stats else []
@@ -1412,6 +1417,21 @@ def main():
     # Cleanup temp HUD files if used
     if tmp_hud_dir:
         shutil.rmtree(tmp_hud_dir)
+
+    # A run with a failed file ends with a non-zero exit code, so the pages
+    # (which show the CLI's exit code) report it as failed, not finished.
+    failed = [s for s in stats_list if s and s.get("error")]
+    if failed:
+        print(f"{len(failed)} of {len(stats_list)} file{'s' if len(stats_list) != 1 else ''} failed.")
+        sys.exit(1)
+
+def _progress_status(stats: dict) -> str:
+    """The UWMEDIA_PROGRESS status for one file's stats: a file that returned
+    an error (e.g. an unreadable date) is an error, not done."""
+    if stats.get("error"):
+        return "error"
+    return "skipped" if stats.get("skipped") else "done"
+
 
 def print_summary(stats_list):
     CYAN = "\033[1;36m"

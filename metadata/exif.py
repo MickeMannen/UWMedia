@@ -71,11 +71,10 @@ class MetadataHandler:
             with ExifTool(executable=self.exiftool_path) as et:
                 et.execute(*cmd)
 
-        # Set xmp date taken if not present
-        meta = self.get_metadata(src)
+        # Sony's XML sidecar metadata (date, camera, lens) to XMP
+        meta = self.get_metadata(src) or {}
 
-        if not any(key.startswith("XML:") for key in meta):
-            # meta = exif._get_metadata(Path(file))
+        if any(key.startswith("XML:") for key in meta):
             if self.set_xmp_data(meta, dest):
                 print("Set XMP data")
 
@@ -114,17 +113,20 @@ class MetadataHandler:
                 tag_info = key_mapping[key]
                 tag = tag_info["tag"]
                 ftype = tag_info["ftype"]
-                if isinstance(value, str) and ftype == str:
-                    # str case
+                if ftype == str:
+                    # exiftool's JSON gives numeric-looking values as numbers
+                    value = str(value)
                     if tag_info.get('regex', None) is not None:
                         value = re.sub(tag_info.get('regex', ''), '', value)
                     cmd.append(f"-{tag}={value}".encode('utf-8'))
-                elif (isinstance(value, datetime) or self._date_str_to_datetime(value) is not None) and ftype == datetime:
-                    # datetime case
-                    t_value = self._date_str_to_datetime(value)
-                    date_str = t_value.strftime(tag_info.get("format"))
-                    if tag_info.get("format") == '%Y:%m:%d %H:%M:%S%z':
-                        date_str = date_str[:-2] + ':' + date_str[-2:]
+                elif ftype == datetime:
+                    t_value = value if isinstance(value, datetime) else self._date_str_to_datetime(str(value))
+                    if t_value is None:
+                        continue
+                    date_str = t_value.strftime("%Y:%m:%d %H:%M:%S")
+                    offset = t_value.strftime("%z")  # "" for a date without an offset
+                    if offset:
+                        date_str += offset[:-2] + ':' + offset[-2:]
                     cmd.append(f"-{tag}={date_str}".encode('utf-8'))
 
         if len(cmd) > 0:
@@ -185,7 +187,7 @@ class MetadataHandler:
             return None
 
     def _parse_timezone(self, tz_str: Any) -> Optional[timezone]:
-        if not tz_str:
+        if tz_str is None or tz_str == "":
             return None
         # Convert to string if it's an int/float (minutes offset)
         if isinstance(tz_str, (int, float)):
@@ -257,7 +259,8 @@ class MetadataHandler:
                 creation_str = str(creation_str)
                 # 2023:10:27 12:34:56+08:00
                 dt = datetime.strptime(creation_str[:19], "%Y:%m:%d %H:%M:%S")
-                tz = self._parse_timezone(creation_str[19:])
+                # subseconds come before the offset: "...12:34:56.98+08:00"
+                tz = self._parse_timezone(re.sub(r"^\.\d+", "", creation_str[19:]))
                 if tz:
                     return dt.replace(tzinfo=tz).astimezone(timezone.utc)
             except:

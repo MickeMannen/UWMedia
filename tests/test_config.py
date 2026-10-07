@@ -63,3 +63,12 @@ def test_broken_yaml_loads_as_empty(fresh, capsys):
     fresh.write_text("tanks: [unclosed")
     assert config.get_config().get_tank_mapping() == {}
     assert "Error loading" in capsys.readouterr().out
+
+
+def test_unquoted_numeric_serials_are_text(fresh):
+    fresh.write_text("tanks:\n  3456789: Left\n  '100': Right\n")
+    cfg = config.get_config()
+    assert cfg.get_tank_mapping() == {"3456789": "Left", "100": "Right"}
+    cfg.set_tank_name("3456789", "Main")
+    cfg.remove_tank("100")
+    assert _read(fresh)["tanks"] == {"3456789": "Main"}

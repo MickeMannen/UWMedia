@@ -1,4 +1,4 @@
-from garmin_fit_sdk import Decoder, Stream, Encoder
+from garmin_fit_sdk import Decoder, Stream
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict
 from pathlib import Path
@@ -201,7 +201,6 @@ class GarminParser(BaseParser):
         # Tank Updates
         tank_messages_dict = {}
         tank_messages = messages.get("tank_update_mesgs", [])
-        print(f"DEBUG: Found {len(tank_messages)} tank update messages")
         for t_msg in tank_messages:
             ts = t_msg.get("timestamp")
             if isinstance(ts, int):
@@ -233,7 +232,6 @@ class GarminParser(BaseParser):
             if ts_local not in tank_messages_dict:
                 tank_messages_dict[ts_local] = {}
             tank_messages_dict[ts_local][tank_key] = tank_data
-            # print(f"DEBUG: Tank update at {ts_local} for {tank_key}")
 
         # Dive-alert events (e.g. "approaching_first_deco_stop", "safety_stop_started") -
         # a more direct state signal than depth-band heuristics; see hud_rules_engine.resolve_state()
@@ -256,7 +254,6 @@ class GarminParser(BaseParser):
         waypoints = []
         current_active_tanks = {}
         record_messages = messages.get("record_mesgs", [])
-        print(f"DEBUG: Found {len(record_messages)} record messages")
 
         # Sort tank updates by time for efficient merging
         sorted_tank_times = sorted(tank_messages_dict.keys())
@@ -271,7 +268,6 @@ class GarminParser(BaseParser):
                     initial_tanks[t_key] = tank_messages_dict[ts_key][t_key]
                     unique_tank_keys.add(t_key)
         
-        print(f"DEBUG: Unique tanks identified: {unique_tank_keys}")
         
         current_active_tanks = initial_tanks.copy()
         tank_ptr = 0
@@ -344,24 +340,3 @@ class GarminParser(BaseParser):
         )
         
         return [dive]
-
-    def adjust_time(self, filename: Path, target:Path) -> bool:
-
-        # Create a stream to write to a file
-        stream = Stream.from_file(str(target))
-        encoder = Encoder(stream)
-
-        # 1. Write the File Header
-        # encoder.write_file_header()
-
-        # 2. Define and write messages (e.g., File Id, Records)
-        file_id_message = {
-            'type': 'file_id',
-            'product': 1,
-            'serial_number': 12345,
-            'time_created': 1000000000  # FIT Epoch time
-        }
-        encoder.write_mesg(file_id_message)
-
-        # 3. Finalize the file (calculates CRC and updates header)
-        encoder.close()

@@ -1,7 +1,7 @@
 """
 Pure logic for the Overlay Designer (module keeps its original "hud_designer"
-name - overlay_rework.md decision Q10): anchor/offset math, layout JSON (de)serialization,
-element hit-testing, and alignment - ported from gui/hud_manager.py's HUDManager,
+name - overlay_rework.md decision Q10): anchor math, reading a layout's elements,
+element bounds and hit-testing, and alignment - ported from gui/hud_manager.py's HUDManager,
 with Qt's QGraphicsScene item state replaced by plain dicts. No Toga/Qt imports here;
 uwmedia/app.py owns the canvas widget and file I/O, this module owns the math.
 
@@ -75,40 +75,6 @@ def resolve_skin_position(
     return skin_data.get("x_pct", 0.0) * view_w, skin_data.get("y_pct", 0.0) * view_h
 
 
-def compute_ref_offset(
-    anchor: str, x: float, y: float, skin_w: float, skin_h: float, view_w: float, view_h: float
-) -> Tuple[float, float]:
-    """Inverse of resolve_anchor_position (ported from HUDManager.get_layout_json)."""
-    if "LEFT" in anchor:
-        hud_ref_x = x
-    elif "CENTER" in anchor:
-        hud_ref_x = x + skin_w / 2.0
-    else:  # RIGHT
-        hud_ref_x = x + skin_w
-
-    if "TOP" in anchor:
-        hud_ref_y = y
-    elif "MIDDLE" in anchor:
-        hud_ref_y = y + skin_h / 2.0
-    else:  # BOTTOM
-        hud_ref_y = y + skin_h
-
-    if "LEFT" in anchor:
-        screen_ref_x = 0.0
-    elif "CENTER" in anchor:
-        screen_ref_x = view_w / 2.0
-    else:
-        screen_ref_x = float(view_w)
-
-    if "TOP" in anchor:
-        screen_ref_y = 0.0
-    elif "MIDDLE" in anchor:
-        screen_ref_y = view_h / 2.0
-    else:
-        screen_ref_y = float(view_h)
-
-    return hud_ref_x - screen_ref_x, hud_ref_y - screen_ref_y
-
 
 def skin_pixel_size(skin: Dict[str, Any]) -> Tuple[float, float]:
     """Current skin size in design pixels."""
@@ -120,91 +86,6 @@ def skin_pixel_size(skin: Dict[str, Any]) -> Tuple[float, float]:
     return native_w * scale, native_h * scale
 
 
-def build_layout_json(
-    skin: Dict[str, Any],
-    elements: List[Dict[str, Any]],
-    manufacturer: str,
-    model: str,
-    view_w: float,
-    view_h: float,
-) -> Dict[str, Any]:
-    """Ported from HUDManager.get_layout_json, operating on plain dicts."""
-    is_shape = skin.get("type") == "shape"
-    skin_w, skin_h = skin_pixel_size(skin)
-    anchor = skin.get("anchor", "TOP_LEFT")
-    x, y = skin.get("x", 0.0), skin.get("y", 0.0)
-
-    ref_x, ref_y = compute_ref_offset(anchor, x, y, skin_w, skin_h, view_w, view_h)
-
-    linked_elements = []
-    for elem in elements:
-        # Unknown keys (ceiling_color, value_font_size, align, font_family,
-        # ... - overlay_rework.md schema v2) are carried through verbatim;
-        # only the per-type defaults below are filled in when absent.
-        entry = {k: v for k, v in elem.items() if k not in TRANSIENT_ELEMENT_KEYS}
-        entry["field"] = elem["field"]
-        entry["rel_x"] = elem["rel_x"]
-        entry["rel_y"] = elem["rel_y"]
-        kind = elem.get("type")
-        if kind == "graph":
-            entry["type"] = "graph"
-            for key, default in (("color", "#00FF00"), ("width", 300), ("height", 150),
-                                 ("marker_style", "dot"), ("marker_size", 6)):
-                entry.setdefault(key, default)
-        elif kind == "badge":
-            entry["type"] = "badge"
-            entry.setdefault("font_size", 16)
-            entry.setdefault("scale", 1.0)
-        elif kind == "tank_icon":
-            entry["type"] = "tank_icon"
-            for key, default in (("width", 20), ("height", 30), ("corner_radius", 4)):
-                entry.setdefault(key, default)
-        elif kind == "tissue_bar":
-            entry["type"] = "tissue_bar"
-            for key, default in (("width", 12), ("height", 33), ("marker_size", 4)):
-                entry.setdefault(key, default)
-        elif kind == "ascent_chevrons":
-            entry["type"] = "ascent_chevrons"
-            for key, default in (("width", 16), ("height", 47), ("up_count", 4), ("down_count", 1)):
-                entry.setdefault(key, default)
-        else:
-            for key, default in (("color", "#FFFFFF"), ("font_size", 16), ("scale", 1.0)):
-                entry.setdefault(key, default)
-        linked_elements.append(entry)
-
-    skin_data = {
-        "type": "shape" if is_shape else "image",
-        "anchor": anchor,
-        "ref_offset_x": ref_x,
-        "ref_offset_y": ref_y,
-        "opacity": skin.get("opacity", 1.0),
-        "x_pct": x / view_w if view_w else 0.0,
-        "y_pct": y / view_h if view_h else 0.0,
-        "linked_elements": linked_elements,
-    }
-    if is_shape:
-        skin_data.update({
-            "width": skin.get("width", 400),
-            "height": skin.get("height", 200),
-            "color": skin.get("color", "#000000"),
-            "corner_radius": skin.get("corner_radius", 20),
-        })
-    else:
-        skin_data.update({
-            "path": skin.get("path"),
-            "scale": skin.get("scale", 1.0),
-        })
-
-    return {
-        "manufacturer": manufacturer,
-        "model": model,
-        "hud_skin": skin_data,
-        "design_width": view_w,
-        "design_height": view_h,
-    }
-
-
-TRANSIENT_ELEMENT_KEYS = frozenset({"uid", "_origin"})  # _origin: utils.layouts.ELEMENT_ORIGIN_KEY
 
 ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons")
 
@@ -429,33 +310,6 @@ def hit_test_bounds(x: float, y: float, bounds: List[Tuple[float, float, float, 
     return None
 
 
-def element_position(elem: Dict[str, Any], skin: Dict[str, Any]) -> Tuple[float, float]:
-    """Absolute design-pixel top-left of an element (skin position + its rel_x/rel_y)."""
-    skin_w, skin_h = skin_pixel_size(skin)
-    return skin.get("x", 0.0) + elem["rel_x"] * skin_w, skin.get("y", 0.0) + elem["rel_y"] * skin_h
-
-
-def hit_test(
-    x: float, y: float, skin: Optional[Dict[str, Any]], elements: List[Dict[str, Any]]
-) -> Optional[Any]:
-    """Returns the index of the topmost element under (x, y) in design-pixel space, the
-    string "skin" if only the skin was hit, or None. Elements are tested last-first,
-    approximating the draw order's z-index (later-added draws on top)."""
-    if not skin:
-        return None
-
-    for index in range(len(elements) - 1, -1, -1):
-        elem = elements[index]
-        ex, ey = element_position(elem, skin)
-        ew, eh = measure_element_box(elem, skin)
-        if ex <= x <= ex + ew and ey <= y <= ey + eh:
-            return index
-
-    skin_w, skin_h = skin_pixel_size(skin)
-    sx, sy = skin.get("x", 0.0), skin.get("y", 0.0)
-    if sx <= x <= sx + skin_w and sy <= y <= sy + skin_h:
-        return "skin"
-    return None
 
 
 def align_elements(elements: List[Dict[str, Any]], indices: List[int], skin: Dict[str, Any], mode: str) -> None:

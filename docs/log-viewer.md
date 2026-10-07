@@ -27,8 +27,24 @@ from the [Dive Profile Builder](dive-profile-builder.md)).
    temperature, NDL, TTS, gas and tank pressures. **Filter** narrows it down.
 
 **Remove** (or Delete / Backspace) takes the selected dive off the list and
-**Clear** empties it. Neither touches the files: the Log Viewer never writes
-anything.
+**Clear** empties it. Neither touches the files.
+
+## Adjust time (Garmin)
+
+If your Garmin's clock was wrong before a dive (not yet synced after a
+battery change or a trip), the log's times won't match your photos and
+videos. Select the dive and click **Adjust time…** at the top of its **Dive**
+card:
+
+- **Start (local time)**: when the dive really started, in the dive site's
+  local time, e.g. `2026-03-05 14:23:07`.
+- **Time zone (UTC offset)**: the dive site's time zone, e.g. `+07:00` or
+  `-05:30`.
+
+**Save** asks where to put the corrected copy (it suggests
+`<name> (adjusted).fit` next to the original) and adds it to the list. Every
+sample moves by the same amount and all other data stays as logged; the
+original file is never changed. This is for Garmin `.fit` logs only.
 
 ## Tank sensors
 

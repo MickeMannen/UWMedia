@@ -299,6 +299,65 @@ tests don't need that much video.
       `air_long_deco` and `nx32_deco` against the fresh-tissue port and they
       pass; `air_multi_deco` has two gases, which the port doesn't do yet.
 
+### Phase 7 - remaining coverage (2026-10-07)
+Default run measured 86% (2,109 lines missed). Target: every module below at
+least 80-90%, the ones that change users' files or read dive logs as high as
+sensible; drawing code only where the logic is testable.
+
+- [x] `metadata/exif.py` 62% -> 99%, `utils/dependency_check.py` 68% -> 100%
+      (`test_exif_coverage.py`, 53 tests with real exiftool on copies;
+      `test_dependency_check_coverage.py`, 22). Five bugs in `exif.py`, each a
+      strict xfail, not fixed yet (owner to decide):
+      1. `copy_all` never writes XMP: the `XML:` check is inverted (l. 77).
+      2. `set_xmp_data`: a date without offset becomes "09:37::36", which
+         exiftool rejects.
+      3. `set_xmp_data`: numbers / datetimes crash `_date_str_to_datetime`
+         (hidden by 1).
+      4. `get_standardized_creation_date`: offset read from `[19:]`, which is
+         ".98+02:00" when the date has subseconds - offset lost.
+      5. `_parse_timezone(0)` returns None instead of UTC.
+      Also: `test_dependency_check.py::test_check_dependencies_success`
+      changes the real PATH and never restores it.
+- [x] `uwmedia/backends/advanced_backend.py` 56%, `uwmedia/__main__.py` 39%,
+      `uwmedia/app.py` 82% -> all 100% (`test_advanced_backend.py`, 23 tests;
+      `test_app_entry.py`, 21 tests). Note: a hand-written `config.yaml` with
+      unquoted numeric tank serials loads them as numbers, which rename /
+      remove (text) don't match.
+- [x] `utils/hud_designer.py` 65% -> 99%, `gui/dive_profile_view.py` 64% -> 100%
+      (`test_hud_designer.py`, 54 tests; `test_dive_profile_view.py`, 29).
+      Found: `compute_ref_offset` treats a CENTER anchor as bottom-attached
+      vertically, while the renderer and `overlay_document` use top (strict
+      xfail). Nothing in the app calls `compute_ref_offset`,
+      `build_layout_json` or `hit_test` any more, only tests - owner to decide.
+- [x] Parsers: `uddf.py` 76%, `garmin.py` 81%, `subsurface.py` 81%,
+      `shearwater.py` 88%, `subsurface_csv.py` 89% -> 97-100% with synthetic
+      data only (133 tests in `test_uddf_parsing.py`, `test_subsurface_parsing.py`,
+      `test_shearwater_parsing.py`, `test_subsurface_csv_parsing.py`,
+      `test_garmin_parsing.py`). Found: UDDF overwrites a logged `<cns>` with
+      the recomputed value (strict xfail; UWMedia's own UDDF files write
+      `<cns>`); `GarminParser.adjust_time` is broken and unused; a malformed
+      number in some UDDF/Subsurface fields fails the whole parse while others
+      are skipped; garmin.py prints DEBUG lines on every parse.
+- [x] `cli_main.py` 74% -> 97% (`test_cli_main_coverage.py`, 56 tests; adds
+      ~5 s). Found: a file whose date can't be read was reported "done".
+- [x] Page backends: overlay generator 78%, dive profile 82%, color 87%,
+      convertion 86% -> 99-100% (four new files, 106 tests). Found: Color
+      Start ran with an empty Source/Output; the preview slider kept the old
+      clip after an unreadable file.
+- [x] All bugs above fixed (owner, 2026-10-07), their xfails removed;
+      `GarminParser.adjust_time` replaced by `parsers/fit_time.py` and the
+      Log Viewer's "Adjust time…" (`test_fit_time.py`, checked on 38 real FIT
+      logs). Default run: 1273 passed, 6 skipped, 3 xfailed in 1m22s;
+      coverage 86% -> 95%.
+- [x] Owner answers (2026-10-07): a run with a failed file exits 1 (pages
+      show "Failed"); an explicit output file name is used as given (no
+      milliseconds, no filename format); unused `compute_ref_offset`,
+      `build_layout_json`, `element_position`, `hit_test` removed.
+      `--no-overwrite` / `--move-original` with `--overlays-file` alone is
+      terminal-only and left as is (terminal support is going away).
+- [ ] Still open (owner): should a pinned gas on the last waypoint override the
+      deco gas on End dive (Dive Profile Builder)?
+
 ## Log
 
 - 2026-10-06: review done, plan written, Phase 1 done (fast run 1m40s).
@@ -319,3 +378,5 @@ tests don't need that much video.
   745 passed, 6 skipped (Windows-only), 3 xfailed in 1m06s.
 - 2026-10-07: GitHub CI green on all three (run 37550357960): Windows 702 passed,
   50 skipped; macOS and Ubuntu 699 passed, 53 skipped (no test_data); 3 xfailed each.
+- 2026-10-07: Phase 7 (coverage 86% -> 95%, ~620 new tests), bug fixes and
+  Log Viewer "Adjust time" for Garmin FIT.

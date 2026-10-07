@@ -89,8 +89,9 @@ class ConfigManager:
         self._write()
 
     def get_tank_mapping(self) -> Dict[str, str]:
-        """Returns the tank mapping (serial -> friendly name)."""
-        return self._config.get("tanks", {})
+        """Returns the tank mapping (serial -> friendly name). Serials are text
+        even when a hand-written config.yaml has them unquoted (YAML numbers)."""
+        return {str(serial): str(name) for serial, name in (self._config.get("tanks") or {}).items()}
 
     def map_tank_name(self, serial: str) -> str:
         """Maps a serial number to a friendly name, or returns the serial if not found."""

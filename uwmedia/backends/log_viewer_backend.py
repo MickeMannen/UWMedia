@@ -9,6 +9,11 @@ and the selected dive is shown as a grid of fields, a tanks table, a depth
 profile, the channels the log holds, its events and - unlike DiveSync - the
 full sample table with a filter, which is what an overlay is drawn from.
 
+The one thing that writes a file is "Adjust time" for a Garmin FIT dive
+(a dive computer whose clock was wrong): a Save As dialog writes a copy
+with the corrected start time and time zone (parsers/fit_time.py), which
+is then added to the list; the original is left as it was.
+
 Logs are read through parsers.registry (every format UWMedia reads, .xml/.csv
 told apart by content). Every dive of every file is listed, including
 several exports of one dive - unlike the media pages' DiveManager, which
@@ -17,13 +22,16 @@ files doesn't freeze the window; the result comes back through a queued
 signal. The folder the dialogs open in is remembered in settings.json's
 "fields" (key LAST_FOLDER_FIELD).
 """
+import re
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Property, QObject, QStandardPaths, Signal, Slot
 
 from models.dive import Dive
+from parsers.fit_time import adjust_fit_time, fit_activity_time
 from parsers.registry import LOG_FILE_FILTER, is_log_file, parse_log_file
 from utils.app_settings import get_fields, set_field
 from utils.config import get_config
@@ -293,6 +301,45 @@ def log_files_in(folder: Path) -> List[Path]:
     )
 
 
+START_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M")
+
+
+def parse_local_start(text: str) -> datetime:
+    """'2026-03-05 14:23[:07]' as a naive local datetime; ValueError otherwise."""
+    text = " ".join(text.split())
+    for fmt in START_FORMATS:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    raise ValueError(text)
+
+
+def parse_utc_offset(text: str) -> int:
+    """'+07:00', '-5:30', '+7', 'UTC+08:00' or '0' as minutes east of UTC;
+    ValueError otherwise (or outside UTC-12:00..UTC+14:00)."""
+    match = re.fullmatch(r"(?:UTC|GMT)?\s*([+-]?)(\d{1,2})(?::?(\d{2}))?", text.strip(), re.IGNORECASE)
+    if not match:
+        raise ValueError(text)
+    sign, hours, minutes = match.groups()
+    total = int(hours) * 60 + int(minutes or 0)
+    if sign == "-":
+        total = -total
+    if not -12 * 60 <= total <= 14 * 60 or int(minutes or 0) >= 60:
+        raise ValueError(text)
+    return total
+
+
+def format_utc_offset(minutes: int) -> str:
+    sign = "-" if minutes < 0 else "+"
+    return f"{sign}{abs(minutes) // 60:02}:{abs(minutes) % 60:02}"
+
+
+def adjusted_name(path: Path) -> Path:
+    """Where Save As starts: 'Dive 12.fit' -> 'Dive 12 (adjusted).fit'."""
+    return path.with_name(f"{path.stem} (adjusted){path.suffix}")
+
+
 def _dive_key(dive: Dive):
     return (dive.log_path, dive.start_time)
 
@@ -494,6 +541,70 @@ class LogViewerBackend(QObject):
         self.divesChanged.emit()
         self._set_current(-1)
         self._set_message("")
+
+    # -- adjust time (Garmin FIT) -------------------------------------------
+
+    def _selected_dive(self) -> Optional[Dive]:
+        return self._dives[self._current] if 0 <= self._current < len(self._dives) else None
+
+    @Property(bool, notify=selectionChanged)
+    def canAdjustTime(self) -> bool:
+        dive = self._selected_dive()
+        return bool(dive and dive.log_format == "fit" and dive.log_path and Path(dive.log_path).is_file())
+
+    @Property(str, notify=selectionChanged)
+    def adjustStartText(self) -> str:
+        """The selected dive's start as the dialog shows it."""
+        dive = self._selected_dive()
+        return dive.start_time.strftime("%Y-%m-%d %H:%M:%S") if dive else ""
+
+    @Property(str, notify=selectionChanged)
+    def adjustOffsetText(self) -> str:
+        """The selected FIT dive's UTC offset as the dialog shows it."""
+        if not self.canAdjustTime:
+            return ""
+        try:
+            _, offset = fit_activity_time(Path(self._selected_dive().log_path))
+        except (OSError, ValueError):
+            return ""
+        return format_utc_offset(offset or 0)
+
+    def _dialog_save(self, suggested: Path) -> str:
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(None, "Save the adjusted log", str(suggested), "Garmin FIT (*.fit)")
+        return path
+
+    @Slot(str, str, result=str)
+    def adjustTime(self, start_text: str, offset_text: str) -> str:
+        """The Adjust time dialog's OK: asks where to save, writes the copy
+        and adds it to the list. Returns an error for the dialog, or ""."""
+        if not self.canAdjustTime:
+            return "Only Garmin FIT logs can be adjusted"
+        try:
+            local_start = parse_local_start(start_text)
+        except ValueError:
+            return "Enter the start as YYYY-MM-DD HH:MM:SS (the dive site's local time)"
+        try:
+            offset = parse_utc_offset(offset_text)
+        except ValueError:
+            return "Enter the time zone as a UTC offset, e.g. +07:00 or -05:30"
+        source = Path(self._selected_dive().log_path)
+        target = self._dialog_save(adjusted_name(source))
+        if not target:
+            return ""  # cancelled: nothing written
+        target = Path(target)
+        if target.suffix.lower() != ".fit":
+            target = target.with_name(target.name + ".fit")
+        if target.resolve() == source.resolve():
+            return "Save the adjusted log under a new name; the original is kept as it is"
+        try:
+            adjust_fit_time(source, target, local_start, offset)
+        except (OSError, ValueError) as e:
+            return f"Could not save the adjusted log: {e}"
+        self._remember_folder(target.parent)
+        self._read([str(target)])
+        return ""
 
     # -- sample table ------------------------------------------------------
 

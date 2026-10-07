@@ -22,14 +22,13 @@ def parse_time_str(time_str: str) -> int:
         is_seconds = True
         time_str = time_str[:-1].strip()
         
-    if ":" in time_str:
-        parts = time_str.split(":")
-        if len(parts) == 2:
-            return int(parts[0]) * 60 + int(parts[1])
-        elif len(parts) == 3:
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-            
     try:
+        if ":" in time_str:
+            parts = time_str.split(":")
+            if len(parts) == 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
         val = float(time_str)
         if is_minutes:
             return int(val * 60)
@@ -39,36 +38,36 @@ def parse_time_str(time_str: str) -> int:
 
 def parse_depth_str(depth_str: str) -> float:
     depth_str = depth_str.strip()
-    if depth_str.endswith("m"):
-        return float(depth_str[:-1].strip())
-    elif depth_str.endswith("ft"):
-        return float(depth_str[:-2].strip()) * 0.3048
     try:
+        if depth_str.endswith("m"):
+            return float(depth_str[:-1].strip())
+        elif depth_str.endswith("ft"):
+            return float(depth_str[:-2].strip()) * 0.3048
         return float(depth_str)
     except ValueError:
         return 0.0
 
 def parse_temp_str(temp_str: str) -> float:
     temp_str = temp_str.strip()
-    if temp_str.endswith("C"):
-        return float(temp_str[:-1].strip())
-    elif temp_str.endswith("F"):
-        f_val = float(temp_str[:-1].strip())
-        return (f_val - 32.0) * 5.0 / 9.0
-    elif temp_str.endswith("K"):
-        return float(temp_str[:-1].strip()) - 273.15
     try:
+        if temp_str.endswith("C"):
+            return float(temp_str[:-1].strip())
+        elif temp_str.endswith("F"):
+            f_val = float(temp_str[:-1].strip())
+            return (f_val - 32.0) * 5.0 / 9.0
+        elif temp_str.endswith("K"):
+            return float(temp_str[:-1].strip()) - 273.15
         return float(temp_str)
     except ValueError:
         return 0.0
 
 def parse_pressure_str(pressure_str: str) -> float:
     pressure_str = pressure_str.strip()
-    if pressure_str.endswith("bar"):
-        return float(pressure_str[:-3].strip())
-    elif pressure_str.endswith("psi"):
-        return float(pressure_str[:-3].strip()) * 0.0689476
     try:
+        if pressure_str.endswith("bar"):
+            return float(pressure_str[:-3].strip())
+        elif pressure_str.endswith("psi"):
+            return float(pressure_str[:-3].strip()) * 0.0689476
         return float(pressure_str)
     except ValueError:
         return 0.0
@@ -77,15 +76,22 @@ def parse_gas_percent(gas_str: Optional[str], default_val: float) -> float:
     if not gas_str:
         return default_val
     gas_str = gas_str.strip()
-    if gas_str.endswith("%"):
-        return float(gas_str[:-1].strip())
     try:
+        if gas_str.endswith("%"):
+            return float(gas_str[:-1].strip())
         val = float(gas_str)
         if val <= 1.0:
             return val * 100.0
         return val
     except ValueError:
         return default_val
+
+def _optional_float(value: Optional[str]) -> Optional[float]:
+    """An optional sample value; empty or unreadable gives None."""
+    try:
+        return float(value) if value else None
+    except ValueError:
+        return None
 
 class SubsurfaceParser(BaseParser):
     def parse(self, file_path: Path) -> List[Dive]:
@@ -302,9 +308,9 @@ class SubsurfaceParser(BaseParser):
 
                 # Extended Garmin fields if present
                 gf_val = sample.get("gf")
-                gf = float(gf_val) if gf_val else None
+                gf = _optional_float(gf_val)
                 battery_val = sample.get("battery")
-                battery = float(battery_val) if battery_val else None
+                battery = _optional_float(battery_val)
 
                 waypoints.append(Waypoint(
                     timestamp=timestamp,

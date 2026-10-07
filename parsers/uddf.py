@@ -8,6 +8,18 @@ from models.dive import Dive, Waypoint, TankData
 from utils.deco_engine import DiveDecompressor, GasDefinition
 from utils.gas_consumption import fill_sac_and_gtr
 
+def _number(text, kind):
+    """A sample's numeric field, or None when it is empty or unreadable - one
+    bad value is skipped, as for temperature and tank pressure, instead of
+    failing the whole log."""
+    if not text:
+        return None
+    try:
+        return kind(float(text))
+    except (TypeError, ValueError):
+        return None
+
+
 class UDDFParser(BaseParser):
     def update_timezone(self, file_path: Path, offset_minutes: int):
         """Adds <timezone> tag to <dive> elements if missing."""
@@ -133,7 +145,9 @@ class UDDFParser(BaseParser):
                 
                 # Depth
                 depth_str = sample.xpath("string(*[local-name()='depth'])")
-                depth = float(depth_str) if depth_str else 0.0
+                depth = _number(depth_str, float) if depth_str else 0.0
+                if depth is None:
+                    continue  # a sample with an unreadable depth is skipped
                 if depth > current_max_depth:
                     current_max_depth = depth
                 
@@ -150,16 +164,16 @@ class UDDFParser(BaseParser):
 
                 # NDL (nodecotime)
                 ndl_str = sample.xpath("string(*[local-name()='nodecotime'])")
-                ndl = int(float(ndl_str)) if ndl_str else None
+                ndl = _number(ndl_str, int)
 
                 # TTS - UWMedia's own per-waypoint extension (parsers/uddf_writer.py);
                 # absent in other software's exports, recomputed below then.
                 tts_str = sample.xpath("string(*[local-name()='tts'])")
-                logged_tts = int(float(tts_str)) if tts_str else None
+                logged_tts = _number(tts_str, int)
 
                 # CNS
                 cns_str = sample.xpath("string(*[local-name()='cns'])")
-                cns = int(float(cns_str)) if cns_str else None
+                cns = _number(cns_str, int)
 
                 # PO2 (Prioritize UDDF with persistence)
                 po2_str = sample.xpath("string(*[local-name()='calculatedpo2'])")
@@ -207,11 +221,11 @@ class UDDFParser(BaseParser):
 
                 # GF
                 gf_str = sample.xpath("string(*[local-name()='gradientfactor'])")
-                gf = float(gf_str) if gf_str else None
+                gf = _number(gf_str, float)
 
                 # Battery
                 batt_str = sample.xpath("string(*[local-name()='batterychargecondition'])")
-                battery = float(batt_str) if batt_str else None
+                battery = _number(batt_str, float)
 
                 # Gas Switch
                 mix_ref = sample.xpath("string(*[local-name()='switchmix']/@ref)")
@@ -318,7 +332,8 @@ class UDDFParser(BaseParser):
                                 wp.gf = res.gf_current
                             if wp.po2 is None:
                                 wp.po2 = round(res.po2, 2)
-                            wp.cns = int(res.cns)
+                            if wp.cns is None:
+                                wp.cns = int(res.cns)
 
                             # Calculate next stop (next multiple of 3m above the
                             # authoritative ceiling - the file's own logged stop

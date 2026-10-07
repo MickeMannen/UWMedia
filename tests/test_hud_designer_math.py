@@ -3,7 +3,6 @@ Phase 2): element kinds/defaults, schema-v2 key carry-through, native-pixel
 bounds that mirror the renderer, and bounds hit-testing."""
 from gui.hud_renderer import get_font, text_anchor_shift
 from utils.hud_designer import (
-    build_layout_json,
     element_defaults,
     element_kind,
     element_native_bounds,
@@ -45,12 +44,6 @@ def test_parse_and_build_carry_unknown_keys_through():
     assert parsed[0]["color"] == "#FFFFFF"  # default filled in
     assert parsed[1]["value_font_size"] == 44
     assert parsed[2]["ceiling_color"] == "#123456" and parsed[2]["marker_style"] == "dot"
-
-    rebuilt = build_layout_json(skin, parsed, "Generic", "", 1920, 1080)["hud_skin"]["linked_elements"]
-    assert rebuilt[0]["align"] == "right" and rebuilt[0]["font_family"] == "Roboto" and rebuilt[0]["outline"] is False
-    assert rebuilt[1]["value_font_size"] == 44
-    assert rebuilt[2]["ceiling_color"] == "#123456"
-    assert "uid" not in rebuilt[0]
 
 
 def test_graph_and_tank_icon_bounds_are_exact():

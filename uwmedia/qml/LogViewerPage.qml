@@ -5,7 +5,8 @@
 // (or Delete/Backspace) and Clear take them off it, and the selected dive is
 // shown on the right - fields, tanks, depth profile, channels and events -
 // above UWMedia's own sample table (folded by default).
-// Read-only page: no file is ever written, so no confirm dialogs.
+// Nothing is written except by "Adjust time…" (Garmin FIT only), which saves
+// a corrected copy through a Save As dialog; the original is never changed.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -121,7 +122,7 @@ Item {
                 wrapMode: Text.WordWrap
                 color: root.mutedColor
                 font.pixelSize: 12
-                text: "Open dive logs to see them the way UWMedia reads them - to check what an overlay will show before rendering. Open adds to the list; Remove takes a dive off it. The files themselves are never changed."
+                text: "Open dive logs to see them the way UWMedia reads them - to check what an overlay will show before rendering. Open adds to the list; Remove takes a dive off it. The files themselves are never changed; Adjust time saves a corrected copy of a Garmin log."
             }
             ProgressBar { Layout.fillWidth: true; indeterminate: true; visible: logViewerBackend.busy }
             Text {
@@ -263,6 +264,20 @@ Item {
 
                     Card {
                         title: "Dive"
+                        headerContent: [
+                            Item { Layout.fillWidth: true },
+                            SmallButton {
+                                visible: root.hasDive
+                                text: "Adjust time…"
+                                enabled: logViewerBackend.canAdjustTime && !logViewerBackend.busy
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 600
+                                ToolTip.text: logViewerBackend.canAdjustTime
+                                              ? "For a dive computer whose clock was wrong: set this dive's real start time and time zone and save a corrected copy of the log"
+                                              : "Garmin FIT logs only"
+                                onClicked: adjustDialog.open()
+                            }
+                        ]
                         Text {
                             text: root.hasDive ? root.sel.title : "No dive selected"
                             color: root.textColor
@@ -474,6 +489,82 @@ Item {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    Dialog {
+        id: adjustDialog
+        anchors.centerIn: Overlay.overlay
+        width: 520
+        modal: true
+        title: "Adjust the dive's time"
+        // Popups live in the window Overlay; follow the app window's theme
+        // explicitly (same as OverlayDesignerPage's dialogs).
+        Material.theme: window.Material.theme
+        Material.accent: window.Material.accent
+        background: Rectangle {
+            color: "#2B2B2B"
+            radius: 6
+            border.color: "#3F3F3F"
+            border.width: 1
+        }
+        standardButtons: Dialog.Save | Dialog.Cancel
+        property string errorText: ""
+
+        onAboutToShow: {
+            errorText = ""
+            startField.text = logViewerBackend.adjustStartText
+            offsetField.text = logViewerBackend.adjustOffsetText
+            startField.forceActiveFocus()
+        }
+        onAccepted: {
+            const err = logViewerBackend.adjustTime(startField.text, offsetField.text)
+            if (err.length > 0) {
+                open()
+                errorText = err
+            }
+        }
+
+        ColumnLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: "For a dive computer whose clock was wrong before the dive. Enter when the dive really started, in the dive site's local time, and that place's time zone. Every sample moves by the same amount; the corrected log is saved as a new file and added to the list."
+            }
+            GridLayout {
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 8
+                Label { text: "Start (local time)" }
+                TextField {
+                    id: startField
+                    Layout.preferredWidth: 220
+                    Layout.preferredHeight: 34
+                    font.pixelSize: 15
+                    placeholderText: "YYYY-MM-DD HH:MM:SS"
+                    onAccepted: adjustDialog.accept()
+                }
+                Label { text: "Time zone (UTC offset)" }
+                TextField {
+                    id: offsetField
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 34
+                    font.pixelSize: 15
+                    placeholderText: "e.g. +07:00"
+                    onAccepted: adjustDialog.accept()
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                text: adjustDialog.errorText
+                color: "#EF4444"
+                wrapMode: Text.WordWrap
+                visible: text.length > 0
             }
         }
     }

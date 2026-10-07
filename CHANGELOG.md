@@ -5,6 +5,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Log Viewer: "Adjust time…" corrects a Garmin dive whose computer clock was
+  wrong: enter the real start time and time zone, and a corrected copy of the
+  .fit log is saved (every sample moves; the original is kept).
+
 ### Fixed
 - Color: "Move original" keeps the original's file name as it was; a photo
   called DSC03491.JPG was moved as DSC03491.jpg.
@@ -16,6 +21,23 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Windows: videos render on PCs without an NVIDIA graphics card (Intel or AMD
   graphics, virtual machines); the app now falls back to software encoding
   instead of failing every video.
+- Color: Sony videos' camera, lens, frame rate and recording date now also
+  reach the output's XMP metadata; they were never written.
+- Tag Editor: a date with fractions of a second keeps its time zone, and a
+  time zone of UTC+00:00 is no longer treated as missing.
+- Dive logs: a UDDF log's own CNS% is shown as logged instead of being
+  replaced by UWMedia's recalculation; this includes UWMedia's own UDDF files.
+- Dive logs: one unreadable number in a UDDF or Subsurface sample (depth,
+  NDL, CNS, GF, battery...) no longer stops the whole log from loading.
+- Color: Start says "Nothing to run" when Source or Output is empty instead
+  of starting a run that fails, and the preview slider is cleared after
+  picking a file that can't be read.
+- Advanced: tank names from a hand-edited config.yaml with unquoted serials
+  can be renamed and removed.
+- Color: when you pick an output file, the result is saved under exactly that
+  name; a filename format or the photo's milliseconds no longer change it.
+- Color, Overlay Generator, Convertion: a run in which a file failed now ends
+  as "Failed" instead of "Finished (exit code 0)".
 
 ### Removed
 - CLI: `--render-log` no longer writes a Final Cut Pro `.xml` (FCPXML) next to
