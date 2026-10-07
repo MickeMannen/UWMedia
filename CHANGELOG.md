@@ -3,41 +3,42 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.14] - 2026-10-07
 
 ### Added
-- Log Viewer: "Adjust time…" corrects a Garmin dive whose computer clock was
-  wrong: enter the real start time and time zone, and a corrected copy of the
-  .fit log is saved (every sample moves; the original is kept).
+- Log Viewer: "Adjust time…" on the Dive card corrects a Garmin dive whose
+  computer clock was wrong: enter the real start time and time zone, and a
+  corrected copy of the .fit log is saved (every sample moves; the original
+  is kept).
 
 ### Fixed
+- Windows: videos render on PCs without an NVIDIA graphics card (Intel or AMD
+  graphics, virtual machines); the app now falls back to software encoding
+  instead of failing every video.
+- Color, Overlay Generator, Convertion: a run in which a file failed now ends
+  as "Failed" instead of "Finished (exit code 0)".
+- Color: when you pick an output file, the result is saved under exactly that
+  name; a filename format or the photo's milliseconds no longer change it.
+- Color: Sony videos' camera, lens, frame rate and recording date now also
+  reach the output's XMP metadata; they were never written.
 - Color: "Move original" keeps the original's file name as it was; a photo
   called DSC03491.JPG was moved as DSC03491.jpg.
+- Color: Start says "Nothing to run" when Source or Output is empty instead
+  of starting a run that fails, and the preview slider is cleared after
+  picking a file that can't be read.
+- Dive logs: a UDDF log's own CNS% is shown as logged instead of being
+  replaced by UWMedia's recalculation; this includes UWMedia's own UDDF files.
+- Dive logs: one unreadable number in a UDDF or Subsurface sample (depth,
+  NDL, CNS, GF, battery...) no longer stops the whole log from loading.
+- Tag Editor: a date with fractions of a second keeps its time zone, and a
+  time zone of UTC+00:00 is no longer treated as missing.
+- Advanced: tank names from a hand-edited config.yaml with unquoted serials
+  can be renamed and removed.
 - Linux: overlay text uses the bundled Arial-compatible font when Arial and
   Liberation Sans aren't installed, instead of the wider DejaVu Sans, so
   text fits the templates as on macOS and Windows.
 - Windows, Linux: the Log Viewer's event list and the Overlay Designer's
   waypoint data now use a fixed-width font, as on macOS, so columns line up.
-- Windows: videos render on PCs without an NVIDIA graphics card (Intel or AMD
-  graphics, virtual machines); the app now falls back to software encoding
-  instead of failing every video.
-- Color: Sony videos' camera, lens, frame rate and recording date now also
-  reach the output's XMP metadata; they were never written.
-- Tag Editor: a date with fractions of a second keeps its time zone, and a
-  time zone of UTC+00:00 is no longer treated as missing.
-- Dive logs: a UDDF log's own CNS% is shown as logged instead of being
-  replaced by UWMedia's recalculation; this includes UWMedia's own UDDF files.
-- Dive logs: one unreadable number in a UDDF or Subsurface sample (depth,
-  NDL, CNS, GF, battery...) no longer stops the whole log from loading.
-- Color: Start says "Nothing to run" when Source or Output is empty instead
-  of starting a run that fails, and the preview slider is cleared after
-  picking a file that can't be read.
-- Advanced: tank names from a hand-edited config.yaml with unquoted serials
-  can be renamed and removed.
-- Color: when you pick an output file, the result is saved under exactly that
-  name; a filename format or the photo's milliseconds no longer change it.
-- Color, Overlay Generator, Convertion: a run in which a file failed now ends
-  as "Failed" instead of "Finished (exit code 0)".
 
 ### Removed
 - CLI: `--render-log` no longer writes a Final Cut Pro `.xml` (FCPXML) next to
