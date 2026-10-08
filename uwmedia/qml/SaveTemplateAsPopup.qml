@@ -9,7 +9,7 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 Popup {
-    id: popup
+    id: root
     modal: true
     focus: true
     anchors.centerIn: Overlay.overlay
@@ -54,10 +54,10 @@ Popup {
             ? overlayDesignerBackend.finishImport(targetCombo.currentIndex, computerNameField.text, pageNameField.text)
             : overlayDesignerBackend.saveAs(targetCombo.currentIndex, computerNameField.text, pageNameField.text)
         if (err.length > 0) {
-            popup.error = err
+            root.error = err
         } else {
             importMode = false  // a successful import must not be cancelled by onClosed
-            popup.close()
+            root.close()
         }
     }
 
@@ -65,7 +65,7 @@ Popup {
         width: parent.width
         spacing: 10
 
-        Label { text: popup.importMode ? "Import as new page" : "Save as new page"; font.bold: true; font.pixelSize: 16 }
+        Label { text: root.importMode ? "Import as new page" : "Save as new page"; font.bold: true; font.pixelSize: 16 }
 
         GridLayout {
             columns: 2
@@ -79,15 +79,15 @@ Popup {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
                 font.pixelSize: 14
-                model: popup.targets
+                model: root.targets
                 textRole: "label"
             }
 
-            Label { text: "Computer name"; visible: popup.newComputer }
+            Label { text: "Computer name"; visible: root.newComputer }
             TextField {
                 id: computerNameField
                 Layout.fillWidth: true
-                visible: popup.newComputer
+                visible: root.newComputer
                 placeholderText: "e.g. GoPro HUD"
                 selectByMouse: true
             }
@@ -98,7 +98,7 @@ Popup {
                 Layout.fillWidth: true
                 placeholderText: "e.g. My main screen"
                 selectByMouse: true
-                onAccepted: popup.doSave()
+                onAccepted: root.doSave()
             }
         }
 
@@ -108,18 +108,18 @@ Popup {
             font.pixelSize: 12
             wrapMode: Text.WordWrap
             text: {
-                const brand = popup.target ? popup.target.brand : ""
-                const computer = popup.newComputer ? overlayDesignerBackend.slugFor(computerNameField.text) : (popup.target ? popup.target.computer : "")
+                const brand = root.target ? root.target.brand : ""
+                const computer = root.newComputer ? overlayDesignerBackend.slugFor(computerNameField.text) : (root.target ? root.target.computer : "")
                 const page = overlayDesignerBackend.slugFor(pageNameField.text)
                 return "Will be saved as " + brand + "/" + (computer || "…") + "/" + (page || "…")
-                    + (popup.newComputer ? " (default colour rules)" : " (inherits this computer's colour and warning rules)")
+                    + (root.newComputer ? " (default colour rules)" : " (inherits this computer's colour and warning rules)")
             }
         }
 
         Label {
             Layout.fillWidth: true
-            visible: popup.error.length > 0
-            text: popup.error
+            visible: root.error.length > 0
+            text: root.error
             color: "#EF4444"
             wrapMode: Text.WordWrap
         }
@@ -127,8 +127,8 @@ Popup {
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
-            Button { text: "Cancel"; onClicked: popup.close() }
-            Button { text: popup.importMode ? "Import" : "Save"; highlighted: true; onClicked: popup.doSave() }
+            Button { text: "Cancel"; onClicked: root.close() }
+            Button { text: root.importMode ? "Import" : "Save"; highlighted: true; onClicked: root.doSave() }
         }
     }
 }

@@ -53,7 +53,7 @@ ColumnLayout {
             var t0 = samples[0].time || 0
             var maxTime = (samples[samples.length - 1].time || 0) - t0
             var maxDepth = 0
-            for (var i = 0; i < samples.length; i++) {
+            for (let i = 0; i < samples.length; i++) {
                 if (samples[i].depth > maxDepth) maxDepth = samples[i].depth
             }
             if (maxDepth <= 0) maxDepth = 1
@@ -73,9 +73,9 @@ ColumnLayout {
             ctx.strokeStyle = chart.depthColor
             ctx.lineWidth = 1.5
             ctx.beginPath()
-            for (var j = 0; j < samples.length; j++) {
-                var x = xAt(samples[j].time || 0)
-                var y = yAt(samples[j].depth)
+            for (let j = 0; j < samples.length; j++) {
+                const x = xAt(samples[j].time || 0)
+                const y = yAt(samples[j].depth)
                 if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
             }
             ctx.stroke()
@@ -85,12 +85,12 @@ ColumnLayout {
                 ctx.strokeStyle = chart.ceilingColor
                 ctx.lineWidth = 1.2
                 ctx.beginPath()
-                var drawing = false
-                for (var k = 0; k < samples.length; k++) {
-                    var c = samples[k].ceiling || 0
+                let drawing = false
+                for (let k = 0; k < samples.length; k++) {
+                    const c = samples[k].ceiling || 0
                     if (c <= 0) { drawing = false; continue }
-                    var cx = xAt(samples[k].time || 0)
-                    var cy = yAt(c)
+                    const cx = xAt(samples[k].time || 0)
+                    const cy = yAt(c)
                     if (!drawing) { ctx.moveTo(cx, cy); drawing = true } else ctx.lineTo(cx, cy)
                 }
                 ctx.stroke()

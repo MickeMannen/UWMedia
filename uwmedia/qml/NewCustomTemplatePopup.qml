@@ -11,7 +11,7 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 Popup {
-    id: popup
+    id: root
     modal: true
     focus: true
     anchors.centerIn: Overlay.overlay
@@ -55,9 +55,9 @@ Popup {
             backgroundKind, imagePath, rulesCombo.currentText,
             Number(widthField.text), Number(heightField.text), colorField.text)
         if (err.length > 0)
-            popup.error = err
+            root.error = err
         else
-            popup.close()
+            root.close()
     }
 
     ColumnLayout {
@@ -78,26 +78,26 @@ Popup {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
                 font.pixelSize: 14
-                model: popup.targets
+                model: root.targets
                 textRole: "label"
             }
 
-            Label { text: "Computer name"; visible: popup.newComputer }
+            Label { text: "Computer name"; visible: root.newComputer }
             TextField {
                 id: computerNameField
                 Layout.fillWidth: true
-                visible: popup.newComputer
+                visible: root.newComputer
                 placeholderText: "e.g. GoPro HUD"
                 selectByMouse: true
             }
 
-            Label { text: "Colour rules"; visible: popup.newComputer }
+            Label { text: "Colour rules"; visible: root.newComputer }
             ComboBox {
                 id: rulesCombo
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
                 font.pixelSize: 14
-                visible: popup.newComputer
+                visible: root.newComputer
                 model: overlayDesignerBackend.rulesProfiles
             }
 
@@ -112,18 +112,18 @@ Popup {
             Label { text: "Background" }
             RowLayout {
                 ButtonGroup { id: kindGroup }
-                RadioButton { text: "Image"; checked: popup.backgroundKind === "image"; ButtonGroup.group: kindGroup; onClicked: popup.backgroundKind = "image" }
-                RadioButton { text: "Shape"; checked: popup.backgroundKind === "shape"; ButtonGroup.group: kindGroup; onClicked: popup.backgroundKind = "shape" }
+                RadioButton { text: "Image"; checked: root.backgroundKind === "image"; ButtonGroup.group: kindGroup; onClicked: root.backgroundKind = "image" }
+                RadioButton { text: "Shape"; checked: root.backgroundKind === "shape"; ButtonGroup.group: kindGroup; onClicked: root.backgroundKind = "shape" }
             }
 
-            Label { text: "Image file"; visible: popup.backgroundKind === "image" }
+            Label { text: "Image file"; visible: root.backgroundKind === "image" }
             RowLayout {
                 Layout.fillWidth: true
-                visible: popup.backgroundKind === "image"
+                visible: root.backgroundKind === "image"
                 TextField {
                     Layout.fillWidth: true
                     readOnly: true
-                    text: popup.imagePath
+                    text: root.imagePath
                     placeholderText: "PNG, JPEG, WebP or BMP - PNG with transparency works best"
                 }
                 Button {
@@ -131,14 +131,14 @@ Popup {
                     onClicked: {
                         const chosen = overlayDesignerBackend.browseImageFile()
                         if (chosen.length > 0)
-                            popup.imagePath = chosen
+                            root.imagePath = chosen
                     }
                 }
             }
 
-            Label { text: "Size (px)"; visible: popup.backgroundKind === "shape" }
+            Label { text: "Size (px)"; visible: root.backgroundKind === "shape" }
             RowLayout {
-                visible: popup.backgroundKind === "shape"
+                visible: root.backgroundKind === "shape"
                 TextField {
                     id: widthField
                     Layout.preferredWidth: 80
@@ -168,19 +168,19 @@ Popup {
             font.pixelSize: 12
             wrapMode: Text.WordWrap
             text: {
-                const brand = popup.target ? popup.target.brand : ""
-                const computer = popup.newComputer ? overlayDesignerBackend.slugFor(computerNameField.text) : (popup.target ? popup.target.computer : "")
+                const brand = root.target ? root.target.brand : ""
+                const computer = root.newComputer ? overlayDesignerBackend.slugFor(computerNameField.text) : (root.target ? root.target.computer : "")
                 const page = overlayDesignerBackend.slugFor(pageNameField.text)
                 return "Creates " + brand + "/" + (computer || "…") + "/" + (page || "…")
-                    + (popup.newComputer ? "" : " (inherits this computer's colour and warning rules)")
+                    + (root.newComputer ? "" : " (inherits this computer's colour and warning rules)")
                     + ". An image background is copied in and scaled to fit; add fields afterwards with + Add."
             }
         }
 
         Label {
             Layout.fillWidth: true
-            visible: popup.error.length > 0
-            text: popup.error
+            visible: root.error.length > 0
+            text: root.error
             color: "#EF4444"
             wrapMode: Text.WordWrap
         }
@@ -188,8 +188,8 @@ Popup {
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
-            Button { text: "Cancel"; onClicked: popup.close() }
-            Button { text: "Create"; highlighted: true; onClicked: popup.create() }
+            Button { text: "Cancel"; onClicked: root.close() }
+            Button { text: "Create"; highlighted: true; onClicked: root.create() }
         }
     }
 }
