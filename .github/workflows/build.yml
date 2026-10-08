@@ -30,15 +30,15 @@
 #
 # Leaving "Create/update the GitHub Release" unchecked just uploads workflow
 # artifacts (Actions tab) without touching any release - useful for test
-# builds. The four build_* checkboxes let you pick exactly which targets to
+# builds. The three build_* checkboxes let you pick exactly which targets to
 # build, so you're not stuck waiting on ones you don't need.
 #
-# macOS ships two separate apps (see pyproject.toml): "uwmedia" (plain GUI,
-# .dmg, installs to /Applications - what most users want) and
-# "uwmedia-terminal" (CLI + GUI hybrid, .pkg, installs to /Library and adds
-# a `uwmedia` command to PATH). Windows/Linux only build uwmedia-terminal,
-# since they don't have the same "wrong folder for a normal app" mismatch a
-# macOS console app has.
+# macOS builds only "uwmedia" (plain GUI, .dmg, installs to /Applications),
+# signed and notarized - an ad-hoc-signed build only runs on the machine
+# that built it, so it is not offered. pyproject.toml also defines
+# "uwmedia-terminal" (CLI + GUI hybrid): that is what Windows and Linux
+# build, and the only app Briefcase builds there. Its macOS .pkg (installs
+# to /Library and adds a `uwmedia` command to PATH) is no longer built.
 
 name: Release Build
 
@@ -49,14 +49,10 @@ on:
         description: 'Tag to build (e.g. v0.7.4). Leave empty to use the selected tag, or the tag on the selected branch''s latest commit'
         type: string
         default: ''
-      build_macos_unsigned:
-        description: 'Build macOS (ad-hoc/unsigned)'
-        type: boolean
-        default: true
       build_macos_signed:
         description: 'Build macOS (signed + notarized, requires Apple secrets)'
         type: boolean
-        default: false
+        default: true
       build_windows:
         description: 'Build Windows'
         type: boolean
@@ -120,7 +116,6 @@ jobs:
         run: |
           BUILD_LINUX="${{ inputs.build_linux }}"
           BUILD_WINDOWS="${{ inputs.build_windows }}"
-          BUILD_MACOS_UNSIGNED="${{ inputs.build_macos_unsigned }}"
           BUILD_MACOS_SIGNED="${{ inputs.build_macos_signed }}"
 
           ENTRIES=()
@@ -145,18 +140,15 @@ jobs:
             ENTRIES+=('{"os":"windows-latest","platform":"windows","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
           fi
 
-          if [ "$BUILD_MACOS_UNSIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":false,"sign_macos":false}')
-            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":false}')
-          fi
-
+          # macOS: the plain "uwmedia" .dmg only, signed and notarized. The
+          # "needs_installer_identity" flag is for a .pkg (console app),
+          # which isn't built any more; the signing step still honours it.
           if [ "$BUILD_MACOS_SIGNED" = "true" ]; then
-            ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia-terminal","display_app":"uwmedia-terminal","needs_installer_identity":true,"sign_macos":true}')
             ENTRIES+=('{"os":"macos-15","platform":"macOS","format":"app","python-version":"3.11","app":"uwmedia","display_app":"uwmedia","needs_installer_identity":false,"sign_macos":true}')
           fi
 
           if [ ${#ENTRIES[@]} -eq 0 ]; then
-            echo "::error::No build targets selected - check at least one of the four build_* inputs."
+            echo "::error::No build targets selected - check at least one of the three build_* inputs."
             exit 1
           fi
 
@@ -326,12 +318,10 @@ jobs:
         if: always() && matrix.sign_macos
         run: security delete-keychain "$KEYCHAIN_PATH" || true
 
-      # --- Everyone else (and macOS entries that weren't the signed ones) --
-      # NOTE: uwmedia-terminal is a console_app, which Briefcase can only
-      # distribute on macOS as a signed .pkg installer. Without the real
-      # Apple signing above, --adhoc-sign is the only option - and Apple's
-      # ad-hoc signing means the resulting package will only install/run on
-      # the machine that built it (this CI runner), not on any other Mac.
+      # --- Windows and Linux (every entry that isn't the signed macOS one) --
+      # --adhoc-sign is a no-op there; it only ever mattered for the macOS
+      # ad-hoc builds this workflow no longer makes (an ad-hoc-signed app
+      # runs only on the machine that built it).
       - name: Package app with Briefcase (ad-hoc)
         if: "!matrix.sign_macos"
         run: |
