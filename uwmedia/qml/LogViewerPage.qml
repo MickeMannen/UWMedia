@@ -5,8 +5,9 @@
 // (or Delete/Backspace) and Clear take them off it, and the selected dive is
 // shown on the right - fields, tanks, depth profile, channels and events -
 // above UWMedia's own sample table (folded by default).
-// Nothing is written except by "Adjust time…" (Garmin FIT only), which saves
-// a corrected copy through a Save As dialog; the original is never changed.
+// Nothing is written except by "Adjust time…" and "Merge…" (Garmin FIT
+// only): a corrected copy of the log, or the selected dive joined with a
+// later one, saved through a Save As dialog; the originals are never changed.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -276,6 +277,17 @@ Item {
                                               ? "For a dive computer whose clock was wrong: set this dive's real start time and time zone and save a corrected copy of the log"
                                               : "Garmin FIT logs only"
                                 onClicked: adjustDialog.open()
+                            },
+                            SmallButton {
+                                visible: root.hasDive
+                                text: "Merge…"
+                                enabled: logViewerBackend.canMerge && !logViewerBackend.busy
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 600
+                                ToolTip.text: logViewerBackend.canMerge
+                                              ? "For a dive the computer split in two: join this dive with the next one in the list into a single log"
+                                              : "Garmin FIT logs only, and a later FIT dive that starts within 2 hours of this one's end must be in the list"
+                                onClicked: mergeDialog.open()
                             }
                         ]
                         Text {
@@ -562,6 +574,100 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: adjustDialog.errorText
+                color: "#EF4444"
+                wrapMode: Text.WordWrap
+                visible: text.length > 0
+            }
+        }
+    }
+    Dialog {
+        id: mergeDialog
+        anchors.centerIn: Overlay.overlay
+        width: 560
+        modal: true
+        title: "Merge two dives into one"
+        Material.theme: window.Material.theme
+        Material.accent: window.Material.accent
+        background: Rectangle {
+            color: "#2B2B2B"
+            radius: 6
+            border.color: "#3F3F3F"
+            border.width: 1
+        }
+        standardButtons: Dialog.Save | Dialog.Cancel
+        property string errorText: ""
+
+        onAboutToShow: {
+            errorText = ""
+            candidateCombo.currentIndex = 0
+            keepClockOption.checked = true
+        }
+        onAccepted: {
+            const err = logViewerBackend.mergeDives(candidateCombo.currentIndex, closeGapOption.checked)
+            if (err.length > 0) {
+                open()
+                errorText = err
+            }
+        }
+
+        ColumnLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: "For a dive your computer split in two (a short surface stop ended one log and started another). The selected dive and the one chosen below are saved as a single Garmin log that starts with the first and ends with the second, with the gases and tank readings of both; the original files are kept."
+            }
+            GridLayout {
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 8
+                Layout.fillWidth: true
+                Label { text: "Merge with" }
+                ComboBox {
+                    id: candidateCombo
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 34
+                    font.pixelSize: 14
+                    model: logViewerBackend.mergeCandidates
+                }
+            }
+            Label { text: "The time between the dives" ; color: root.mutedColor; font.pixelSize: 12 }
+            RadioButton {
+                id: keepClockOption
+                Layout.fillWidth: true
+                checked: true
+                text: "Keep the real times - the surface interval is filled with the first dive's last sample, so photos and videos from both dives still match the log"
+                contentItem: Label {
+                    text: keepClockOption.text
+                    wrapMode: Text.WordWrap
+                    leftPadding: keepClockOption.indicator.width + keepClockOption.spacing
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            RadioButton {
+                id: closeGapOption
+                Layout.fillWidth: true
+                text: "Close the gap - the second dive moves back to follow the first without a break (one continuous dive; its photos and videos no longer match)"
+                contentItem: Label {
+                    text: closeGapOption.text
+                    wrapMode: Text.WordWrap
+                    leftPadding: closeGapOption.indicator.width + closeGapOption.spacing
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: root.mutedColor
+                font.pixelSize: 12
+                text: "Garmin Connect takes the merged log for the first dive, so delete both original dives there before uploading it."
+            }
+            Label {
+                Layout.fillWidth: true
+                text: mergeDialog.errorText
                 color: "#EF4444"
                 wrapMode: Text.WordWrap
                 visible: text.length > 0

@@ -43,11 +43,12 @@ def fit_crc(data: bytes, crc: int = 0) -> int:
 
 
 class _Definition:
-    def __init__(self, mesg_num: int, endian: str, fields, dev_size: int):
+    def __init__(self, mesg_num: int, endian: str, fields, dev_size: int, raw: bytes = b""):
         self.mesg_num = mesg_num
         self.endian = endian
         self.fields = fields  # [(field number, size, base type)]
         self.dev_size = dev_size
+        self.raw = raw  # the definition message as it is in the file, header byte included
 
     @property
     def size(self) -> int:
@@ -91,7 +92,7 @@ def _walk(data: bytearray, on_message) -> None:
                     dev_count = data[q]
                     dev_size = sum(data[q + 2 + 3 * i] for i in range(dev_count))
                     q += 1 + 3 * dev_count
-                definitions[local] = _Definition(mesg_num, endian, fields, dev_size)
+                definitions[local] = _Definition(mesg_num, endian, fields, dev_size, bytes(data[p:q]))
                 p = q
             else:
                 definition = definitions.get(header & 0x0F)

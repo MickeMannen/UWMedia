@@ -380,3 +380,6 @@ sensible; drawing code only where the logic is testable.
   50 skipped; macOS and Ubuntu 699 passed, 53 skipped (no test_data); 3 xfailed each.
 - 2026-10-07: Phase 7 (coverage 86% -> 95%, ~620 new tests), bug fixes and
   Log Viewer "Adjust time" for Garmin FIT.
+- 2026-10-08: Log Viewer "Merge dives" for Garmin FIT (`parsers/fit_merge.py`,
+  `test_fit_merge.py`: synthetic pairs in the default run, the 450/451 Tioman pair
+  with test_data).

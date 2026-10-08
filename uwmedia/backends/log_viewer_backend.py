@@ -9,10 +9,13 @@ and the selected dive is shown as a grid of fields, a tanks table, a depth
 profile, the channels the log holds, its events and - unlike DiveSync - the
 full sample table with a filter, which is what an overlay is drawn from.
 
-The one thing that writes a file is "Adjust time" for a Garmin FIT dive
-(a dive computer whose clock was wrong): a Save As dialog writes a copy
-with the corrected start time and time zone (parsers/fit_time.py), which
-is then added to the list; the original is left as it was.
+Two things write a file, both for Garmin FIT dives and both through a Save
+As dialog, the originals left as they were and the new file added to the
+list: "Adjust time" (a dive computer whose clock was wrong) writes a copy
+with the corrected start time and time zone (parsers/fit_time.py), and
+"Merge dives" (a dive the computer split in two) joins the selected dive
+with a later one from the list into a single log (parsers/fit_merge.py),
+keeping the real clock times or closing the gap, as the user chooses.
 
 Logs are read through parsers.registry (every format UWMedia reads, .xml/.csv
 told apart by content). Every dive of every file is listed, including
@@ -31,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from PySide6.QtCore import Property, QObject, QStandardPaths, Signal, Slot
 
 from models.dive import Dive
+from parsers.fit_merge import MAX_GAP_SECONDS, merge_fit_dives
 from parsers.fit_time import adjust_fit_time, fit_activity_time
 from parsers.registry import LOG_FILE_FILTER, is_log_file, parse_log_file
 from utils.app_settings import get_fields, set_field
@@ -340,6 +344,35 @@ def adjusted_name(path: Path) -> Path:
     return path.with_name(f"{path.stem} (adjusted){path.suffix}")
 
 
+def merged_name(path: Path) -> Path:
+    """Where Save As starts for a merge: 'Dive 12.fit' -> 'Dive 12 (merged).fit'."""
+    return path.with_name(f"{path.stem} (merged){path.suffix}")
+
+
+def _is_fit_file(dive: Dive) -> bool:
+    return bool(dive.log_format == "fit" and dive.log_path and Path(dive.log_path).is_file())
+
+
+def merge_candidates(dives: List[Dive], dive: Dive) -> List[Dive]:
+    """The FIT dives of the list that start after `dive` ends, within the
+    merge's limit - the ones `dive` can be merged with - earliest first."""
+    found = []
+    for other in dives:
+        if other is dive or not _is_fit_file(other) or other.log_path == dive.log_path:
+            continue
+        gap = (other.start_time - dive.end_time).total_seconds()
+        if 0 < gap <= MAX_GAP_SECONDS:
+            found.append(other)
+    return sorted(found, key=lambda d: d.start_time)
+
+
+def candidate_label(dive: Dive, other: Dive) -> str:
+    """How the merge dialog names a dive to merge with: its start, file and
+    how long after `dive` it began."""
+    gap = int((other.start_time - dive.end_time).total_seconds())
+    return f"{other.start_time:%H:%M} · {other.log_filename or Path(other.log_path).name} ({gap // 60} min after this dive)"
+
+
 def _dive_key(dive: Dive):
     return (dive.log_path, dive.start_time)
 
@@ -569,10 +602,10 @@ class LogViewerBackend(QObject):
             return ""
         return format_utc_offset(offset or 0)
 
-    def _dialog_save(self, suggested: Path) -> str:
+    def _dialog_save(self, suggested: Path, title: str = "Save the adjusted log") -> str:
         from PySide6.QtWidgets import QFileDialog
 
-        path, _ = QFileDialog.getSaveFileName(None, "Save the adjusted log", str(suggested), "Garmin FIT (*.fit)")
+        path, _ = QFileDialog.getSaveFileName(None, title, str(suggested), "Garmin FIT (*.fit)")
         return path
 
     @Slot(str, str, result=str)
@@ -602,6 +635,56 @@ class LogViewerBackend(QObject):
             adjust_fit_time(source, target, local_start, offset)
         except (OSError, ValueError) as e:
             return f"Could not save the adjusted log: {e}"
+        self._remember_folder(target.parent)
+        self._read([str(target)])
+        return ""
+
+    # -- merge dives (Garmin FIT) -------------------------------------------
+
+    def _merge_candidates(self) -> List[Dive]:
+        dive = self._selected_dive()
+        if dive is None or not _is_fit_file(dive):
+            return []
+        return merge_candidates(self._dives, dive)
+
+    @Property(bool, notify=selectionChanged)
+    def canMerge(self) -> bool:
+        """A Garmin FIT dive is selected and a later FIT dive in the list
+        starts within the merge's limit after it ends."""
+        return bool(self._merge_candidates())
+
+    @Property("QVariantList", notify=selectionChanged)
+    def mergeCandidates(self):
+        """The dives the selected one can be merged with, as the dialog lists them."""
+        dive = self._selected_dive()
+        return [candidate_label(dive, other) for other in self._merge_candidates()]
+
+    @Slot(int, bool, result=str)
+    def mergeDives(self, candidate: int, close_gap: bool) -> str:
+        """The Merge dialog's Save: joins the selected dive with
+        mergeCandidates[candidate] into a new file (asks where) and adds it
+        to the list. close_gap moves the second dive back to follow the
+        first; otherwise the real clock times are kept and the surface
+        interval is filled. Returns an error for the dialog, or ""."""
+        candidates = self._merge_candidates()
+        if not candidates:
+            return "Select a Garmin FIT dive that another FIT dive follows within 2 hours"
+        if not 0 <= candidate < len(candidates):
+            return "Pick the dive to merge with"
+        first = Path(self._selected_dive().log_path)
+        second = Path(candidates[candidate].log_path)
+        target = self._dialog_save(merged_name(first), "Save the merged dive")
+        if not target:
+            return ""  # cancelled: nothing written
+        target = Path(target)
+        if target.suffix.lower() != ".fit":
+            target = target.with_name(target.name + ".fit")
+        if target.resolve() in (first.resolve(), second.resolve()):
+            return "Save the merged dive under a new name; the original logs are kept as they are"
+        try:
+            merge_fit_dives(first, second, target, close_gap)
+        except (OSError, ValueError) as e:
+            return f"Could not merge the dives: {e}"
         self._remember_folder(target.parent)
         self._read([str(target)])
         return ""

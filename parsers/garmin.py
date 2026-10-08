@@ -198,8 +198,28 @@ class GarminParser(BaseParser):
                     "status": gas.get("status") == "enabled"
                 }
 
+        # Which gas is breathed when: FIT doesn't link a tank pod to a gas
+        # (tank_update carries only sensor and pressure). The computer logs a
+        # dive_gas_switched event with the index of the gas in use, at the
+        # start of the dive and at every switch; every tank reading takes the
+        # gas active at its time, as the UDDF parser does with <switchmix>.
+        gas_switches = []
+        for ev in messages.get("event_mesgs", []):
+            if ev.get("event") != "dive_gas_switched" or ev.get("data") not in gas_dict:
+                continue
+            ts = ev.get("timestamp")
+            if ts is None:
+                continue
+            if isinstance(ts, int):
+                ts = datetime.fromtimestamp(ts + FIT_EPOCH_S, tz=timezone.utc)
+            gas_switches.append((remove_offset(ts.astimezone(tz)), ev["data"]))
+        gas_switches.sort(key=lambda pair: pair[0])
+        default_gas = 0 if 0 in gas_dict else min(gas_dict, default=None)
+        active_gas = gas_switches[0][1] if gas_switches else default_gas
+
         # Tank Updates
         tank_messages_dict = {}
+        tanks_following_gas = set()  # tank keys whose readings don't name a gas of their own
         tank_messages = messages.get("tank_update_mesgs", [])
         for t_msg in tank_messages:
             ts = t_msg.get("timestamp")
@@ -217,7 +237,9 @@ class GarminParser(BaseParser):
             
             tank_name = sensor_data.get(sensor_id, {}).get("name") if sensor_id else None
             
-            gas_idx = t_msg.get("gas_type_index") # Field 3 usually
+            gas_idx = t_msg.get("gas_type_index")  # not in Garmin's profile; honoured when a file has it
+            if gas_idx is None:
+                tanks_following_gas.add(tank_key)
             gas_info = gas_dict.get(gas_idx, {"he": 0, "o2": 21, "mode": "open_circuit", "status": True})
             
             tank_data = TankData(
@@ -272,7 +294,21 @@ class GarminParser(BaseParser):
         current_active_tanks = initial_tanks.copy()
         tank_ptr = 0
         alert_ptr = 0
+        switch_ptr = 0
         current_max_depth = 0.0
+
+        def with_active_gas(tanks: Dict[str, TankData]) -> Dict[str, TankData]:
+            gas = gas_dict.get(active_gas)
+            if gas is None:
+                return tanks
+            return {
+                key: tank.model_copy(update={"o2_percent": float(gas["o2"]), "he_percent": float(gas["he"]),
+                                             "mode": gas["mode"], "enabled": gas["status"]})
+                if key in tanks_following_gas else tank
+                for key, tank in tanks.items()
+            }
+
+        wp_tanks = with_active_gas(current_active_tanks)
 
         for record in record_messages:
             ts = record.get("timestamp")
@@ -282,11 +318,20 @@ class GarminParser(BaseParser):
             
             ts_local = remove_offset(ts.astimezone(tz))
             
-            # Catch up current_active_tanks to the current waypoint time
+            # Catch up current_active_tanks and the breathed gas to the current waypoint time
+            tanks_changed = False
             while tank_ptr < len(sorted_tank_times) and sorted_tank_times[tank_ptr] <= ts_local:
                 updates = tank_messages_dict[sorted_tank_times[tank_ptr]]
                 current_active_tanks.update(updates)
                 tank_ptr += 1
+                tanks_changed = True
+            while switch_ptr < len(gas_switches) and gas_switches[switch_ptr][0] <= ts_local:
+                if gas_switches[switch_ptr][1] != active_gas:
+                    active_gas = gas_switches[switch_ptr][1]
+                    tanks_changed = True
+                switch_ptr += 1
+            if tanks_changed:
+                wp_tanks = with_active_gas(current_active_tanks)
 
             depth = float(record.get("depth", 0.0))
             if depth > current_max_depth:
@@ -321,7 +366,7 @@ class GarminParser(BaseParser):
                 heart_rate=int(record.get("heart_rate", 0)),
                 cns=int(record.get("cns_load", 0)),
                 po2=float(record.get("po2", 1.2)),
-                tanks=current_active_tanks.copy(),
+                tanks=dict(wp_tanks),
                 dive_alerts=wp_alerts,
             )
             waypoints.append(wp)

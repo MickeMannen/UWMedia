@@ -41,6 +41,7 @@ Photo with Telemetry data (old overlay)
 - **Overlays keep their colours**: when overlays are burned in with colour correction, the correction applies to the footage only; the dive computer's bezel and text come out exactly as designed.
 - **Layout Validation**: Automatic verification of HUD layouts against loaded dive logs to prevent errors during processing.
 - **Dive Profile Builder**: Draw a synthetic open circuit, sidemount or CCR dive and save it as a UDDF, Garmin FIT or Subsurface log, to test overlays in situations like deco or gas switches. *Test data only - not for dive planning.*
+- **Log Viewer with Garmin FIT repair**: Browse what the overlays will read from a log, correct a Garmin dive whose clock was wrong (**Adjust time**), and join a dive the computer split in two into one `.fit` log (**Merge**) - keeping the real clock times with the surface interval filled in, or closing the gap. Garmin's own data (GPS, heart rate, tank readings, gases) is carried over. Limitations: Garmin `.fit` logs only, the two dives must be within 2 hours of each other, and Garmin Connect treats the merged log as the first dive, so delete both originals there before uploading it. Whether Connect accepts a merged log has not been verified yet.
 
 <p align="center">
   <img src="media/video_pipeline.png" alt="Color page video pipeline: colour analysis and HUD layers in Python, then one FFmpeg pass that decodes, colour-corrects, overlays the HUD and encodes" width="800">

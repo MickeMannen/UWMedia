@@ -250,3 +250,46 @@ def test_unique_tank_serials_of_a_synthetic_fit(tmp_path):
     assert GarminParser().get_unique_tank_serials(path) == [str(TANK_SENSOR_BASE)]
     dive, = GarminParser().parse(path)
     assert set(dive.waypoints[0].tanks) == {str(TANK_SENSOR_BASE)}
+
+
+def test_tanks_take_the_gas_switched_to(monkeypatch, tmp_path):
+    """Garmin's tank updates name no gas; the dive_gas_switched events say
+    which gas is breathed, and every tank reading follows them."""
+    t = lambda s: START_UTC + timedelta(seconds=s)  # noqa: E731
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": _records(4),
+        "dive_gas_mesgs": [{"message_index": 0, "oxygen_content": 31, "helium_content": 0, "status": "enabled"},
+                           {"message_index": 1, "oxygen_content": 50, "helium_content": 0, "status": "enabled"}],
+        "event_mesgs": [{"timestamp": t(0), "event": "dive_gas_switched", "event_type": "marker", "data": 0},
+                        {"timestamp": t(120), "event": "dive_gas_switched", "event_type": "marker", "data": 1},
+                        {"timestamp": t(150), "event": "dive_gas_switched", "event_type": "marker", "data": 9}],  # no such gas
+        "tank_update_mesgs": [{"timestamp": t(0), "sensor": 111, "pressure": 210.0},
+                              {"timestamp": _fit_int(t(60)), "sensor": 222, "pressure": 190.0}],
+    })
+    w0, w1, w2, w3 = dive.waypoints
+    assert [w.gasmix for w in (w0, w1, w2, w3)] == ["Nx31", "Nx31", "Nx50", "Nx50"]
+    assert (w1.tanks["111"].o2_percent, w1.tanks["222"].o2_percent) == (31.0, 31.0)
+    assert (w2.tanks["111"].o2_percent, w2.tanks["222"].o2_percent) == (50.0, 50.0)
+    assert (w2.tanks["111"].pressure_bar, w2.tanks["222"].pressure_bar) == (210.0, 190.0)
+    assert w0.tanks["111"].mode == "open_circuit" and w0.tanks["111"].enabled
+
+
+def test_first_listed_gas_when_nothing_was_switched(monkeypatch, tmp_path):
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": _records(2),
+        "dive_gas_mesgs": [{"message_index": 0, "oxygen_content": 32, "helium_content": 0, "status": "enabled"}],
+        "tank_update_mesgs": [{"timestamp": START_UTC, "sensor": 111, "pressure": 200.0}],
+    })
+    assert dive.waypoints[0].gasmix == "Nx32"
+
+
+@pytest.mark.requires_media
+def test_real_nitrox_dive_shows_its_mix():
+    from conftest import LOGS_DIR
+
+    dive, = GarminParser().parse(LOGS_DIR / "fit" / "500 Kapalai, Mandarin Garden.fit")
+    assert {wp.gasmix for wp in dive.waypoints} == {"Nx31"}
+    tank, = dive.waypoints[-1].tanks.values()
+    assert (tank.o2_percent, tank.he_percent) == (31.0, 0.0)
