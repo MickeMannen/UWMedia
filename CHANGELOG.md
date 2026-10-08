@@ -3,20 +3,22 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.16] - 2026-10-08
 
 ### Added
 - Log Viewer: "Merge…" on the Dive card joins a dive the computer split in
   two (a short surface stop ended one Garmin log and started another) into a
-  single .fit log, with the gases and tank readings of both. Choose to keep
-  the real clock times (the surface interval is filled with the first dive's
-  last sample, so photos and videos from both dives still match) or to close
-  the gap (one continuous dive). The originals are kept.
+  single .fit log with the gases and tank readings of both. Keep the real
+  clock times (the surface interval is filled with the first dive's last
+  sample, so photos and videos from both dives still match) or close the gap
+  (one continuous dive). The originals are kept. Garmin Connect treats the
+  merged log as the first dive, so delete both originals there before
+  uploading it.
 
 ### Fixed
-- Garmin logs: tanks now show the gas the dive was on (Nx31, a trimix, the gas
-  switched to mid-dive) instead of always air, in the Log Viewer's tank table,
-  its gas-change events and the gas elements of overlays.
+- Garmin logs: tanks show the gas the dive was on (Nx31, a trimix, the gas
+  switched to mid-dive) instead of always air - in the Log Viewer's tank
+  table, its gas-change events and the gas elements of overlays.
 
 ## [0.7.15] - 2026-10-07
 
