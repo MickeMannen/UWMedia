@@ -311,7 +311,8 @@ def element_native_bounds(
         dx, dy, w, h = oriented_text_geometry(font, value, elem["orientation"], size, align, valign)
         return x + dx, y + dy, x + dx + w, y + dy + h
     main, suffix, suffix_scale = text_parts(elem.get("field", ""), value, elem)
-    size = fitted_font_size(elem, size, main, suffix, suffix_scale, 1.0)  # a `max_width` shrinks the font
+    unit = unit_suffix_text(elem, elem.get("field", ""))
+    size = fitted_font_size(elem, size, main, suffix, suffix_scale, 1.0, unit)  # a `max_width` shrinks the font
     font = get_font(size, family, weight)
     dx, dy, (left, top, right, bottom) = text_anchor_shift(font, main, align, valign)
     suffix_x = None
@@ -323,7 +324,6 @@ def element_native_bounds(
             dx = -(left + right) / 2.0
         elif align == "right":
             dx = -float(right)
-    unit = unit_suffix_text(elem, elem.get("field", ""))
     if unit:
         # the unit drawn after the value (gui.hud_renderer._draw_unit_suffix), skin px (scale 1)
         ux, uy, unit_font, _ = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0)

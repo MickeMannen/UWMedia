@@ -1,6 +1,15 @@
 # Processing redesign: from CLI subprocess to a dedicated worker
 
-Status: **draft 1** (2026-10-03). Findings and a recommendation, plus the work that has to be done before an implementation plan can be written. No code has changed. Items marked "to verify" have not been checked yet.
+Status: **draft 2** (2026-10-16). Draft 1 (2026-10-03) gave the findings and a recommendation. Draft 2 records the owner's decisions and narrows the plan to them. No code has changed. Items marked "to verify" have not been checked yet.
+
+## 0. Decisions (owner, 2026-10-16)
+
+- **Option B it is:** processing stays in a child process, driven by a job spec and JSON messages (section 4, "Option B"). Option A is dropped.
+- **The Flutter port is not starting now.** `investigation.md` stays as a record; nothing here waits on it, and the "decide this first" item in 6.1 is closed.
+- **No scripting tool from now on.** `cli_main.py` is not a supported way to run UWMedia. It survives only as long as the GUI's child process needs it (until the worker replaces it) and as a test harness; the `--help` text, the CLI examples in `README.md` and `docs/cli.md`, and the `--units` flag go when it does.
+- **GUI only on every platform.** macOS, Windows and Linux each ship one GUI app: the macOS `UWMedia-Terminal.pkg` is dropped, and the Windows / Linux `uwmedia-terminal` console build becomes the plain `uwmedia` GUI build (no console window, no `uwmedia` command on PATH).
+
+What this closes in section 6: 6.1 entirely (all three questions are answered above), and the "decide whether `cli_main.py` becomes a thin wrapper" step in section 7. What it adds: the Windows GUI-subsystem build must be verified before the console build can go (6.3, second item), because the child process and ffmpeg / exiftool must start without console windows.
 
 ## 1. Summary
 
@@ -75,7 +84,7 @@ Costs:
 - **Isolation stays.** Stop still kills a process, and a native crash only fails the run. Stop is fixed properly at the same time:
   - macOS/Linux: a process group (`start_new_session`), killed with `killpg`.
   - Windows: a job object, or `taskkill /T /F`.
-- **`cli_main.py` becomes optional for the GUI.** Keep it as a thin wrapper that builds the same job spec from arguments, for scripting and running from source. Delete it later if it isn't needed.
+- **`cli_main.py` goes.** Decided 2026-10-16 (section 0): there is no scripting tool, so once every page runs through the worker, `cli_main.py` is removed rather than kept as a wrapper. Until then it stays as the GUI's child process and as the harness of the `render` tests.
 
 Costs:
 - New code: the worker entry point, the job spec, the message channel, and a shared client on the GUI side.
@@ -88,18 +97,19 @@ B removes problems 1–4 and fixes 5, while keeping what the subprocess design a
 
 ## 5. Related decisions
 
-- **Drop the macOS Terminal installer (independent, can go first).** Remove `uwmedia-terminal.macOS` from `pyproject.toml`, the two macOS `uwmedia-terminal` entries in `.github/workflows/build.yml`, the macOS Terminal step in `build.sh`, and the `UWMedia-Terminal-*.pkg` part of `docs/getting-started.md`. It's untested, and it already behaves differently from the main app. Scripting stays possible from source.
-- **Windows/Linux `uwmedia-terminal`:** unchanged for now. Once the worker exists, decide whether it can become a GUI-subsystem app (6.3).
-- **The Flutter port (`investigation.md`).** If the port goes ahead, Python processing would be replaced by Dart/ffmpeg, and this redesign is only worth what it fixes before then. But a job spec plus JSON messages is also the natural interface between a Flutter desktop shell and a Python worker, if the port keeps Python processing on desktop for a while. Decide this first (6.1).
+- **Drop the macOS Terminal installer (independent, goes first).** Remove `uwmedia-terminal.macOS` from `pyproject.toml`, the two macOS `uwmedia-terminal` entries in `.github/workflows/build.yml`, the macOS Terminal step in `build.sh`, and the `UWMedia-Terminal-*.pkg` part of `docs/getting-started.md` and `docs/building.md`. Decided 2026-10-16.
+- **Windows / Linux become GUI-only too (decided 2026-10-16).** The `uwmedia-terminal` app in `pyproject.toml`, `build.ps1` and the workflow's Linux / Windows matrix entries become the `uwmedia` app (Briefcase `console_app = false`), so no console window opens and no `uwmedia` command is installed. The hidden-console relaunch in `uwmedia/__main__.py` goes with it, once 6.3 shows the child and ffmpeg / exiftool start without console windows. On Linux the `.desktop` entry and the Flatpak id stay `org.christersson.uwmedia`.
+- **Scripting (decided 2026-10-16: none).** `docs/cli.md` is removed, the CLI examples in `README.md` and `docs/getting-started.md` go, and the "Command line" mentions in `docs/advanced.md` (`--units`) and `docs/configuration.md` are rewritten for the GUI. Running from source stays `python -m uwmedia` (the GUI).
+- **The Flutter port (`investigation.md`)** is not starting now (decided 2026-10-16). The job spec plus JSON messages would still be the natural seam if it ever does, but nothing here is designed around it.
 
 ## 6. Work before an implementation plan
 
 These must be answered or measured first; each one changes the plan.
 
-### 6.1 Decisions (owner)
-- [ ] Is the Flutter port going ahead, and roughly when? If it's soon, limit this to the Stop fix plus the Terminal installer removal.
-- [ ] Is `cli_main.py` kept as a supported scripting tool (thin wrapper over the job spec), kept for source/tests only, or removed?
-- [ ] Are the Windows/Linux builds expected to stay console apps?
+### 6.1 Decisions (owner) - done 2026-10-16, see section 0
+- [x] Is the Flutter port going ahead, and roughly when? **Not now.**
+- [x] Is `cli_main.py` kept as a supported scripting tool, kept for source/tests only, or removed? **Removed once the worker replaces it; tests only until then.**
+- [x] Are the Windows/Linux builds expected to stay console apps? **No - GUI only on every platform.**
 
 ### 6.2 Investigations (code)
 - [ ] **Full inventory of the CLI options in use.** For each of the 26 options: which page sets it, and which pipeline function finally reads it. This gives the job spec's fields and shows dead options.
@@ -108,11 +118,11 @@ These must be answered or measured first; each one changes the plan.
 - [ ] **List what the three backends parse today.** Statuses, error handling, timing, the "N of M files done" text, and the final summary. The new messages must cover all of it, or the pages lose information.
 - [ ] **Choose the message channel.** Extra pipe vs `QLocalSocket` vs a passed fd: check what works the same way on macOS, Windows and Linux with `QProcess`, in both source and packaged builds.
 - [ ] **Find everywhere external processes are started** (ffmpeg, ffprobe, exiftool via pyexiftool, anything else), for the process-group / job-object Stop fix.
-- [ ] **Check the existing tests.** Which ones drive the CLI (`tests/` has 49 files) and how they would move to the job spec or worker.
+- [ ] **Check the existing tests.** Which ones drive the CLI (`tests/` has 49 files) and how they would move to the job spec or worker. With `cli_main.py` going, every `render`-marked test and `tests/test_cli*.py` has to run against the worker instead - list them.
 
 ### 6.3 Verifications (run it)
 - [ ] **Windows Stop:** start a Color video run, press Stop, and check Task Manager for ffmpeg still running. Do the same with Overlay Generator and Convertion.
-- [ ] **Windows console:** does a GUI-subsystem build that starts a child (with `CREATE_NO_WINDOW`) and ffmpeg/exiftool show any console windows? This decides whether the relaunch trick can go.
+- [ ] **Windows console:** does a GUI-subsystem build that starts a child (with `CREATE_NO_WINDOW`) and ffmpeg/exiftool show any console windows? Now a must (section 0: GUI only): it decides when the console build and the relaunch trick can go, not whether.
 - [ ] **Packaged macOS:** confirm that an extra pipe or socket survives Briefcase's launcher, which is exactly the kind of thing that broke stdout.
 
 ### 6.4 Measurements
@@ -124,10 +134,10 @@ These must be answered or measured first; each one changes the plan.
 
 ## 7. After this: the implementation plan
 
-Once section 6 is done, write the plan as separate, shippable steps:
+Once sections 6.2-6.5 are done, write the plan as separate, shippable steps:
 1. Fix Windows Stop (process tree kill on all platforms).
-2. Remove the macOS Terminal installer.
+2. Remove the macOS Terminal installer, and the scripting docs (`docs/cli.md`, the CLI examples in `README.md` / `docs/getting-started.md`): the tool is no longer supported even while `cli_main.py` still exists underneath.
 3. Job spec, worker entry point and message channel, with tests.
 4. Move Color to the worker, then Overlay Generator, then Convertion. One page per release, with the old path removed after each.
-5. Make `cli_main.py` a thin wrapper, or remove it (per 6.1).
-6. Reconsider the Windows/Linux console app (per 6.3).
+5. Remove `cli_main.py` and `argparse`, moving the `render` tests to the worker (per 6.1).
+6. Turn the Windows / Linux build into the `uwmedia` GUI app and drop the hidden-console relaunch (per 6.3).

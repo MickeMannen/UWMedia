@@ -22,10 +22,12 @@
         "scale": 1.0,
         "unit_suffix": true,
         "unit_position": "below",
-        "unit_scale": 0.281,
-        "unit_dx": -80.3,
-        "unit_dy": -16.4,
-        "unit_color": "#00ADED"
+        "unit_scale": 0.325,
+        "unit_dx": 9.1,
+        "unit_dy": -46.6,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
       },
       {
         "id": "label_time",
@@ -49,17 +51,17 @@
         "id": "state_badge",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.48,
+        "rel_x": 0.475,
         "rel_y": 0.25421,
         "font_size": 31,
-        "value_font_size": 68,
+        "value_font_size": 62,
         "scale": 1.0,
         "depth_unit": "m"
       },
       {
         "id": "label_ndl",
         "field": "custom:NDL",
-        "rel_x": 0.71137,
+        "rel_x": 0.69,
         "rel_y": 0.4601,
         "color": "#00ADED",
         "font_size": 39,
@@ -68,7 +70,7 @@
       {
         "id": "ndl",
         "field": "ndl",
-        "rel_x": 0.71137,
+        "rel_x": 0.69,
         "rel_y": 0.51313,
         "color": "#FFFFFF",
         "font_size": 90,
@@ -80,7 +82,7 @@
         "type": "notice",
         "rel_x": 0.13,
         "rel_y": 0.655,
-        "width": 700,
+        "width": 660,
         "font_size": 76,
         "caption_font_size": 34,
         "scale": 1.0,
@@ -90,7 +92,7 @@
     "screen": {
       "x0": 0.123,
       "y0": 0.248,
-      "x1": 0.877,
+      "x1": 0.81,
       "y1": 0.8621,
       "shape": "rect"
     }

@@ -1,21 +1,3 @@
 {
-  "_about": "Layout issues tests/test_template_sweep.py reports that were checked by eye and accepted, per page: {issue key: note}. Remove a key once the template is fixed; a key the sweep no longer reports is harmless.",
-  "garmin/mk3i/main/single_tank": {
-    "label_n_d_l overlaps ndl": "the stacked N D L label's box reaches into the NDL digits' box; the ink is clear (checked 2026-10-16)"
-  },
-  "garmin/mk3i/main/sidemount": {
-    "label_n_d_l overlaps ndl": "as single_tank"
-  },
-  "shearwater/perdix_2/main/single_tank": {
-    "depth overlaps label_m": "the m label sits under the small decimals, inside the depth's box; the ink is clear (checked 2026-10-16)"
-  },
-  "shearwater/perdix_2/main/sidemount": {
-    "depth overlaps label_m": "as single_tank"
-  },
-  "shearwater/teric/main": {
-    "depth overlaps custom:m": "the m label sits under the small decimals; the ink is clear (checked 2026-10-16)"
-  },
-  "shearwater/tern/main": {
-    "depth overlaps custom:m": "the m label sits under the small decimals; the ink is clear (checked 2026-10-16)"
-  }
+  "_about": "Layout issues tests/test_template_sweep.py reports that were checked by eye and accepted, per page: {issue key: note}. Remove a key once the template is fixed; a key the sweep no longer reports is harmless."
 }

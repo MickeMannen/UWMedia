@@ -48,7 +48,7 @@
       },
       {
         "field": "custom:STOP",
-        "rel_x": 0.54052,
+        "rel_x": 0.515,
         "rel_y": 0.18104,
         "color": "#00ADED",
         "font_size": 38,
@@ -59,7 +59,7 @@
       },
       {
         "field": "deco_stop_depth",
-        "rel_x": 0.58874,
+        "rel_x": 0.56,
         "rel_y": 0.25829,
         "color": "#FFFFFF",
         "font_size": 72,
@@ -71,7 +71,7 @@
       },
       {
         "field": "custom:TIME",
-        "rel_x": 0.71548,
+        "rel_x": 0.675,
         "rel_y": 0.18104,
         "color": "#00ADED",
         "font_size": 38,
@@ -82,7 +82,7 @@
       },
       {
         "field": "next_stop_time",
-        "rel_x": 0.76,
+        "rel_x": 0.705,
         "rel_y": 0.25662,
         "color": "#FFFFFF",
         "font_size": 72,
@@ -156,7 +156,7 @@
       },
       {
         "field": "gf",
-        "rel_x": 0.6962,
+        "rel_x": 0.6842,
         "rel_y": 0.47159,
         "color": "#FFFFFF",
         "font_size": 66,
@@ -164,7 +164,7 @@
       },
       {
         "field": "custom:%",
-        "rel_x": 0.82293,
+        "rel_x": 0.77,
         "rel_y": 0.50013,
         "color": "#00ADED",
         "font_size": 19,
@@ -196,7 +196,7 @@
       },
       {
         "field": "custom:NDL",
-        "rel_x": 0.53,
+        "rel_x": 0.495,
         "rel_y": 0.61266,
         "color": "#00ADED",
         "font_size": 40,
@@ -204,7 +204,7 @@
       },
       {
         "field": "ndl",
-        "rel_x": 0.55,
+        "rel_x": 0.515,
         "rel_y": 0.68488,
         "color": "#FFFFFF",
         "font_size": 66,
@@ -215,7 +215,7 @@
       },
       {
         "field": "ndl_before_clear",
-        "rel_x": 0.55,
+        "rel_x": 0.515,
         "rel_y": 0.68488,
         "color": "#FFFFFF",
         "font_size": 66,
@@ -223,7 +223,7 @@
       },
       {
         "field": "custom:TTS",
-        "rel_x": 0.84,
+        "rel_x": 0.785,
         "rel_y": 0.61434,
         "color": "#00ADED",
         "font_size": 42,
@@ -232,10 +232,10 @@
       },
       {
         "field": "tts",
-        "rel_x": 0.84,
+        "rel_x": 0.785,
         "rel_y": 0.68488,
         "color": "#FFFFFF",
-        "font_size": 70,
+        "font_size": 62,
         "scale": 1.0,
         "align": "right"
       },
@@ -243,7 +243,7 @@
         "id": "clear_counter",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.541,
+        "rel_x": 0.515,
         "rel_y": 0.181,
         "font_size": 38,
         "value_font_size": 72,
@@ -261,7 +261,7 @@
     "screen": {
       "x0": 0.133,
       "y0": 0.1633,
-      "x1": 0.867,
+      "x1": 0.79,
       "y1": 0.834,
       "shape": "rect"
     }

@@ -57,7 +57,7 @@
     {
       "id": "label_gtr",
       "field": "custom:GTR",
-      "rel_x": 0.66139,
+      "rel_x": 0.64,
       "rel_y": 0.67067,
       "color": "#00ADED",
       "font_size": 41,
@@ -67,7 +67,7 @@
     {
       "id": "label_gtr_tank",
       "field": "custom:T1",
-      "rel_x": 0.755,
+      "rel_x": 0.735,
       "rel_y": 0.679,
       "color": "#808080",
       "font_size": 24,
@@ -77,12 +77,13 @@
     {
       "id": "gtr",
       "field": "air_remaining",
-      "rel_x": 0.77422,
+      "rel_x": 0.8,
       "rel_y": 0.74241,
       "color": "#FFFFFF",
       "font_size": 80,
       "scale": 1.0,
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "align": "right"
     }
   ]
 }

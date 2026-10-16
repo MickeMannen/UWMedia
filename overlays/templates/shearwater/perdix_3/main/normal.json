@@ -17,10 +17,12 @@
         "scale": 1.0,
         "unit_suffix": true,
         "unit_position": "below",
-        "unit_scale": 0.28,
-        "unit_dx": 7.7,
-        "unit_dy": -17.0,
-        "unit_color": "#00ADED"
+        "unit_scale": 0.325,
+        "unit_dx": 7.5,
+        "unit_dy": -38.5,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
       },
       {
         "field": "dive_time",
@@ -115,7 +117,7 @@
     "screen": {
       "x0": 0.1292,
       "y0": 0.1561,
-      "x1": 0.8719,
+      "x1": 0.81,
       "y1": 0.8373,
       "shape": "rect"
     }

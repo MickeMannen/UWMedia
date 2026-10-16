@@ -17,10 +17,12 @@
         "scale": 1.0,
         "unit_suffix": true,
         "unit_position": "below",
-        "unit_scale": 0.277,
-        "unit_dx": -5.7,
-        "unit_dy": -27.6,
-        "unit_color": "#00ADED"
+        "unit_scale": 0.325,
+        "unit_dx": 7.0,
+        "unit_dy": -36.2,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
       },
       {
         "field": "state_badge",
@@ -83,34 +85,37 @@
       {
         "field": "dive_time",
         "rel_x": 0.358,
-        "rel_y": 0.577,
+        "rel_y": 0.555,
         "color": "#FFFFFF",
         "font_size": 66,
         "scale": 1.0
       },
       {
         "field": "gasmix",
-        "rel_x": 0.28,
-        "rel_y": 0.645,
+        "rel_x": 0.345,
+        "rel_y": 0.62,
         "color": "#FFFFFF",
-        "font_size": 42,
+        "font_size": 36,
         "scale": 1.0
       },
       {
         "field": "custom:MAX",
-        "rel_x": 0.56,
-        "rel_y": 0.65,
+        "rel_x": 0.475,
+        "rel_y": 0.63,
         "color": "#00ADED",
         "font_size": 22,
         "scale": 1.0
       },
       {
         "field": "max_depth",
-        "rel_x": 0.645,
-        "rel_y": 0.64,
+        "rel_x": 0.54,
+        "rel_y": 0.615,
         "color": "#FFFFFF",
         "font_size": 38,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.35,
+        "unit_color": "#00ADED"
       },
       {
         "id": "notice",

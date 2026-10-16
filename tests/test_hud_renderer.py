@@ -1083,8 +1083,9 @@ def test_garmin_mk3i_main_renders_stop_states_in_the_ndl_slot(variant):
     elems = layout["hud_skin"]["linked_elements"]
     badge = next(e for e in elems if e.get("type") == "badge")
     assert badge["depth_font"] == "label" and badge["timer_format"] == "m:ss"
-    for field in ("ndl", "custom:N\nD\nL"):
+    for field in ("ndl", "custom:NDL"):  # the NDL label is one word turned upwards (real Mk3i screenshot), not three stacked letters
         assert set(next(e for e in elems if e["field"] == field)["hide_in_states"]) == {"safety_stop", "deco", "clear"}
+    assert next(e for e in elems if e["field"] == "custom:NDL")["orientation"] == "up"
     tanks = {"T1": TankData(pressure_bar=150, o2_percent=32.0), "T2": TankData(pressure_bar=140, o2_percent=32.0)}
     deco = Waypoint(timestamp=datetime.now(), depth=12.0, max_depth=40.0, temp=27.0, time_since_start=1500,
                     dive_time=1500, deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=180, ndl=0, tanks=tanks)

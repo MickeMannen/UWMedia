@@ -48,7 +48,7 @@
       },
       {
         "field": "custom:STOP",
-        "rel_x": 0.54427,
+        "rel_x": 0.52,
         "rel_y": 0.25577,
         "color": "#00ADED",
         "font_size": 39,
@@ -59,7 +59,7 @@
       },
       {
         "field": "deco_stop_depth",
-        "rel_x": 0.59426,
+        "rel_x": 0.565,
         "rel_y": 0.32751,
         "color": "#FFFFFF",
         "font_size": 76,
@@ -71,7 +71,7 @@
       },
       {
         "field": "custom:TIME",
-        "rel_x": 0.72566,
+        "rel_x": 0.685,
         "rel_y": 0.25577,
         "color": "#00ADED",
         "font_size": 39,
@@ -82,7 +82,7 @@
       },
       {
         "field": "next_stop_time",
-        "rel_x": 0.78,
+        "rel_x": 0.72,
         "rel_y": 0.32596,
         "color": "#FFFFFF",
         "font_size": 76,
@@ -157,7 +157,7 @@
       },
       {
         "field": "custom:%",
-        "rel_x": 0.83706,
+        "rel_x": 0.79,
         "rel_y": 0.55212,
         "color": "#00ADED",
         "font_size": 20,
@@ -189,7 +189,7 @@
       },
       {
         "field": "custom:NDL",
-        "rel_x": 0.53,
+        "rel_x": 0.51,
         "rel_y": 0.65662,
         "color": "#00ADED",
         "font_size": 43,
@@ -197,7 +197,7 @@
       },
       {
         "field": "ndl",
-        "rel_x": 0.55,
+        "rel_x": 0.53,
         "rel_y": 0.7237,
         "color": "#FFFFFF",
         "font_size": 70,
@@ -205,7 +205,7 @@
       },
       {
         "field": "custom:TTS",
-        "rel_x": 0.85,
+        "rel_x": 0.8,
         "rel_y": 0.65818,
         "color": "#00ADED",
         "font_size": 44,
@@ -214,10 +214,10 @@
       },
       {
         "field": "tts",
-        "rel_x": 0.85,
+        "rel_x": 0.8,
         "rel_y": 0.7237,
         "color": "#FFFFFF",
-        "font_size": 74,
+        "font_size": 64,
         "scale": 1.0,
         "align": "right"
       },
@@ -225,7 +225,7 @@
         "id": "clear_counter",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.544,
+        "rel_x": 0.52,
         "rel_y": 0.256,
         "font_size": 39,
         "value_font_size": 74,
@@ -243,7 +243,7 @@
     "screen": {
       "x0": 0.123,
       "y0": 0.248,
-      "x1": 0.877,
+      "x1": 0.81,
       "y1": 0.8621,
       "shape": "rect"
     }

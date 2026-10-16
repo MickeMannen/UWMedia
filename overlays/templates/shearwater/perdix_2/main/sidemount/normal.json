@@ -146,7 +146,8 @@
     "depth": {
       "rel_x": 0.15593,
       "rel_y": 0.19926,
-      "font_size": 139
+      "font_size": 139,
+      "max_width": 227
     },
     "ascent_rate": {
       "rel_x": 0.41

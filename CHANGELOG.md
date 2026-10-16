@@ -6,6 +6,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Overlay Designer: a **Play** button next to the Time slider runs the dive
+  at 10x, so the moment you want in a long log is found by watching the
+  page rather than by dragging the slider back and forth.
 - Advanced: a **Units** setting - Metric (m, bar, °C) or Imperial (ft, psi,
   °F) - that applies at once to the whole app: overlays and the designer's
   preview, the Log Viewer's numbers, headers and chart, and the Dive
@@ -64,6 +67,19 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   and the Descent X50i's no longer touch the digits.
 
 ### Changed
+- Overlays: the Shearwater pages are laid out the way the manuals show them.
+  The depth is "30.0" with small decimals and the "m" under them on every
+  Big / Standard page (Teric, Tern, Perdix 3, Petrel, Peregrine, as the
+  Perdix 2 already had), "98 ft" with the unit after it in feet, and the
+  Tern, Peregrine and Perdix 3 Tec max depth carries its unit; a Tec page's
+  DEPTH stays a bare number, as on the computer.
+- Overlays: nothing runs off the glass any more. The Shearwater pages' NDL,
+  gas time, notification row and deco box, the Descent Mk3i's max depth,
+  NDL label, dive time and stop box, and the Descent X50i's alert box all
+  sit inside their computer's screen in every state and both unit systems,
+  and the Mk3i's NDL label is readable instead of three stacked letters.
+  The round screens (Mk3i, Teric, Tern) are now checked against the circle,
+  not just its square.
 - Overlays: every built-in template now knows where the computer's screen
   is inside its picture. Nothing is drawn outside it (an alert box or a
   wide value stops at the glass, as on the real device), the Overlay

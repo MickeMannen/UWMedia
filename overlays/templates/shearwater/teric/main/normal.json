@@ -17,10 +17,12 @@
         "scale": 1.0,
         "unit_suffix": true,
         "unit_position": "below",
-        "unit_scale": 0.275,
-        "unit_dx": -5.7,
-        "unit_dy": -24.1,
-        "unit_color": "#00ADED"
+        "unit_scale": 0.325,
+        "unit_dx": 6.0,
+        "unit_dy": -30.8,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
       },
       {
         "field": "state_badge",
@@ -102,9 +104,9 @@
         "field": "notice",
         "type": "notice",
         "style": "banner",
-        "rel_x": 0.17,
+        "rel_x": 0.18,
         "rel_y": 0.465,
-        "width": 345,
+        "width": 330,
         "height": 70,
         "font_size": 30,
         "caption_font_size": 14,

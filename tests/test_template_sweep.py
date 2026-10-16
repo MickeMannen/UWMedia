@@ -111,9 +111,14 @@ def sweep_page(layout, size, situation, wp, waypoints):
         where = "the screen"
     else:
         sx0, sy0, sx1, sy1, where = 0.0, 0.0, w, h, "the skin"
+    round_screen = isinstance(screen, dict) and screen.get("shape") == "ellipse"
     for name, kind, (x0, y0, x1, y1) in boxes:
         if x0 < sx0 - SLACK or y0 < sy0 - SLACK or x1 > sx1 + SLACK or y1 > sy1 + SLACK:
             issues.append((f"{name} leaves {where}", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of ({sx0:.0f},{sy0:.0f})-({sx1:.0f},{sy1:.0f})"))
+        elif round_screen and not _inside_ellipse((x0, y0, x1, y1), (sx0, sy0, sx1, sy1)):
+            # a round screen (Descent Mk3i, Teric, Tern): the box's corners
+            # must be on the glass too, not only inside its bounding rectangle
+            issues.append((f"{name} leaves the round screen", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of the ellipse in ({sx0:.0f},{sy0:.0f})-({sx1:.0f},{sy1:.0f})"))
     textual = [(n, k, b) for n, k, b in boxes if k in ("text", "badge", "notice")]
     graphics = [(n, k, b) for n, k, b in boxes if k not in ("text", "badge", "notice")]
     for i, (na, ka, ba) in enumerate(textual):
@@ -122,6 +127,16 @@ def sweep_page(layout, size, situation, wp, waypoints):
             if over:
                 issues.append((f"{na} overlaps {nb}", f"{situation}: by {over[0]:.0f}x{over[1]:.0f} px"))
     return issues
+
+
+def _inside_ellipse(box, screen):
+    """Every corner of `box` inside the ellipse filling `screen`, with SLACK
+    px of tolerance on the radii."""
+    x0, y0, x1, y1 = box
+    sx0, sy0, sx1, sy1 = screen
+    cx, cy = (sx0 + sx1) / 2.0, (sy0 + sy1) / 2.0
+    rx, ry = (sx1 - sx0) / 2.0 + SLACK, (sy1 - sy0) / 2.0 + SLACK
+    return all(((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 <= 1.0 for px, py in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)))
 
 
 def sweep_report(layout, size):

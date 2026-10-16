@@ -108,11 +108,12 @@ def split_small_suffix(val_str, style):
     return val_str[:index], val_str[index:]
 
 
-def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px_scale=1.0):
+def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px_scale=1.0, unit_text=None):
     """The font size (px) a text element draws at: `size`, or smaller when
     the element has a `max_width` (skin px, before the skin scale) and the
-    value plus its small suffix is wider than that - a four-digit psi
-    reading in a cell drawn for three digits of bar. Shared by the
+    value plus its small suffix - and the unit drawn after it, when there
+    is one - is wider than that: a four-digit psi reading in a cell drawn
+    for three digits of bar, "131 ft" where "40.0" stood. Shared by the
     renderer and the designer's bounds."""
     try:
         max_w = float(elem.get("max_width") or 0) * px_scale
@@ -122,10 +123,14 @@ def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px
         return size
     family, weight = elem.get("font_family"), elem.get("font_weight")
 
+    unit_after = bool(unit_text) and (elem.get("unit_position", "right") != "below" or not suffix_str)
+
     def width(px):
         w = get_font(px, family, weight).getlength(main_str)
         if suffix_str:
             w += get_font(max(1, round(px * suffix_scale)), family, weight).getlength(suffix_str)
+        if unit_after:
+            w += int(px * 0.08) + get_font(max(1, int(px * float(elem.get("unit_scale", 0.35)))), family, weight).getlength(unit_text)
         return w
 
     if width(size) <= max_w:
@@ -173,8 +178,9 @@ def unit_suffix_text(elem, field):
 def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale):
     """(x, y, unit_font, unit_size) for the unit drawn after a value: to the
     right of the value's run, baseline-aligned, or below its last part (the
-    way a Perdix / Descent puts the "m" under the small decimals). `unit_dx`
-    / `unit_dy` move it (skin px); `unit_scale` sizes it against the value."""
+    way a Perdix / Descent puts the "m" under the small decimals; with no
+    small part - whole feet - it goes after the value). `unit_dx` /
+    `unit_dy` move it (skin px); `unit_scale` sizes it against the value."""
     scale = float(elem.get("unit_scale", 0.35))
     unit_size = max(1, int(size * scale))
     unit_font = get_font(unit_size, elem.get("font_family"), elem.get("font_weight"))
@@ -182,9 +188,15 @@ def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_sc
     dy = float(elem.get("unit_dy", 0.0)) * px_scale
     main_bottom = font.getbbox(main_text)[3]
     unit_bbox = unit_font.getbbox("m")
-    if elem.get("unit_position", "right") == "below":
-        x = (suffix_x if suffix_x is not None else run_right - unit_font.getlength("m")) + dx
+    if elem.get("unit_position", "right") == "below" and suffix_x is not None:
+        x = suffix_x + dx
         y = main_bottom + int(size * 0.08) + dy
+    elif elem.get("unit_position", "right") == "below":
+        # nothing small to sit under (whole feet on a Shearwater, Perdix 2
+        # manual p.12 "45 ft"): after the value instead, the offsets - tuned
+        # for the place under the decimals - left out
+        x = run_right + int(size * 0.08)
+        y = main_bottom - unit_bbox[3]
     else:
         x = run_right + int(size * 0.08) + dx
         y = main_bottom - unit_bbox[3] + dy  # baselines together
@@ -1927,7 +1939,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         main_str, suffix_str, suffix_scale = text_parts(field, val_str, elem)
         unit_text = unit_suffix_text(elem, field)  # "m" / "ft", "BAR" / "PSI" ... drawn after the value
         px_scale = user_scale if render_log else user_scale * res_scale
-        final_size = fitted_font_size(elem, final_size, main_str, suffix_str, suffix_scale, px_scale)
+        final_size = fitted_font_size(elem, final_size, main_str, suffix_str, suffix_scale, px_scale, unit_text)
         font = get_font(final_size, elem.get("font_family"), elem.get("font_weight"))
         outline = elem.get("outline", TEXT_OUTLINE_DEFAULT)
         suffix_font = None

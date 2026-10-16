@@ -27,7 +27,8 @@
         "unit_scale": 0.325,
         "unit_dx": 9.4,
         "unit_dy": -48.4,
-        "unit_color": "#00ADED"
+        "unit_color": "#00ADED",
+        "max_width": 210
       },
       {
         "id": "label_time",
@@ -51,10 +52,10 @@
         "id": "state_badge",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.50895,
+        "rel_x": 0.495,
         "rel_y": 0.21331,
         "font_size": 29,
-        "value_font_size": 63,
+        "value_font_size": 54,
         "scale": 1.0,
         "depth_unit": "m"
       },
@@ -108,7 +109,7 @@
         "type": "notice",
         "rel_x": 0.13,
         "rel_y": 0.615,
-        "width": 660,
+        "width": 590,
         "font_size": 70,
         "caption_font_size": 32,
         "scale": 1.0,
@@ -133,7 +134,7 @@
     "screen": {
       "x0": 0.1309,
       "y0": 0.1633,
-      "x1": 0.868,
+      "x1": 0.79,
       "y1": 0.838,
       "shape": "rect"
     }

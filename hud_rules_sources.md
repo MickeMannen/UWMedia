@@ -131,8 +131,10 @@ carries its own `_source`; the table is the summary.
 | Brand / model | Rule | Source | Status |
 |---|---|---|---|
 | Shearwater | depth: one decimal in metres, whole feet | Perdix 2 manual p.12 (figures) | verified |
-| Shearwater Teric | depth: one decimal in both | Teric manual p.23 | verified |
-| Garmin | depth: one decimal in metres, whole feet | Mk3 manual p.8 figures | assumed (feet figure only) |
+| Shearwater Teric, Tern | depth: one decimal in both | Teric manual p.23; Tern p.11 ("Displayed to one decimal place in feet or meters", figure 125.6 ft) | verified |
+| Garmin | depth: one decimal in metres, whole feet | Mk3 p.15 figure 57 ft; X50i p.12 figures 30 ft, 40 ft, MAX. DEPTH 51 ft; metric screenshots 0.0 m | verified |
+| Shearwater | where the unit sits: Big / Standard / Rec layouts show the depth with small decimals and the cyan "m" under them ("15.7 m", Perdix 2 p.12 figure), whole feet with the "ft" after the number ("45 ft", same page), and the unit small after the MAX value ("21.0m", "31.6 m"); the Tec layouts' top-row DEPTH has no unit at all, only the value ("54.0", "220"), while a MAX slot keeps its unit | Perdix 2 p.11-12, p.16; Perdix 3 p.22, p.32, p.37-38; Petrel 3 Tec p.10-11; Teric p.11, p.35; Tern p.10-11; Peregrine p.10, p.13 | verified |
+| Garmin | where the unit sits: small grey ft / m right after the value for depth and MAX. DEPTH ("30 ft", "51 ft"); the Mk3i Big Numbers page puts the m under the decimal | X50i p.12 figures; Mk3 p.15 figure; real Mk3i screenshot `mk3i_main_single_tank.BMP` | verified |
 | all | stops at 10 / 20 / 30 ft for 3 / 6 / 9 m, the 5 m safety stop at 15 ft; pressures whole psi; temperatures whole degrees | Perdix 2 p.28, Mk3 p.10 | verified |
 
 ## Display passes (`simulator.md` A5)

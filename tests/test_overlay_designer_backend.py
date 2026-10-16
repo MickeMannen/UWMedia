@@ -1335,3 +1335,27 @@ def test_units_preview_is_the_pages_own_choice(monkeypatch):
     app.unitsChanged()  # Advanced changed (or re-announced) the setting: follow it again
     assert app.unitsIndex == 0 and " m" in app.dataText
     U.reload_units()
+
+
+def test_play_runs_the_time_slider_at_ten_x_and_stops_at_the_end():
+    """Play next to Time: each tick moves the slider one dive second (ten per
+    real second), the page follows, and it stops by itself at the end -
+    pressing Play again then starts over."""
+    from uwmedia.backends.overlay_designer_backend import PLAY_SPEED, PLAY_TICK_MS
+    app = OverlayDesignerBackend()
+    assert app.playing is False
+    app.onTimeChanged(100)
+    app.togglePlay()
+    assert app.playing is True
+    for _ in range(5):
+        app._play_tick()
+    assert app.timeValue == 100 + 5 * PLAY_SPEED * PLAY_TICK_MS // 1000
+    app.togglePlay()
+    assert app.playing is False
+    app.onTimeChanged(app.timeMax - 1)
+    app.togglePlay()
+    app._play_tick()
+    assert app.timeValue == app.timeMax and app.playing is False  # ran out
+    app.togglePlay()
+    assert app.playing is True and app.timeValue == app.timeMin  # from the start again
+    app._stop_playing()

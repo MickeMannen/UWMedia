@@ -39,6 +39,8 @@ or metres, bar and °C - to check that "3002 PSI" fits where "207 BAR" did.
 It starts on the app's setting ([Advanced](advanced.md#units)), never
 changes it, and goes back to following it when that setting changes.
 
+**Play** next to the slider runs the dive at ten times real speed, so the moment you are after in a long log - the deco stop, an alert - is found by watching the page change rather than by dragging. Press it again to pause; it stops by itself at the end and starts over on the next press. With a video loaded the frames advance the same way.
+
 ## Views
 
 - **Design view** - the template at native pixels, for placing elements.

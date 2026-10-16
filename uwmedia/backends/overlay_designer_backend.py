@@ -71,7 +71,7 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 from PIL import Image as PILImage
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickImageProvider
 
@@ -204,6 +204,10 @@ def _clamp_zoom(value: float) -> float:
     return max(ZOOM_MIN, min(ZOOM_MAX, float(value)))
 
 
+PLAY_SPEED = 10  # dive seconds per real second when the time slider plays
+PLAY_TICK_MS = 100
+
+
 class OverlayDesignerBackend(QObject):
     cascadeChanged = Signal()
     documentChanged = Signal()
@@ -215,6 +219,7 @@ class OverlayDesignerBackend(QObject):
     telemetryChanged = Signal()
     unitsPreviewChanged = Signal()
     timeChanged = Signal()
+    playChanged = Signal()
     dataChanged = Signal()
     statusChanged = Signal()
     tzChanged = Signal()
@@ -254,6 +259,13 @@ class OverlayDesignerBackend(QObject):
         self._element_boxes: List[List[float]] = []
         self._selection_box = {"visible": False, "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0, "label": ""}
         self._preview_units: Optional[str] = None  # the page's own Metric / Imperial choice; None follows Advanced
+        # Play (2026-10-16): the time slider runs on its own at PLAY_SPEED x
+        # real time, so a moment in a long log - the deco, an alert - is
+        # found by watching rather than by dragging.
+        self._playing = False
+        self._play_timer = QTimer(self)
+        self._play_timer.setInterval(PLAY_TICK_MS)
+        self._play_timer.timeout.connect(self._play_tick)
 
         # --- canvas view ---
         self._view_mode = VIEW_DESIGN
@@ -2480,6 +2492,7 @@ class OverlayDesignerBackend(QObject):
         return self._time_text
 
     def _set_time(self, minimum, maximum, value, enabled, text):
+        self._stop_playing()
         self._time_min = minimum
         self._time_max = maximum
         self._time_value = value
@@ -2492,6 +2505,51 @@ class OverlayDesignerBackend(QObject):
             0, DUMMY_DURATION_S, DUMMY_DEFAULT_SECONDS, True,
             str(timedelta(seconds=DUMMY_DEFAULT_SECONDS)),
         )
+
+    # -- Play: the slider advances on its own at PLAY_SPEED x real time ------
+
+    @Property(bool, notify=playChanged)
+    def playing(self):
+        return self._playing
+
+    @Slot()
+    def togglePlay(self):
+        """Start the slider running (from the start again when it is at the
+        end), or stop it."""
+        if self._playing:
+            self._stop_playing()
+            return
+        if not self._time_enabled:
+            return
+        if self._time_value >= self._time_max:
+            self.onTimeChanged(self._time_min)
+        self._playing = True
+        from PySide6.QtCore import QCoreApplication
+        if QCoreApplication.instance() is not None:
+            self._play_timer.start()
+        self.playChanged.emit()
+
+    def _stop_playing(self):
+        if self._play_timer.isActive():
+            self._play_timer.stop()
+        if self._playing:
+            self._playing = False
+            self.playChanged.emit()
+
+    def _play_step(self):
+        """Slider units per tick: seconds, or video frames when a video is loaded."""
+        seconds = PLAY_SPEED * PLAY_TICK_MS / 1000.0
+        if self.video_cap is not None and self.video_fps:
+            return max(1, int(round(seconds * self.video_fps)))
+        return max(1, int(round(seconds)))
+
+    def _play_tick(self):
+        if not self._playing:
+            return
+        value = min(self._time_max, self._time_value + self._play_step())
+        self.onTimeChanged(value)
+        if value >= self._time_max:
+            self._stop_playing()
 
     @Slot(int)
     def onTimeChanged(self, value):

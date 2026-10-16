@@ -16,7 +16,7 @@
         "id": "max_depth",
         "field": "max_depth",
         "rel_x": 0.41246,
-        "rel_y": 0.21587,
+        "rel_y": 0.216,
         "color": "#FFFFFF",
         "font_size": 48,
         "scale": 1.0,
@@ -51,23 +51,24 @@
         "unit_dy": -3.2
       },
       {
-        "id": "label_n_d_l",
-        "field": "custom:N\nD\nL",
-        "rel_x": 0.21593,
-        "rel_y": 0.60608,
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.218,
+        "rel_y": 0.598,
         "color": "#FFFFFF",
-        "font_size": 18,
+        "font_size": 26,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
           "deco",
           "clear"
-        ]
+        ],
+        "orientation": "up"
       },
       {
         "id": "ndl",
         "field": "ndl",
-        "rel_x": 0.26722,
+        "rel_x": 0.275,
         "rel_y": 0.58543,
         "color": "#FFFFFF",
         "font_size": 101,
@@ -82,10 +83,10 @@
         "id": "state_badge",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.21593,
-        "rel_y": 0.575,
+        "rel_x": 0.27,
+        "rel_y": 0.565,
         "font_size": 30,
-        "value_font_size": 92,
+        "value_font_size": 80,
         "depth_font": "label",
         "depth_unit": "m",
         "label": "Stop / deco (↑ceiling + timer)",
@@ -94,7 +95,7 @@
       {
         "id": "dive_time",
         "field": "dive_time",
-        "rel_x": 0.5959,
+        "rel_x": 0.545,
         "rel_y": 0.58775,
         "color": "#FFFFFF",
         "font_size": 101,
@@ -104,10 +105,10 @@
       }
     ],
     "screen": {
-      "x0": 0.15,
-      "y0": 0.225,
-      "x1": 0.85,
-      "y1": 0.75,
+      "x0": 0.126,
+      "y0": 0.194,
+      "x1": 0.889,
+      "y1": 0.778,
       "shape": "ellipse"
     }
   }

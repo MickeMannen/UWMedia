@@ -376,6 +376,18 @@ Item {
                     }
 
                     Label { text: "Time"; font.pixelSize: 12; Layout.leftMargin: 8 }
+                    Button {
+                        // Play / pause: the slider runs at 10x so a moment in a
+                        // long log is found by watching, not by dragging.
+                        text: overlayDesignerBackend.playing ? "\u275A\u275A" : "\u25B6"
+                        flat: true
+                        Layout.preferredHeight: 34
+                        Layout.preferredWidth: 34
+                        enabled: overlayDesignerBackend.timeEnabled
+                        onClicked: overlayDesignerBackend.togglePlay()
+                        ToolTip.text: overlayDesignerBackend.playing ? "Pause" : "Play the dive at 10x speed"
+                        ToolTip.visible: hovered
+                    }
                     Slider {
                         Layout.fillWidth: true
                         Layout.minimumWidth: 80
