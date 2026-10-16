@@ -205,10 +205,11 @@ pythonpath = ["."]
 # spread over all CPU cores (pytest-xdist; `-n0` runs in one process, e.g.
 # for a debugger). tests/run_tests.sh has the other runs; a later -m or -n on
 # the command line replaces these.
-addopts = ["-m", "not release", "-n", "auto"]
+addopts = ["-m", "not release and not golden", "-n", "auto"]
 markers = [
     "render: renders the fixture media through cli_main.py (slower; tests/fixtures + synthetic logs)",
     "release: tests/release_test.py pre-release validation on the full 4K media",
+    "golden: tests/test_template_golden.py compares every template's render with tests/fixtures/overlay_golden (fonts differ between machines; the Everything suite)",
     "requires_media: reads the local test_data/ media or logs; skipped when it is missing",
     "windows: Windows-only checks (skipped on other platforms)",
 ]

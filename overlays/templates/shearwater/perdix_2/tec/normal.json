@@ -190,7 +190,10 @@
         "rel_y": 0.68488,
         "color": "#FFFFFF",
         "font_size": 35,
-        "scale": 1.0
+        "scale": 1.0,
+        "hide_in_states": [
+          "clear"
+        ]
       },
       {
         "field": "ndl_before_clear",

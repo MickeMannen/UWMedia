@@ -33,6 +33,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   critical pressure.
 - Overlays: Shearwater PPO2 readouts turn red at the computer's deco limit
   (1.61 bar) rather than 1.6.
+- Overlays: the Perdix 2 Tec page no longer draws dashes over the NDL
+  outside the deco-clear count-up; the MAX depth's "m" on the Perdix 3 pages
+  and the Descent X50i's no longer touch the digits.
 
 ### Changed
 - Overlays: Teric and Tern templates show the safety stop as the watches do -

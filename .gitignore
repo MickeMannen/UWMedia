@@ -201,6 +201,8 @@ uwmedia/**/*_ui.py
 !/overlays/templates/**/*.png
 # README screenshots
 !/media/*.png
+# Overlay golden images (tests/test_template_golden.py): reviewed renders
+!/tests/fixtures/overlay_golden/*.png
 
 
 /config.yaml

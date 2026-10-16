@@ -1492,6 +1492,8 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
     if field == "ndl_before_clear":
         from utils.hud_rules_engine import get_ndl_before_clear
         raw_val = get_ndl_before_clear(manufacturer, model, waypoint, waypoints)
+        if raw_val is None:
+            return "", None  # only shown during the clear count-up: nothing (not "--") the rest of the dive
         return format_telemetry_value(field, raw_val), raw_val
     if field.startswith("custom:"):
         return field.replace("custom:", ""), None

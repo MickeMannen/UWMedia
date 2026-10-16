@@ -34,7 +34,7 @@ if [ -z "$choice_arg" ]; then
     echo -e "  ${YELLOW}1)${NC} Default: everything except the release run, renders included (~1 min)"
     echo -e "  ${YELLOW}2)${NC} Quick: also skip the render tests (~30 s)"
     echo -e "  ${YELLOW}3)${NC} Release: pre-release validation on the full 4K media (release_test.py, ~3.5 min)"
-    echo -e "  ${YELLOW}4)${NC} Everything: default + release (~6 min) - run this before a release"
+    echo -e "  ${YELLOW}4)${NC} Everything: default + release + overlay golden images (~7 min) - run this before a release"
     echo -e "  ${YELLOW}5)${NC} Exit"
 fi
 
@@ -62,7 +62,7 @@ while true; do
             ;;
         2)
             echo -e "\n${GREEN}[*] Running the quick suite (no renders, no release)...${NC}"
-            pytest -v -m "not render and not release"
+            pytest -v -m "not render and not release and not golden"
             status=$?
             break
             ;;

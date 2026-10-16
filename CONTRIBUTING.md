@@ -19,7 +19,7 @@ commit.
 |---|---|---|---|
 | Before every commit | `tests/run_tests.sh` (Enter) or `pytest` | ~1 min | Everything except the release run, including render tests on the small media in `tests/fixtures/` |
 | A quicker check while working | `tests/run_tests.sh 2` | ~30 s | The same without the render tests |
-| Before a release | `tests/run_tests.sh 4` | ~6 min | Everything, including `release_test.py` on the full 4K media |
+| Before a release | `tests/run_tests.sh 4` | ~7 min | Everything, including `release_test.py` on the full 4K media and the overlay golden images (`tests/test_template_golden.py`) |
 
 `tests/run_tests.sh 3` runs only `release_test.py`.
 
@@ -70,6 +70,16 @@ commit.
 - Markers (registered in `pyproject.toml`):
   - `render`: renders the fixture media through `cli_main.py` (slower).
   - `release`: `release_test.py`.
+  - `golden`: `test_template_golden.py` renders every bundled template in
+    nine states and compares the halved crop with the PNG in
+    `tests/fixtures/overlay_golden/` (tracked; fonts differ between machines,
+    so it is not in the default suite). After an intended change to a
+    template or the renderer, look at the new render, then regenerate with
+    `pytest tests/test_template_golden.py -m golden --update-golden`.
+    `test_template_sweep.py` (default suite) lays every page out in every
+    designer state and fails on a text element leaving the skin or
+    overlapping another; accepted overlaps are listed with a note in
+    `tests/template_sweep_known.json`.
   - `requires_media`: reads `test_data/`; skipped when it is missing.
   - `windows`: Windows-only checks.
 - Never write to the real app folders (Application Support, `~/.config`,

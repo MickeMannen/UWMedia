@@ -83,6 +83,11 @@ def run_cli(*args):
                           capture_output=True, text=True, cwd=REPO_ROOT)
 
 
+def pytest_addoption(parser):
+    parser.addoption("--update-golden", action="store_true", default=False,
+                     help="rewrite the overlay golden images (tests/test_template_golden.py) instead of comparing")
+
+
 def pytest_collection_modifyitems(config, items):
     if TEST_DATA.is_dir():
         return
