@@ -2,7 +2,8 @@
 // time, plus the deco ceiling when the log has one. Taken from DiveSync's
 // ProfileChart.qml (dive_sync repo); used by LogViewerPage.qml. Hides itself
 // for fewer than two samples. ``samples`` is a list of {time (s), depth (m),
-// ceiling (m, 0 for none)} - log_viewer_backend.dive_details' "samples".
+// ceiling (0 for none)} in the unit named by ``depthUnit`` -
+// log_viewer_backend.dive_details' "samples" and "depth_unit".
 // Temperature is not plotted: logs record it in whole degrees, so the curve
 // is a staircase that reads as noise next to the depth line.
 import QtQuick
@@ -12,6 +13,7 @@ ColumnLayout {
     id: chart
     property var samples: []
     property bool showCeiling: false
+    property string depthUnit: "m"
     property int chartHeight: 180
     readonly property color depthColor: "#00A6ED"
     readonly property color ceilingColor: "#F59E0B"
@@ -98,8 +100,8 @@ ColumnLayout {
 
             ctx.fillStyle = chart.labelColor
             ctx.font = "10px sans-serif"
-            ctx.fillText("0 m", 4, pad.top + 8)
-            ctx.fillText(maxDepth.toFixed(1) + " m", 4, pad.top + plotH)
+            ctx.fillText("0 " + chart.depthUnit, 4, pad.top + 8)
+            ctx.fillText(maxDepth.toFixed(chart.depthUnit === "ft" ? 0 : 1) + " " + chart.depthUnit, 4, pad.top + plotH)
             ctx.fillText(Math.round(maxTime / 60) + " min", pad.left + plotW - 30, height - 4)
         }
     }

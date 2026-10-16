@@ -19,16 +19,11 @@
         "rel_y": 0.21587,
         "color": "#FFFFFF",
         "font_size": 48,
-        "scale": 1.0
-      },
-      {
-        "id": "label_m",
-        "field": "custom:m",
-        "rel_x": 0.56001,
-        "rel_y": 0.24401,
-        "color": "#FFFFFF",
-        "font_size": 21,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.438,
+        "unit_dx": 5.7,
+        "unit_dy": 1.9
       },
       {
         "id": "gasmix",
@@ -48,16 +43,12 @@
         "font_size": 123,
         "scale": 1.0,
         "small_suffix": "decimals",
-        "small_suffix_scale": 0.67
-      },
-      {
-        "id": "label_m_2",
-        "field": "custom:m",
-        "rel_x": 0.56905,
-        "rel_y": 0.53218,
-        "color": "#FFFFFF",
-        "font_size": 35,
-        "scale": 1.0
+        "small_suffix_scale": 0.67,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.285,
+        "unit_dx": 27.2,
+        "unit_dy": -3.2
       },
       {
         "id": "label_n_d_l",

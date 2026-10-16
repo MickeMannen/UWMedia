@@ -67,6 +67,7 @@ python cli_main.py ./raw/ --force-media-tz +8 --fix-tz
 | `--export-json DIR` | Parse every log in `DIR` and write it as JSON next to it. |
 | `--create-config` | Scan the log folder for Garmin tank sensors and create `config.yaml` (sensor names). |
 | `--tz-adjust H` | Shift the log time by H hours (for Shearwater logs). |
+| `--units {metric,imperial}` | Unit system of the overlay for this run (feet, psi, °F with `imperial`); default is the Advanced page's setting. A template with its own `units` key keeps it. |
 
 ## Output files
 

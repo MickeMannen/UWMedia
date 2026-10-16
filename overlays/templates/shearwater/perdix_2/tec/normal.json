@@ -122,15 +122,13 @@
         "rel_y": 0.47159,
         "color": "#FFFFFF",
         "font_size": 74,
-        "scale": 1.0
-      },
-      {
-        "field": "custom:BAR",
-        "rel_x": 0.35,
-        "rel_y": 0.47159,
-        "color": "#00ADED",
-        "font_size": 18,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.243,
+        "unit_dx": -6.3,
+        "unit_dy": -52.0,
+        "unit_color": "#00ADED",
+        "max_width": 142
       },
       {
         "field": "custom:PPO2",

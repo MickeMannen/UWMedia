@@ -14,15 +14,12 @@
         "rel_y": 0.215,
         "color": "#FFFFFF",
         "font_size": 100,
-        "scale": 1.0
-      },
-      {
-        "field": "custom:m",
-        "rel_x": 0.415,
-        "rel_y": 0.335,
-        "color": "#00ADED",
-        "font_size": 30,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.3,
+        "unit_dx": 33.5,
+        "unit_dy": 30.3,
+        "unit_color": "#00ADED"
       },
       {
         "field": "dive_time",

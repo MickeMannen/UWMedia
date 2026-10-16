@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 from gui.hud_renderer import apply_value_format, badge_lines, notice_for, resolve_element_text, rules_manufacturer
+from utils import units as U
 from utils.dummy_telemetry import STATE_OPTIONS, build_dummy_dive, forced_dive, waypoint_at
 from utils.hud_designer import element_kind, element_native_bounds
 from utils.hud_rules_engine import resolve_state
@@ -142,12 +143,20 @@ def _known():
     return json.loads(KNOWN.read_text()) if KNOWN.exists() else {}
 
 
+@pytest.mark.parametrize("units", U.UNIT_SYSTEMS)
 @pytest.mark.parametrize("brand,computer,page,variant", bundled_pages(), ids=lambda v: str(v))
-def test_bundled_page_lays_out_in_every_state(brand, computer, page, variant):
+def test_bundled_page_lays_out_in_every_state(brand, computer, page, variant, units):
+    """Both unit systems: feet and psi are wider numbers (3002 psi for 207
+    bar) and must still fit. A known issue applies to both unless the
+    entry is keyed `<page>@imperial`."""
     layout, size = load_page(brand, computer, page, variant)
-    report = sweep_report(layout, size)
+    with U.units_override(units):
+        report = sweep_report(layout, size)
     key = _page_key(brand, computer, page, variant)
-    known = _known().get(key, {})
+    known = dict(_known().get(key, {}))
+    if units == U.IMPERIAL:
+        known.update(_known().get(f"{key}@imperial", {}))
+    key = f"{key}@{units}"
     new = {k: v for k, v in report.items() if k not in known}
     lines = [f"{k}  ({len(v)} situation(s), e.g. {v[0]})" for k, v in new.items()]
     assert not new, (
@@ -158,5 +167,5 @@ def test_bundled_page_lays_out_in_every_state(brand, computer, page, variant):
 
 def test_known_issue_list_only_names_bundled_pages():
     keys = {_page_key(*p) for p in bundled_pages()}
-    stale = [k for k in _known() if not k.startswith("_") and k not in keys]
+    stale = [k for k in _known() if not k.startswith("_") and k.removesuffix("@imperial") not in keys]
     assert not stale, f"{KNOWN.name} lists pages that no longer exist: {stale}"

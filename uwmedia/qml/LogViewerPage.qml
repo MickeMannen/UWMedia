@@ -372,6 +372,7 @@ Item {
                         ProfileChart {
                             Layout.fillWidth: true
                             samples: root.sel.samples || []
+                            depthUnit: root.sel.depth_unit || "m"
                             showCeiling: !!root.sel.has_ceiling
                         }
                         Text {

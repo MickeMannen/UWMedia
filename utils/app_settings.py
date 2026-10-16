@@ -16,6 +16,9 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "exiftool_path": None,
     "filename_formats": [],
     "render_log_filename_formats": [],
+    # "metric" (m, bar, °C) or "imperial" (ft, psi, °F) for everything the app
+    # shows; the data stays SI (utils/units.py)
+    "units": "metric",
     # Last-used value of every persisted Process/Advanced form field, keyed
     # by its widget attribute name (e.g. "source_input", "hw_accel_switch").
     "fields": {},

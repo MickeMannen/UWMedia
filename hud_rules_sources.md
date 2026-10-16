@@ -126,6 +126,15 @@ carries its own `_source`; the table is the summary.
 | Garmin | priority order | deduced (dangerous first; the manual lists alphabetically) | deduced |
 | Garmin | depth and stop badge yellow more than 2 m above the safety stop ceiling (`warn_above_m`, phase `warn`) | Mk3 p.13, X50i p.12 | verified |
 
+## Units (`display.depth_decimals`, `simulator.md` §7)
+
+| Brand / model | Rule | Source | Status |
+|---|---|---|---|
+| Shearwater | depth: one decimal in metres, whole feet | Perdix 2 manual p.12 (figures) | verified |
+| Shearwater Teric | depth: one decimal in both | Teric manual p.23 | verified |
+| Garmin | depth: one decimal in metres, whole feet | Mk3 manual p.8 figures | assumed (feet figure only) |
+| all | stops at 10 / 20 / 30 ft for 3 / 6 / 9 m, the 5 m safety stop at 15 ft; pressures whole psi; temperatures whole degrees | Perdix 2 p.28, Mk3 p.10 | verified |
+
 ## Display passes (`simulator.md` A5)
 
 | Template | Item | Source | Status |

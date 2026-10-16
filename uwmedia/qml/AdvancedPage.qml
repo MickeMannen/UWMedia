@@ -46,6 +46,22 @@ Item {
                         checked: advancedBackend.summary
                         onToggled: advancedBackend.summary = checked
                     }
+                    RowLayout {
+                        spacing: 8
+                        Label { text: "Units"; color: "#9AA0A6"; font.pixelSize: 11 }
+                        ComboBox {
+                            id: unitsCombo
+                            Layout.preferredWidth: 220
+                            Layout.preferredHeight: 34
+                            font.pixelSize: 13
+                            model: advancedBackend.unitOptions
+                            Binding { target: unitsCombo; property: "currentIndex"; value: advancedBackend.unitsIndex }
+                            onActivated: (index) => advancedBackend.setUnitsIndex(index)
+                            ToolTip.text: "Depths, pressures and temperatures everywhere in the app: overlays, Log Viewer, Dive Profile Builder. The dive logs stay as recorded."
+                            ToolTip.visible: hovered
+                            ToolTip.delay: 400
+                        }
+                    }
                 }
             }
 

@@ -19,9 +19,12 @@ from gui.hud_renderer import (
     get_font,
     tank_outline_metrics,
     tank_segments_geometry,
+    fitted_font_size,
     text_anchor_shift,
     text_parts,
     tissue_bar_geometry,
+    unit_suffix_geometry,
+    unit_suffix_text,
 )
 from models.dive import Waypoint
 
@@ -179,6 +182,8 @@ def available_telemetry_fields(dive=None) -> List[str]:
         "secondary_tank_pressure", "secondary_tank_name",
         "gasmix", "safety_stop", "time_of_day",
         "mod",  # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
+        # unit labels that follow the unit system (utils/units.py)
+        "unit:depth", "unit:pressure", "unit:pressure_lower", "unit:temp", "unit:sac", "unit:volume_rate", "unit:depth_rate",
     ]
     fields = sorted(f for f in standard_fields if f != "tanks")
 
@@ -300,20 +305,33 @@ def element_native_bounds(
         return x0, float(y0), x1, float(y0 + block_h)
 
     size = max(1, int(float(elem.get("font_size", 16)) * float(elem.get("scale", 1.0))))
-    font = get_font(size, family, weight)
     value = text if text else (element_display_name(elem.get("field", "")) or "0")
     if elem.get("orientation") in VERTICAL_ORIENTATIONS:
+        font = get_font(size, family, weight)
         dx, dy, w, h = oriented_text_geometry(font, value, elem["orientation"], size, align, valign)
         return x + dx, y + dy, x + dx + w, y + dy + h
     main, suffix, suffix_scale = text_parts(elem.get("field", ""), value, elem)
+    size = fitted_font_size(elem, size, main, suffix, suffix_scale, 1.0)  # a `max_width` shrinks the font
+    font = get_font(size, family, weight)
     dx, dy, (left, top, right, bottom) = text_anchor_shift(font, main, align, valign)
+    suffix_x = None
     if suffix:
         suffix_font = get_font(max(1, round(size * suffix_scale)), family, weight)
+        suffix_x = font.getlength(main)
         right = right + suffix_font.getlength(suffix)
         if align == "center":
             dx = -(left + right) / 2.0
         elif align == "right":
             dx = -float(right)
+    unit = unit_suffix_text(elem, elem.get("field", ""))
+    if unit:
+        # the unit drawn after the value (gui.hud_renderer._draw_unit_suffix), skin px (scale 1)
+        ux, uy, unit_font, _ = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0)
+        ul, ut, ur, ub = unit_font.getbbox(unit)
+        if elem.get("unit_orientation") in VERTICAL_ORIENTATIONS:
+            ur, ub = ul + (ub - ut), ut + (ur - ul) * len(unit)
+        right = max(right, ux + ur)
+        bottom = max(bottom, uy + ub)
     return x + dx + left, y + dy + top, x + dx + right, y + dy + bottom
 
 

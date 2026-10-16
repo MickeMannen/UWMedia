@@ -26,6 +26,9 @@ from the [Dive Profile Builder](dive-profile-builder.md)).
 3. **Samples** → **Show** opens the full sample table: time, depth,
    temperature, NDL, TTS, gas and tank pressures. **Filter** narrows it down.
 
+Depths, pressures and temperatures show in the unit system chosen on the
+[Advanced](advanced.md#units) page; the logs themselves are not changed.
+
 **Remove** (or Delete / Backspace) takes the selected dive off the list and
 **Clear** empties it. Neither touches the files.
 

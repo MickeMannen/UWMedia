@@ -6,6 +6,18 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Advanced: a **Units** setting - Metric (m, bar, °C) or Imperial (ft, psi,
+  °F) - that applies at once to the whole app: overlays and the designer's
+  preview, the Log Viewer's numbers, headers and chart, and the Dive
+  Profile Builder's inputs, tables and preview. Logs and saved dives stay
+  metric; only what is shown converts. The CLI takes `--units` for one run.
+- Overlays: every bundled template renders in feet and psi the way its
+  computer does - whole feet on a Shearwater, one decimal on the Teric,
+  stops at 10 / 20 ft and the safety stop at 15 ft, "3002 PSI" where "207
+  BAR" stood - with its unit labels switching along. In the Overlay
+  Designer a value's unit is now part of the element (**Show unit**, with
+  size, offset, colour and stacked options) instead of a separate label,
+  and a **Max width** shrinks a value that would run into its neighbour.
 - Overlays: templates can show the computer's own notifications. A new
   "Notice" element draws the message the computer put on its screen, in its
   wording and colours - a Perdix's yellow FAST ASCENT, MISSED DECO STOP, HIGH

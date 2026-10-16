@@ -66,6 +66,7 @@ FIT_LOGS_DIR_FIELD = "advanced_fit_logs_dialog_dir"
 
 class AdvancedBackend(QObject):
     switchesChanged = Signal()
+    unitsChanged = Signal()  # the whole app follows (utils/units.py)
     locationsChanged = Signal()
     toolsChanged = Signal()
     statusChanged = Signal()
@@ -112,6 +113,28 @@ class AdvancedBackend(QObject):
         self._summary = value
         set_field("summary_switch", value)
         self.switchesChanged.emit()
+
+    # ------------------------------------------------------------------
+    # Units - one setting for everything the app shows (utils/units.py)
+    # ------------------------------------------------------------------
+
+    @Property(list, constant=True)
+    def unitOptions(self):
+        from utils.units import UNIT_LABELS, UNIT_SYSTEMS
+        return [UNIT_LABELS[u] for u in UNIT_SYSTEMS]
+
+    @Property(int, notify=unitsChanged)
+    def unitsIndex(self):
+        from utils.units import UNIT_SYSTEMS, current_units
+        return UNIT_SYSTEMS.index(current_units())
+
+    @Slot(int)
+    def setUnitsIndex(self, index):
+        from utils.units import UNIT_SYSTEMS, current_units, set_units
+        if not 0 <= int(index) < len(UNIT_SYSTEMS) or UNIT_SYSTEMS[int(index)] == current_units():
+            return
+        set_units(UNIT_SYSTEMS[int(index)])
+        self.unitsChanged.emit()
 
     # ------------------------------------------------------------------
     # Locations / tool paths - ported close to verbatim from

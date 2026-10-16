@@ -16,7 +16,11 @@
         "rel_y": 0.08645570886255655,
         "color": "#ffffff",
         "font_size": 45,
-        "scale": 1.4
+        "scale": 1.4,
+        "unit_suffix": true,
+        "unit_scale": 0.889,
+        "unit_dx": 13.0,
+        "unit_dy": 10.6
       },
       {
         "field": "temp",
@@ -24,23 +28,11 @@
         "rel_y": 0.4832449967269859,
         "color": "#ffffff",
         "font_size": 45,
-        "scale": 1.4
-      },
-      {
-        "field": "custom:m",
-        "rel_x": 0.6582865928802736,
-        "rel_y": 0.1256552286157239,
-        "color": "#ffffff",
-        "font_size": 40,
-        "scale": 1.4
-      },
-      {
-        "field": "custom:\u00b0C",
-        "rel_x": 0.6046031673627441,
-        "rel_y": 0.5084056510738831,
-        "color": "#ffffff",
-        "font_size": 40,
-        "scale": 1.4
+        "scale": 1.4,
+        "unit_suffix": true,
+        "unit_scale": 0.889,
+        "unit_dx": 18.0,
+        "unit_dy": 1.3
       }
     ],
     "width": 230,

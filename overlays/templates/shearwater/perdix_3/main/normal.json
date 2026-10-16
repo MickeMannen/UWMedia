@@ -14,15 +14,13 @@
         "rel_y": 0.2222,
         "color": "#FFFFFF",
         "font_size": 100,
-        "scale": 1.0
-      },
-      {
-        "field": "custom:m",
-        "rel_x": 0.4241,
-        "rel_y": 0.332,
-        "color": "#00ADED",
-        "font_size": 28,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.28,
+        "unit_dx": 7.7,
+        "unit_dy": -17.0,
+        "unit_color": "#00ADED"
       },
       {
         "field": "dive_time",
@@ -104,15 +102,12 @@
         "rel_y": 0.6653,
         "color": "#FFFFFF",
         "font_size": 75,
-        "scale": 1.0
-      },
-      {
-        "field": "custom:m",
-        "rel_x": 0.53672,
-        "rel_y": 0.6944,
-        "color": "#00ADED",
-        "font_size": 28,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.373,
+        "unit_dx": -6.3,
+        "unit_dy": -22.0,
+        "unit_color": "#00ADED"
       }
     ],
     "path": "normal.png",

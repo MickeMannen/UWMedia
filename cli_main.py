@@ -1091,7 +1091,13 @@ def main():
              'Default: "{filename}_{hud}"',
     )
 
+    parser.add_argument("--units", choices=["metric", "imperial"], default=None,
+                        help="Units for the overlays: metric (m, bar, °C) or imperial (ft, psi, °F). Default: the app's Advanced setting.")
+
     args = parser.parse_args()
+    if args.units:
+        from utils.units import set_units_override
+        set_units_override(args.units)
 
     if args.render_log:
         if not args.layout:

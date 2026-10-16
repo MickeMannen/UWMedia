@@ -169,7 +169,7 @@ Item {
                                 visible: text.length > 0
                             }
 
-                            Label { text: "Descent rate (m/min)" }
+                            Label { text: "Descent rate (" + diveProfileBackend.rateUnit + ")" }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -178,7 +178,7 @@ Item {
                                 onTextEdited: diveProfileBackend.descentRateText = text
                             }
 
-                            Label { text: "Ascent rate (m/min)" }
+                            Label { text: "Ascent rate (" + diveProfileBackend.rateUnit + ")" }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -187,7 +187,7 @@ Item {
                                 onTextEdited: diveProfileBackend.ascentRateText = text
                             }
 
-                            Label { text: "Water temp (°C)" }
+                            Label { text: "Water temp (" + diveProfileBackend.tempUnit + ")" }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -257,7 +257,7 @@ Item {
                                 visible: diveProfileBackend.isCcr && text.length > 0
                             }
 
-                            Label { text: "SP switch depth (m)"; visible: diveProfileBackend.isCcr }
+                            Label { text: "SP switch depth (" + diveProfileBackend.depthUnit + ")"; visible: diveProfileBackend.isCcr }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -271,7 +271,7 @@ Item {
                                 ToolTip.text: "Low setpoint shallower than this, high setpoint at and below it"
                             }
 
-                            Label { text: "O2 cylinder (L / bar)"; visible: diveProfileBackend.isCcr }
+                            Label { text: "O2 cylinder (L / " + diveProfileBackend.pressureUnit + ")"; visible: diveProfileBackend.isCcr }
                             RowLayout {
                                 Layout.fillWidth: true
                                 visible: diveProfileBackend.isCcr
@@ -294,7 +294,7 @@ Item {
                                 }
                             }
 
-                            Label { text: "Switch tanks every (bar)"; visible: diveProfileBackend.isSidemount }
+                            Label { text: "Switch tanks every (" + diveProfileBackend.pressureUnit + ")"; visible: diveProfileBackend.isSidemount }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -308,7 +308,7 @@ Item {
                                 ToolTip.text: "Switch to the other tank once the one in use is this far below it"
                             }
 
-                            Label { text: "Max depth (m)" }
+                            Label { text: "Max depth (" + diveProfileBackend.depthUnit + ")" }
                             TextField {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -544,7 +544,7 @@ Item {
                                 text: diveProfileBackend.gasVolumeText
                                 onTextEdited: diveProfileBackend.gasVolumeText = text
                             }
-                            Label { text: "Start (bar)" }
+                            Label { text: "Start (" + diveProfileBackend.pressureUnit + ")" }
                             TextField {
                                 Layout.preferredWidth: 60
                                 Layout.preferredHeight: 34
@@ -602,7 +602,7 @@ Item {
                                 text: diveProfileBackend.gasMaxDepthText
                                 onTextEdited: diveProfileBackend.gasMaxDepthText = text
                             }
-                            Label { text: "m" }
+                            Label { text: diveProfileBackend.depthUnit }
                             ComboBox {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
@@ -723,7 +723,7 @@ Item {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 34
                                 font.pixelSize: 15
-                                placeholderText: "meters"
+                                placeholderText: diveProfileBackend.depthUnit === "ft" ? "feet" : "metres"
                                 text: diveProfileBackend.wpDepthText
                                 onTextEdited: diveProfileBackend.wpDepthText = text
                             }
@@ -1020,7 +1020,7 @@ Item {
                 columns: 2
                 columnSpacing: 12
                 rowSpacing: 8
-                Label { text: "Max depth (m)" }
+                Label { text: "Max depth (" + diveProfileBackend.depthUnit + ")" }
                 TextField {
                     id: depthField
                     Layout.preferredWidth: 120

@@ -66,6 +66,21 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
 - A text element may carry `value_format` in its JSON (`"minutes"` for a
   time in whole minutes, `"integer"` for a whole number) - the way a
   Shearwater Tec row shows the dive time and stop depth.
+- **Unit** (depth, pressure, temperature, SAC and MOD elements): tick
+  **Show unit** and the element draws its own unit after the value - `m` or
+  `ft`, `BAR` or `PSI`, `°C` or `°F` - following the app's unit system
+  ([Advanced](advanced.md#units)). **Right** puts it after the digits,
+  **Below** under them; **Size** is a fraction of the value's size,
+  **Offset X / Y** nudge it, **Colour** and **Stacked** (letters one under
+  the other, the Shearwater `BAR` tag) finish it. The bundled templates use
+  this for every unit on their screens, so switching to feet moves nothing.
+  A custom label that says `m` stays `m` - custom text is never translated;
+  a label that should follow the unit system uses the fields `unit:depth`,
+  `unit:pressure` (`unit:pressure_lower` for `bar` / `psi`), `unit:temp`,
+  `unit:sac`, `unit:volume_rate` or `unit:depth_rate`.
+- **Max width** (text elements, skin px): a value wider than this shrinks
+  to fit - a four-digit psi reading in a cell drawn for three digits of
+  bar, with the unit following. 0 is no limit.
 - **Ascent chevrons** follow the template's brand rules: Garmin gets chevrons
   over a divider bar (green / yellow / red, the lower one lit on descent),
   Shearwater six arrows and no bar - white under 9 m/min, yellow to 18,

@@ -533,3 +533,29 @@ def test_log_dialogs_start_in_home_then_remember_the_last_folder(settings_file, 
     backend.saveLog()
     backend.openLog()
     assert starts == [home, logs]
+
+
+def test_imperial_inputs_land_in_the_plan_as_metres_bar_and_celsius(settings_file):
+    """The Advanced page's unit system: typed in feet / psi / °F, the plan
+    (and the logs saved from it) stays SI; the texts show the chosen units."""
+    from utils import units as U
+    with U.units_override("imperial"):
+        backend = DiveProfileBackend()
+        backend.unitsChanged()
+        assert backend.depthUnit == "ft" and backend.pressureUnit == "psi" and backend.tempUnit == "°F" and backend.rateUnit == "ft/min"
+        assert backend.waypointHeaders[1] == "Depth (ft)" and backend.waypointHeaders[3] == "Rate (ft/min)"
+        assert backend.gasStartPressureText == "3002"  # the AL80 default, 207 bar
+        backend.maxDepthText = "100"
+        assert backend.dive_plan.max_depth_m == pytest.approx(30.48, abs=0.01)
+        backend.descentRateText = "60"
+        assert backend.dive_plan.default_descent_rate == pytest.approx(18.29, abs=0.01)
+        backend.waterTempText = "80"
+        assert backend.dive_plan.water_temp_c == pytest.approx(26.67, abs=0.01)
+        backend.gasStartPressureText = "3000"
+        backend.addGas()
+        assert backend.dive_plan.gases[-1].start_pressure_bar == pytest.approx(206.8, abs=0.1)
+        assert backend.gasTableHeaders[4:6] == ["Tank L/psi", "MOD (ft)"]
+    with U.units_override("metric"):
+        backend.unitsChanged()
+        assert backend.maxDepthText == "30.5" and backend.descentRateText == "18.3" and backend.waterTempText == "26.7"
+        assert backend.waypointHeaders[1] == "Depth (m)"

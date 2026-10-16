@@ -239,13 +239,24 @@ def render_profile_image(
     def y_of(depth: float) -> float:
         return xy_of(0.0, depth, width, height, axes)[1]
 
-    grid_step = 5.0 if max_depth <= 30 else 10.0
-    d = 0.0
-    while d <= max_depth:
+    # gridlines at round numbers of the unit system in force (every 5/10 m,
+    # or 10/20/50 ft), labelled in it; the chart itself stays in metres
+    from utils import units as U
+    imperial = U.current_units() == U.IMPERIAL
+    if imperial:
+        max_ft = U.depth(max_depth)
+        grid_step = 10.0 if max_ft <= 60 else 20.0 if max_ft <= 150 else 50.0
+    else:
+        grid_step = 5.0 if max_depth <= 30 else 10.0
+    shown = 0.0
+    while True:
+        d = U.depth_to_metres(shown) if imperial else shown
+        if d > max_depth:
+            break
         y = y_of(d)
         draw.line([(margin_left, y), (width - margin_right, y)], fill=GRID_COLOR, width=1)
-        draw.text((4, y - 6), f"{int(d)}m", fill=AXIS_TEXT_COLOR, font=font_small)
-        d += grid_step
+        draw.text((4, y - 6), f"{int(shown)}{U.depth_label()}", fill=AXIS_TEXT_COLOR, font=font_small)
+        shown += grid_step
 
     time_step = 300 if max_time <= 1800 else 600
     t = 0

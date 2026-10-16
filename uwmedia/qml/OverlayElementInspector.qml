@@ -299,6 +299,8 @@ ColumnLayout {
                 // Text + badge typography (a notice: the message size)
                 Label { text: inspector.kind === "badge" ? "Label size" : "Size"; visible: inspector.kind === "text" || inspector.kind === "badge" || inspector.kind === "notice" }
                 NumField { attr: "font_size"; value: inspector.sel.font_size; visible: inspector.kind === "text" || inspector.kind === "badge" || inspector.kind === "notice" }
+                Label { text: "Max width"; visible: inspector.kind === "text" }
+                NumField { attr: "max_width"; value: inspector.sel.max_width; visible: inspector.kind === "text"; ToolTip.text: "Skin px; a wider value (3002 psi where 207 bar fits) shrinks to this. 0 = no limit"; ToolTip.visible: hovered }
                 Label { text: "Caption size"; visible: inspector.kind === "notice" }
                 NumField { attr: "caption_font_size"; value: inspector.sel.caption_font_size; visible: inspector.kind === "notice"; ToolTip.text: "Size of the Warning / Alert caption and the Confirm hint"; ToolTip.visible: hovered }
                 Label { text: inspector.kind === "badge" ? "Value size" : "Scale"; visible: inspector.kind === "text" || inspector.kind === "badge" }
@@ -451,6 +453,46 @@ ColumnLayout {
                     ToolTip.delay: 400
                 }
 
+            }
+            Section {
+                title: "Unit"
+                visible: inspector.kind === "text" && inspector.sel.is_custom !== true
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Unit after the value"
+                    visible: inspector.kind === "text"
+                    checked: inspector.sel.unit_suffix === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("unit_suffix", checked)
+                    ToolTip.text: "Draw the value's unit with it (m or ft, BAR or PSI, °C or °F) so it follows the Units setting - instead of a separate label"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+                }
+                Label { text: "Place"; visible: inspector.sel.unit_suffix === true }
+                ChoiceRow {
+                    Layout.columnSpan: 3
+                    visible: inspector.sel.unit_suffix === true
+                    attr: "unit_position"; options: ["right", "below"]; labels: ["Right", "Below"]
+                    current: String(inspector.sel.unit_position)
+                }
+                Label { text: "Size"; visible: inspector.sel.unit_suffix === true }
+                NumField { attr: "unit_scale"; value: inspector.sel.unit_scale; visible: inspector.sel.unit_suffix === true; ToolTip.text: "Fraction of the value's size (0.35 = about a third)"; ToolTip.visible: hovered }
+                Label { text: "Colour"; visible: inspector.sel.unit_suffix === true }
+                ColorField { attr: "unit_color"; value: inspector.sel.unit_color; visible: inspector.sel.unit_suffix === true }
+                Label { text: "Offset X"; visible: inspector.sel.unit_suffix === true }
+                NumField { attr: "unit_dx"; value: inspector.sel.unit_dx; visible: inspector.sel.unit_suffix === true; ToolTip.text: "Skin px from its natural place"; ToolTip.visible: hovered }
+                Label { text: "Offset Y"; visible: inspector.sel.unit_suffix === true }
+                NumField { attr: "unit_dy"; value: inspector.sel.unit_dy; visible: inspector.sel.unit_suffix === true }
+                Label { text: "Stacked"; visible: inspector.sel.unit_suffix === true }
+                ChoiceRow {
+                    Layout.columnSpan: 3
+                    visible: inspector.sel.unit_suffix === true
+                    attr: "unit_orientation"; options: ["horizontal", "stacked"]; labels: ["H", "S"]
+                    current: String(inspector.sel.unit_orientation)
+                    HoverHandler { id: unitOrientHover }
+                    ToolTip.text: "S: the unit's letters one under the other, as a Shearwater's B A R tag"
+                    ToolTip.visible: unitOrientHover.hovered
+                    ToolTip.delay: 400
+                }
             }
             Section {
                 title: "Notice"

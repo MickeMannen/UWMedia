@@ -36,7 +36,7 @@ dive: deco, gas switches, high PO2, low tank pressure and so on.
 
 | Action | What it does |
 |---|---|
-| Click on empty space | Adds a waypoint. Time snaps to whole minutes, depth to whole metres. |
+| Click on empty space | Adds a waypoint. Time snaps to whole minutes, depth to whole metres (feet in imperial). |
 | Drag a waypoint | Moves it. It can't pass the waypoints either side of it. |
 | Right-click a waypoint | Deletes it. |
 | Click a waypoint | Loads it into the Waypoints editor. |
@@ -96,7 +96,7 @@ All of these are remembered between restarts.
 | Name | Name of the dive; the suggested file name when saving. |
 | Dive type | *Open circuit*, *Sidemount* or *CCR* - see [Dive types](#dive-types). |
 | GF Low / High | Gradient factors for the deco model (1-100, low ≤ high). |
-| Descent / Ascent rate | Default speeds in m/min between waypoints. |
+| Descent / Ascent rate | Default speeds in m/min (ft/min) between waypoints. |
 | Water temp | Temperature written into every sample. |
 | SAC rate | Surface air consumption in L/min, used for every gas's tank pressure. |
 | Max PO2 bottom / deco | The highest PO2 you accept on the bottom and on deco. Sets each gas's MOD. |
@@ -104,6 +104,10 @@ All of these are remembered between restarts.
 | O2 cylinder (L / bar) | CCR only - size and start pressure of the O2 cylinder. |
 | Switch tanks every (bar) | Sidemount only - see [Sidemount](#sidemount). |
 | Max depth / Planned runtime | The chart's scale. |
+
+Every depth, rate, pressure and temperature is entered and shown in the
+unit system chosen on the [Advanced](advanced.md#units) page; the plan and
+the saved logs stay in metres, bar and Celsius.
 
 ## Dive types
 
@@ -163,8 +167,9 @@ serial are remembered between restarts; the start time is not.
 Each gas has:
 
 - **Name** and **type** (Air, Nitrox, Trimix), **O2 %** and **He %**.
-- A **tank**: name, **volume** (L) and **start pressure** (bar). New gases get
-  the next free tank name (T1, T2, …) and default to an AL80 (11.1 L, 207 bar).
+- A **tank**: name, **volume** (L) and **start pressure** (bar, or psi in
+  imperial). New gases get the next free tank name (T1, T2, …) and default
+  to an AL80 (11.1 L, 207 bar / 3002 psi).
   Give each gas its own tank - the saved log records pressures per tank.
 - On a CCR dive, **Diluent (the loop)**; on a sidemount dive, **Sidemount
   pair (left/right)** - see [Dive types](#dive-types).

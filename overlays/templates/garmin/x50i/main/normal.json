@@ -97,16 +97,12 @@
         "rel_y": 0.38984,
         "color": "#FFFFFF",
         "font_size": 74,
-        "scale": 1.0
-      },
-      {
-        "id": "label_m",
-        "field": "custom:m",
-        "rel_x": 0.37365,
-        "rel_y": 0.4442,
-        "color": "#999999",
-        "font_size": 35,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.473,
+        "unit_dx": -3.8,
+        "unit_dy": -3.4,
+        "unit_color": "#999999"
       },
       {
         "id": "dive_time",
@@ -151,16 +147,12 @@
         "rel_y": 0.48403,
         "color": "#FFFFFF",
         "font_size": 67,
-        "scale": 1.0
-      },
-      {
-        "id": "label_m_2",
-        "field": "custom:m",
-        "rel_x": 0.61278,
-        "rel_y": 0.53242,
-        "color": "#999999",
-        "font_size": 35,
-        "scale": 1.0
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.522,
+        "unit_dx": -6.1,
+        "unit_dy": -1.9,
+        "unit_color": "#999999"
       },
       {
         "id": "volume_sac",

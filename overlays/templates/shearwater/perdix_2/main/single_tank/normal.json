@@ -47,17 +47,12 @@
       "color": "#FFFFFF",
       "font_size": 74,
       "scale": 1.0,
-      "hide_when_notice": true
-    },
-    {
-      "id": "label_bar",
-      "field": "custom:BAR",
-      "rel_x": 0.5543,
-      "rel_y": 0.70335,
-      "color": "#00ADED",
-      "font_size": 13,
-      "scale": 1.0,
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "unit_suffix": true,
+      "unit_scale": 0.176,
+      "unit_dx": -8.5,
+      "unit_dy": -57.3,
+      "unit_color": "#00ADED"
     },
     {
       "id": "label_gtr",

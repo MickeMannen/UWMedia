@@ -108,6 +108,38 @@ def split_small_suffix(val_str, style):
     return val_str[:index], val_str[index:]
 
 
+def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px_scale=1.0):
+    """The font size (px) a text element draws at: `size`, or smaller when
+    the element has a `max_width` (skin px, before the skin scale) and the
+    value plus its small suffix is wider than that - a four-digit psi
+    reading in a cell drawn for three digits of bar. Shared by the
+    renderer and the designer's bounds."""
+    try:
+        max_w = float(elem.get("max_width") or 0) * px_scale
+    except (TypeError, ValueError):
+        return size
+    if max_w <= 0 or size <= 1 or not main_str:
+        return size
+    family, weight = elem.get("font_family"), elem.get("font_weight")
+
+    def width(px):
+        w = get_font(px, family, weight).getlength(main_str)
+        if suffix_str:
+            w += get_font(max(1, round(px * suffix_scale)), family, weight).getlength(suffix_str)
+        return w
+
+    if width(size) <= max_w:
+        return size
+    lo, hi = 1, size
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if width(mid) <= max_w:
+            lo = mid
+        else:
+            hi = mid - 1
+    return max(1, lo)
+
+
 def text_parts(field, val_str, elem):
     """(main, suffix, suffix_scale) the renderer draws for a text element:
     the NDL "99+" convention (small, top-aligned plus sign) and the
@@ -125,6 +157,52 @@ def text_parts(field, val_str, elem):
                 scale = SMALL_SUFFIX_DEFAULT_SCALE
             return main, suffix, max(0.1, min(1.0, scale))
     return val_str, "", SMALL_SUFFIX_DEFAULT_SCALE
+
+
+def unit_suffix_text(elem, field):
+    """The unit a text element draws after its value when `unit_suffix` is
+    on: the field's own unit in the system in force (or `unit_kind` when the
+    element names one). "" when there is nothing to draw."""
+    if not elem.get("unit_suffix"):
+        return ""
+    from utils import units as U
+    kind = elem.get("unit_kind") or unit_kind_of(field)
+    return U.unit_label(kind) if kind else ""
+
+
+def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale):
+    """(x, y, unit_font, unit_size) for the unit drawn after a value: to the
+    right of the value's run, baseline-aligned, or below its last part (the
+    way a Perdix / Descent puts the "m" under the small decimals). `unit_dx`
+    / `unit_dy` move it (skin px); `unit_scale` sizes it against the value."""
+    scale = float(elem.get("unit_scale", 0.35))
+    unit_size = max(1, int(size * scale))
+    unit_font = get_font(unit_size, elem.get("font_family"), elem.get("font_weight"))
+    dx = float(elem.get("unit_dx", 0.0)) * px_scale
+    dy = float(elem.get("unit_dy", 0.0)) * px_scale
+    main_bottom = font.getbbox(main_text)[3]
+    unit_bbox = unit_font.getbbox("m")
+    if elem.get("unit_position", "right") == "below":
+        x = (suffix_x if suffix_x is not None else run_right - unit_font.getlength("m")) + dx
+        y = main_bottom + int(size * 0.08) + dy
+    else:
+        x = run_right + int(size * 0.08) + dx
+        y = main_bottom - unit_bbox[3] + dy  # baselines together
+    return x, y, unit_font, unit_size
+
+
+def _draw_unit_suffix(pil_img, draw, elem, unit_text, abs_x, abs_y, run_right, suffix_x, font, main_text, size, color_rgb, outline, px_scale):
+    x, y, unit_font, unit_size = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale)
+    x, y = int(round(x)), int(round(abs_y + y))
+    colour = _rgb(elem["unit_color"]) if elem.get("unit_color") else color_rgb
+    if elem.get("unit_orientation") in VERTICAL_ORIENTATIONS:
+        draw_oriented_text(pil_img, draw, unit_text, unit_font, elem["unit_orientation"], x, y, "left", "top", colour, outline, unit_size)
+        return
+    o = max(1, int(unit_size / 20))
+    if outline:
+        for ox, oy in [(-o, -o), (o, -o), (-o, o), (o, o)]:
+            draw.text((x + ox, y + oy), unit_text, font=unit_font, fill=(0, 0, 0))
+    draw.text((x, y), unit_text, font=unit_font, fill=colour)
 
 
 def _get_system_arial_font():
@@ -177,8 +255,26 @@ def text_anchor_shift(font, text, align="left", valign="top"):
         dy = -float(bottom)
     return dx, dy, (left, top, right, bottom)
 
-def format_telemetry_value(field, raw_val):
-    """Unified formatting for telemetry values."""
+# Fields that carry a unit, and which one (for unit suffixes and `unit:*` labels).
+UNIT_KIND_OF_FIELD = {
+    "depth": "depth", "max_depth": "depth", "deco_stop_depth": "depth", "next_stop_depth": "depth", "ceiling": "depth", "mod": "depth",
+    "primary_tank_pressure": "pressure", "secondary_tank_pressure": "pressure",
+    "temp": "temp", "pressure_sac": "sac", "volume_sac": "volume_rate",
+}
+
+
+def unit_kind_of(field):
+    if field.startswith("tank_pressure:"):
+        return "pressure"
+    return UNIT_KIND_OF_FIELD.get(field)
+
+
+def format_telemetry_value(field, raw_val, display_rule=None):
+    """Unified formatting for telemetry values, in the unit system in force
+    (utils/units.py: the data is SI, the display converts). `display_rule`
+    is the brand's `display` rule (depth decimals per system)."""
+    from utils import units as U
+    units = U.current_units()
     if field == "gasmix":
         return str(raw_val) if raw_val is not None else "N/A"
     elif field.startswith("tank_name:"):
@@ -188,7 +284,7 @@ def format_telemetry_value(field, raw_val):
     elif field in ("primary_tank_pressure", "secondary_tank_pressure") or field.startswith("tank_pressure:"):
         if raw_val is None:
             return "--"
-        return str(int(float(raw_val)))
+        return U.format_pressure(float(raw_val), units)
     elif field in ("primary_tank_name", "secondary_tank_name"):
         return str(raw_val) if raw_val else "--"
     elif field in ["ndl", "ndl_before_clear", "air_remaining"] and raw_val is not None:
@@ -204,16 +300,25 @@ def format_telemetry_value(field, raw_val):
         secs = int(raw_val % 60)
         return f"{mins:02d}:{secs:02d}"
     elif field in ["depth", "max_depth"] and raw_val is not None:
-        return f"{raw_val:.1f}"
+        return U.format_depth(float(raw_val), units, display_rule=display_rule)
+    elif field in ("deco_stop_depth", "next_stop_depth") and raw_val is not None:
+        # a stop level: whole metres, or the feet stop level (10 ft steps, 15 ft safety stop)
+        return f"{U.stop_depth(float(raw_val), units):.0f}" if units == U.IMPERIAL else f"{float(raw_val):.1f}"
+    elif field == "ceiling" and raw_val is not None:
+        return f"{U.depth(float(raw_val), units):.1f}"
+    elif field == "temp" and raw_val is not None:
+        return f"{U.temperature(float(raw_val), units):.1f}" if units == U.METRIC else U.format_temperature(float(raw_val), units)
     elif field in ("gf", "surf_gf") and raw_val is not None:
         return str(int(round(float(raw_val))))  # whole percent, as GF99 / SurGF read on a Perdix (manual p.20)
     elif field == "mod" and raw_val is not None:
-        return f"{float(raw_val):.0f}"
+        return f"{U.depth(float(raw_val), units):.0f}"
     elif field == "volume_sac" and raw_val is not None:
-        return str(int(float(raw_val)))
+        return f"{U.volume_rate(float(raw_val), units):.2f}" if units == U.IMPERIAL else str(int(float(raw_val)))
     elif field == "pressure_sac":
         # A Perdix shows "wait" until it has two minutes of data (manual p.41).
-        return "wait" if raw_val is None else f"{float(raw_val):.1f}"
+        if raw_val is None:
+            return "wait"
+        return f"{U.pressure(float(raw_val), units):.0f}" if units == U.IMPERIAL else f"{float(raw_val):.1f}"
     elif raw_val is None:
         return "--"
     elif isinstance(raw_val, float):
@@ -357,7 +462,8 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False, way
     screen = screen_box(hud_skin, skin_x, skin_y, w_hud, h_hud)
     before = frame.copy() if screen else None
     from utils.hud_rules_engine import rule_overrides
-    with rule_overrides(layout.get("rules")):
+    from utils.units import resolve_units, units_override
+    with rule_overrides(layout.get("rules")), units_override(resolve_units(layout)):
         draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=waypoints)
     if screen:
         # Nothing is drawn outside the computer's screen: whatever the
@@ -483,8 +589,9 @@ def graph_stop_label(waypoint):
         return None
     stop = stop_depth_of(waypoint)
     if stop > 0:
+        from utils import units as U
         seconds = getattr(waypoint, "next_stop_time", None)
-        return f"STOP {stop:g}m" + (f" {seconds // 60}:{seconds % 60:02d}" if seconds else ""), True
+        return f"STOP {U.stop_depth(stop):g}{U.depth_label()}" + (f" {seconds // 60}:{seconds % 60:02d}" if seconds else ""), True
     return None
 
 
@@ -863,9 +970,12 @@ def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     check = bool(badge.get("check_mark")) and phase in ("at_stop", "counting")
 
     timer_format = elem.get("timer_format") or ("m:ss" if elem.get("style") == "box" else badge.get("timer_format", "mm:ss"))
-    unit = elem.get("depth_unit", "")
+    from utils import units as U
+    unit = U.depth_label() if elem.get("depth_unit") else ""  # `depth_unit` set at all: show the unit of the system in force
     depth_is_value = elem.get("depth_font") != "label"
     show_depth = badge.get("show_depth", True) and stop_depth
+    if show_depth:
+        stop_depth = U.stop_depth(float(stop_depth))  # whole metres, or the feet stop level
     if show_depth and badge.get("inline"):
         # "6m 2min" far from the stop; "6m↑ 2min" with the arrow flashing while
         # approaching; "6m✓ 2min" at the stop; "6m↓ 2min" shallower than it
@@ -1610,6 +1720,8 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
     waypoint (every branch then yields "--"/None)."""
     manufacturer = rules_manufacturer(layout)
     model = layout.get("model", "Perdix2")
+    from utils.hud_rules_engine import get_rule_config
+    display = get_rule_config(manufacturer, model, "display")  # the brand's depth decimals per unit system
     if field == "safety_stop":
         from utils.hud_rules_engine import get_safety_stop_text
         return get_safety_stop_text(manufacturer, model, waypoint), None
@@ -1621,12 +1733,16 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
         raw_val = get_ndl_before_clear(manufacturer, model, waypoint, waypoints)
         if raw_val is None:
             return "", None  # only shown during the clear count-up: nothing (not "--") the rest of the dive
-        return format_telemetry_value(field, raw_val), raw_val
+        return format_telemetry_value(field, raw_val, display), raw_val
+    if field.startswith("unit:"):
+        # a unit label that follows the unit system (m / ft, BAR / PSI, °C / °F ...)
+        from utils import units as U
+        return U.unit_label(field[len("unit:"):]), None
     if field == "mod":
         # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
         from utils.hud_gas import mod_metres
         raw_val = mod_metres(manufacturer, model, waypoint) if waypoint is not None else None
-        return format_telemetry_value(field, raw_val), raw_val
+        return format_telemetry_value(field, raw_val, display), raw_val
     if field == "air_remaining" and waypoint is not None and getattr(waypoint, "air_remaining", None) is None:
         # No logged gas time (Shearwater exports never carry GTR): the brand's
         # formula from the pressure trend, "wait" until it has two minutes of data.
@@ -1639,21 +1755,21 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
             # Perdix 2 manual p.26: "wait" until two minutes of data; once deco
             # stops are required the slot reads "deco" (GTR is for no-deco diving, p.44)
             return ("deco" if resolve_state(manufacturer, model, waypoint, waypoints) == "deco" else "wait"), None
-        return format_telemetry_value(field, raw_val), raw_val
+        return format_telemetry_value(field, raw_val, display), raw_val
     if field.startswith("custom:"):
         return field.replace("custom:", ""), None
     if field.startswith("tank_pressure:"):
         tank_name = field.replace("tank_pressure:", "")
         tank_data = waypoint.tanks.get(tank_name) if waypoint is not None else None
         raw_val = tank_data.pressure_bar if tank_data else None
-        return format_telemetry_value(field, raw_val), raw_val
+        return format_telemetry_value(field, raw_val, display), raw_val
     if field.startswith("tank_name:"):
         tank_name = field.replace("tank_name:", "")
         tank_data = waypoint.tanks.get(tank_name) if waypoint is not None else None
         raw_val = tank_data.name if tank_data else tank_name
-        return format_telemetry_value(field, raw_val), raw_val
+        return format_telemetry_value(field, raw_val, display), raw_val
     raw_val = getattr(waypoint, field, None)
-    return format_telemetry_value(field, raw_val), raw_val
+    return format_telemetry_value(field, raw_val, display), raw_val
 
 def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     """
@@ -1806,12 +1922,14 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         else:
             final_size = int(base_font_size * user_scale * res_scale * item_scale)
         if final_size < 1: final_size = 1
-        
-        font = get_font(final_size, elem.get("font_family"), elem.get("font_weight"))
-        outline = elem.get("outline", TEXT_OUTLINE_DEFAULT)
 
         val_str = str(val)
         main_str, suffix_str, suffix_scale = text_parts(field, val_str, elem)
+        unit_text = unit_suffix_text(elem, field)  # "m" / "ft", "BAR" / "PSI" ... drawn after the value
+        px_scale = user_scale if render_log else user_scale * res_scale
+        final_size = fitted_font_size(elem, final_size, main_str, suffix_str, suffix_scale, px_scale)
+        font = get_font(final_size, elem.get("font_family"), elem.get("font_weight"))
+        outline = elem.get("outline", TEXT_OUTLINE_DEFAULT)
         suffix_font = None
         if suffix_str:
             suffix_size = max(1, round(final_size * suffix_scale))
@@ -1861,6 +1979,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 for dx, dy in [(-suffix_o, -suffix_o), (suffix_o, -suffix_o), (-suffix_o, suffix_o), (suffix_o, suffix_o)]:
                     draw.text((suffix_x + dx, suffix_y + dy), suffix_str, font=suffix_font, fill=(0, 0, 0))
             draw.text((suffix_x, suffix_y), suffix_str, font=suffix_font, fill=color_rgb)
+            if unit_text:
+                run_right = suffix_x + draw.textlength(suffix_str, font=suffix_font)
+                _draw_unit_suffix(pil_img, draw, elem, unit_text, abs_x, abs_y, run_right, suffix_x, font, main_str, final_size, color_rgb, outline, px_scale)
             continue
 
         highlight = elem.get("tank_switch_highlight")
@@ -1883,5 +2004,8 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 draw.text((abs_x + dx, abs_y + dy), val_str, font=font, fill=(0, 0, 0))
 
         draw.text((abs_x, abs_y), val_str, font=font, fill=color_rgb)
+        if unit_text:
+            run_right = abs_x + draw.textlength(val_str, font=font)
+            _draw_unit_suffix(pil_img, draw, elem, unit_text, abs_x, abs_y, run_right, None, font, val_str, final_size, color_rgb, outline, px_scale)
 
     frame[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)

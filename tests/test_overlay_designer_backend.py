@@ -370,8 +370,8 @@ def test_elements_model_and_selection_slots():
     assert app.hasSelection is False and app.selectedElement["index"] == -1
     assert app.selectedElement["color"] == "#FFFFFF"  # defaults, never undefined
 
-    app.selectElement(3)
-    assert app.selectedIndex == 3 and app.hasSelection and app.selectionBoxVisible
+    app.selectElement(2)  # depth, TIME label, dive time (the depth's "m" is its unit suffix, not an element)
+    assert app.selectedIndex == 2 and app.hasSelection and app.selectionBoxVisible
     assert app.selectionBoxLabel == "dive_time"
     app.selectSkin()
     assert app.skinSelected and app.selectedIndex == -1 and app.selectionBoxLabel == "Skin"

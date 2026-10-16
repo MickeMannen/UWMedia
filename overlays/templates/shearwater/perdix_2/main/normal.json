@@ -21,16 +21,13 @@
         "font_size": 126,
         "scale": 1.0,
         "small_suffix": "decimals",
-        "small_suffix_scale": 0.35
-      },
-      {
-        "id": "label_m",
-        "field": "custom:m",
-        "rel_x": 0.33641,
-        "rel_y": 0.29919,
-        "color": "#00ADED",
-        "font_size": 41,
-        "scale": 1.0
+        "small_suffix_scale": 0.35,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 9.4,
+        "unit_dy": -48.4,
+        "unit_color": "#00ADED"
       },
       {
         "id": "label_time",

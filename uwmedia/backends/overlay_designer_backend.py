@@ -178,8 +178,8 @@ ADD_ELEMENT_PRESETS = {
     DIVE_TIME_SMALL_SECONDS: ("dive_time", "seconds"),
 }
 
-_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
-_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
+_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "max_width", "unit_scale", "unit_dx", "unit_dy", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
+_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "max_width", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
 _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill", "notice": "text"}
 # A graph's deco-stop shading colour when the inspector switches it on.
 DEFAULT_STOPS_COLOR = "#FFA500"
@@ -855,6 +855,8 @@ class OverlayDesignerBackend(QObject):
                 "up_count": 4, "down_count": 1, "bar": True, "style": "segments",
                 "segments": 5, "segment_gap": 2, "full_bar": 200,
                 "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "source": "timed",
+                "unit_suffix": False, "unit_position": "right", "unit_scale": 0.35, "unit_dx": 0.0, "unit_dy": 0.0, "unit_color": "", "unit_orientation": "horizontal",
+                "max_width": 0,
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
         field = elem.get("field", "")
@@ -916,6 +918,16 @@ class OverlayDesignerBackend(QObject):
             "caption_color": elem.get("caption_color") or "",
             "hide_when_notice": bool(elem.get("hide_when_notice", False)),
             "source": "persistent" if elem.get("source") == "persistent" else "timed",
+            # the font shrinks when the value is wider than this (0: never)
+            "max_width": elem.get("max_width", 0),
+            # unit drawn after a value (gui.hud_renderer._draw_unit_suffix)
+            "unit_suffix": bool(elem.get("unit_suffix", False)),
+            "unit_position": elem.get("unit_position") or "right",
+            "unit_scale": elem.get("unit_scale", 0.35),
+            "unit_dx": elem.get("unit_dx", 0.0),
+            "unit_dy": elem.get("unit_dy", 0.0),
+            "unit_color": elem.get("unit_color") or "",
+            "unit_orientation": elem.get("unit_orientation") or "horizontal",
         }
 
     @Slot(str, "QVariant")
@@ -962,8 +974,17 @@ class OverlayDesignerBackend(QObject):
                 number = max(1, number)
             elif key == "scale":
                 number = max(0.05, number)
+            elif key == "max_width":
+                number = max(0, number)
+                if number == 0:
+                    doc.set_element_attr(index, key, None)  # no limit: the key goes
+                    return
             elif key == "small_suffix_scale":
                 number = max(0.1, min(1.0, round(number, 3)))
+            elif key == "unit_scale":
+                number = max(0.1, min(1.5, round(number, 3)))
+            elif key in ("unit_dx", "unit_dy"):
+                number = round(number, 1)
             elif key in ("fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"):
                 number = max(0.0, min(1.0, round(number, 3)))
             doc.set_element_attr(index, key, number)
@@ -972,6 +993,14 @@ class OverlayDesignerBackend(QObject):
             doc.set_element_attr(index, "confirm_text", str(value or ""))
         elif key == "hide_when_notice":
             doc.set_element_attr(index, "hide_when_notice", True if bool(value) else None)
+        elif key == "unit_suffix":
+            doc.set_element_attr(index, "unit_suffix", True if bool(value) else None)
+        elif key == "unit_position":
+            doc.set_element_attr(index, "unit_position", "below" if value == "below" else None)
+        elif key == "unit_orientation":
+            doc.set_element_attr(index, "unit_orientation", "stacked" if value == "stacked" else None)
+        elif key == "unit_color":
+            doc.set_element_attr(index, "unit_color", str(value) if value else None)
         elif key == "source":
             doc.set_element_attr(index, "source", "persistent" if value == "persistent" else None)
         elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color", "caption_color"):
@@ -2307,6 +2336,12 @@ class OverlayDesignerBackend(QObject):
         self._update_data_text()
         self._redraw()
 
+    @Slot()
+    def unitsChanged(self):
+        """The Advanced page changed the unit system: redraw with it."""
+        self._update_data_text()
+        self._redraw()
+
     @Property(list, constant=True)
     def stateList(self):
         return [STATE_LABELS[s] for s in STATE_OPTIONS]
@@ -2373,8 +2408,9 @@ class OverlayDesignerBackend(QObject):
             with rule_overrides(self.document.layout.get("rules") if self.document else None):
                 state, phase, _, _ = stop_phase(manufacturer, model, wp, waypoints)
                 notice = active_notice(manufacturer, model, wp, waypoints)
-            depth = f"{wp.depth:.1f} m" if wp.depth is not None else "--"
-            temp = f"{wp.temp:.1f} °C" if wp.temp is not None else "--"
+            from utils import units as U
+            depth = f"{U.depth(wp.depth):.1f} {U.depth_label()}" if wp.depth is not None else "--"
+            temp = f"{U.temperature(wp.temp):.0f} {U.temperature_label()}" if wp.temp is not None else "--"
             state_text = f"{state} ({phase})" if phase else state
             notice_text = f" · Notice: {notice['text']}" if notice else ""
             self._data_text = f"{source} · Depth {depth} · Temp {temp} · State: {state_text}{notice_text}"

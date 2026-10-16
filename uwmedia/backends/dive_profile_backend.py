@@ -65,6 +65,7 @@ from parsers.plan_embed import read_log_origin
 from parsers.registry import detect_log_format, parse_log_file
 from parsers.subsurface_writer import write_subsurface
 from parsers.uddf_writer import write_uddf
+from utils import units as U
 from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
 from utils.dive_computers import DIVE_COMPUTERS
 from utils.dive_plan_engine import (
@@ -198,9 +199,16 @@ def _format_gas_use(gas):
     return f"{low}-{high}m{GAS_PHASE_ARROWS[gas.use_phase]}"
 
 
+def _short(value) -> str:
+    """A converted number for a text field: one decimal at most, no trailing zero."""
+    return f"{float(value):.1f}".rstrip("0").rstrip(".")
+
+
 def _parse_optional_depth(text):
+    """A typed depth in the unit system in force, as metres (None when empty)."""
+    from utils import units as U
     text = (text or "").strip()
-    return float(text) if text else None
+    return U.depth_to_metres(float(text)) if text else None
 
 
 def _setpoint_pair_error(low, high):
@@ -267,7 +275,7 @@ class DiveProfileBackend(QObject):
         self._gas_side = ""
         self._gas_tank_text = self._next_free_tank()
         self._gas_volume_text = DEFAULT_TANK_VOLUME_TEXT
-        self._gas_start_pressure_text = DEFAULT_START_PRESSURE_TEXT
+        self._gas_start_pressure_text = f"{U.pressure(float(DEFAULT_START_PRESSURE_TEXT)):.0f}"
         self._gas_min_depth_text = ""
         self._gas_max_depth_text = ""
         self._gas_phase = "any"
@@ -294,16 +302,18 @@ class DiveProfileBackend(QObject):
     def _sync_texts_from_plan(self):
         """The Dive settings texts as the plan has them - on start-up and
         after Open log replaces the plan."""
+        from utils import units as U
         plan = self.dive_plan
         self._name_text = plan.name
         self._gf_low_text = f"{plan.gf_low:g}"
         self._gf_high_text = f"{plan.gf_high:g}"
         self._gf_error_text = ""
-        self._descent_rate_text = str(plan.default_descent_rate)
-        self._ascent_rate_text = str(plan.default_ascent_rate)
-        self._water_temp_text = str(plan.water_temp_c)
+        # depths, pressures, rates and the temperature show in the unit system in force (the plan is SI)
+        self._descent_rate_text = _short(U.depth(plan.default_descent_rate))
+        self._ascent_rate_text = _short(U.depth(plan.default_ascent_rate))
+        self._water_temp_text = _short(U.temperature(plan.water_temp_c))
         self._sac_text = f"{plan.sac_lpm:g}"
-        self._max_depth_text = f"{plan.max_depth_m:g}" if plan.max_depth_m else ""
+        self._max_depth_text = _short(U.depth(plan.max_depth_m)) if plan.max_depth_m else ""
         self._bottom_po2_text = f"{plan.max_po2_bottom:g}"
         self._deco_po2_text = f"{plan.max_po2_deco:g}"
         self._runtime_text = _format_minutes(plan.planned_runtime_sec) if plan.planned_runtime_sec else ""
@@ -312,10 +322,10 @@ class DiveProfileBackend(QObject):
         self._ccr_low_text = f"{plan.ccr_low_setpoint:g}"
         self._ccr_high_text = f"{plan.ccr_high_setpoint:g}"
         self._ccr_error_text = ""
-        self._ccr_switch_depth_text = f"{plan.ccr_setpoint_switch_depth_m:g}"
+        self._ccr_switch_depth_text = f"{U.depth(plan.ccr_setpoint_switch_depth_m):.0f}"
         self._ccr_o2_size_text = f"{plan.ccr_o2_tank_size_l:g}"
-        self._ccr_o2_start_text = f"{plan.ccr_o2_start_pressure_bar:g}"
-        self._sidemount_switch_text = f"{plan.sidemount_switch_bar:g}"
+        self._ccr_o2_start_text = f"{U.pressure(plan.ccr_o2_start_pressure_bar):.0f}"
+        self._sidemount_switch_text = f"{U.pressure(plan.sidemount_switch_bar):.0f}"
         self._serial_text = plan.computer_serial
         self._start_time_text = plan.start_time.strftime(START_TIME_FORMATS[0]) if plan.start_time else ""
         self._log_error_text = ""
@@ -475,7 +485,8 @@ class DiveProfileBackend(QObject):
     def descentRateText(self, value):
         self._descent_rate_text = value
         try:
-            rate = float(value)
+            from utils import units as U
+            rate = U.depth_to_metres(float(value))
             if rate > 0:
                 self.dive_plan.default_descent_rate = rate
                 self._persist("default_descent_rate")
@@ -492,7 +503,8 @@ class DiveProfileBackend(QObject):
     def ascentRateText(self, value):
         self._ascent_rate_text = value
         try:
-            rate = float(value)
+            from utils import units as U
+            rate = U.depth_to_metres(float(value))
             if rate > 0:
                 self.dive_plan.default_ascent_rate = rate
                 self._persist("default_ascent_rate")
@@ -509,7 +521,8 @@ class DiveProfileBackend(QObject):
     def waterTempText(self, value):
         self._water_temp_text = value
         try:
-            self.dive_plan.water_temp_c = float(value)
+            from utils import units as U
+            self.dive_plan.water_temp_c = U.temperature_to_celsius(float(value))
             self._persist("water_temp_c")
         except (TypeError, ValueError):
             pass
@@ -626,6 +639,12 @@ class DiveProfileBackend(QObject):
         except (TypeError, ValueError):
             return
         if is_valid(number):
+            from utils import units as U
+            # typed in the unit system in force; the plan keeps SI
+            if attr.endswith("_m"):
+                number = U.depth_to_metres(number)
+            elif attr.endswith("_bar"):
+                number = U.pressure_to_bar(number)
             setattr(self.dive_plan, attr, number)
             self._persist(attr)
 
@@ -792,7 +811,8 @@ class DiveProfileBackend(QObject):
     def maxDepthText(self, value):
         self._max_depth_text = value
         try:
-            depth = float(value)
+            from utils import units as U
+            depth = U.depth_to_metres(float(value))
             if depth > 0:
                 self.dive_plan.max_depth_m = depth
                 self._persist("max_depth_m")
@@ -821,10 +841,11 @@ class DiveProfileBackend(QObject):
     @Slot(str, str, result=str)
     def defineScale(self, max_depth_text, runtime_text):
         """Popup OK handler. Returns an error message, or "" on success."""
+        from utils import units as U
         try:
-            depth = float(max_depth_text)
+            depth = U.depth_to_metres(float(max_depth_text))
         except (TypeError, ValueError):
-            return "Enter the max depth in metres"
+            return f"Enter the max depth in {'feet' if U.current_units() == U.IMPERIAL else 'metres'}"
         if depth <= 0:
             return "Max depth must be greater than 0"
         try:
@@ -837,7 +858,7 @@ class DiveProfileBackend(QObject):
         self.dive_plan.planned_runtime_sec = seconds
         self._persist("max_depth_m")
         self._persist("planned_runtime_sec")
-        self._max_depth_text = f"{depth:g}"
+        self._max_depth_text = _short(U.depth(depth))
         self._runtime_text = _format_minutes(seconds)
         self.settingsChanged.emit()
         self._resimulate()
@@ -879,15 +900,16 @@ class DiveProfileBackend(QObject):
                 kind,
                 f"{g.o2_percent:.0f}",
                 f"{g.he_percent:.0f}",
-                f"{tanks} {g.tank_size_l:g}L/{g.start_pressure_bar:g}",
-                f"{self.dive_plan.gas_display_mod_m(g):.0f}",
+                f"{tanks} {g.tank_size_l:g}L/{U.pressure(g.start_pressure_bar):.0f}",
+                f"{U.depth(self.dive_plan.gas_display_mod_m(g)):.0f}",
                 _format_gas_use(g),
             ])
         return rows
 
     @Property(list, notify=gasesChanged)
     def gasTableHeaders(self):
-        return ["Name", "Type", "O2%", "He%", "Tank L/bar", "MOD", "Use"]
+        from utils import units as U
+        return ["Name", "Type", "O2%", "He%", f"Tank L/{U.pressure_label(upper=False)}", f"MOD ({U.depth_label()})", "Use"]
 
     @Property(list, notify=gasesChanged)
     def gasIdList(self):
@@ -1070,10 +1092,11 @@ class DiveProfileBackend(QObject):
         self._gas_diluent = g.diluent
         self._gas_side = g.side or ""
         self._gas_tank_text = g.tank_ref
+        from utils import units as U
         self._gas_volume_text = f"{g.tank_size_l:g}"
-        self._gas_start_pressure_text = f"{g.start_pressure_bar:g}"
-        self._gas_min_depth_text = f"{g.use_min_depth_m:g}" if g.use_min_depth_m is not None else ""
-        self._gas_max_depth_text = f"{g.use_max_depth_m:g}" if g.use_max_depth_m is not None else ""
+        self._gas_start_pressure_text = f"{U.pressure(g.start_pressure_bar):.0f}"
+        self._gas_min_depth_text = f"{U.depth(g.use_min_depth_m):.0f}" if g.use_min_depth_m is not None else ""
+        self._gas_max_depth_text = f"{U.depth(g.use_max_depth_m):.0f}" if g.use_max_depth_m is not None else ""
         self._gas_phase = g.use_phase
         self._gas_color = gas_color(self.dive_plan, g.id)
         self.gasFieldsChanged.emit()
@@ -1113,7 +1136,7 @@ class DiveProfileBackend(QObject):
                 self._gas_he_text = f"{left.he_percent:g}"
         self._gas_tank_text = self._next_free_tank()
         self._gas_volume_text = DEFAULT_TANK_VOLUME_TEXT
-        self._gas_start_pressure_text = DEFAULT_START_PRESSURE_TEXT
+        self._gas_start_pressure_text = f"{U.pressure(float(DEFAULT_START_PRESSURE_TEXT)):.0f}"
         self._gas_min_depth_text = ""
         self._gas_max_depth_text = ""
         self._gas_phase = "any"
@@ -1153,7 +1176,7 @@ class DiveProfileBackend(QObject):
                 side=self._gas_side or None,
                 tank_ref=self._gas_tank_text.strip() or self._next_free_tank(),
                 tank_size_l=float(self._gas_volume_text),
-                start_pressure_bar=float(self._gas_start_pressure_text),
+                start_pressure_bar=U.pressure_to_bar(float(self._gas_start_pressure_text)),
                 use_min_depth_m=_parse_optional_depth(self._gas_min_depth_text),
                 use_max_depth_m=_parse_optional_depth(self._gas_max_depth_text),
                 use_phase=self._gas_phase,
@@ -1262,9 +1285,38 @@ class DiveProfileBackend(QObject):
     # on_dp_add_or_update_waypoint/on_dp_remove_waypoint.
     # ------------------------------------------------------------------
 
-    @Property(list, constant=True)
+    @Slot()
+    def unitsChanged(self):
+        """The Advanced page changed the unit system: texts, tables and the
+        preview follow (the plan itself is SI)."""
+        self._sync_texts_from_plan()
+        # the gas form's untouched default start pressure (207 bar) follows too
+        if self._gas_start_pressure_text in (DEFAULT_START_PRESSURE_TEXT, f"{U.pressure(207.0, U.IMPERIAL):.0f}"):
+            self._gas_start_pressure_text = f"{U.pressure(207.0):.0f}"
+        for sig in (self.settingsChanged, self.gasesChanged, self.gasFieldsChanged, self.waypointsChanged, self.waypointFieldsChanged, self.previewChanged):
+            sig.emit()
+        self._redraw()
+
+    @Property(str, notify=settingsChanged)
+    def depthUnit(self):
+        return U.depth_label()
+
+    @Property(str, notify=settingsChanged)
+    def pressureUnit(self):
+        return U.pressure_label(upper=False)
+
+    @Property(str, notify=settingsChanged)
+    def tempUnit(self):
+        return U.temperature_label()
+
+    @Property(str, notify=settingsChanged)
+    def rateUnit(self):
+        return U.depth_rate_label()
+
+    @Property(list, notify=waypointsChanged)
     def waypointHeaders(self):
-        return ["Time", "Depth (m)", "Gas", "Rate (m/min)"]
+        from utils import units as U
+        return ["Time", f"Depth ({U.depth_label()})", "Gas", f"Rate ({U.depth_rate_label()})"]
 
     @Property("QVariant", notify=waypointsChanged)
     def waypointRows(self):
@@ -1272,9 +1324,9 @@ class DiveProfileBackend(QObject):
         for wp in self.dive_plan.sorted_waypoints():
             rows.append([
                 _format_mmss(wp.runtime_sec),
-                f"{wp.depth_m:.1f}",
+                f"{U.depth(wp.depth_m):.1f}",
                 f"{wp.gas_id} (auto)" if wp.gas_auto else wp.gas_id,
-                f"{wp.rate_m_per_min:.0f}" if wp.rate_m_per_min else "default",
+                f"{U.depth(wp.rate_m_per_min):.0f}" if wp.rate_m_per_min else "default",
             ])
         return rows
 
@@ -1351,14 +1403,15 @@ class DiveProfileBackend(QObject):
     @Slot()
     def addOrUpdateWaypoint(self):
         try:
+            from utils import units as U
             runtime_sec = _parse_time_to_seconds(self._wp_time_text)
-            depth = float(self._wp_depth_text)
+            depth = U.depth_to_metres(float(self._wp_depth_text))
             if not self.dive_plan.gases:
                 raise ValueError("Define a gas first")
             gas_auto = self._wp_gas_text in ("", AUTO_GAS_LABEL)
             gas_id = self.dive_plan.breathed_gases()[0].id if gas_auto else self._wp_gas_text
             rate_text = self._wp_rate_text.strip()
-            rate = float(rate_text) if rate_text else None
+            rate = U.depth_to_metres(float(rate_text)) if rate_text else None
             new_wp = PlannedWaypoint(
                 runtime_sec=runtime_sec, depth_m=depth, gas_id=gas_id, rate_m_per_min=rate, gas_auto=gas_auto,
             )
@@ -1624,7 +1677,7 @@ class DiveProfileBackend(QObject):
         po2_over = gas is not None and not on_loop and sample.po2 > po2_limit + 0.005
         info = [
             {"label": "Time", "value": _format_mmss(sample.time_sec), "color": normal},
-            {"label": "Depth", "value": f"{sample.depth_m:.1f} m", "color": normal},
+            {"label": "Depth", "value": f"{U.depth(sample.depth_m):.1f} {U.depth_label()}", "color": normal},
             {"label": "Gas", "value": sample.gas_id, "color": gas_color(self.dive_plan, sample.gas_id)},
             {"label": "PO2", "value": f"{sample.po2:.2f} bar (max {po2_limit:g})", "color": bad if po2_over else normal},
         ]
@@ -1671,12 +1724,12 @@ class DiveProfileBackend(QObject):
         if on_loop:
             refs = [t.ref for t in self.dive_plan.tank_specs() if t.role == "oxygen"] + refs
         tanks = [
-            f"{'▸' if ref == sample.tank_ref and len(refs) > 1 else ''}{ref} {sample.tank_pressures[ref]:.0f}"
+            f"{'▸' if ref == sample.tank_ref and len(refs) > 1 else ''}{ref} {U.pressure(sample.tank_pressures[ref]):.0f}"
             for ref in refs if ref in sample.tank_pressures
         ]
         info.append({
             "label": "Tanks" if len(tanks) > 1 else "Tank",
-            "value": ("  ".join(tanks) + " bar") if tanks else f"{sample.tank_pressure_bar:.0f} bar",
+            "value": ("  ".join(tanks) + f" {U.pressure_label(upper=False)}") if tanks else f"{U.pressure(sample.tank_pressure_bar):.0f} {U.pressure_label(upper=False)}",
             "color": normal,
         })
         self._cursor_info = info

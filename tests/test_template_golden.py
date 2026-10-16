@@ -20,18 +20,21 @@ import pytest
 
 from gui.hud_renderer import draw_hud
 from test_template_sweep import bundled_pages, load_page
+from utils import units as U
 from utils.dummy_telemetry import build_dummy_dive, forced_dive, waypoint_at
 
 GOLDEN_DIR = Path(__file__).parent / "fixtures" / "overlay_golden"
 STATES = ("normal", "ndl_low", "deco_at_stop", "deco_violation", "clear", "safety_stop", "safety_paused", "fast_ascent", "critical_gas")
+IMPERIAL_STATES = ("normal", "deco_at_stop", "critical_gas")  # feet, a 10/20 ft stop ladder, psi
 MEAN_TOLERANCE = 2.0      # mean absolute difference over the crop (0-255)
 CHANGED_FRACTION = 0.005  # share of pixels that may differ by more than 40
 
 pytestmark = pytest.mark.golden
 
 
-def golden_name(brand, computer, page, variant, state):
-    return "__".join(p for p in (brand, computer, page, variant, state) if p) + ".png"
+def golden_name(brand, computer, page, variant, state, units=U.METRIC):
+    suffix = "" if units == U.METRIC else f"__{units}"
+    return "__".join(p for p in (brand, computer, page, variant, state) if p) + suffix + ".png"
 
 
 def render_half(layout, state):
@@ -47,12 +50,20 @@ def render_half(layout, state):
     return cv2.resize(crop, (max(1, crop.shape[1] // 2), max(1, crop.shape[0] // 2)), interpolation=cv2.INTER_AREA)
 
 
-@pytest.mark.parametrize("state", STATES)
-@pytest.mark.parametrize("brand,computer,page,variant", bundled_pages(), ids=lambda v: str(v))
-def test_golden_image(brand, computer, page, variant, state, request, tmp_path):
+def _cases():
+    for page in bundled_pages():
+        for state in STATES:
+            yield (*page, state, U.METRIC)
+        for state in IMPERIAL_STATES:
+            yield (*page, state, U.IMPERIAL)
+
+
+@pytest.mark.parametrize("brand,computer,page,variant,state,units", list(_cases()), ids=lambda v: str(v))
+def test_golden_image(brand, computer, page, variant, state, units, request, tmp_path):
     layout, _ = load_page(brand, computer, page, variant)
-    image = render_half(layout, state)
-    path = GOLDEN_DIR / golden_name(brand, computer, page, variant, state)
+    with U.units_override(units):
+        image = render_half(layout, state)
+    path = GOLDEN_DIR / golden_name(brand, computer, page, variant, state, units)
     if request.config.getoption("--update-golden"):
         GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(path), image, [cv2.IMWRITE_PNG_COMPRESSION, 9])

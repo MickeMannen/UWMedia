@@ -37,13 +37,21 @@ from models.dive import Dive
 from parsers.fit_merge import MAX_GAP_SECONDS, merge_fit_dives
 from parsers.fit_time import adjust_fit_time, fit_activity_time
 from parsers.registry import LOG_FILE_FILTER, is_log_file, parse_log_file
+from utils import units as U
 from utils.app_settings import get_fields, set_field
 from utils.config import get_config
 
 LAST_FOLDER_FIELD = "log_viewer_folder"
 
 TABLE_COLUMNS = ["time", "depth", "temp", "ndl", "tts", "gas", "tanks"]
-TABLE_HEADERS = ["Time", "Depth (m)", "Temp (°C)", "NDL (s)", "TTS (s)", "Gas", "Tanks"]
+
+
+def table_headers() -> List[str]:
+    from utils import units as U
+    return ["Time", f"Depth ({U.depth_label()})", f"Temp ({U.temperature_label()})", "NDL (s)", "TTS (s)", "Gas", "Tanks"]
+
+
+TABLE_HEADERS = table_headers()  # the metric form; the page asks table_headers() for the live one
 
 # The chart draws at most this many points; a 1 s FIT log of an hour's dive
 # has ~3600, which only slows the Canvas down without showing more.
@@ -86,8 +94,17 @@ IGNORED_ALERTS = ("alert_dismissed",)
 
 
 def _num(value: Optional[float], unit: str = "", digits: int = 1) -> str:
+    """A number for display; "m", "bar" and "°C" convert to the unit system
+    in force (utils/units.py), anything else is printed as given."""
     if value is None:
         return ""
+    from utils import units as U
+    if unit == "m":
+        value, unit = U.depth(value), U.depth_label()
+    elif unit == "bar":
+        value, unit = U.pressure(value), U.pressure_label(upper=False)
+    elif unit == "°C":
+        value, unit = U.temperature(value), U.temperature_label()
     text = f"{value:.{digits}f}"
     return f"{text} {unit}" if unit else text
 
@@ -201,8 +218,9 @@ def _chart_samples(dive: Dive) -> List[Dict[str, float]]:
     picked = points[::step]
     if points and picked[-1] is not points[-1]:
         picked.append(points[-1])
+    from utils import units as U
     return [
-        {"time": wp.time_since_start, "depth": wp.depth, "ceiling": wp.ceiling or 0.0}
+        {"time": wp.time_since_start, "depth": U.depth(wp.depth), "ceiling": U.depth(wp.ceiling or 0.0)}
         for wp in picked
     ]
 
@@ -229,6 +247,7 @@ def dive_details(dive: Dive, reverse_map: Dict[str, str]) -> Dict[str, Any]:
         "end": f"{dive.end_time:%Y-%m-%d %H:%M:%S}",
         "timezone": dive.timezone or "",
         "duration": _minutes(dive.duration),
+        "depth_unit": U.depth_label(),  # the chart's axis labels
         "max_depth": _num(dive.max_depth, "m"),
         "avg_depth": _num(_avg_depth(dive), "m"),
         "temp_min": _num(min(temps), "°C") if temps else "",
@@ -248,7 +267,7 @@ def dive_details(dive: Dive, reverse_map: Dict[str, str]) -> Dict[str, Any]:
 
 
 def _format_tank_reading(key, tank, reverse_map) -> str:
-    text = f"{_sensor_label(key, reverse_map)}: {tank.pressure_bar:.0f} bar"
+    text = f"{_sensor_label(key, reverse_map)}: {_num(tank.pressure_bar, 'bar', 0)}"
     if tank.he_percent:
         text += f" ({tank.o2_percent:.0f}/{tank.he_percent:.0f})"
     elif abs(tank.o2_percent - 21.0) > 0.5:
@@ -262,8 +281,8 @@ def sample_rows(dive: Dive, reverse_map: Dict[str, str]) -> List[Dict[str, str]]
         rows.append(
             {
                 "time": wp.timestamp.strftime("%H:%M:%S"),
-                "depth": f"{wp.depth:.1f}" if wp.depth is not None else "",
-                "temp": f"{wp.temp:.1f}" if wp.temp is not None else "",
+                "depth": _num(wp.depth, "m").rsplit(" ", 1)[0] if wp.depth is not None else "",
+                "temp": _num(wp.temp, "°C").rsplit(" ", 1)[0] if wp.temp is not None else "",
                 "ndl": str(wp.ndl) if wp.ndl is not None else "",
                 "tts": str(wp.tts) if wp.tts is not None else "",
                 "gas": wp.gasmix if wp.tanks else "",
@@ -691,9 +710,17 @@ class LogViewerBackend(QObject):
 
     # -- sample table ------------------------------------------------------
 
-    @Property(list, constant=True)
+    @Property(list, notify=tableChanged)
     def tableHeaders(self):
-        return TABLE_HEADERS
+        return table_headers()
+
+    @Slot()
+    def unitsChanged(self):
+        """The Advanced page changed the unit system: the dive list, the
+        details pane, the chart and the samples table all follow."""
+        self._refresh_rows()
+        self.divesChanged.emit()
+        self._set_current(self._current)
 
     @Property(str, notify=tableChanged)
     def filterText(self):

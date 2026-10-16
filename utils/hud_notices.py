@@ -120,6 +120,10 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
     cns = _num(getattr(wp, "cns", None))
     if cns is not None:
         ctx["cns"] = int(cns)  # "{cns}" in a text (Garmin "CNS toxicity at %1%.")
+    stop = _num(getattr(wp, "next_stop_depth", None)) or _num(getattr(wp, "deco_stop_depth", None))
+    if stop:
+        from utils import units as U
+        ctx["stop"] = f"{U.stop_depth(stop):.0f} {U.depth_label()}"  # Garmin X50i "DESCEND TO %1"
     if when == "fit_alert":
         return rule.get("alert") in set(getattr(wp, "dive_alerts", None) or []), ctx
     if when == "tank_critical":
@@ -159,7 +163,8 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
         depth = _num(getattr(wp, "depth", None))
         if mod is None or depth is None:
             return False, ctx
-        ctx["mod"] = int(round(mod))
+        from utils import units as U
+        ctx["mod"] = f"{U.depth(mod):.0f}{U.depth_label()}"  # "34m" / "112ft" in the system in force
         if when == "mod_exceeded":
             return depth > mod, ctx
         return mod - float(rule.get("metres", 1.9)) <= depth <= mod, ctx

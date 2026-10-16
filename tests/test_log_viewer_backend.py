@@ -212,3 +212,27 @@ def test_chart_samples_are_thinned_but_keep_both_ends(backend):
     assert len(samples) <= lvb.MAX_CHART_POINTS + 1
     assert samples[0]["time"] == dive.waypoints[0].time_since_start
     assert samples[-1]["time"] == dive.waypoints[-1].time_since_start
+
+
+def test_numbers_and_headers_follow_the_unit_system():
+    from utils import units as U
+    with U.units_override("imperial"):
+        assert lvb._num(10.0, "m") == "32.8 ft" and lvb._num(207.0, "bar", 0) == "3002 psi" and lvb._num(27.0, "°C") == "80.6 °F"
+        assert lvb.table_headers()[1:3] == ["Depth (ft)", "Temp (°F)"]
+    with U.units_override("metric"):
+        assert lvb._num(10.0, "m") == "10.0 m" and lvb.table_headers()[1:3] == ["Depth (m)", "Temp (°C)"]
+
+
+@pytest.mark.requires_media
+def test_units_change_refreshes_the_selected_dive(backend):
+    from utils import units as U
+    backend.addFiles([str(FIT)])
+    metric_depth = backend.selected["max_depth"]
+    with U.units_override("imperial"):
+        backend.unitsChanged()
+        assert backend.selected["max_depth"].endswith(" ft") and backend.selected["depth_unit"] == "ft"
+        assert backend.tableHeaders[1] == "Depth (ft)"
+        assert backend.currentRow == 0
+    with U.units_override("metric"):
+        backend.unitsChanged()
+    assert backend.selected["max_depth"] == metric_depth

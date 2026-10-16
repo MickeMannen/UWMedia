@@ -59,11 +59,12 @@
     {
       "id": "primary_tank_pressure",
       "field": "primary_tank_pressure",
-      "rel_x": 0.28159,
+      "rel_x": 0.40153,
       "rel_y": 0.32723,
       "color": "#FFFFFF",
       "font_size": 50,
-      "scale": 1.0
+      "scale": 1.0,
+      "align": "right"
     },
     {
       "id": "secondary_tank_pressure",

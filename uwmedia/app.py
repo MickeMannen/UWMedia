@@ -93,6 +93,10 @@ def create_engine():
     engine.rootContext().setContextProperty("advancedBackend", advanced_backend)
     # Patterns saved on Advanced show up in Color's output-filename list at once.
     advanced_backend.filenameFormatsChanged.connect(color_backend.reloadFilenameFormats)
+    # Units (Advanced): the pages that show numbers follow at once
+    advanced_backend.unitsChanged.connect(log_viewer_backend.unitsChanged)
+    advanced_backend.unitsChanged.connect(overlay_designer_backend.unitsChanged)
+    advanced_backend.unitsChanged.connect(dive_profile_backend.unitsChanged)
 
     about_backend = AboutBackend()
     engine.rootContext().setContextProperty("aboutBackend", about_backend)

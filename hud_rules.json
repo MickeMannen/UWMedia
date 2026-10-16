@@ -201,7 +201,14 @@
           "when": "safety_started",
           "_source": "Teric Rev H5 p.25 (p.24) figure 'INFO Safety Stop': an alert when in the safety stop range"
         }
-      ]
+      ],
+      "display": {
+        "depth_decimals": {
+          "metric": 1,
+          "imperial": 1
+        },
+        "_source": "Teric p.23 figure 103.6ft"
+      }
     },
     "Tern": {
       "badge_states": {
@@ -283,7 +290,14 @@
           "when": "safety_started",
           "_source": "Tern Rev B-1 p.25 (p.24) figure 'INFO Safety Stop': an alert when in the safety stop range"
         }
-      ]
+      ],
+      "display": {
+        "depth_decimals": {
+          "metric": 1,
+          "imperial": 1
+        },
+        "_source": "as the Teric (assumed)"
+      }
     },
     "Perdix 3": {
       "badge_states": {
@@ -478,14 +492,14 @@
       },
       {
         "id": "mod_exceeded",
-        "text": "MOD\n{mod}m\n↑",
+        "text": "MOD\n{mod}\n↑",
         "color": "#FF0000",
         "when": "mod_exceeded",
         "_source": "p.23 'MOD, go up'; p.13 figure: red box MOD / depth / up arrow"
       },
       {
         "id": "near_mod",
-        "text": "MOD\n{mod}m",
+        "text": "MOD\n{mod}",
         "color": "#FFFF00",
         "when": "near_mod",
         "metres": 1.9,
@@ -494,7 +508,14 @@
       {
         "_order": "p.23 lists High CNS, MOD go up, MOD switch gas, Near MOD, Better Gas; 'switch gas' and 'Better Gas' need the gas list (not modelled)"
       }
-    ]
+    ],
+    "display": {
+      "depth_decimals": {
+        "metric": 1,
+        "imperial": 0
+      },
+      "_source": "Perdix 2 p.12: 'When in meters, one decimal place is shown' (the feet figure shows 45 ft)"
+    }
   },
   "Garmin": {
     "_manual": "Descent Mk3 series owner's manual (Mk3) and Descent X50i owner's manual (X50i); pages are PDF pages. Full list: hud_rules_sources.md",
@@ -898,6 +919,13 @@
           "_source": "X50i p.12"
         }
       ]
+    },
+    "display": {
+      "depth_decimals": {
+        "metric": 1,
+        "imperial": 0
+      },
+      "_source": "Mk3 p.8 figures: 77 ft / 86 ft whole, metric screenshots 0.0 m"
     }
   },
   "default": {
@@ -983,6 +1011,12 @@
         "color": "#FF0000"
       }
     ],
-    "_note": "generic values with no source, for Custom templates that borrow no brand profile"
+    "_note": "generic values with no source, for Custom templates that borrow no brand profile",
+    "display": {
+      "depth_decimals": {
+        "metric": 1,
+        "imperial": 0
+      }
+    }
   }
 }
