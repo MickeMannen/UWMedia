@@ -797,9 +797,13 @@ def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     if phase and badge.get(f"{phase}_value_color"):
         value_hex = badge[f"{phase}_value_color"]
     value_text = badge.get(f"{phase}_value_text") if phase else None  # e.g. Teric: "CLEAR" once the stop is done
-    violating = phase == "violation" or (state in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint))
+    violating = phase in ("violation", "ceiling_violation") or (state in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint))
     if violating:
+        # Teric manual p.26: yellow above the stop (violation_color), flashing
+        # red above the ceiling (ceiling_violation_color); a Perdix: red for both.
         red = badge.get("violation_color") or ceiling_broken_color(manufacturer, model)
+        if phase == "ceiling_violation":
+            red = badge.get("ceiling_violation_color") or red
         title_hex = resolve_blink_color(badge.get("color", "#FFFFFF"), red, elapsed)
         value_hex = resolve_blink_color(badge.get("value_color", badge.get("color", "#FFFFFF")), red, elapsed)
 
@@ -1364,6 +1368,108 @@ def _draw_tank_fill(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w
 
     draw.rounded_rectangle([abs_x, abs_y, abs_x + w, abs_y + h], radius=radius, fill=color_rgb)
 
+def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb):
+    """A filled rounded box behind `text` drawn at (abs_x, abs_y) - the way a
+    Perdix highlights a tank to switch to (manual p.42) or a tank pressure
+    below the reserve (p.40)."""
+    left, top, right, bottom = font.getbbox(text)
+    pad = max(1, int(size * 0.15))
+    draw.rounded_rectangle(
+        [abs_x + left - pad, abs_y + top - pad, abs_x + right + pad, abs_y + bottom + pad],
+        radius=max(1, int(size * 0.15)), fill=box_rgb,
+    )
+
+
+def notice_for(layout, waypoint, waypoints=None):
+    """The notice the template's computer would show now, or None."""
+    from utils.hud_notices import active_notice
+    return active_notice(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints)
+
+
+def notice_lines(elem, notice, manufacturer, model):
+    """What a notice element draws: (caption, confirm, message, style dict)
+    with the texts resolved from the element and the brand's notice_style.
+    Shared with the Overlay Designer."""
+    from utils.hud_notices import notice_style
+    style = dict(notice_style(manufacturer, model))
+    style["style"] = elem.get("style") or style.get("style", "text")
+    confirm = elem.get("confirm_text")
+    if confirm is None:
+        confirm = style.get("confirm_text", "")
+    return notice.get("caption", ""), confirm or "", notice.get("text", ""), style
+
+
+def _fit_font(draw, text, size, width_px, family, weight, floor=8):
+    """The largest font at or under `size` whose `text` fits `width_px`."""
+    size = max(floor, int(size))
+    font = get_font(size, family, weight)
+    while size > floor and draw.textlength(text, font=font) > width_px:
+        size = max(floor, int(size * 0.92))
+        font = get_font(size, family, weight)
+    return font, size
+
+
+def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
+    """A device notification (schema element type "notice"): the active
+    notice's message in the brand's style. "text" (Perdix 2 manual p.22): the
+    caption ("Warning" / "Alert") top left and the confirm hint top right in
+    the caption colour, the message under them in the notice colour, shrunk
+    to fit `width`. "banner" (Teric manual p.26): a filled band `width` x
+    `height` in the notice colour with the caption small above the message in
+    the text colour and the confirm hint at the right edge."""
+    if not notice:
+        return
+    caption, confirm, message, style = notice_lines(elem, notice, manufacturer, model)
+    scale = user_scale if render_log else user_scale * res_scale
+    item_scale = float(elem.get("scale", 1.0))
+    abs_x = int(skin_x + elem.get("rel_x", 0.0) * w_scaled)
+    abs_y = int(skin_y + elem.get("rel_y", 0.0) * h_scaled)
+    width_px = max(8, int(float(elem.get("width", 400)) * scale))
+    msg_size = max(1, int(float(elem.get("font_size", 40)) * scale * item_scale))
+    cap_size = max(1, int(float(elem.get("caption_font_size", 18)) * scale * item_scale))
+    family, weight = elem.get("font_family"), elem.get("font_weight")
+    colour = _rgb(notice.get("color") or style.get("color", "#FFFF00"))
+    text_colour = _rgb(notice.get("text_color") or style.get("text_color") or notice.get("color") or style.get("color", "#FFFF00"))
+    cap_colour = _rgb(elem.get("caption_color") or style.get("caption_color") or "#FFFF00")
+    outline = elem.get("outline", False)
+    cap_font = get_font(cap_size, family, weight)
+    cap_h = int(cap_size * 1.25)
+
+    if style["style"] == "banner":
+        height_px = max(4, int(float(elem.get("height", 60)) * scale))
+        pad = max(2, int(height_px * 0.08))
+        draw.rounded_rectangle([abs_x, abs_y, abs_x + width_px, abs_y + height_px], radius=max(2, int(height_px * 0.12)), fill=colour)
+        inner = width_px - 2 * pad
+        if confirm:
+            inner -= int(draw.textlength(confirm, font=cap_font)) + pad
+            draw.text((abs_x + width_px - pad - draw.textlength(confirm, font=cap_font), abs_y + pad), confirm, font=cap_font, fill=text_colour)
+        if caption:
+            draw.text((abs_x + pad, abs_y + pad), caption, font=cap_font, fill=text_colour)
+        font, size = _fit_font(draw, message, min(msg_size, height_px - cap_h - 2 * pad), inner, family, weight)
+        draw.text((abs_x + pad, abs_y + pad + cap_h), message, font=font, fill=text_colour)
+        return
+
+    font, size = _fit_font(draw, message, msg_size, width_px, family, weight)
+    o = max(1, int(cap_size / 20))
+    if caption:
+        if outline:
+            for dx, dy in [(-o, -o), (o, -o), (-o, o), (o, o)]:
+                draw.text((abs_x + dx, abs_y + dy), caption, font=cap_font, fill=(0, 0, 0))
+        draw.text((abs_x, abs_y), caption, font=cap_font, fill=cap_colour)
+    if confirm:
+        cx = abs_x + width_px - draw.textlength(confirm, font=cap_font)
+        if outline:
+            for dx, dy in [(-o, -o), (o, -o), (-o, o), (o, o)]:
+                draw.text((cx + dx, abs_y + dy), confirm, font=cap_font, fill=(0, 0, 0))
+        draw.text((cx, abs_y), confirm, font=cap_font, fill=cap_colour)
+    my = abs_y + (cap_h if caption or confirm else 0)
+    o = max(1, int(size / 20))
+    if outline:
+        for dx, dy in [(-o, -o), (o, -o), (-o, o), (o, o)]:
+            draw.text((abs_x + dx, my + dy), message, font=font, fill=(0, 0, 0))
+    draw.text((abs_x, my), message, font=font, fill=text_colour)
+
+
 def rules_manufacturer(layout):
     """The hud_rules.json manufacturer key a layout's colour/warning rules
     come from: `rules_profile` when set (overlay_rework.md schema v2 - a
@@ -1430,10 +1536,20 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     if any(elem.get("hide_in_states") for elem in linked_elements):
         from utils.hud_rules_engine import resolve_state
         hud_state = resolve_state(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints)
+    # The device's own notification, when a notice element draws it; the
+    # elements it covers (`hide_when_notice`) step aside while it shows.
+    notice = None
+    if any(elem.get("type") == "notice" or elem.get("hide_when_notice") for elem in linked_elements):
+        notice = notice_for(layout, waypoint, waypoints)
 
     for elem in linked_elements:
         field = elem.get("field", "")
         if hud_state is not None and hud_state in (elem.get("hide_in_states") or ()):
+            continue
+        if notice is not None and elem.get("hide_when_notice"):
+            continue
+        if elem.get("type") == "notice":
+            _draw_notice(draw, elem, notice, rules_manufacturer(layout), layout.get("model", "Perdix2"), skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
             continue
         if elem.get("type") == "graph" or field == "depth_graph":
             if elem.get("stop_label"):
@@ -1490,13 +1606,32 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         model = layout.get("model", "Perdix2")
         default_color = elem.get("color", "#FFFFFF")
         color_hex = get_dynamic_color(manufacturer, model, field, raw_val, default_color)
+        elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
         if field == "depth":
             # Above a deco ceiling by more than the margin: the depth flashes
             # red along with the badge's ceiling line (Descent Mk3 manual p.10).
-            from utils.hud_rules_engine import ceiling_broken, ceiling_broken_color, resolve_blink_color, resolve_state
-            if resolve_state(manufacturer, model, waypoint, waypoints) in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint):
-                elapsed = waypoint.dive_time if waypoint.dive_time is not None else waypoint.time_since_start
+            from utils.hud_rules_engine import ceiling_broken, ceiling_broken_color, resolve_blink_color, resolve_state, stop_phase, get_rule_config
+            state = resolve_state(manufacturer, model, waypoint, waypoints)
+            if state in ("deco", "clear") and ceiling_broken(manufacturer, model, waypoint):
                 color_hex = resolve_blink_color(color_hex, ceiling_broken_color(manufacturer, model), elapsed)
+            elif state == "safety_stop" and stop_phase(manufacturer, model, waypoint, waypoints)[1] == "warn":
+                # More than warn_above_m above the safety stop ceiling: the
+                # depth turns yellow with the stop depth (Mk3 manual p.13).
+                ss_rule = get_rule_config(manufacturer, model, "safety_stop")
+                color_hex = (ss_rule.get("warn_color") if isinstance(ss_rule, dict) else None) or "#FFFF00"
+        box_rgb = None
+        if field in ("primary_tank_pressure", "secondary_tank_pressure") or field.startswith("tank_pressure:"):
+            # Below the reserve / critical pressure: a Shearwater puts the
+            # value on a yellow / red box (Perdix 2 manual p.40), a Descent
+            # turns it yellow, then flashing red (Mk3 manual p.14).
+            from utils.hud_rules_engine import get_rule_config, resolve_blink_color, tank_pressure_state
+            reserve_rule = get_rule_config(manufacturer, model, "tank_reserve")
+            tank_state = tank_pressure_state(manufacturer, model, raw_val) if isinstance(reserve_rule, dict) else None
+            if tank_state and reserve_rule.get("style") == "fill":
+                box_rgb = _rgb(reserve_rule.get(tank_state + "_color", "#FFFF00"))
+                color_hex = reserve_rule.get(tank_state + "_text_color") or ("#FFFFFF" if tank_state == "critical" else "#000000")
+            elif tank_state == "critical" and reserve_rule.get("critical_blink"):
+                color_hex = resolve_blink_color(default_color, reserve_rule.get("critical_color", "#FF0000"), elapsed)
         color_hex = color_hex.lstrip('#')
         color_rgb = tuple(int(color_hex[i:i+2], 16) for i in (0, 2, 4))
 
@@ -1574,15 +1709,11 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             from utils.hud_rules_engine import get_rule_config, sidemount_switch_target
             if sidemount_switch_target(manufacturer, model, waypoint) == highlight:
                 rule = get_rule_config(manufacturer, model, "sidemount_switch") or {}
-                box_rgb = tuple(int(str(rule.get("color", "#00C800")).lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
-                color_rgb = tuple(int(str(rule.get("text_color", "#000000")).lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
-                left, top, right, bottom = font.getbbox(val_str)
-                pad = max(1, int(final_size * 0.15))
-                draw.rounded_rectangle(
-                    [abs_x + left - pad, abs_y + top - pad, abs_x + right + pad, abs_y + bottom + pad],
-                    radius=max(1, int(final_size * 0.15)), fill=box_rgb,
-                )
-                outline = False
+                box_rgb = _rgb(str(rule.get("color", "#00C800")))
+                color_rgb = _rgb(str(rule.get("text_color", "#000000")))
+        if box_rgb is not None:
+            _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb)
+            outline = False
 
         o_dist = max(1, int(final_size / 20))
         if outline:

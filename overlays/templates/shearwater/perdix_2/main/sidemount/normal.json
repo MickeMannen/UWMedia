@@ -9,7 +9,8 @@
       "color": "#00ADED",
       "font_size": 24,
       "scale": 1.0,
-      "tank_switch_highlight": "primary"
+      "tank_switch_highlight": "primary",
+      "hide_when_notice": true
     },
     {
       "id": "primary_tank_icon",
@@ -26,7 +27,8 @@
       "full_bar": 200,
       "outline_color": "#9A9A9A",
       "outline_width": 2,
-      "outline_gap": 3
+      "outline_gap": 3,
+      "hide_when_notice": true
     },
     {
       "id": "primary_tank_pressure",
@@ -35,7 +37,8 @@
       "rel_y": 0.68973,
       "color": "#FFFFFF",
       "font_size": 50,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_bar",
@@ -45,7 +48,8 @@
       "color": "#00ADED",
       "font_size": 15,
       "scale": 1.0,
-      "orientation": "stacked"
+      "orientation": "stacked",
+      "hide_when_notice": true
     },
     {
       "id": "label_gtr",
@@ -54,7 +58,8 @@
       "rel_y": 0.65281,
       "color": "#00ADED",
       "font_size": 25,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "gtr",
@@ -63,7 +68,8 @@
       "rel_y": 0.64779,
       "color": "#FFFFFF",
       "font_size": 34,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_sm",
@@ -72,7 +78,8 @@
       "rel_y": 0.69484,
       "color": "#808080",
       "font_size": 17,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_sac",
@@ -81,7 +88,8 @@
       "rel_y": 0.7342,
       "color": "#00ADED",
       "font_size": 25,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "sac",
@@ -90,7 +98,8 @@
       "rel_y": 0.73332,
       "color": "#FFFFFF",
       "font_size": 34,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_t2",
@@ -100,7 +109,8 @@
       "color": "#00ADED",
       "font_size": 24,
       "scale": 1.0,
-      "tank_switch_highlight": "secondary"
+      "tank_switch_highlight": "secondary",
+      "hide_when_notice": true
     },
     {
       "id": "secondary_tank_icon",
@@ -117,7 +127,8 @@
       "full_bar": 200,
       "outline_color": "#9A9A9A",
       "outline_width": 2,
-      "outline_gap": 3
+      "outline_gap": 3,
+      "hide_when_notice": true
     },
     {
       "id": "secondary_tank_pressure",
@@ -126,7 +137,8 @@
       "rel_y": 0.68973,
       "color": "#FFFFFF",
       "font_size": 50,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_bar_2",
@@ -136,7 +148,8 @@
       "color": "#00ADED",
       "font_size": 15,
       "scale": 1.0,
-      "orientation": "stacked"
+      "orientation": "stacked",
+      "hide_when_notice": true
     }
   ],
   "overrides": {

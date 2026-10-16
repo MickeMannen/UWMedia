@@ -87,7 +87,7 @@ def skin_pixel_size(skin: Dict[str, Any]) -> Tuple[float, float]:
 
 
 
-ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons")
+ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice")
 
 
 def element_kind(element: Dict[str, Any]) -> str:
@@ -96,7 +96,7 @@ def element_kind(element: Dict[str, Any]) -> str:
     kind = element.get("type")
     if kind == "graph" or element.get("field") == "depth_graph":
         return "graph"
-    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons"):
+    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons", "notice"):
         return kind
     return "text"
 
@@ -116,6 +116,10 @@ def element_defaults(kind: str, field: str) -> Dict[str, Any]:
         base.update({"type": "tissue_bar", "field": "n2_tissue_load", "width": 12, "height": 33, "marker_size": 4})
     elif kind == "ascent_chevrons":
         base.update({"type": "ascent_chevrons", "field": "ascent_rate", "width": 16, "height": 47, "up_count": 4, "down_count": 1})
+    elif kind == "notice":
+        # The device's own notification (gui.hud_renderer._draw_notice): the
+        # message fitted into `width`, a caption line above it.
+        base.update({"type": "notice", "field": "notice", "width": 400, "height": 60, "font_size": 40, "caption_font_size": 18, "scale": 1.0})
     else:
         base.update({"color": "#FFFFFF", "font_size": 30, "scale": 1.0})
     return base
@@ -154,6 +158,10 @@ def parse_layout_elements(hud_skin: Dict[str, Any]) -> List[Dict[str, Any]]:
         elif kind == "ascent_chevrons":
             entry["field"] = field or "ascent_rate"
             for key, default in (("width", 16), ("height", 47), ("up_count", 4), ("down_count", 1)):
+                entry.setdefault(key, default)
+        elif kind == "notice":
+            entry["field"] = field or "notice"
+            for key, default in (("width", 400), ("height", 60), ("font_size", 40), ("caption_font_size", 18), ("scale", 1.0)):
                 entry.setdefault(key, default)
         else:
             entry["field"] = field
@@ -261,6 +269,14 @@ def element_native_bounds(
     align = elem.get("align", "left")
     valign = elem.get("valign", "top")
 
+    if kind == "notice":
+        # caption line over the message line, inside `width` (a banner has its own height)
+        w = float(elem.get("width", 400))
+        if elem.get("style") == "banner":
+            return x, y, x + w, y + float(elem.get("height", 60))
+        size = float(elem.get("font_size", 40)) * float(elem.get("scale", 1.0))
+        cap = float(elem.get("caption_font_size", 18)) * float(elem.get("scale", 1.0))
+        return x, y, x + w, y + cap * 1.25 + size * 1.2
     if kind == "badge" and elem.get("style") == "box":
         return x, y, x + float(elem.get("width", 80)), y + float(elem.get("height", 44))
     if kind == "badge":

@@ -348,6 +348,8 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "state_badge",
         "ndl_before_clear",
         "n2_tissue_load",
+        # the device's own notification (gui/hud_renderer._draw_notice)
+        "notice",
     }
     
     layout_fields = [elem.get("field") for elem in linked_elements if elem.get("field")]

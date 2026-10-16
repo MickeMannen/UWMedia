@@ -1129,7 +1129,7 @@ def test_perdix2_main_variants_share_a_base_and_the_sidemount_row_highlights_the
     page = Path("overlays/templates/shearwater/perdix_2/main")
     base = json.load(open(page / "normal.json"))
     assert [e["id"] for e in base["hud_skin"]["linked_elements"]] == [
-        "depth", "label_m", "label_time", "dive_time", "state_badge", "label_ndl", "ndl", "n2_bar", "ascent_rate"]
+        "depth", "label_m", "label_time", "dive_time", "state_badge", "label_ndl", "ndl", "n2_bar", "ascent_rate", "notice"]
     single = load_layout_file(page / "single_tank/normal.json")
     side = load_layout_file(page / "sidemount/normal.json")
     single_row = [e["field"] for e in single["hud_skin"]["linked_elements"] if e[ELEMENT_ORIGIN_KEY] == "variant"]

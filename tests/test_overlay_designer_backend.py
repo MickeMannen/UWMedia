@@ -110,7 +110,7 @@ def test_default_canvas_is_populated_without_any_media_or_log():
     assert app.viewMode == "design" and app.zoomIsFit is True
     assert app.telemetrySource == "dummy" and app.logTelemetryAvailable is False
     assert app.timeEnabled is True and app.timeMax == DUMMY_DURATION_S
-    assert "Dummy telemetry" in app.dataText and "Depth 24.0 m" in app.dataText
+    assert "Dummy telemetry" in app.dataText and "Depth 30.0 m" in app.dataText
 
     img = app.render_current_frame()
     assert (img.width(), img.height()) == (app.canvasDisplayWidth, app.canvasDisplayHeight)
@@ -179,16 +179,16 @@ def test_time_slider_scrubs_dummy_dive():
     app.onTimeChanged(0)
     assert "Depth 0.0 m" in app.dataText and app.timeText == "0:00:00"
     app.onTimeChanged(10 * 60)
-    assert "Depth 24.0 m" in app.dataText
+    assert "Depth 30.0 m" in app.dataText
     assert app._preview_revision == revision + 2
 
 
 def test_state_selector_forces_resolved_state():
     app = OverlayDesignerBackend()
     assert app.stateIndex == 0 and app.stateList[0].startswith("Auto")
-    app.onStateSelected("Deco")
-    assert "State: deco" in app.dataText and app.stateIndex == 3
-    app.onStateSelected("Safety stop")
+    app.onStateSelected("Deco (far from the stop)")
+    assert "State: deco (far)" in app.dataText and app.stateIndex == 4
+    app.onStateSelected("Safety stop counting")
     assert "State: safety_stop" in app.dataText
     app.onStateSelected("Auto (from data)")
     assert "State: normal" in app.dataText

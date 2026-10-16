@@ -227,3 +227,5 @@ uwmedia/**/*_ui.py
 /ui_update_log.md
 /overlay_rework.md
 /investigation.md
+/simulator.md
+/simulator_facts.md

@@ -100,6 +100,7 @@ from utils.dummy_telemetry import (
     STATE_OPTIONS,
     apply_state,
     build_dummy_dive,
+    forced_dive,
     waypoint_at,
 )
 from utils.fonts import DEFAULT_FAMILY, list_families
@@ -112,7 +113,7 @@ from utils.hud_designer import (
     element_native_bounds,
     hit_test_bounds,
 )
-from utils.hud_rules_engine import load_rules_json, resolve_state, resolve_tank_variant
+from utils.hud_rules_engine import is_annotation_key, load_rules_json, resolve_state, resolve_tank_variant
 from utils.layouts import list_templates, page_display_name, resolve_template_state, variant_display_name
 from utils.overlay_document import OverlayDocument, TemplateRef
 from utils.resource_paths import app_temp_dir
@@ -177,9 +178,9 @@ ADD_ELEMENT_PRESETS = {
     DIVE_TIME_SMALL_SECONDS: ("dive_time", "seconds"),
 }
 
-_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
-_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
-_STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill"}
+_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
+_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
+_STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill", "notice": "text"}
 # A graph's deco-stop shading colour when the inspector switches it on.
 DEFAULT_STOPS_COLOR = "#FFA500"
 _NUMERIC_SKIN_ATTRS = {"scale", "opacity", "ref_offset_x", "ref_offset_y", "width", "height", "corner_radius"}
@@ -853,6 +854,7 @@ class OverlayDesignerBackend(QObject):
                 "draw_outline": False, "outline_color": "#FFFFFF", "outline_width": 2, "outline_gap": 4,
                 "up_count": 4, "down_count": 1, "bar": True, "style": "segments",
                 "segments": 5, "segment_gap": 2, "full_bar": 200,
+                "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False,
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
         field = elem.get("field", "")
@@ -908,6 +910,11 @@ class OverlayDesignerBackend(QObject):
             "segments": elem.get("segments", 5),
             "segment_gap": elem.get("segment_gap", 2),
             "full_bar": elem.get("full_bar", 200),
+            # notice element (gui.hud_renderer._draw_notice)
+            "caption_font_size": elem.get("caption_font_size", 18),
+            "confirm_text": elem.get("confirm_text", ""),
+            "caption_color": elem.get("caption_color") or "",
+            "hide_when_notice": bool(elem.get("hide_when_notice", False)),
         }
 
     @Slot(str, "QVariant")
@@ -946,7 +953,7 @@ class OverlayDesignerBackend(QObject):
                 return
             if key in _INT_ELEMENT_ATTRS:
                 number = int(round(number))
-            if key in ("font_size", "value_font_size", "width", "height", "marker_size", "outline_width"):
+            if key in ("font_size", "value_font_size", "caption_font_size", "width", "height", "marker_size", "outline_width"):
                 number = max(1, number)
             elif key in ("outline_gap", "up_count", "down_count", "segment_gap"):
                 number = max(0, number)
@@ -959,7 +966,12 @@ class OverlayDesignerBackend(QObject):
             elif key in ("fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"):
                 number = max(0.0, min(1.0, round(number, 3)))
             doc.set_element_attr(index, key, number)
-        elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color"):
+        elif key == "confirm_text":
+            # "" is a choice (no hint); only an unset key falls back to the brand's notice_style
+            doc.set_element_attr(index, "confirm_text", str(value or ""))
+        elif key == "hide_when_notice":
+            doc.set_element_attr(index, "hide_when_notice", True if bool(value) else None)
+        elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color", "caption_color"):
             if key == "marker_style" and value not in MARKER_STYLES:
                 return
             doc.set_element_attr(index, key, str(value))
@@ -972,7 +984,7 @@ class OverlayDesignerBackend(QObject):
         elif key in ("reveal_profile", "stop_label"):
             doc.set_element_attr(index, key, True if bool(value) else None)
         elif key == "style":
-            if value not in ("segments", "fill"):
+            if value not in ("segments", "fill", "text", "banner"):
                 return
             default = _STYLE_DEFAULTS.get(element_kind(doc.element(index)), "segments")
             doc.set_element_attr(index, "style", None if value == default else value)
@@ -1091,8 +1103,9 @@ class OverlayDesignerBackend(QObject):
     @Property(list, constant=True)
     def rulesProfiles(self):
         """Colour/warning rule sets a new Custom computer can borrow:
-        "Default" plus every manufacturer block in hud_rules.json."""
-        return ["Default"] + [key for key in load_rules_json() if key != "default"]
+        "Default" plus every manufacturer block in hud_rules.json (its
+        "_"-prefixed annotation keys are not brands)."""
+        return ["Default"] + [key for key in load_rules_json() if key != "default" and not is_annotation_key(key)]
 
     @Slot(result=str)
     def browseImageFile(self):
@@ -1247,10 +1260,12 @@ class OverlayDesignerBackend(QObject):
         doc = self.document
         if doc is None or not field:
             return
-        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons"):
+        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice"):
             kind = "text"
         if kind == "graph":
             field = "depth_graph"
+        elif kind == "notice":
+            field = "notice"
         elif kind == "badge":
             field = "state_badge"
         elif kind == "tissue_bar":
@@ -2298,8 +2313,12 @@ class OverlayDesignerBackend(QObject):
             wp = waypoint_at(self.dummy_dive, seconds)
             if waypoints is None:
                 waypoints = self.dummy_dive.waypoints
-        if wp is not None:
-            wp = apply_state(wp, self._state_override)
+        if wp is not None and self._state_override != "auto":
+            # A forced state comes with its own short history, so the
+            # timelines (safety stop, deco clear, notices) report it too.
+            wp, history = forced_dive(wp, self._state_override)
+            if history is not None:
+                waypoints = history
         return wp, waypoints
 
     def _update_data_text(self):
@@ -2317,10 +2336,15 @@ class OverlayDesignerBackend(QObject):
                 source = "Out of dive range - showing dummy telemetry"
             manufacturer = self.document.rules_manufacturer if self.document else None
             model = self.document.model if self.document else None
-            state = resolve_state(manufacturer, model, wp, waypoints)
+            from utils.hud_notices import active_notice
+            from utils.hud_rules_engine import stop_phase
+            state, phase, _, _ = stop_phase(manufacturer, model, wp, waypoints)
+            notice = active_notice(manufacturer, model, wp, waypoints)
             depth = f"{wp.depth:.1f} m" if wp.depth is not None else "--"
             temp = f"{wp.temp:.1f} °C" if wp.temp is not None else "--"
-            self._data_text = f"{source} · Depth {depth} · Temp {temp} · State: {state}"
+            state_text = f"{state} ({phase})" if phase else state
+            notice_text = f" · Notice: {notice['text']}" if notice else ""
+            self._data_text = f"{source} · Depth {depth} · Temp {temp} · State: {state_text}{notice_text}"
         self.dataChanged.emit()
         self._update_boxes()  # rendered strings (and so hit boxes) follow the telemetry
 

@@ -5,7 +5,19 @@ from utils.resource_paths import find_resource
 
 _rules_cache = None
 
+
+def is_annotation_key(key: Any) -> bool:
+    """True for a key that annotates hud_rules.json rather than configuring
+    it: any key starting with "_" (e.g. "_source": "manual p.27"). JSON has
+    no comments, so these carry the citation next to the rule they describe
+    (hud_rules_sources.md holds the full list). Lookups never match them and
+    merges skip them."""
+    return isinstance(key, str) and key.startswith("_")
+
+
 def load_rules_json() -> Dict[str, Any]:
+    """The HUD colour / state rules, brand -> model -> rule key. Keys that
+    start with "_" at any level are annotations (see is_annotation_key)."""
     global _rules_cache
     if _rules_cache is not None:
         return _rules_cache
@@ -55,7 +67,14 @@ def load_rules_json() -> Dict[str, Any]:
 
 def get_rule_config(manufacturer: Optional[str], model: Optional[str], rule_key: str) -> Any:
     rules = load_rules_json()
-    
+    if is_annotation_key(rule_key):
+        return None
+    # An annotation is never a brand or a model: look past it.
+    if is_annotation_key(manufacturer):
+        manufacturer = None
+    if is_annotation_key(model):
+        model = None
+
     # 1. Try finding rule in manufacturer -> model
     if manufacturer and manufacturer in rules:
         mfg_block = rules[manufacturer]
@@ -101,7 +120,10 @@ def get_dynamic_color(manufacturer: Optional[str], model: Optional[str], field: 
 
     config = get_rule_config(manufacturer, model, rule_key)
     if not config:
-        return default_color
+        if rule_key == "tank_pressure" and isinstance(get_rule_config(manufacturer, model, "tank_reserve"), dict):
+            config = []
+        else:
+            return default_color
         
     if rule_key == "safety_stop":
         if isinstance(config, dict):
@@ -151,6 +173,14 @@ def get_dynamic_color(manufacturer: Optional[str], model: Optional[str], field: 
     elif rule_key == "tank_pressure":
         try:
             val_bar = float(value)
+            reserve_rule = get_rule_config(manufacturer, model, "tank_reserve")
+            if isinstance(reserve_rule, dict):
+                state = tank_pressure_state(manufacturer, model, val_bar)
+                if state == "critical":
+                    return reserve_rule.get("critical_color", "#FF0000")
+                if state == "reserve":
+                    return reserve_rule.get("reserve_color", "#FFFF00")
+                return default_color
             for rule in rules_list:
                 match = True
                 if "min" in rule and val_bar < rule["min"]:
@@ -177,6 +207,45 @@ def get_dynamic_color(manufacturer: Optional[str], model: Optional[str], field: 
             pass
 
     return default_color
+
+def tank_reserve_thresholds(manufacturer: Optional[str], model: Optional[str], reserve_bar: Optional[float] = None) -> Optional[Tuple[float, float]]:
+    """(reserve_bar, critical_bar) from the manufacturer's `tank_reserve`
+    rule, or None without one. `reserve_bar` is the diver's own setting
+    when known (a template knob, later a log value); otherwise the rule's
+    `default_bar` (the manufacturer's default: 50 bar on a Shearwater,
+    Perdix 2 manual p.57). The critical threshold is the larger of
+    `critical_min_bar` and `critical_fraction` x reserve (Shearwater: 21
+    bar or half the reserve, p.57) or, for a computer where it is its own
+    setting (Garmin), `critical_default_bar`."""
+    rule = get_rule_config(manufacturer, model, "tank_reserve")
+    if not isinstance(rule, dict):
+        return None
+    reserve = float(reserve_bar) if reserve_bar is not None else float(rule.get("default_bar", 50))
+    if "critical_default_bar" in rule and reserve_bar is None:
+        critical = float(rule["critical_default_bar"])
+    else:
+        critical = max(float(rule.get("critical_min_bar", 0)), reserve * float(rule.get("critical_fraction", 0.5)))
+    return reserve, critical
+
+
+def tank_pressure_state(manufacturer: Optional[str], model: Optional[str], value: Any, reserve_bar: Optional[float] = None) -> Optional[str]:
+    """'critical' below the critical pressure, 'reserve' below the reserve
+    pressure, else None (also None without a `tank_reserve` rule or a
+    number). The computers draw it so: a Shearwater puts the value on a
+    yellow (reserve) or red (critical) box (Perdix 2 manual p.40), a
+    Descent turns the value yellow and then flashing red (Mk3 manual
+    p.14)."""
+    thresholds = tank_reserve_thresholds(manufacturer, model, reserve_bar)
+    val = _num(value)
+    if thresholds is None or val is None:
+        return None
+    reserve, critical = thresholds
+    if val < critical:
+        return "critical"
+    if val < reserve:
+        return "reserve"
+    return None
+
 
 def get_safety_stop_text(manufacturer: Optional[str], model: Optional[str], waypoint: Any) -> str:
     if waypoint is None:
@@ -221,12 +290,14 @@ def _num(value: Any) -> Optional[float]:
 
 def deco_stop_phase(manufacturer: Optional[str], model: Optional[str], waypoint: Any) -> Optional[str]:
     """Where the diver is relative to a mandatory deco stop, for computers
-    with a `deco_stop` rule (Perdix 2 manual p.28): 'far' (deeper than the
+    with a `deco_stop` rule (Perdix 2 manual p.28; Descent Mk3 manual p.10 and
+    p.13 for the Garmin numbers): 'far' (deeper than the
     approach margin), 'approach' (within `approach_m` above... i.e. deeper
     than the stop by at most approach_m - the title turns yellow and the
     up-arrow flashes), 'at_stop' (at the stop or up to `at_stop_m` deeper -
-    green title with a check mark) or 'violation' (shallower than the
-    stop - red flashing). None outside deco or without the rule."""
+    green title with a check mark), 'violation' (shallower than the stop -
+    red flashing) or, with `ceiling_phase`, 'ceiling_violation' (shallower
+    than the deco ceiling too). None outside deco or without the rule."""
     if waypoint is None:
         return None
     rule = get_rule_config(manufacturer, model, "deco_stop")
@@ -237,7 +308,16 @@ def deco_stop_phase(manufacturer: Optional[str], model: Optional[str], waypoint:
     if not stop or stop <= 0 or depth is None:
         return None
     above = depth - stop  # positive = deeper than the stop
-    if above < 0:
+    # Teric manual p.26 / Tern p.25: shallower than the stop but deeper than
+    # the ceiling is one thing (yellow), shallower than the ceiling another
+    # (flashing red). The ceiling is UWMedia's own recomputation (GF high).
+    if rule.get("ceiling_phase"):
+        ceiling = _num(getattr(waypoint, "ceiling", None))
+        if ceiling is not None and 0 < ceiling < stop and depth < ceiling:
+            return "ceiling_violation"
+    # A Descent only objects more than 0.6 m above the ceiling (Mk3 manual
+    # p.10); a Perdix as soon as the diver is shallower than the stop.
+    if above < -float(rule.get("violation_above_m", 0.0)):
         return "violation"
     if above <= float(rule.get("at_stop_m", 1.5)):
         return "at_stop"
@@ -321,8 +401,10 @@ def _in_deco(manufacturer: Optional[str], model: Optional[str], wp: Any) -> bool
     return bool(_num(getattr(wp, "deco_stop_depth", None)) or 0)
 
 
-# Safety-stop phases a timeline reports: None = nothing shown.
-SS_PENDING, SS_COUNTING, SS_PAUSED, SS_COMPLETE = "pending", "counting", "paused", "complete"
+# Safety-stop phases a timeline reports: None = nothing shown. 'warn' is a
+# Descent's "Descend to complete safety stop" (more than warn_above_m above
+# the ceiling: depth and stop depth in yellow, Mk3 manual p.13).
+SS_PENDING, SS_COUNTING, SS_PAUSED, SS_COMPLETE, SS_WARN = "pending", "counting", "paused", "complete", "warn"
 
 
 def _garmin_safety_timeline(cfg: Dict[str, Any], manufacturer, model, waypoints) -> Dict[int, Tuple[Optional[str], int]]:
@@ -339,13 +421,16 @@ def _garmin_safety_timeline(cfg: Dict[str, Any], manufacturer, model, waypoints)
     around the threshold. The computer's own safety_stop_started /
     safety_stop_complete alerts (FIT dive_alerts) override the depth rules
     where present, so a real log renders exactly what the computer showed.
-    Only 'counting' is ever reported - the Descent shows nothing before or
-    after the countdown."""
+    Only 'counting' (or 'warn', more than `warn_above_m` above the ceiling)
+    is ever reported - the Descent shows nothing before or after the
+    countdown."""
     duration = int(cfg["duration_sec"])
     trigger = float(cfg.get("trigger_max_depth", 11.0))
     stop_depth = float(cfg.get("stop_depth", 5.0))
     start_window = float(cfg.get("start_window", 1.0))
     pause_above = float(cfg.get("pause_above", 3.0))
+    warn_above = cfg.get("warn_above_m")
+    warn_above = float(warn_above) if warn_above is not None else None
     surface = float(cfg.get("min_depth", 1.2))
 
     timeline: Dict[int, Tuple[Optional[str], int]] = {}
@@ -376,7 +461,10 @@ def _garmin_safety_timeline(cfg: Dict[str, Any], manufacturer, model, waypoints)
                 left = max(0, left - dt)
         if alerts & _SAFETY_STOP_END_ALERTS:
             left = 0
-        timeline[t] = (SS_COUNTING if armed and started and left > 0 else None, left)
+        phase = SS_COUNTING if armed and started and left > 0 else None
+        if phase and warn_above is not None and depth < stop_depth - warn_above:
+            phase = SS_WARN
+        timeline[t] = (phase, left)
     return timeline
 
 
@@ -647,6 +735,8 @@ def get_badge_config(manufacturer: Optional[str], model: Optional[str], state: s
         if isinstance(cfg, dict):
             found = True
             for key, value in cfg.items():
+                if is_annotation_key(key):
+                    continue
                 if value is None:
                     merged.pop(key, None)
                 else:

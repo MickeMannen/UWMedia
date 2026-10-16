@@ -104,6 +104,18 @@
         "down_count": 0,
         "bar": false,
         "label": "Ascent rate (manual p.12)"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.13,
+        "rel_y": 0.615,
+        "width": 660,
+        "font_size": 70,
+        "caption_font_size": 32,
+        "scale": 1.0,
+        "label": "Notification row (manual p.22)"
       }
     ]
   }

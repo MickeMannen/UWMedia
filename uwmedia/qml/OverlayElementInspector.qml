@@ -23,7 +23,7 @@ ColumnLayout {
     readonly property bool elementSelected: overlayDesignerBackend.selectedIndex >= 0
     readonly property bool skinSelected: overlayDesignerBackend.skinSelected
     readonly property string kind: elementSelected ? String(sel.kind) : ""
-    readonly property bool sizedKind: kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || (kind === "badge" && String(sel.style) === "box")
+    readonly property bool sizedKind: kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || kind === "notice" || (kind === "badge" && String(sel.style) === "box")
 
     // Fixed field widths (2026-09-28, per the user): the fill-width fields
     // made the grid, and with it the whole right column, wider than the
@@ -218,6 +218,7 @@ ColumnLayout {
                 Label {
                     Layout.fillWidth: true
                     text: "Element · " + (inspector.kind === "tissue_bar" ? "tissue bar" : inspector.kind === "ascent_chevrons" ? "ascent chevrons" : inspector.kind)
+                    // a notice has no field of its own: the active notification is what it shows
                     font.bold: true
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -295,9 +296,11 @@ ColumnLayout {
                 Label { text: "Y" }
                 NumField { attr: "y_px"; value: inspector.sel.y_px }
 
-                // Text + badge typography
-                Label { text: inspector.kind === "badge" ? "Label size" : "Size"; visible: inspector.kind === "text" || inspector.kind === "badge" }
-                NumField { attr: "font_size"; value: inspector.sel.font_size; visible: inspector.kind === "text" || inspector.kind === "badge" }
+                // Text + badge typography (a notice: the message size)
+                Label { text: inspector.kind === "badge" ? "Label size" : "Size"; visible: inspector.kind === "text" || inspector.kind === "badge" || inspector.kind === "notice" }
+                NumField { attr: "font_size"; value: inspector.sel.font_size; visible: inspector.kind === "text" || inspector.kind === "badge" || inspector.kind === "notice" }
+                Label { text: "Caption size"; visible: inspector.kind === "notice" }
+                NumField { attr: "caption_font_size"; value: inspector.sel.caption_font_size; visible: inspector.kind === "notice"; ToolTip.text: "Size of the Warning / Alert caption and the Confirm hint"; ToolTip.visible: hovered }
                 Label { text: inspector.kind === "badge" ? "Value size" : "Scale"; visible: inspector.kind === "text" || inspector.kind === "badge" }
                 NumField {
                     attr: inspector.kind === "badge" ? "value_font_size" : "scale"
@@ -318,9 +321,9 @@ ColumnLayout {
                 // Tank icon + graph geometry, and the stop/deco box's own size
                 // (a `style: "box"` badge - its label and value sizes are the text inside)
                 Label { text: "Width"; visible: inspector.sizedKind }
-                NumField { attr: "width"; value: inspector.sel.width; visible: inspector.sizedKind; ToolTip.text: inspector.kind === "badge" ? "Box width in skin px - the text inside follows Label size / Value size" : ""; ToolTip.visible: hovered && ToolTip.text.length > 0 }
-                Label { text: "Height"; visible: inspector.sizedKind }
-                NumField { attr: "height"; value: inspector.sel.height; visible: inspector.sizedKind }
+                NumField { attr: "width"; value: inspector.sel.width; visible: inspector.sizedKind; ToolTip.text: inspector.kind === "badge" ? "Box width in skin px - the text inside follows Label size / Value size" : inspector.kind === "notice" ? "The message is shrunk to fit this width (skin px); the Confirm hint sits at its right edge" : ""; ToolTip.visible: hovered && ToolTip.text.length > 0 }
+                Label { text: "Height"; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) !== "banner") }
+                NumField { attr: "height"; value: inspector.sel.height; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) !== "banner") }
                 Label { text: "Up"; visible: inspector.kind === "ascent_chevrons" }
                 NumField { attr: "up_count"; value: inspector.sel.up_count; visible: inspector.kind === "ascent_chevrons"; ToolTip.text: "Number of upward (ascent) chevrons"; ToolTip.visible: hovered }
                 Label { text: "Down"; visible: inspector.kind === "ascent_chevrons" }
@@ -437,11 +440,67 @@ ColumnLayout {
                     checked: inspector.sel.outline === true
                     onToggled: overlayDesignerBackend.setSelectedAttr("outline", checked)
                 }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Hide while a notice shows"
+                    visible: inspector.kind === "text" || inspector.kind === "badge"
+                    checked: inspector.sel.hide_when_notice === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("hide_when_notice", checked)
+                    ToolTip.text: "Step aside while the template's notice element shows a notification (a Perdix replaces its bottom row with the message)"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+                }
 
+            }
+            Section {
+                title: "Notice"
+                visible: inspector.kind === "notice"
+                Label { text: "Style"; visible: inspector.kind === "notice" }
+                ChoiceRow {
+                    Layout.columnSpan: 3
+                    visible: inspector.kind === "notice"
+                    attr: "style"; options: ["text", "banner"]; labels: ["Text", "Banner"]
+                    current: String(inspector.sel.style)
+                    HoverHandler { id: noticeStyleHover }
+                    ToolTip.text: "Text: caption and message in the notice colour (Perdix). Banner: a filled band with black text (Teric)."
+                    ToolTip.visible: noticeStyleHover.hovered
+                    ToolTip.delay: 400
+                }
+                Label { text: "Confirm hint"; visible: inspector.kind === "notice" }
+                TextField {
+                    id: confirmTextField
+                    Layout.columnSpan: 3
+                    Layout.preferredWidth: inspector.textW
+                    Layout.preferredHeight: 32
+                    font.pixelSize: 13
+                    visible: inspector.kind === "notice"
+                    selectByMouse: true
+                    placeholderText: "Confirm"
+                    Binding { target: confirmTextField; property: "text"; value: String(inspector.sel.confirm_text) }
+                    onEditingFinished: overlayDesignerBackend.setSelectedAttr("confirm_text", text)
+                    ToolTip.text: "The button hint at the right (Confirm on a Perdix, CLEAR on a Teric); empty for none"
+                    ToolTip.visible: hovered
+                }
+                Label { text: "Caption colour"; visible: inspector.kind === "notice" }
+                ColorField { Layout.columnSpan: 3; attr: "caption_color"; value: inspector.sel.caption_color; visible: inspector.kind === "notice" }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Black outline"
+                    visible: inspector.kind === "notice"
+                    checked: inspector.sel.outline === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("outline", checked)
+                }
             }
             Section {
                 title: "Tank icon"
                 visible: inspector.kind === "tank_icon"
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Hide while a notice shows"
+                    visible: inspector.kind === "tank_icon"
+                    checked: inspector.sel.hide_when_notice === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("hide_when_notice", checked)
+                }
                 // Tank icon style: upright fill (optionally with a drawn outline) or
                 // Shearwater's horizontal segmented gauge (always draws its outline)
                 Label { text: "Style"; visible: inspector.kind === "tank_icon" }

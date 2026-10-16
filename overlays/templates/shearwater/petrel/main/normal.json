@@ -76,6 +76,18 @@
         "color": "#FFFFFF",
         "font_size": 90,
         "scale": 1.0
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.12,
+        "rel_y": 0.655,
+        "width": 700,
+        "font_size": 76,
+        "caption_font_size": 34,
+        "scale": 1.0,
+        "label": "Notification row (Petrel 3 Rec manual p.24)"
       }
     ]
   }

@@ -20,8 +20,8 @@ from utils.hud_rules_engine import (
 )
 
 def test_rules_loading_and_hierarchical_fallback():
-    # 1. Exact model-level override check (Shearwater Perdix 2 has its own tank_pressure)
-    perdix_tp = get_rule_config("Shearwater", "Perdix 2", "tank_pressure")
+    # 1. Exact model-level override check (Shearwater Perdix 3 has its own badge_states)
+    perdix_tp = get_rule_config("Shearwater", "Perdix 3", "badge_states")
     assert perdix_tp is not None
 
     # 2. Manufacturer-level fallback (Shearwater has ndl, but Perdix 2's block doesn't)
@@ -58,9 +58,12 @@ def test_ndl_dynamic_colors():
     assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 240, "#BLUE") == "#FFFF00"
 
 def test_po2_dynamic_colors():
-    # Standard high-PPO2 alarm threshold (1.6 bar) - Shearwater-configured
+    # Perdix 2 manual p.19 / p.62: the PPO2 flashes red outside the PPO2
+    # limits; the OC Deco limit (1.61 by default) is the band used so a deco
+    # gas is not flagged (the bottom gas's 1.40 limit needs the gas list).
     assert get_dynamic_color("Shearwater", "Perdix 2", "po2", 1.3, "#FFFFFF") == "#FFFFFF"
-    assert get_dynamic_color("Shearwater", "Perdix 2", "po2", 1.6, "#FFFFFF") == "#FF0000"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "po2", 1.6, "#FFFFFF") == "#FFFFFF"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "po2", 1.61, "#FFFFFF") == "#FF0000"
     assert get_dynamic_color("Shearwater", "Perdix 2", "po2", 1.8, "#FFFFFF") == "#FF0000"
     # Same band applies to each CCR cell field
     assert get_dynamic_color("Shearwater", "Perdix 2", "po2_1", 1.7, "#FFFFFF") == "#FF0000"
@@ -78,21 +81,79 @@ def test_garmin_po2_dynamic_colors_are_two_tier_and_independent_of_shearwater():
     assert get_dynamic_color("Garmin", "x50i", "po2", 1.8, "#FFFFFF") == "#FF0000"
 
 def test_tank_pressure_dynamic_colors():
-    # 150 bar -> default_color
+    # Perdix 2 manual p.57: a Reserve Pressure warning below the reserve
+    # setting (50 bar by default) and a Critical Pressure warning below the
+    # larger of 21 bar or half the reserve; p.40: yellow box, then red box.
     assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 150, "#BLUE") == "#BLUE"
-    
-    # 65 bar (below 70, but not below 60) -> #FFA500
-    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 65, "#BLUE") == "#FFA500"
-    
-    # 50 bar (below 60) -> #FF0000
-    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 50, "#BLUE") == "#FF0000"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 65, "#BLUE") == "#BLUE"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 50, "#BLUE") == "#BLUE"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 49, "#BLUE") == "#FFFF00"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 25, "#BLUE") == "#FFFF00"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "primary_tank_pressure", 24, "#BLUE") == "#FF0000"
+    # Every Shearwater shares the rule (the Peregrine TX manual p.56 says the same)
+    assert get_dynamic_color("Shearwater", "Peregrine TX", "primary_tank_pressure", 24, "#BLUE") == "#FF0000"
+    assert get_dynamic_color("Shearwater", "Petrel", "primary_tank_pressure", 40, "#BLUE") == "#FFFF00"
 
 def test_secondary_tank_pressure_dynamic_colors():
     # secondary_tank_pressure (sidemount's second cylinder) follows the same
-    # tank_pressure rule bands as primary_tank_pressure
+    # tank_reserve rule as primary_tank_pressure
     assert get_dynamic_color("Shearwater", "Perdix 2", "secondary_tank_pressure", 150, "#BLUE") == "#BLUE"
-    assert get_dynamic_color("Shearwater", "Perdix 2", "secondary_tank_pressure", 65, "#BLUE") == "#FFA500"
-    assert get_dynamic_color("Shearwater", "Perdix 2", "secondary_tank_pressure", 50, "#BLUE") == "#FF0000"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "secondary_tank_pressure", 49, "#BLUE") == "#FFFF00"
+    assert get_dynamic_color("Shearwater", "Perdix 2", "secondary_tank_pressure", 20, "#BLUE") == "#FF0000"
+
+
+def test_tank_reserve_thresholds_follow_the_manuals():
+    from utils.hud_rules_engine import tank_reserve_thresholds, tank_pressure_state
+    # Shearwater: critical = max(21, reserve / 2) - the manual's own examples
+    # (p.57): reserve 48 -> critical 24; reserve 27 -> critical 21.
+    assert tank_reserve_thresholds("Shearwater", "Perdix 2") == (50.0, 25.0)
+    assert tank_reserve_thresholds("Shearwater", "Perdix 2", reserve_bar=48) == (48.0, 24.0)
+    assert tank_reserve_thresholds("Shearwater", "Perdix 2", reserve_bar=27) == (27.0, 21.0)
+    assert tank_pressure_state("Shearwater", "Teric", 47) == "reserve"
+    assert tank_pressure_state("Shearwater", "Teric", 23) == "critical"
+    assert tank_pressure_state("Shearwater", "Teric", 50) is None
+    assert tank_pressure_state("Shearwater", "Teric", None) is None
+    # Garmin: reserve and critical are two settings (Mk3 manual p.6); the
+    # value turns yellow below the reserve and flashes red below critical
+    # (p.14). Defaults are not in the manual: 50 / 25 bar assumed.
+    assert tank_reserve_thresholds("Garmin", "mk3i") == (50.0, 25.0)
+    assert get_dynamic_color("Garmin", "x50i", "tank_pressure:T1", 49, "#FFFFFF") == "#FFFF00"
+    assert get_dynamic_color("Garmin", "x50i", "tank_pressure:T1", 24, "#FFFFFF") == "#FF0000"
+    assert get_dynamic_color("Garmin", "x50i", "tank_pressure:T1", 120, "#FFFFFF") == "#FFFFFF"
+    # No rule: no thresholds, and the generic bands still apply
+    assert tank_reserve_thresholds("UnknownMfg", None) is None
+    assert get_dynamic_color("UnknownMfg", None, "primary_tank_pressure", 55, "#FFFFFF") == "#FF0000"
+
+
+def test_garmin_deco_stop_phases_use_the_descent_margins():
+    # Mk3 manual p.10 / p.13: Approaching Deco Stop within one stop interval
+    # (3 m); stay within 0.6 m of the ceiling; more than 0.6 m above it is a
+    # violation. A Perdix (p.28) objects as soon as the diver is shallower.
+    def at(depth, stop=6.0):
+        wp = MagicMock()
+        wp.depth, wp.next_stop_depth, wp.deco_stop_depth = depth, stop, stop
+        return wp
+    assert deco_stop_phase("Garmin", "mk3i", at(12.0)) == "far"
+    assert deco_stop_phase("Garmin", "mk3i", at(8.5)) == "approach"
+    assert deco_stop_phase("Garmin", "mk3i", at(6.5)) == "at_stop"
+    assert deco_stop_phase("Garmin", "mk3i", at(5.5)) == "at_stop"  # 0.5 m above: within the margin
+    assert deco_stop_phase("Garmin", "mk3i", at(5.3)) == "violation"
+    assert deco_stop_phase("Shearwater", "Perdix 2", at(5.9)) == "violation"
+
+
+def test_teric_and_tern_badges_box_the_title_and_say_paused():
+    # Teric manual p.25 / Tern manual p.24 figures: "SAFETY" in a green box,
+    # "SAFETY / PAUSED" in yellow, "SAFETY / CLEAR" when done; p.26 / p.25:
+    # the stop info is yellow when shallower than the stop but deeper than
+    # the ceiling, and flashes red above the ceiling.
+    for model in ("Teric", "Tern"):
+        ss = get_badge_config("Shearwater", model, "safety_stop")
+        assert ss["paused_label"] == "PAUSED" and ss["title_box"] is True
+        deco = get_badge_config("Shearwater", model, "deco")
+        assert deco["violation_color"] == "#FFFF00" and deco["ceiling_violation_color"] == "#FF0000"
+    # A Perdix 2 keeps its red violation and plain title
+    perdix = get_badge_config("Shearwater", "Perdix 2", "deco")
+    assert perdix["violation_color"] == "#FF0000" and "title_box" not in get_badge_config("Shearwater", "Perdix 2", "safety_stop")
 
 def test_safety_stop_text():
     wp_no_trigger = MagicMock()
@@ -150,7 +211,8 @@ def test_resolve_state_garmin_deco_cleared_and_complete_alerts():
 
 def test_get_badge_config():
     stop_cfg = get_badge_config("Garmin", "x50i", "safety_stop")
-    assert stop_cfg == {"label": "STOP", "color": "#00FF00"}
+    # Mk3 manual p.13: depth and stop depth turn yellow more than 2 m above the ceiling (phase "warn")
+    assert stop_cfg == {"label": "STOP", "color": "#00FF00", "warn_color": "#FFFF00", "warn_value_color": "#FFFF00"}
 
     deco_cfg = get_badge_config("Garmin", "x50i", "deco")
     assert deco_cfg == {"label": "DECO", "color": "#FFA500"}
@@ -307,7 +369,8 @@ def test_deco_stop_phase_follows_the_perdix_margins():
     assert deco_stop_phase("Shearwater", "Perdix 2", stop(6.0)) == "at_stop"
     assert deco_stop_phase("Shearwater", "Perdix 2", stop(5.5)) == "violation"  # shallower than the stop
     assert deco_stop_phase("Shearwater", "Perdix 2", _wp(depth=5.0)) is None
-    assert deco_stop_phase("Garmin", "x50i", stop(7.0)) is None  # no such rule on Garmin
+    assert deco_stop_phase("Garmin", "x50i", stop(7.0)) == "approach"  # a Descent has its own margins (3 m / 0.6 m)
+    assert deco_stop_phase("UnknownMfg", None, stop(7.0)) is None  # no such rule without a brand
     assert resolve_state("Shearwater", "Perdix 2", stop(5.5)) == "deco"  # not a state of its own
 
 
@@ -406,3 +469,33 @@ def test_perdix_3_badge_is_a_boxed_title_that_replaces_the_ndl():
     deco = get_badge_config("Shearwater", "Perdix 3", "deco")
     assert deco["label"] == "DECO" and deco["color"] == "#00ADED" and deco["inline"] is True
     assert "approach_color" not in deco
+
+
+def test_underscore_keys_in_rules_are_annotations_not_config(monkeypatch):
+    # hud_rules.json cannot carry comments; a key starting with "_" at any
+    # level ("_source": "manual p.27") cites the rule next to it and must be
+    # invisible to every lookup and merge (hud_rules_sources.md).
+    import utils.hud_rules_engine as engine
+    rules = {
+        "_source": "hud_rules_sources.md",
+        "Shearwater": {
+            "_manual": "Perdix 2 Recreational manual Rev C",
+            "ndl": [{"max": 5, "color": "#FFFF00"}, {"min": 5, "color": "#FFFFFF"}],
+            "_ndl": "p.31",
+            "badge_states": {
+                "_source": "p.27-28",
+                "safety_stop": {"label": "SAFETY STOP", "color": "#00ADED", "_source": "p.27"},
+            },
+            "Perdix 2": {"tank_pressure": [{"max": 60, "color": "#FF0000"}], "_source": "unverified"},
+        },
+        "default": {"ndl": [{"max": 10, "color": "#FF0000"}]},
+    }
+    monkeypatch.setattr(engine, "_rules_cache", rules)
+    assert engine.is_annotation_key("_source") and not engine.is_annotation_key("ndl")
+    assert engine.get_rule_config("Shearwater", "Perdix 2", "ndl")[0]["max"] == 5
+    assert engine.get_rule_config("Shearwater", "Perdix 2", "_ndl") is None
+    assert engine.get_rule_config("Shearwater", "_source", "ndl")[0]["max"] == 5  # not a model
+    assert engine.get_rule_config("_source", None, "ndl")[0]["max"] == 10  # not a brand
+    badge = engine.get_badge_config("Shearwater", "Perdix 2", "safety_stop")
+    assert badge == {"label": "SAFETY STOP", "color": "#00ADED"}
+    assert engine.get_dynamic_color("Shearwater", "Perdix 2", "ndl", 240, "#000000") == "#FFFF00"

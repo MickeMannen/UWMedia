@@ -3,6 +3,49 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Overlays: templates can show the computer's own notifications. A new
+  "Notice" element draws the message the computer put on its screen, in its
+  wording and colours - a Perdix's yellow FAST ASCENT, MISSED DECO STOP, HIGH
+  PPO2, Low NDL Alert or T1 CRITICAL PRES across the bottom row under
+  "Warning" and "Confirm", a Teric's WARNING / INFO banner, a Descent's
+  alerts from the log's own events - for ten seconds after the log triggers
+  it; elements it covers can step aside while it shows. The Shearwater
+  Perdix 2, Petrel, Peregrine, Teric and Tern main pages have it in place.
+- Overlay Designer: the dummy dive now passes through every situation a
+  template is checked in - low NDL, a deep excursion, a deco stop with its
+  approach, a violation and the clear, the safety stop with a pause, the
+  cylinder reaching the reserve - and the State list offers each of them
+  (and fast ascent, high PPO2, high CNS, low and critical gas, surfacing) as
+  a forced preview, with the state, phase and notice named under the canvas.
+- Overlays: a tank pressure below the reserve or critical pressure sits on
+  a yellow or red box on Shearwater templates, as on the computers; on
+  Garmin templates it turns yellow, then flashing red.
+
+### Fixed
+- Overlays: tank pressure readouts on Shearwater and Garmin templates now
+  follow the computers' own reserve rule instead of fixed 60 and 70 bar
+  bands. A Shearwater turns yellow below the reserve pressure (50 bar by
+  default) and red below the critical pressure (half the reserve, at least
+  21 bar); a Descent turns yellow below its reserve and red below its
+  critical pressure.
+- Overlays: Shearwater PPO2 readouts turn red at the computer's deco limit
+  (1.61 bar) rather than 1.6.
+
+### Changed
+- Overlays: Teric and Tern templates show the safety stop as the watches do -
+  "SAFETY" in a boxed title, "PAUSED" while paused - and their deco badge
+  turns yellow, not red, when the diver is above the stop but still below
+  the ceiling.
+- Overlays: Garmin templates mark the approach to a deco stop (within 3 m)
+  and only treat the diver as above the stop beyond the watch's 0.6 m
+  margin; more than 2 m above the safety stop, the depth and the stop badge
+  turn yellow as the watch's do.
+- Overlays: Teric and Tern deco badges flash red only above the deco
+  ceiling (yellow above the stop but below it), as their manuals describe.
+
 ## [0.7.16] - 2026-10-08
 
 ### Added

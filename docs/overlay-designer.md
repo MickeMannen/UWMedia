@@ -21,8 +21,19 @@ so you need no video or dive log - or **Loaded log**. Optionally, under
   log up with the media if their clocks differ.
 - **Show raw waypoint data** lists the values of the current sample.
 
-The **Time** slider moves through the dive and **State** forces a state (e.g.
-deco, safety stop) so you can check how the overlay looks in it.
+The **Time** slider moves through the dive. The dummy dive is built to pass
+through every situation a template is checked in: descent, the bottom at
+30 m, the NDL running out (Low NDL Alert), a deep excursion to 42 m (Depth
+Alert, HIGH PPO2), a deco stop at 6 m with a fast ascent on the way, the
+approach, the stop, a violation (MISSED DECO STOP), the stop clearing, the
+safety stop at 5 m with a pause at 1.8 m, and the surface, while the cylinder
+drains into the reserve. **State** forces one situation instead - descent,
+low NDL, each deco phase (far, approaching, at the stop, above the stop,
+above the ceiling), clear, each safety-stop phase (pending, counting, paused,
+complete), fast ascent, high PPO2, high CNS, low and critical gas,
+surfacing - built as a short synthetic history so the badge, the notice and
+the colours show exactly that case whatever the slider says. The status line
+under the canvas names the state, its phase and the notice showing.
 
 ## Views
 
@@ -36,7 +47,7 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
 ## Editing elements
 
 - **+ Add** adds a telemetry field, a custom label, the state badge, tank
-  icons or the depth graph. Depth and dive time come in two entries each:
+  icons, the depth graph or a **Notice** (see below). Depth and dive time come in two entries each:
   **depth** (plain, e.g. `12.3`) and **depth_small_decimals** - the metres
   large and the decimal part small and top-aligned; **dive_time** (e.g.
   `32:15`) and **dive_time_small_seconds** - the minutes large and the
@@ -70,6 +81,26 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
 - **Undo** / **Redo** (Cmd/Ctrl-Z, Shift-Cmd/Ctrl-Z).
 - Click the skin background to edit its **placement** (anchor, offsets,
   scale); **Replace image…** swaps the background image.
+
+### Notices
+
+A **Notice** element shows the computer's own notification when the log
+triggers it: a Perdix's `FAST ASCENT`, `MISSED DECO STOP`, `HIGH PPO2`,
+`Low NDL Alert` or `T1 CRITICAL PRES` in yellow under *Warning* / *Confirm*,
+a Teric's *WARNING* / *INFO* banner (`MISSED STOP`, `Deco Needed`, `Deco
+Clear`, `Safety Stop`), a Descent's alerts (`Approaching NDL`, `Descend
+below deco ceiling.` …) taken from the events in its `.fit` log. The
+texts, triggers and colours come from `hud_rules.json` (the manual page for
+each is in `hud_rules_sources.md`); the notice stays for ten seconds, since a
+log does not record when the diver pressed the button. Nothing is drawn
+while there is no notice. In the inspector: **Size** (message), **Caption
+size**, **Width** (the message shrinks to fit), **Style** (*Text*: caption
+and message in the notice colour; *Banner*: a filled band with black text
+and its own **Height**), **Confirm hint** (the button hint at the right,
+empty for none) and **Caption colour**. Tick **Hide while a notice shows** on
+the elements the notice covers - a Perdix replaces its whole bottom row with
+the message. The Shearwater Perdix 2, Petrel, Peregrine, Teric and Tern main
+pages come with a notice in place.
 
 ### Depth graph
 

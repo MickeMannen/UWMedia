@@ -8,7 +8,8 @@
       "rel_y": 0.74397,
       "color": "#FFFFFF",
       "font_size": 78,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_t1",
@@ -17,7 +18,8 @@
       "rel_y": 0.67067,
       "color": "#00ADED",
       "font_size": 39,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "primary_tank_icon",
@@ -34,7 +36,8 @@
       "full_bar": 200,
       "outline_color": "#9A9A9A",
       "outline_width": 2,
-      "outline_gap": 3
+      "outline_gap": 3,
+      "hide_when_notice": true
     },
     {
       "id": "primary_tank_pressure",
@@ -43,7 +46,8 @@
       "rel_y": 0.74241,
       "color": "#FFFFFF",
       "font_size": 80,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_bar",
@@ -52,7 +56,8 @@
       "rel_y": 0.74085,
       "color": "#00ADED",
       "font_size": 14,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_gtr",
@@ -61,7 +66,8 @@
       "rel_y": 0.67067,
       "color": "#00ADED",
       "font_size": 41,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "label_gtr_tank",
@@ -70,7 +76,8 @@
       "rel_y": 0.679,
       "color": "#808080",
       "font_size": 24,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     },
     {
       "id": "gtr",
@@ -79,7 +86,8 @@
       "rel_y": 0.74241,
       "color": "#FFFFFF",
       "font_size": 80,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     }
   ]
 }
