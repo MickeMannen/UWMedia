@@ -680,6 +680,22 @@ def resolve_state(manufacturer: Optional[str], model: Optional[str], waypoint: A
     return "normal"
 
 
+def _last_stop_depth(waypoint: Any, waypoints: Optional[List[Any]]) -> Optional[float]:
+    """The deco stop depth of the most recent waypoint before `waypoint`
+    that still had one (the stop just cleared), or None."""
+    if not waypoints:
+        return None
+    now = getattr(waypoint, "time_since_start", None)
+    for w in reversed(waypoints):
+        t = getattr(w, "time_since_start", None)
+        if now is not None and t is not None and t > now:
+            continue
+        depth = _num(getattr(w, "next_stop_depth", None)) or _num(getattr(w, "deco_stop_depth", None))
+        if depth is not None and depth > 0:
+            return depth
+    return None
+
+
 def stop_phase(manufacturer: Optional[str], model: Optional[str], waypoint: Any, waypoints: Optional[List[Any]] = None) -> Tuple[str, Optional[str], Optional[int], Optional[float]]:
     """(state, phase, seconds, stop_depth) - everything a stop badge needs:
     the resolved state; its phase (safety stop: pending/counting/paused/
@@ -704,7 +720,12 @@ def stop_phase(manufacturer: Optional[str], model: Optional[str], waypoint: Any,
         elapsed = deco_clear_seconds(manufacturer, model, waypoint, waypoints)
         if elapsed is not None:
             return state, "clear", elapsed, None
-        return state, "clear", getattr(waypoint, "next_stop_time", None), getattr(waypoint, "next_stop_depth", None)
+        # the computer's own "cleared" alert (Descent): the log's stop fields
+        # are already zero, so the badge keeps the depth of the stop it just
+        # cleared (Mk3 manual p.35: "the current depth and stop depth flash")
+        # instead of dropping its depth line and letting the timer jump up
+        depth = _num(getattr(waypoint, "next_stop_depth", None)) or _last_stop_depth(waypoint, waypoints)
+        return state, "clear", getattr(waypoint, "next_stop_time", None) or 0, depth
     return state, deco_stop_phase(manufacturer, model, waypoint), getattr(waypoint, "next_stop_time", None), getattr(waypoint, "next_stop_depth", None)
 
 

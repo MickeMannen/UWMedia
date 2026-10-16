@@ -51,10 +51,22 @@
         "unit_dy": -3.2
       },
       {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.793,
+        "rel_y": 0.428,
+        "width": 46,
+        "height": 100,
+        "up_count": 3,
+        "down_count": 1,
+        "label": "Ascent rate (manual p.23: green / yellow / red by rate)"
+      },
+      {
         "id": "label_ndl",
         "field": "custom:NDL",
         "rel_x": 0.218,
-        "rel_y": 0.598,
+        "rel_y": 0.60993,
         "color": "#FFFFFF",
         "font_size": 26,
         "scale": 1.0,

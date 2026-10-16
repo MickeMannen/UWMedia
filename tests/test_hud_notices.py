@@ -141,3 +141,25 @@ def test_renderer_puts_a_low_tank_pressure_on_a_coloured_box():
     assert yellow(frame(150)) == 0 and red(frame(150)) == 0
     assert yellow(frame(47)) > 2000  # a filled yellow box (Perdix 2 manual p.40), not just yellow digits
     assert red(frame(23)) > 2000
+
+
+def test_garmin_sidemount_pages_say_which_tank_to_breathe_from():
+    """Mk3 EN-US manual p.24 / p.36, X50i p.13 / p.27: when the two sidemount
+    tanks differ by more than the Switch Pressure, "Breathe from <tank>."
+    appears and that tank is highlighted in blue; nothing while they are
+    within the threshold, and the alert re-arms once they are again."""
+    from utils.hud_rules_engine import get_rule_config, sidemount_switch_target
+    rule = get_rule_config("Garmin", "mk3i", "sidemount_switch")
+    assert rule["threshold_bar"] == 30.0 and rule["color"].startswith("#")
+    even = {"T1": TankData(pressure_bar=150.0, name="T1", enabled=True), "T2": TankData(pressure_bar=140.0, name="T2", enabled=True)}
+    skewed = {"T1": TankData(pressure_bar=100.0, name="T1", enabled=True), "T2": TankData(pressure_bar=140.0, name="T2", enabled=True)}
+    assert sidemount_switch_target("Garmin", "mk3i", _wp(0, 20.0, tanks=even)) is None
+    assert sidemount_switch_target("Garmin", "x50i", _wp(0, 20.0, tanks=skewed)) == "secondary"
+    samples = [(0, 20.0, {"tanks": even}), (10, 20.0, {"tanks": skewed}), (15, 20.0, {"tanks": skewed}),
+               (40, 20.0, {"tanks": skewed}), (50, 20.0, {"tanks": even}), (60, 20.0, {"tanks": skewed})]
+    tl = notice_timeline("Garmin", "mk3i", _dive(samples))
+    assert tl[0] is None
+    assert tl[10]["text"] == "Breathe from T2." and tl[15]["text"] == "Breathe from T2."
+    assert tl[40] is None  # shown for show_seconds, then gone although the difference remains
+    assert tl[60]["text"] == "Breathe from T2."  # re-armed after the tanks were even again
+    assert notice_timeline("Garmin", "x50i", _dive(samples))[10]["text"] == "Breathe from T2."  # the X50i's own notice list has it too

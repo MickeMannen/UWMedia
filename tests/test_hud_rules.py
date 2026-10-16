@@ -452,7 +452,9 @@ def test_sidemount_switch_target_follows_the_21_bar_threshold():
     assert sidemount_switch_target("Shearwater", "Perdix 2", wp(150, 180)) == "secondary"
     assert sidemount_switch_target("Shearwater", "Perdix 2", wp(170, 160)) is None         # within 21 bar
     assert sidemount_switch_target("Shearwater", "Perdix 2", wp(170)) is None              # one tank
-    assert sidemount_switch_target("Garmin", "x50i", wp(175, 100)) is None                 # no such rule
+    assert sidemount_switch_target("Garmin", "x50i", wp(175, 100)) == "primary"            # Descent: 30 bar Switch Pressure (Mk3 EN-US p.24)
+    assert sidemount_switch_target("Garmin", "x50i", wp(175, 150)) is None                 # within it
+    assert sidemount_switch_target("Generic", "Custom", wp(175, 100)) is None              # no such rule
 
 
 def test_teric_and_tern_badges_override_only_what_differs_from_the_perdix_family():

@@ -302,9 +302,9 @@ def format_telemetry_value(field, raw_val, display_rule=None):
     elif field in ["ndl", "ndl_before_clear", "air_remaining"] and raw_val is not None:
         val_mins = int(raw_val / 60)
         if field in ("ndl", "ndl_before_clear"):
-            if val_mins > 99 or val_mins <= 0:
+            if val_mins > 99:
                 return "99+"
-            return f"{val_mins:02d}"
+            return f"{max(0, val_mins):02d}"  # the last minute before deco is "00", not "99+"
         else:
             return str(val_mins)
     elif field in ["dive_time", "tts", "next_stop_time"] and raw_val is not None:
@@ -1005,8 +1005,8 @@ def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
         return lines
     if show_depth:
         depth_hex = value_hex
-        if badge.get("blink_depth"):
-            depth_hex = blink_red(depth_hex)
+        if badge.get("blink_depth") or (phase == "clear" and badge.get("clear_blink_depth")):
+            depth_hex = blink_red(depth_hex)  # Descent: "Decompression Cleared - the current depth and stop depth flash red"
         lines.append((f"↑{stop_depth:.0f}{unit}", _rgb(depth_hex), depth_is_value))
     if value_text:
         lines.append((value_text, _rgb(value_hex), True))
@@ -1654,11 +1654,18 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         pad = max(2, int(height_px * 0.1))
         draw.rounded_rectangle([abs_x, abs_y, abs_x + width_px, abs_y + height_px], radius=max(2, int(height_px * 0.12)),
                                fill=(20, 20, 20), outline=colour, width=max(1, int(height_px * 0.04)))
-        tri = int(height_px * 0.5)
-        tx, ty = abs_x + pad, abs_y + (height_px - tri) // 2
-        draw.polygon([(tx + tri // 2, ty), (tx, ty + tri), (tx + tri, ty + tri)], outline=colour, fill=None, width=max(1, tri // 10))
-        draw.text((tx + tri // 2 - cap_size // 5, ty + tri // 3), "!", font=cap_font, fill=colour)
-        inner_x = tx + tri + pad
+        # a warning carries the triangle in a left column; an information
+        # alert ("Breathe from Left Tank", `icon: none`) has none and its
+        # text centred, as the real screenshots show
+        icon = (notice.get("icon") or style.get("icon") or "warning") != "none"
+        if icon:
+            tri = int(height_px * 0.5)
+            tx, ty = abs_x + pad, abs_y + (height_px - tri) // 2
+            draw.polygon([(tx + tri // 2, ty), (tx, ty + tri), (tx + tri, ty + tri)], outline=colour, fill=None, width=max(1, tri // 10))
+            draw.text((tx + tri // 2 - cap_size // 5, ty + tri // 3), "!", font=cap_font, fill=colour)
+            inner_x = tx + tri + pad
+        else:
+            inner_x = abs_x + pad
         inner_w = abs_x + width_px - pad - inner_x
         # two lines at a sentence boundary when the text has one, else word-wrapped
         text = message if "\n" in message else message.replace(". ", ".\n")
@@ -1666,7 +1673,8 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         line_h = (height_px - 2 * pad) // max(1, len(parts))
         font, size = _fit_font(draw, max(parts, key=len), min(msg_size, int(line_h * 0.8)), inner_w, family, weight)
         for i, part in enumerate(parts):
-            draw.text((inner_x, abs_y + pad + i * line_h + (line_h - size) // 2), part, font=font, fill=text_colour)
+            x = inner_x if icon else inner_x + (inner_w - draw.textlength(part, font=font)) // 2
+            draw.text((x, abs_y + pad + i * line_h + (line_h - size) // 2), part, font=font, fill=text_colour)
         return
 
     if style["style"] == "banner":

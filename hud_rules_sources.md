@@ -31,8 +31,8 @@ rule below was checked against the manuals listed.
 | Shearwater Peregrine TX | `Peregrine_TX_Manual_RevC_….pdf` | Rev C (2024-04-23) |
 | Shearwater Teric | `Teric_Manual_RevH5.pdf` | Rev H (2024-09-09) |
 | Shearwater Tern | `Tern_Manual_Rev_B-1.pdf` | Rev B (2023-11-24) |
-| Garmin Descent Mk3 series | `descentmk3series_OM_EN-MY.pdf` | owner's manual |
-| Garmin Descent X50i | `descentx50i_OM_EN-SG.pdf` | owner's manual |
+| Garmin Descent Mk3 series | `Descent_Mk3_Series_OM_EN-US.pdf` | owner's manual, EN-US (replaced the EN-MY edition on 2026-10-16; Garmin pages cited before that date are the older edition's, e.g. its p.12-14 alert table is now p.35-36) |
+| Garmin Descent X50i | `Descent_X50i_OM_EN-US.pdf` | owner's manual, EN-US (replaced the EN-SG edition on 2026-10-16; older page numbers as above, its p.12-13 alert table is now p.26-27) |
 
 To re-read a passage: `pdftotext -layout <file> out.txt`, then `grep`; a
 figure: `pdftoppm -f N -l N -r 100 -png <file> page` and open the PNG.
@@ -125,6 +125,12 @@ carries its own `_source`; the table is the summary.
 | Garmin | alert texts, driven by the FIT `dive_alert` events of the same name | Mk3 p.12-14 (Mk3i wording), X50i p.12-13 (x50i wording) | verified |
 | Garmin | priority order | deduced (dangerous first; the manual lists alphabetically) | deduced |
 | Garmin | depth and stop badge yellow more than 2 m above the safety stop ceiling (`warn_above_m`, phase `warn`) | Mk3 p.13, X50i p.12 | verified |
+| Garmin | `sidemount_switch` the tank to breathe from highlighted in blue when the two tanks differ by more than the Switch Pressure threshold; the notice "Breathe from %1." with the tank's name | Mk3 EN-US p.24 (Enabling Sidemount Setup: "an alert appears to remind you to breathe from the tank with the higher pressure", "The recommended breathing tank is highlighted in blue"), p.36 alert table; X50i EN-US p.13, p.27 | verified (threshold: a setting, 30 bar assumed - the owner's) |
+| Garmin | `clear_blink_depth`: on Decompression Cleared the stop depth line flashes red | Mk3 EN-US p.35 / X50i EN-US p.27 alert table: "The current depth and stop depth flash red" | verified |
+| Garmin | NDL under a minute shows "00"; "99+" only above 99 minutes | real screenshots show 99+ at the top end; the last minute is the formatter's own choice | deduced |
+| X50i | alert box fills the top-right cell of the grid (from the column divider to the right edge, the first row's height), dark with a border in the alert's colour; a warning has the triangle in a left column, an information alert (Breathe from ...) a blue border, no triangle and centred text; the cell's own fields step aside | real screenshots `x50i_deco_required_trimix_o2_17_he_40.png`, `x50i_sidemount_change_tank.png`, `x50i_safety_stop.png` | verified (from the photos) |
+| X50i | the glass starts at 0.213 of the skin PNG's height (the bezel above it is dark too) | measured in `overlays/templates/garmin/x50i/main/normal.png` | verified |
+| mk3i | ascent rate: three chevrons up, a bar, one down, lit green / yellow / red by the `ascent_rate` bands | real screenshot `mk3i_main_sidemount.BMP` (the shape); Mk3 EN-US p.23 (the colours) | verified |
 
 ## Units (`display.depth_decimals`, `simulator.md` §7)
 

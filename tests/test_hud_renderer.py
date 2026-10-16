@@ -1392,3 +1392,33 @@ def test_graph_background_box_colour_and_opacity():
     frame = np.full((50, 100, 3), 200, dtype=np.uint8)
     draw_depth_graph(frame, {**plain, "background_color": "#FF0000", "background_opacity": 1.0}, wps[-1], wps, GRAPH_SKIN)
     assert tuple(frame[corner[1], corner[0]]) == (0, 0, 255)                # solid, in the box colour (BGR)
+
+
+def test_ndl_shows_the_last_minute_as_00_and_99_plus_only_above_99_minutes():
+    from gui.hud_renderer import format_telemetry_value
+    assert format_telemetry_value("ndl", 4) == "00"        # 4 s left before deco: not a red "99+"
+    assert format_telemetry_value("ndl", 0) == "00"
+    assert format_telemetry_value("ndl", 5 * 60 + 30) == "05"
+    assert format_telemetry_value("ndl", 100 * 60) == "99+"
+
+
+def test_garmin_clear_badge_keeps_the_cleared_stops_depth_and_flashes_it():
+    """Mk3 EN-US manual p.35: "Decompression Cleared - the current depth and
+    stop depth flash red". The log's stop fields are already zero at that
+    sample, so the badge takes the depth of the stop it just cleared rather
+    than dropping the line and letting the timer jump up."""
+    from gui.hud_renderer import badge_lines
+    from utils.hud_rules_engine import stop_phase
+    from models.dive import Waypoint
+    t0 = datetime.now()
+    history = [Waypoint(timestamp=t0 + timedelta(seconds=t), depth=6.0, time_since_start=t, dive_time=t,
+                        deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=10 - t) for t in range(0, 10)]
+    cleared = Waypoint(timestamp=t0 + timedelta(seconds=10), depth=6.0, time_since_start=10, dive_time=10,
+                       deco_stop_depth=0.0, next_stop_depth=0.0, next_stop_time=0, dive_alerts=["deco_stop_cleared"])
+    history.append(cleared)
+    assert stop_phase("Garmin", "mk3i", cleared, history) == ("clear", "clear", 0, 6.0)
+    elem = {"field": "state_badge", "type": "badge", "depth_font": "label", "depth_unit": "m", "timer_format": "m:ss"}
+    lines = badge_lines("Garmin", "mk3i", elem, cleared, history)
+    assert [text for text, _, _ in lines] == ["↑6m", "0:00"]
+    colours = {badge_lines("Garmin", "mk3i", elem, Waypoint(**{**cleared.model_dump(), "dive_time": dt}), history)[0][1] for dt in (10, 11)}
+    assert (255, 0, 0) in colours  # the depth line flashes red

@@ -6,6 +6,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Garmin overlays: sidemount pages show the computer's own tank-switch guidance
+  - the tank to breathe from is highlighted in blue and "Breathe from T2."
+  appears when the two tanks differ by more than the switch pressure (30 bar
+  unless the template says otherwise), as the Descent manuals describe.
 - Overlay Designer: a **Play** button next to the Time slider runs the dive
   at 10x, so the moment you want in a long log is found by watching the
   page rather than by dragging the slider back and forth.
@@ -54,6 +58,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Garmin templates it turns yellow, then flashing red.
 
 ### Fixed
+- Garmin x50i: the alert box no longer sits above the top of the display. It
+  fills the top-right cell the way the real screen does (the tank fields step
+  aside while it shows), and the sidemount "Breathe from" alert has its blue
+  border and centred text as on the device.
+- Garmin overlays: the NDL no longer flips to a red "99+" in the last minute
+  before deco (it reads "00"); the Descent Mk3i's ascent arrows are live -
+  lit green, yellow or red by the ascent rate as the manual describes - instead
+  of a picture painted on the skin; and when a deco stop clears, the stop depth
+  stays in the box and flashes red, as the manual says, instead of vanishing and
+  letting the timer jump up a line.
 - Overlays: tank pressure readouts on Shearwater and Garmin templates now
   follow the computers' own reserve rule instead of fixed 60 and 70 bar
   bands. A Shearwater turns yellow below the reserve pressure (50 bar by

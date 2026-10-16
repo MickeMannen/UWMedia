@@ -31,6 +31,9 @@ Conditions (`when`), with their parameters:
   safety_started      the safety stop starts counting
   safety_complete     the safety stop countdown ends
   mod_exceeded        deeper than the breathed gas's MOD (utils.hud_gas)
+  sidemount_switch    the two sidemount tanks differ by more than the
+                      brand's sidemount_switch threshold; {tank} is the
+                      one to breathe from (Descent "Breathe from %1.")
   near_mod            within `metres` above the MOD
 An entry with "enabled": false is kept for the record (a device alert that
 is off by default) and never fires.
@@ -87,6 +90,7 @@ def _render(rule: Dict[str, Any], style: Dict[str, Any], context: Dict[str, Any]
         "caption": rule.get("caption", ""),
         "color": rule.get("color") or style.get("color", "#FFFF00"),
         "text_color": rule.get("text_color") or style.get("text_color"),
+        "icon": rule.get("icon") or style.get("icon"),  # box style: "none" drops the warning triangle (Descent "Breathe from")
         "since": since,
     }
 
@@ -170,6 +174,15 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
         return mod - float(rule.get("metres", 1.9)) <= depth <= mod, ctx
     if when == "stop_violation":
         return deco_stop_phase(manufacturer, model, wp) in ("violation", "ceiling_violation"), ctx
+    if when == "sidemount_switch":
+        from utils.hud_rules_engine import sidemount_switch_target
+        target = sidemount_switch_target(manufacturer, model, wp)
+        if target is None:
+            return False, ctx
+        tanks = list((getattr(wp, "tanks", None) or {}).items())
+        key, tank = tanks[0 if target == "primary" else 1]
+        ctx["tank"] = getattr(tank, "name", None) or key
+        return True, ctx
     if when in ("deco_required", "deco_cleared"):
         return resolve_state(manufacturer, model, wp, waypoints) == "deco", ctx
     if when in ("safety_started", "safety_complete"):

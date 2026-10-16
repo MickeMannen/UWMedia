@@ -62,7 +62,7 @@
       {
         "id": "label_ndl",
         "field": "custom:NDL",
-        "rel_x": 0.59836,
+        "rel_x": 0.61581,
         "rel_y": 0.41403,
         "color": "#00ADED",
         "font_size": 46,
@@ -71,11 +71,12 @@
       {
         "id": "ndl",
         "field": "ndl",
-        "rel_x": 0.59578,
-        "rel_y": 0.47892,
+        "rel_x": 0.71795,
+        "rel_y": 0.47071,
         "color": "#FFFFFF",
         "font_size": 87,
-        "scale": 1.0
+        "scale": 1.0,
+        "align": "right"
       },
       {
         "id": "n2_bar",
@@ -121,7 +122,7 @@
         "type": "notice",
         "style": "frame",
         "source": "persistent",
-        "rel_x": 0.455,
+        "rel_x": 0.47463,
         "rel_y": 0.385,
         "width": 100,
         "height": 125,

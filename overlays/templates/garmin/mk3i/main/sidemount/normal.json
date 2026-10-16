@@ -8,7 +8,8 @@
       "rel_y": 0.282,
       "color": "#FFFFFF",
       "font_size": 24,
-      "scale": 1.0
+      "scale": 1.0,
+      "tank_switch_highlight": "primary"
     },
     {
       "id": "label_sm",
@@ -26,7 +27,8 @@
       "rel_y": 0.28347,
       "color": "#FFFFFF",
       "font_size": 24,
-      "scale": 1.0
+      "scale": 1.0,
+      "tank_switch_highlight": "secondary"
     },
     {
       "id": "primary_tank_pressure_icon",

@@ -580,10 +580,12 @@
       },
       "clear": {
         "label": "DECO",
-        "color": "#FFA500"
+        "color": "#FFA500",
+        "clear_blink_depth": true
       },
       "_source": "X50i p.10 figure (stop box); mk3i: real screenshots test_data/dive_computers/garmin_mk3i",
-      "_warn": "Mk3 p.13 / X50i p.12: more than 2 m above the safety stop ceiling the current depth and stop depth turn yellow (phase 'warn')"
+      "_warn": "Mk3 p.13 / X50i p.12: more than 2 m above the safety stop ceiling the current depth and stop depth turn yellow (phase 'warn')",
+      "_clear": "Mk3 p.35 / X50i p.27 alert table: Decompression Cleared - 'The current depth and stop depth flash red'"
     },
     "tissue_load": [
       {
@@ -633,7 +635,8 @@
         },
         "clear": {
           "label": "",
-          "color": "#FFFFFF"
+          "color": "#FFFFFF",
+          "clear_blink_depth": true
         }
       }
     },
@@ -794,6 +797,15 @@
       },
       {
         "_order": "priority deduced (dangerous first); the manual lists the alerts alphabetically. Alerts with no wording in the manual (depth_alert, time_alert, po2_warn which only colours the value) are left out"
+      },
+      {
+        "id": "sidemount_switch",
+        "text": "Breathe from {tank}.",
+        "caption": "",
+        "when": "sidemount_switch",
+        "_source": "Mk3 p.36 / X50i p.27 alert table: 'Breathe from %1.' - the pressure difference between the sidemounted tanks exceeded the configured threshold; %1 is the transceiver name; look: real screenshot test_data/dive_computers/garmin_x50i/x50i_sidemount_change_tank.png - blue border, no triangle, text centred",
+        "color": "#1E78FF",
+        "icon": "none"
       }
     ],
     "x50i": {
@@ -917,6 +929,15 @@
           "when": "fit_alert",
           "alert": "otu_warning",
           "_source": "X50i p.12"
+        },
+        {
+          "id": "sidemount_switch",
+          "text": "Breathe from {tank}.",
+          "caption": "",
+          "when": "sidemount_switch",
+          "_source": "X50i EN-US p.27 alert table 'Breathe from %1.'; the real screenshot x50i_sidemount_change_tank.png reads 'Breathe from Left Tank (VASEN).' - blue border, no triangle, centred",
+          "color": "#1E78FF",
+          "icon": "none"
         }
       ]
     },
@@ -926,6 +947,12 @@
         "imperial": 0
       },
       "_source": "Mk3 p.8 figures: 77 ft / 86 ft whole, metric screenshots 0.0 m"
+    },
+    "sidemount_switch": {
+      "threshold_bar": 30.0,
+      "color": "#1E78FF",
+      "text_color": "#FFFFFF",
+      "_source": "Mk3 p.24 / X50i p.13 Enabling Sidemount Setup: 'when the pressure difference is greater than the configured threshold, an alert appears to remind you to breathe from the tank with the higher pressure'; 'The recommended breathing tank is highlighted in blue'. Switch Pressure is a setting; the default is not in the manual - 30 bar assumed (the owner's)"
     }
   },
   "default": {

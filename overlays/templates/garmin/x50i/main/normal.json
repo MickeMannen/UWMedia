@@ -204,19 +204,19 @@
         "field": "notice",
         "type": "notice",
         "style": "box",
-        "rel_x": 0.4,
-        "rel_y": 0.183,
-        "width": 370,
-        "height": 62,
-        "font_size": 30,
-        "caption_font_size": 16,
+        "rel_x": 0.438,
+        "rel_y": 0.225,
+        "width": 431,
+        "height": 108,
+        "font_size": 40,
+        "caption_font_size": 18,
         "scale": 1.0,
-        "label": "Alert box (real screenshots: top right, over the tank name)"
+        "label": "Alert box: fills the top-right cell (real screenshots x50i_sidemount_change_tank.png, x50i_deco_required_trimix_o2_17_he_40.png)"
       }
     ],
     "screen": {
       "x0": 0.175,
-      "y0": 0.168,
+      "y0": 0.213,
       "x1": 0.906,
       "y1": 0.832,
       "shape": "rect"

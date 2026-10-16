@@ -9,7 +9,8 @@
       "color": "#FFFFFF",
       "font_size": 38,
       "scale": 1.0,
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "tank_switch_highlight": "primary"
     },
     {
       "id": "secondary_tank_name",
@@ -19,7 +20,8 @@
       "color": "#FFFFFF",
       "font_size": 38,
       "scale": 1.0,
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "tank_switch_highlight": "secondary"
     },
     {
       "id": "primary_tank_pressure_icon",
@@ -33,7 +35,8 @@
       "draw_outline": true,
       "outline_color": "#FFFFFF",
       "outline_width": 2,
-      "outline_gap": 2
+      "outline_gap": 2,
+      "hide_when_notice": true
     },
     {
       "id": "secondary_tank_pressure_icon",
@@ -47,7 +50,8 @@
       "draw_outline": true,
       "outline_color": "#FFFFFF",
       "outline_width": 2,
-      "outline_gap": 2
+      "outline_gap": 2,
+      "hide_when_notice": true
     },
     {
       "id": "primary_tank_pressure",
@@ -57,7 +61,8 @@
       "color": "#FFFFFF",
       "font_size": 67,
       "scale": 1.0,
-      "align": "right"
+      "align": "right",
+      "hide_when_notice": true
     },
     {
       "id": "secondary_tank_pressure",
@@ -66,7 +71,8 @@
       "rel_y": 0.28447,
       "color": "#FFFFFF",
       "font_size": 67,
-      "scale": 1.0
+      "scale": 1.0,
+      "hide_when_notice": true
     }
   ]
 }
