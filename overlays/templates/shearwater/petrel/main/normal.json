@@ -27,7 +27,21 @@
         "unit_dy": -46.6,
         "unit_color": "#00ADED",
         "small_suffix": "decimals",
-        "small_suffix_scale": 0.35
+        "small_suffix_scale": 0.35,
+        "max_width": 185
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.403,
+        "rel_y": 0.29,
+        "width": 34,
+        "height": 118,
+        "up_count": 6,
+        "down_count": 0,
+        "bar": false,
+        "label": "Ascent rate (Petrel 3 Rec manual p.11: six arrows, 1 per 3 m/min)"
       },
       {
         "id": "label_time",

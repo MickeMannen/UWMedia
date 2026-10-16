@@ -58,6 +58,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Garmin templates it turns yellow, then flashing red.
 
 ### Fixed
+- Shearwater Petrel: the ascent arrows are live (lit per 3 m/min, yellow and
+  red at the manual's rates) instead of a picture painted on the skin, and the
+  stray white tick next to the depth is gone; a stray dot on the Perdix 3
+  skin too.
 - Garmin x50i: the alert box no longer sits above the top of the display. It
   fills the top-right cell the way the real screen does (the tank fields step
   aside while it shows), and the sidemount "Breathe from" alert has its blue
