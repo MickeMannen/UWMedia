@@ -51,8 +51,6 @@ def table_headers() -> List[str]:
     return ["Time", f"Depth ({U.depth_label()})", f"Temp ({U.temperature_label()})", "NDL (s)", "TTS (s)", "Gas", "Tanks"]
 
 
-TABLE_HEADERS = table_headers()  # the metric form; the page asks table_headers() for the live one
-
 # The chart draws at most this many points; a 1 s FIT log of an hour's dive
 # has ~3600, which only slows the Canvas down without showing more.
 MAX_CHART_POINTS = 1500

@@ -1313,3 +1313,25 @@ def test_file_dialogs_start_in_home_then_remember_the_last_folder(tmp_path, monk
     app.loadLogFile()    # logs
     app.browseImageFile()  # home: images have their own folder
     assert starts == [home, zips, home, logs, home]
+
+
+def test_units_preview_is_the_pages_own_choice(monkeypatch):
+    """Units next to State: the page previews in feet / psi without touching
+    the Advanced setting, starts on that setting and follows it again when
+    it changes."""
+    from utils import units as U
+    monkeypatch.setattr("utils.app_settings.load_settings", lambda: {"units": "metric"})
+    U.reload_units()
+    saved = []
+    monkeypatch.setattr("utils.app_settings.update_settings", lambda **kw: saved.append(kw))
+    app = OverlayDesignerBackend()
+    assert app.unitsIndex == 0 and app.unitsList[1].startswith("Imperial")
+    metric_boxes = app.elementBoxes
+    app.onUnitsSelected(1)
+    assert app.unitsIndex == 1 and " ft" in app.dataText and "°F" in app.dataText
+    assert U.current_units() == "metric" and not saved  # the setting is untouched
+    assert app.elementBoxes != metric_boxes  # the hit boxes follow the wider feet values
+    app.render_current_frame()
+    app.unitsChanged()  # Advanced changed (or re-announced) the setting: follow it again
+    assert app.unitsIndex == 0 and " m" in app.dataText
+    U.reload_units()

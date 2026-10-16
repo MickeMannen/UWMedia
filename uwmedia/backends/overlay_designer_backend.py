@@ -65,6 +65,7 @@ import json
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
+import contextlib
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -212,6 +213,7 @@ class OverlayDesignerBackend(QObject):
     persistenceChanged = Signal()
     viewChanged = Signal()
     telemetryChanged = Signal()
+    unitsPreviewChanged = Signal()
     timeChanged = Signal()
     dataChanged = Signal()
     statusChanged = Signal()
@@ -251,6 +253,7 @@ class OverlayDesignerBackend(QObject):
         self._grid_size = DEFAULT_GRID_SIZE
         self._element_boxes: List[List[float]] = []
         self._selection_box = {"visible": False, "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0, "label": ""}
+        self._preview_units: Optional[str] = None  # the page's own Metric / Imperial choice; None follows Advanced
 
         # --- canvas view ---
         self._view_mode = VIEW_DESIGN
@@ -1639,7 +1642,7 @@ class OverlayDesignerBackend(QObject):
         native_w, native_h = doc.skin_native_size()
         layout = doc.layout
         from utils.hud_rules_engine import rule_overrides
-        with rule_overrides(layout.get("rules")):
+        with rule_overrides(layout.get("rules")), self._units():
             return self._native_bounds_for(doc, layout, wp, waypoints, native_w, native_h)
 
     def _native_bounds_for(self, doc, layout, wp, waypoints, native_w, native_h) -> List[Tuple[float, float, float, float]]:
@@ -2295,14 +2298,16 @@ class OverlayDesignerBackend(QObject):
                 self._draw_grid(canvas, zoom)
             layout = self._visible_layout(self.document.design_view_layout(zoom))
             try:
-                draw_hud(canvas, layout, wp, render_log=True, waypoints=waypoints)
+                with self._units():
+                    draw_hud(canvas, layout, wp, render_log=True, waypoints=waypoints)
                 self._draw_screen_edge(canvas, layout)
             except Exception as e:
                 print(f"Overlay Designer render error (design view): {e}")
         else:
             canvas = self.bg_frame.copy() if self.bg_frame is not None else self._synthetic_background()
             try:
-                draw_hud(canvas, self._visible_layout(self.document.render_layout()), wp, waypoints=waypoints)
+                with self._units():
+                    draw_hud(canvas, self._visible_layout(self.document.render_layout()), wp, waypoints=waypoints)
             except Exception as e:
                 print(f"Overlay Designer render error (frame view): {e}")
 
@@ -2338,7 +2343,39 @@ class OverlayDesignerBackend(QObject):
 
     @Slot()
     def unitsChanged(self):
-        """The Advanced page changed the unit system: redraw with it."""
+        """The Advanced page changed the unit system: the preview follows it
+        again (the page's own choice is only a departure from the setting)."""
+        self._preview_units = None
+        self.unitsPreviewChanged.emit()
+        self._update_data_text()
+        self._redraw()
+
+    def _units(self):
+        """The unit system the preview renders in: the page's own choice when
+        one was made, else the Advanced setting (utils/units.py)."""
+        from utils import units as U
+        return U.units_override(self._preview_units) if self._preview_units else contextlib.nullcontext()
+
+    @Property(list, constant=True)
+    def unitsList(self):
+        from utils import units as U
+        return [U.UNIT_LABELS[u] for u in U.UNIT_SYSTEMS]
+
+    @Property(int, notify=unitsPreviewChanged)
+    def unitsIndex(self):
+        from utils import units as U
+        return U.UNIT_SYSTEMS.index(self._preview_units or U.current_units())
+
+    @Slot(int)
+    def onUnitsSelected(self, index):
+        """Preview this page in metres or feet without touching the Advanced
+        setting; picking the setting's own system goes back to following it."""
+        from utils import units as U
+        if not 0 <= index < len(U.UNIT_SYSTEMS):
+            return
+        chosen = U.UNIT_SYSTEMS[index]
+        self._preview_units = None if chosen == U.current_units() else chosen
+        self.unitsPreviewChanged.emit()
         self._update_data_text()
         self._redraw()
 
@@ -2409,8 +2446,9 @@ class OverlayDesignerBackend(QObject):
                 state, phase, _, _ = stop_phase(manufacturer, model, wp, waypoints)
                 notice = active_notice(manufacturer, model, wp, waypoints)
             from utils import units as U
-            depth = f"{U.depth(wp.depth):.1f} {U.depth_label()}" if wp.depth is not None else "--"
-            temp = f"{U.temperature(wp.temp):.0f} {U.temperature_label()}" if wp.temp is not None else "--"
+            with self._units():
+                depth = f"{U.depth(wp.depth):.1f} {U.depth_label()}" if wp.depth is not None else "--"
+                temp = f"{U.temperature(wp.temp):.0f} {U.temperature_label()}" if wp.temp is not None else "--"
             state_text = f"{state} ({phase})" if phase else state
             notice_text = f" · Notice: {notice['text']}" if notice else ""
             self._data_text = f"{source} · Depth {depth} · Temp {temp} · State: {state_text}{notice_text}"

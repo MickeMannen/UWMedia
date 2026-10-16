@@ -139,6 +139,18 @@ def _isolated_user_dirs(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _units_from_the_tests_own_settings():
+    """utils/units.py caches the `units` setting per process; a module
+    imported at collection time (before _isolated_user_dirs) can prime it
+    from the owner's real settings.json. Every test starts from the isolated
+    folder's own setting instead (metric unless the test writes one)."""
+    from utils import units as U
+    U.reload_units()
+    yield
+    U.reload_units()
+
+
+@pytest.fixture(autouse=True)
 def _fresh_cli_run():
     """cli_main remembers the output names it handed out in a run (so parallel
     files never pick the same one); a test calling it in-process is a run of

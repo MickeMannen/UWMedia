@@ -34,6 +34,10 @@ complete), fast ascent, high PPO2, high CNS, low and critical gas,
 surfacing - built as a short synthetic history so the badge, the notice and
 the colours show exactly that case whatever the slider says. The status line
 under the canvas names the state, its phase and the notice showing.
+**Units** previews the page in the other unit system - feet, psi and °F,
+or metres, bar and °C - to check that "3002 PSI" fits where "207 BAR" did.
+It starts on the app's setting ([Advanced](advanced.md#units)), never
+changes it, and goes back to following it when that setting changes.
 
 ## Views
 

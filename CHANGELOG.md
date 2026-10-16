@@ -18,6 +18,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Designer a value's unit is now part of the element (**Show unit**, with
   size, offset, colour and stacked options) instead of a separate label,
   and a **Max width** shrinks a value that would run into its neighbour.
+  A **Units** list next to **State** previews the page in the other
+  system without touching the setting.
 - Overlays: templates can show the computer's own notifications. A new
   "Notice" element draws the message the computer put on its screen, in its
   wording and colours - a Perdix's yellow FAST ASCENT, MISSED DECO STOP, HIGH

@@ -365,6 +365,16 @@ Item {
                         onActivated: (index) => overlayDesignerBackend.onStateSelected(model[index])
                     }
 
+                    Label { text: "Units"; font.pixelSize: 12; Layout.leftMargin: 8 }
+                    CascadeCombo {
+                        Layout.preferredWidth: 170
+                        model: overlayDesignerBackend.unitsList
+                        backendIndex: overlayDesignerBackend.unitsIndex
+                        onActivated: (index) => overlayDesignerBackend.onUnitsSelected(index)
+                        ToolTip.text: "Preview this page in metres or feet; the app's setting (Advanced) is not changed"
+                        ToolTip.visible: hovered
+                    }
+
                     Label { text: "Time"; font.pixelSize: 12; Layout.leftMargin: 8 }
                     Slider {
                         Layout.fillWidth: true
