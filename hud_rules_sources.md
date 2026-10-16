@@ -138,7 +138,17 @@ carries its own `_source`; the table is the summary.
 | X50i main | the stop box takes the NDL corner and the tissue bar disappears; the alert sits in a bordered box top right over the tank name; alerts of two lines as the table prints them | real screenshots `test_data/dive_computers/garmin_x50i/x50i_safety_stop.png`, `x50i_deco_required_trimix_o2_17_he_40.png` (night mode, so the colours are not read from them); manual p.12-13 | verified (layout), assumed (box colours) |
 | mk3i main | Big Numbers layout | real screenshots `test_data/dive_computers/garmin_mk3i`; manual p.8 figure | verified |
 
-## Facts read but not yet in the rules (for `simulator.md` A6)
+## Computed values and persistent notifications (`simulator.md` A6)
+
+| Rule key | Value | Source | Status |
+|---|---|---|---|
+| Shearwater `gf_colors` | GF99 and SurGF yellow above the GF High setting, red above 100 %; GF high from the log's deco model when it has one, else 85 (Med) | Perdix 2 p.20; p.~55 Conservatism defaults | verified (default GF high: Med 40/85 per p.55) |
+| Shearwater `gas_time` | GTR = (Ptank - Preserve - Pascent) / (SAC x Pamb), SAC over the last two minutes at 1 ATA, 10 m/min direct ascent, reserve default 50 bar, "wait" until two minutes of data, no GTR in deco | Perdix 2 p.44-45, p.57, p.26 | verified; Pascent = SAC x ascent minutes x mean ambient is our reading of "the pressure used for the ascent" |
+| Shearwater `persistent_notices` | High CNS (CNS limit reached), MOD go up (red box, up arrow) past the gas's MOD, Near MOD (yellow) within 1.9 m below it; p.13 figure for the box | Perdix 2 p.23, p.13 | verified; "MOD switch gas" and "Better Gas" need the gas list (not modelled) |
+| MOD | (MOD ppO2 / fO2 - 1) x 10 m with the brand's `po2_limits.mod` (Shearwater 1.40) | Perdix 2 p.62 | verified |
+| GF99 / SurfGF | leading compartment's supersaturation over ambient as a share of the Bühlmann M-value gradient, at depth and at surface pressure; 0 when on-gassing ("On Gas" on the device) | Perdix 2 p.20 definitions | verified (the "On Gas" wording is not drawn) |
+
+## Facts read but not yet in the rules
 
 - Shearwater persistent notifications shown left of the NDL (Perdix 2
   p.23): `High CNS`, `MOD, go up`, `MOD, switch gas`, `Near MOD` (within

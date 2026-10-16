@@ -330,6 +330,7 @@ class UDDFParser(BaseParser):
                                 wp.deco_stop_depth = res.ceiling_meters
                             if wp.gf is None:
                                 wp.gf = res.gf_current
+                            wp.surf_gf = res.surf_gf  # no log records SurfGF: always the recompute
                             if wp.po2 is None:
                                 wp.po2 = round(res.po2, 2)
                             if wp.cns is None:
@@ -361,6 +362,8 @@ class UDDFParser(BaseParser):
                     waypoints=waypoints,
                     device=device_name if device_name else None,
                     manufactor=manufacturer if manufacturer else None,
+                    gf_low=int(round(file_gf[0] * 100)) if file_gf else None,
+                    gf_high=int(round(file_gf[1] * 100)) if file_gf else None,
                     timezone=tz_offset_str if tz_offset_str else None,
                     log_filename=file_path.name,
                     log_path=str(file_path)

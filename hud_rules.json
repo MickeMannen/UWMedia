@@ -452,6 +452,46 @@
       {
         "_order": "the table on p.25-26 lists notifications by priority; this order follows its first column then its second (deduced, the two-column layout makes the exact order uncertain)"
       }
+    ],
+    "gf_colors": {
+      "above_gf_high": "#FFFF00",
+      "above_100": "#FF0000",
+      "gf_high_default": 85,
+      "_source": "Perdix 2 p.20: GF99 yellow when the GF High-modified M-value is exceeded, red above 100 %; SurGF coloured by the current GF the same way. GF high from the log when it carries one (UDDF decomodel), else the Med default 85 (p.~55)"
+    },
+    "gas_time": {
+      "formula": "shearwater_gtr",
+      "ascent_m_per_min": 10,
+      "sac_window_s": 120,
+      "_source": "Perdix 2 p.44-45 and p.57: GTR = (Ptank - Preserve - Pascent) / (SAC x Pamb), SAC over the last two minutes at 1 ATA, direct ascent at 10 m/min, reserve 50 bar default; 'wait' until two minutes of data; no GTR once deco stops are required (p.26). Pascent as SAC x ascent minutes x mean ambient is our reading of 'the pressure used for the ascent'"
+    },
+    "persistent_notices": [
+      {
+        "id": "high_cns_box",
+        "text": "High\nCNS\n{cns}%",
+        "color": "#FF0000",
+        "when": "cns_at_least",
+        "percent": 100,
+        "_source": "p.23 'High CNS': CNS limit reached; the figure's wording follows the Perdix 2 p.13 box layout"
+      },
+      {
+        "id": "mod_exceeded",
+        "text": "MOD\n{mod}m\n↑",
+        "color": "#FF0000",
+        "when": "mod_exceeded",
+        "_source": "p.23 'MOD, go up'; p.13 figure: red box MOD / depth / up arrow"
+      },
+      {
+        "id": "near_mod",
+        "text": "MOD\n{mod}m",
+        "color": "#FFFF00",
+        "when": "near_mod",
+        "metres": 1.9,
+        "_source": "p.23 'Near MOD': within 1.9 m below the MOD, a notification only"
+      },
+      {
+        "_order": "p.23 lists High CNS, MOD go up, MOD switch gas, Near MOD, Better Gas; 'switch gas' and 'Better Gas' need the gas list (not modelled)"
+      }
     ]
   },
   "Garmin": {

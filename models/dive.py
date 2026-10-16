@@ -52,7 +52,8 @@ class Waypoint(BaseModel):
     cns: Optional[int] = None
     po2: Optional[float] = None
     divemode: Optional[str] = None
-    gf: Optional[float] = None
+    gf: Optional[float] = Field(None, description="GF99 in percent: the log's own value where it records one, else recomputed by the parsers' Bühlmann pass")
+    surf_gf: Optional[float] = Field(None, description="SurfGF in percent (the gradient factor on an instant ascent to the surface) - recomputed by the parsers' Bühlmann pass; no log format records it")
     switchmix: Optional[float] = None
     battery: Optional[float] = None
     cleared_gas_mix: Optional[str] = Field(
@@ -141,6 +142,8 @@ class Dive(BaseModel):
     end_longitude: Optional[float] = None
     timezone: Optional[str] = None
     duration_seconds: Optional[int] = None
+    gf_low: Optional[int] = Field(None, description="The computer's GF low setting in percent, when the log carries it")
+    gf_high: Optional[int] = Field(None, description="The computer's GF high setting in percent, when the log carries it (colours GF99 / SurfGF)")
     
     # Source Info
     log_filename: Optional[str] = None

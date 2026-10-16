@@ -116,6 +116,21 @@
         "caption_font_size": 32,
         "scale": 1.0,
         "label": "Notification row (manual p.22)"
+      },
+      {
+        "id": "persistent_notice",
+        "field": "notice",
+        "type": "notice",
+        "style": "frame",
+        "source": "persistent",
+        "rel_x": 0.455,
+        "rel_y": 0.385,
+        "width": 100,
+        "height": 125,
+        "font_size": 34,
+        "caption_font_size": 22,
+        "scale": 1.0,
+        "label": "Persistent notification left of the NDL (manual p.13, p.23)"
       }
     ]
   }

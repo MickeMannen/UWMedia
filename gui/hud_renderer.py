@@ -205,6 +205,10 @@ def format_telemetry_value(field, raw_val):
         return f"{mins:02d}:{secs:02d}"
     elif field in ["depth", "max_depth"] and raw_val is not None:
         return f"{raw_val:.1f}"
+    elif field in ("gf", "surf_gf") and raw_val is not None:
+        return str(int(round(float(raw_val))))  # whole percent, as GF99 / SurGF read on a Perdix (manual p.20)
+    elif field == "mod" and raw_val is not None:
+        return f"{float(raw_val):.0f}"
     elif field == "volume_sac" and raw_val is not None:
         return str(int(float(raw_val)))
     elif field == "pressure_sac":
@@ -1401,9 +1405,15 @@ def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb):
 
 
 def notice_for(layout, waypoint, waypoints=None):
-    """The notice the template's computer would show now, or None."""
+    """The (timed) notice the template's computer would show now, or None."""
     from utils.hud_notices import active_notice
     return active_notice(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints)
+
+
+def persistent_notice_for(layout, waypoint, waypoints=None):
+    """The persistent notification (MOD, Near MOD, High CNS) showing now, or None."""
+    from utils.hud_notices import active_persistent_notice
+    return active_persistent_notice(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints)
 
 
 def notice_lines(elem, notice, manufacturer, model):
@@ -1456,6 +1466,23 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
     outline = elem.get("outline", False)
     cap_font = get_font(cap_size, family, weight)
     cap_h = int(cap_size * 1.25)
+
+    if style["style"] == "frame":
+        # Perdix 2 manual p.13 / p.23: a persistent notification left of the
+        # NDL - a box outlined in its colour with "MOD", the depth and an up
+        # arrow stacked inside, all in that colour.
+        height_px = max(4, int(float(elem.get("height", 60)) * scale))
+        pad = max(2, int(height_px * 0.06))
+        draw.rounded_rectangle([abs_x, abs_y, abs_x + width_px, abs_y + height_px], radius=max(2, int(height_px * 0.08)),
+                               outline=colour, width=max(1, int(height_px * 0.03)))
+        parts = [p.strip() for p in message.split("\n") if p.strip()] or [message]
+        line_h = (height_px - 2 * pad) / max(1, len(parts))
+        for i, part in enumerate(parts):
+            font, size = _fit_font(draw, part, min(msg_size, int(line_h * 0.9)), width_px - 2 * pad, family, weight)
+            left, _, right, _ = font.getbbox(part)
+            x = abs_x + (width_px - (right - left)) // 2 - left
+            draw.text((x, int(abs_y + pad + i * line_h + (line_h - size) / 2)), part, font=font, fill=colour)
+        return
 
     if style["style"] == "box":
         # Descent X50i (real screenshots, test_data/dive_computers/garmin_x50i):
@@ -1540,6 +1567,20 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
         if raw_val is None:
             return "", None  # only shown during the clear count-up: nothing (not "--") the rest of the dive
         return format_telemetry_value(field, raw_val), raw_val
+    if field == "mod":
+        # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
+        from utils.hud_gas import mod_metres
+        raw_val = mod_metres(manufacturer, model, waypoint) if waypoint is not None else None
+        return format_telemetry_value(field, raw_val), raw_val
+    if field == "air_remaining" and waypoint is not None and getattr(waypoint, "air_remaining", None) is None:
+        # No logged gas time (Shearwater exports never carry GTR): the brand's
+        # formula from the pressure trend, "wait" until it has two minutes of data.
+        from utils.hud_gas import gas_time_remaining
+        raw_val = gas_time_remaining(manufacturer, model, waypoint, waypoints)
+        if raw_val is None:
+            from utils.hud_rules_engine import get_rule_config
+            return ("wait" if isinstance(get_rule_config(manufacturer, model, "gas_time"), dict) else "--"), None
+        return format_telemetry_value(field, raw_val), raw_val
     if field.startswith("custom:"):
         return field.replace("custom:", ""), None
     if field.startswith("tank_pressure:"):
@@ -1586,8 +1627,11 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     # The device's own notification, when a notice element draws it; the
     # elements it covers (`hide_when_notice`) step aside while it shows.
     notice = None
-    if any(elem.get("type") == "notice" or elem.get("hide_when_notice") for elem in linked_elements):
+    if any((elem.get("type") == "notice" and elem.get("source") != "persistent") or elem.get("hide_when_notice") for elem in linked_elements):
         notice = notice_for(layout, waypoint, waypoints)
+    persistent = None
+    if any(elem.get("type") == "notice" and elem.get("source") == "persistent" for elem in linked_elements):
+        persistent = persistent_notice_for(layout, waypoint, waypoints)
 
     for elem in linked_elements:
         field = elem.get("field", "")
@@ -1596,7 +1640,8 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         if notice is not None and elem.get("hide_when_notice"):
             continue
         if elem.get("type") == "notice":
-            _draw_notice(draw, elem, notice, rules_manufacturer(layout), layout.get("model", "Perdix2"), skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
+            shown = persistent if elem.get("source") == "persistent" else notice
+            _draw_notice(draw, elem, shown, rules_manufacturer(layout), layout.get("model", "Perdix2"), skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
             continue
         if elem.get("type") == "graph" or field == "depth_graph":
             if elem.get("stop_label"):
@@ -1674,6 +1719,16 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 # depth turns yellow with the stop depth (Mk3 manual p.13).
                 ss_rule = get_rule_config(manufacturer, model, "safety_stop")
                 color_hex = (ss_rule.get("warn_color") if isinstance(ss_rule, dict) else None) or "#FFFF00"
+        if field in ("gf", "surf_gf") and isinstance(raw_val, (int, float)):
+            from utils.hud_rules_engine import get_rule_config
+            gf_rule = get_rule_config(manufacturer, model, "gf_colors")
+            if isinstance(gf_rule, dict):
+                dive = getattr(waypoint, "_dive", None)
+                gf_high = getattr(dive, "gf_high", None) or gf_rule.get("gf_high_default", 85)
+                if float(raw_val) > 100:
+                    color_hex = gf_rule.get("above_100", "#FF0000")
+                elif float(raw_val) > float(gf_high):
+                    color_hex = gf_rule.get("above_gf_high", "#FFFF00")
         box_rgb = None
         if field in ("primary_tank_pressure", "secondary_tank_pressure") or field.startswith("tank_pressure:"):
             # Below the reserve / critical pressure: a Shearwater puts the

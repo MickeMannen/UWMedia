@@ -38,9 +38,9 @@ def timezone_from_pair(local_dt: datetime, utc_dt: datetime) -> timezone:
     return timezone(timedelta(minutes=minutes))
 
 def _add_ceilings(waypoints: List[Waypoint], gas_dict: Dict) -> None:
-    """FIT logs the computer's own next stop but no ceiling - recompute it
-    with the same Buhlmann pass the UDDF/Subsurface parsers already run.
-    Treats every gas as open circuit."""
+    """FIT logs the computer's own next stop but no ceiling, GF99 or SurfGF -
+    recompute them with the same Buhlmann pass the UDDF/Subsurface parsers
+    already run. Treats every gas as open circuit."""
     gases = [
         GasDefinition(f"{g['o2']}/{g['he']}", g["o2"] / 100.0, g["he"] / 100.0, max(0.0, (1.4 / (g["o2"] / 100.0) - 1.0) * 10.0))
         for g in gas_dict.values() if g["status"] and g["o2"]
@@ -57,6 +57,10 @@ def _add_ceilings(waypoints: List[Waypoint], gas_dict: Dict) -> None:
         res = results.get(wp.time_since_start)
         if res:
             wp.ceiling = res.ceiling_meters
+            # FIT records no gradient factor: GF99 and SurfGF from the same pass
+            if wp.gf is None:
+                wp.gf = res.gf_current
+            wp.surf_gf = res.surf_gf
 
 
 class GarminParser(BaseParser):

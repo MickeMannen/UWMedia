@@ -30,8 +30,15 @@ Conditions (`when`), with their parameters:
   deco_cleared        the HUD state leaves 'deco'
   safety_started      the safety stop starts counting
   safety_complete     the safety stop countdown ends
+  mod_exceeded        deeper than the breathed gas's MOD (utils.hud_gas)
+  near_mod            within `metres` above the MOD
 An entry with "enabled": false is kept for the record (a device alert that
 is off by default) and never fires.
+
+A brand's `persistent_notices` list (Perdix 2 manual p.23: shown left of the
+NDL for as long as the condition lasts - MOD exceeded, Near MOD, High CNS)
+uses the same conditions but never times out; a notice element with
+"source": "persistent" shows the first one that holds.
 """
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -146,6 +153,16 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
         if t is None:
             t = _num(getattr(wp, "time_since_start", None))
         return t is not None and t > float(rule.get("minutes", 60)) * 60.0, ctx
+    if when in ("mod_exceeded", "near_mod"):
+        from utils.hud_gas import mod_metres
+        mod = mod_metres(manufacturer, model, wp)
+        depth = _num(getattr(wp, "depth", None))
+        if mod is None or depth is None:
+            return False, ctx
+        ctx["mod"] = int(round(mod))
+        if when == "mod_exceeded":
+            return depth > mod, ctx
+        return mod - float(rule.get("metres", 1.9)) <= depth <= mod, ctx
     if when == "stop_violation":
         return deco_stop_phase(manufacturer, model, wp) in ("violation", "ceiling_violation"), ctx
     if when in ("deco_required", "deco_cleared"):
@@ -230,6 +247,27 @@ def notice_timeline(manufacturer: Optional[str], model: Optional[str], waypoints
     return _cached_timeline("notice", manufacturer, model, waypoints, lambda: _build_timeline(manufacturer, model, waypoints))
 
 
+def persistent_notice_rules(manufacturer: Optional[str], model: Optional[str]) -> List[Dict[str, Any]]:
+    rules = get_rule_config(manufacturer, model, "persistent_notices")
+    if not isinstance(rules, list):
+        return []
+    return [r for r in rules if isinstance(r, dict) and r.get("id") and r.get("text") and r.get("enabled", True)]
+
+
+def active_persistent_notice(manufacturer: Optional[str], model: Optional[str], waypoint: Any, waypoints: Optional[List[Any]] = None) -> Optional[Dict[str, Any]]:
+    """The persistent notification the computer would be showing now: the
+    first `persistent_notices` entry whose condition holds at `waypoint`
+    (no history, no time-out - it stays while the situation lasts)."""
+    if waypoint is None:
+        return None
+    style = notice_style(manufacturer, model)
+    for rule in persistent_notice_rules(manufacturer, model):
+        now, ctx = _condition_now(rule, manufacturer, model, waypoint, None, waypoints)
+        if now:
+            return _render(rule, style, ctx, int(getattr(waypoint, "time_since_start", 0) or 0))
+    return None
+
+
 def active_notice(manufacturer: Optional[str], model: Optional[str], waypoint: Any, waypoints: Optional[List[Any]] = None) -> Optional[Dict[str, Any]]:
     """The notice the computer would be showing at `waypoint`: from the dive's
     timeline when the whole dive is at hand, otherwise from what this one
@@ -242,7 +280,7 @@ def active_notice(manufacturer: Optional[str], model: Optional[str], waypoint: A
         return timeline.get(int(getattr(waypoint, "time_since_start", 0) or 0))
     style = notice_style(manufacturer, model)
     for rule in notice_rules(manufacturer, model):
-        if rule.get("when") not in _INSTANT and rule.get("when") not in ("po2_above", "ascent_faster_than", "stop_violation"):
+        if rule.get("when") not in _INSTANT and rule.get("when") not in ("po2_above", "ascent_faster_than", "stop_violation", "mod_exceeded", "near_mod"):
             continue
         now, ctx = _condition_now(rule, manufacturer, model, waypoint, None, None)
         if now:

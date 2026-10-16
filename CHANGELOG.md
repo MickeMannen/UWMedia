@@ -20,6 +20,18 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   cylinder reaching the reserve - and the State list offers each of them
   (and fast ascent, high PPO2, high CNS, low and critical gas, surfacing) as
   a forced preview, with the state, phase and notice named under the canvas.
+- Overlays: values the computer shows but no log records are now computed
+  from the dive and shown where a template asks for them: GF99 and surface
+  GF (a new `surf_gf` field) from the same Bühlmann pass that already
+  recomputes the ceiling, turning yellow above the computer's GF high and
+  red above 100 % on Shearwater templates; the breathed gas's MOD (a new
+  `mod` field); a Shearwater's GTR from the tank-pressure trend as its
+  manual defines it ("wait" for the first two minutes, nothing in deco), so
+  the Perdix 2 bottom row no longer shows "--" there.
+- Overlays: the Perdix 2 main page shows the computer's persistent
+  notifications left of the NDL - the red MOD box with an up arrow past the
+  gas's MOD, the yellow one within 1.9 m of it, the High CNS box - through a
+  notice element in Persistent mode (a fourth style, Frame).
 - Overlays: a tank pressure below the reserve or critical pressure sits on
   a yellow or red box on Shearwater templates, as on the computers; on
   Garmin templates it turns yellow, then flashing red.

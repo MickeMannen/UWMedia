@@ -854,7 +854,7 @@ class OverlayDesignerBackend(QObject):
                 "draw_outline": False, "outline_color": "#FFFFFF", "outline_width": 2, "outline_gap": 4,
                 "up_count": 4, "down_count": 1, "bar": True, "style": "segments",
                 "segments": 5, "segment_gap": 2, "full_bar": 200,
-                "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False,
+                "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "source": "timed",
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
         field = elem.get("field", "")
@@ -915,6 +915,7 @@ class OverlayDesignerBackend(QObject):
             "confirm_text": elem.get("confirm_text", ""),
             "caption_color": elem.get("caption_color") or "",
             "hide_when_notice": bool(elem.get("hide_when_notice", False)),
+            "source": "persistent" if elem.get("source") == "persistent" else "timed",
         }
 
     @Slot(str, "QVariant")
@@ -971,6 +972,8 @@ class OverlayDesignerBackend(QObject):
             doc.set_element_attr(index, "confirm_text", str(value or ""))
         elif key == "hide_when_notice":
             doc.set_element_attr(index, "hide_when_notice", True if bool(value) else None)
+        elif key == "source":
+            doc.set_element_attr(index, "source", "persistent" if value == "persistent" else None)
         elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color", "caption_color"):
             if key == "marker_style" and value not in MARKER_STYLES:
                 return
@@ -984,7 +987,7 @@ class OverlayDesignerBackend(QObject):
         elif key in ("reveal_profile", "stop_label"):
             doc.set_element_attr(index, key, True if bool(value) else None)
         elif key == "style":
-            if value not in ("segments", "fill", "text", "banner", "box"):
+            if value not in ("segments", "fill", "text", "banner", "box", "frame"):
                 return
             default = _STYLE_DEFAULTS.get(element_kind(doc.element(index)), "segments")
             doc.set_element_attr(index, "style", None if value == default else value)

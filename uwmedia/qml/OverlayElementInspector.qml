@@ -459,11 +459,22 @@ ColumnLayout {
                 ChoiceRow {
                     Layout.columnSpan: 3
                     visible: inspector.kind === "notice"
-                    attr: "style"; options: ["text", "banner", "box"]; labels: ["Text", "Banner", "Box"]
+                    attr: "style"; options: ["text", "banner", "box", "frame"]; labels: ["Text", "Banner", "Box", "Frame"]
                     current: String(inspector.sel.style)
                     HoverHandler { id: noticeStyleHover }
-                    ToolTip.text: "Text: caption and message in the notice colour (Perdix). Banner: a filled band with black text (Teric). Box: a dark outlined box with a warning triangle (Descent X50i)."
+                    ToolTip.text: "Text: caption and message in the notice colour (Perdix). Banner: a filled band with black text (Teric). Box: a dark outlined box with a warning triangle (Descent X50i). Frame: an outlined box with stacked lines (a Perdix's MOD box)."
                     ToolTip.visible: noticeStyleHover.hovered
+                    ToolTip.delay: 400
+                }
+                Label { text: "Shows"; visible: inspector.kind === "notice" }
+                ChoiceRow {
+                    Layout.columnSpan: 3
+                    visible: inspector.kind === "notice"
+                    attr: "source"; options: ["timed", "persistent"]; labels: ["Alerts", "Persistent"]
+                    current: String(inspector.sel.source)
+                    HoverHandler { id: noticeSourceHover }
+                    ToolTip.text: "Alerts: the computer's notifications, shown for a few seconds when the log triggers them. Persistent: the box that stays while a situation lasts (MOD exceeded, Near MOD, High CNS on a Perdix)."
+                    ToolTip.visible: noticeSourceHover.hovered
                     ToolTip.delay: 400
                 }
                 Label { text: "Confirm hint"; visible: inspector.kind === "notice" }

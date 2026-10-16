@@ -178,6 +178,7 @@ def available_telemetry_fields(dive=None) -> List[str]:
         "primary_tank_pressure", "primary_tank_name",
         "secondary_tank_pressure", "secondary_tank_name",
         "gasmix", "safety_stop", "time_of_day",
+        "mod",  # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
     ]
     fields = sorted(f for f in standard_fields if f != "tanks")
 
@@ -272,7 +273,7 @@ def element_native_bounds(
     if kind == "notice":
         # caption line over the message line, inside `width` (a banner has its own height)
         w = float(elem.get("width", 400))
-        if elem.get("style") in ("banner", "box"):
+        if elem.get("style") in ("banner", "box", "frame"):
             return x, y, x + w, y + float(elem.get("height", 60))
         size = float(elem.get("font_size", 40)) * float(elem.get("scale", 1.0))
         cap = float(elem.get("caption_font_size", 18)) * float(elem.get("scale", 1.0))

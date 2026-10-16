@@ -103,7 +103,16 @@ and its own **Height**; *Box*: a dark outlined box with a warning triangle,
 as a Descent X50i shows its alerts), **Confirm hint** (the button hint at the right,
 empty for none) and **Caption colour**. Tick **Hide while a notice shows** on
 the elements the notice covers - a Perdix replaces its whole bottom row with
-the message. The Shearwater Perdix 2, Petrel, Peregrine, Teric and Tern main
+the message. **Shows** switches a notice element between the computer's
+*Alerts* (timed, as above) and its *Persistent* notifications - the box a
+Perdix keeps left of the NDL while a situation lasts: MOD exceeded (red,
+with an up arrow), Near MOD (yellow), High CNS - drawn in the *Frame* style.
+
+Some values no log records are computed from the dive and shown where a
+template asks for them: GF99 and surface GF (`gf`, `surf_gf`), the breathed
+gas's MOD at the computer's ppO2 limit (`mod`), and on Shearwater templates
+the GTR from the tank-pressure trend (`air_remaining`, "wait" for the first
+two minutes, nothing during deco), following the Perdix 2 manual's formula. The Shearwater Perdix 2, Petrel, Peregrine, Teric and Tern main
 pages come with a notice in place.
 
 ### Depth graph

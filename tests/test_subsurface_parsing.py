@@ -287,4 +287,6 @@ def test_an_unreadable_gf_or_battery_is_empty_not_fatal(tmp_path):
         "<sample time='2:00 min' depth='0.0 m' /></divecomputer></dive>"))
     wp = dives[0].waypoints[1]
     assert (wp.depth, wp.battery) == (10.0, None)
-    assert wp.gf == pytest.approx(0.7)  # empty, so the recompute fills it in
+    # empty, so the recompute fills it in: GF99 is 0 one minute into a 10 m
+    # dive (tissues still on-gassing), and SurfGF comes along with it
+    assert wp.gf == 0.0 and wp.surf_gf is not None

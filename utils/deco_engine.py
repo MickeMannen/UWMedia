@@ -54,7 +54,8 @@ class TTSDataPoint(BaseModel):
     tts_seconds: int = Field(description="Total Time to Surface")
     ceiling_meters: float = Field(description="Current decompression ceiling")
     active_gas: str
-    gf_current: float
+    gf_current: float = Field(description="GF99: the leading tissue's supersaturation as a percentage of its M-value at the current depth")
+    surf_gf: float = Field(default=0.0, description="SurfGF: the same gradient factor evaluated at surface pressure - what GF99 would read on an instant ascent")
     cns: float = Field(default=0.0, description="Cumulative CNS toxicity percentage")
     po2: float = Field(default=0.0, description="Partial pressure of oxygen")
 
@@ -182,6 +183,28 @@ class BuhlmannEngine:
         ceiling_meters = (max_ceiling_bar - self.surface_pressure) * 10.0
         return max(0.0, ceiling_meters)
 
+    def gradient_factor(self, ambient_bar: float) -> float:
+        """The current gradient factor in percent at `ambient_bar`: the
+        leading compartment's supersaturation over ambient as a share of its
+        Bühlmann M-value gradient at that pressure (0 % = tissue tension equal
+        to ambient, 100 % = at the unmodified M-value). At the current depth
+        this is a Shearwater's GF99, at surface pressure its SurfGF (Perdix 2
+        manual p.20). Never negative: an on-gassing tissue reads 0."""
+        worst = 0.0
+        for i, tissue in enumerate(self.tissues):
+            coeffs = self.COEFFICIENTS[i]
+            p_total = tissue.p_n2 + tissue.p_he
+            if p_total <= 0:
+                continue
+            a = (coeffs.n2_a * tissue.p_n2 + coeffs.he_a * tissue.p_he) / p_total
+            b = (coeffs.n2_b * tissue.p_n2 + coeffs.he_b * tissue.p_he) / p_total
+            m_value = ambient_bar / b + a
+            gradient = m_value - ambient_bar
+            if gradient <= 0:
+                continue
+            worst = max(worst, (p_total - ambient_bar) / gradient * 100.0)
+        return worst
+
     def clone(self) -> 'BuhlmannEngine':
         return copy.deepcopy(self)
 
@@ -288,13 +311,15 @@ class DiveDecompressor:
                 if 3.0 <= depth <= 6.0 and last_tts > 0:
                     last_tts = max(0, last_tts - 1)
             
+            ambient = self.engine.surface_pressure + depth / 10.0
             results[sec] = TTSDataPoint(
                 timestamp=timestamp,
                 depth=depth,
                 tts_seconds=last_tts,
                 ceiling_meters=last_ceiling,
                 active_gas=active_gas.name,
-                gf_current=self.gf_high, # Placeholder
+                gf_current=round(self.engine.gradient_factor(ambient), 1),
+                surf_gf=round(self.engine.gradient_factor(self.engine.surface_pressure), 1),
                 cns=self.engine.cns,
                 po2=(self.engine.surface_pressure + (depth / 10.0)) * active_gas.f_o2
             )
