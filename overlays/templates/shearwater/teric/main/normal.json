@@ -80,7 +80,8 @@
         "color": "#FFFFFF",
         "font_size": 60,
         "scale": 1.0,
-        "hide_when_notice": true
+        "hide_when_notice": true,
+        "value_format": "minutes"
       },
       {
         "field": "dive_time",
@@ -114,7 +115,14 @@
       }
     ],
     "path": "normal.png",
-    "scale": 0.5
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.17,
+      "y0": 0.29,
+      "x1": 0.83,
+      "y1": 0.76,
+      "shape": "ellipse"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

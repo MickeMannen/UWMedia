@@ -136,6 +136,18 @@ graph from the first frame and only the cursor moves, as in the plain Dive
 Profile. See it with a deco log from the
 [Dive Profile Builder](dive-profile-builder.md).
 
+### Screen area
+
+A device template knows where the screen sits inside its picture: a
+`screen` entry on the skin in `normal.json`, `{"x0", "y0", "x1", "y1"}` as
+fractions of the picture and `"shape"` `rect` or `ellipse` (the round
+watches). The renderer draws nothing outside it - a value that would run
+onto the bezel is cut at the glass, as on the computer - and the design view
+outlines it in cyan so you see at once when an element sits outside. The
+built-in templates carry it; for your own, add the entry by hand (a
+measuring tool in the designer is planned). Templates without it draw on the
+whole picture as before.
+
 ## Saving
 
 - Built-in templates are read-only in the installed app. **Save as…** copies

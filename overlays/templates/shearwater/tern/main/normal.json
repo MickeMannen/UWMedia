@@ -119,9 +119,9 @@
         "field": "notice",
         "type": "notice",
         "style": "banner",
-        "rel_x": 0.2,
+        "rel_x": 0.21,
         "rel_y": 0.46,
-        "width": 450,
+        "width": 400,
         "height": 90,
         "font_size": 36,
         "caption_font_size": 18,
@@ -130,7 +130,14 @@
       }
     ],
     "path": "normal.png",
-    "scale": 0.5
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.205,
+      "y0": 0.295,
+      "x1": 0.795,
+      "y1": 0.705,
+      "shape": "ellipse"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

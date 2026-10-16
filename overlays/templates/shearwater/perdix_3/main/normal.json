@@ -116,7 +116,14 @@
       }
     ],
     "path": "normal.png",
-    "scale": 0.75
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.1292,
+      "y0": 0.1561,
+      "x1": 0.8719,
+      "y1": 0.8373,
+      "shape": "rect"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

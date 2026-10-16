@@ -81,7 +81,7 @@
         "id": "notice",
         "field": "notice",
         "type": "notice",
-        "rel_x": 0.12,
+        "rel_x": 0.13,
         "rel_y": 0.655,
         "width": 700,
         "font_size": 76,
@@ -89,6 +89,13 @@
         "scale": 1.0,
         "label": "Notification row (Petrel 3 Rec manual p.24)"
       }
-    ]
+    ],
+    "screen": {
+      "x0": 0.123,
+      "y0": 0.248,
+      "x1": 0.877,
+      "y1": 0.8621,
+      "shape": "rect"
+    }
   }
 }

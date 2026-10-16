@@ -354,7 +354,45 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False, way
         'res_scale': res_scale, 'user_scale': user_scale,
         'render_log': render_log
     }
+    screen = screen_box(hud_skin, skin_x, skin_y, w_hud, h_hud)
+    before = frame.copy() if screen else None
     draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=waypoints)
+    if screen:
+        # Nothing is drawn outside the computer's screen: whatever the
+        # elements put on the bezel (or beyond the skin) is undone, as on the
+        # real device where the glass ends.
+        _clip_to_screen(frame, before, screen, hud_skin.get("screen", {}).get("shape", "rect"))
+
+
+def screen_box(hud_skin, skin_x, skin_y, w_hud, h_hud):
+    """The skin's `screen` area ({x0, y0, x1, y1} as fractions of the skin,
+    "shape" rect or ellipse) in frame pixels, or None when the template
+    defines none."""
+    screen = hud_skin.get("screen")
+    if not isinstance(screen, dict):
+        return None
+    try:
+        x0, y0, x1, y1 = (float(screen[k]) for k in ("x0", "y0", "x1", "y1"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (int(round(skin_x + x0 * w_hud)), int(round(skin_y + y0 * h_hud)),
+            int(round(skin_x + x1 * w_hud)), int(round(skin_y + y1 * h_hud)))
+
+
+def _clip_to_screen(frame, before, screen, shape):
+    h, w = frame.shape[:2]
+    x0, y0, x1, y1 = screen
+    mask = np.zeros((h, w), dtype=np.uint8)
+    cx0, cy0, cx1, cy1 = max(0, x0), max(0, y0), min(w, x1), min(h, y1)
+    if cx1 <= cx0 or cy1 <= cy0:
+        frame[:] = before
+        return
+    if shape == "ellipse":
+        cv2.ellipse(mask, ((x0 + x1) // 2, (y0 + y1) // 2), (max(1, (x1 - x0) // 2), max(1, (y1 - y0) // 2)), 0, 0, 360, 255, -1)
+    else:
+        mask[cy0:cy1, cx0:cx1] = 255
+    outside = mask == 0
+    frame[outside] = before[outside]
 
 def resolve_overlay_instance_layout(layout, x, y, scale, frame_w, frame_h):
     """Pass 2 (Color page multi-overlay) helper: turns one overlay instance's
@@ -1548,6 +1586,21 @@ def rules_manufacturer(layout):
     custom template borrowing a brand's scheme), else `manufacturer`."""
     return layout.get("rules_profile") or layout.get("manufacturer", "Shearwater")
 
+def apply_value_format(elem, val, raw_val):
+    """An element's `value_format` on a resolved value: "minutes" (a time in
+    whole minutes) or "integer" - the Shearwater Tec row's dive time, stop
+    time and stop depth (Petrel 3 Technical manual p.24-25). Used by the
+    renderer and by the designer's / sweep's bounds alike."""
+    value_format = elem.get("value_format")
+    if not value_format or not isinstance(raw_val, (int, float)) or isinstance(raw_val, bool):
+        return val
+    if value_format == "minutes":
+        return str(int(raw_val // 60))
+    if value_format == "integer":
+        return f"{raw_val:.0f}"
+    return val
+
+
 def resolve_element_text(layout, field, waypoint, waypoints=None):
     """(display string, raw value) for one text element's field - the exact
     chain draw_telemetry_on_frame() renders with, factored out so the
@@ -1673,14 +1726,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             continue
 
         val, raw_val = resolve_element_text(layout, field, waypoint, waypoints)
-        value_format = elem.get("value_format")
-        if value_format and isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
-            # Shearwater Tec row (Petrel 3 Technical manual p.24-25): dive time
-            # and stop time in whole minutes, the stop depth in whole metres.
-            if value_format == "minutes":
-                val = str(int(raw_val // 60))
-            elif value_format == "integer":
-                val = f"{raw_val:.0f}"
+        val = apply_value_format(elem, val, raw_val)
 
         if field == "ndl" and (raw_val is None or (isinstance(raw_val, (int, float)) and raw_val <= 0)):
             # In deco a Perdix shows NDL "0" in red (manual p.33) - for

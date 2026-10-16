@@ -11,7 +11,7 @@
       {
         "field": "n2_tissue_load",
         "type": "tissue_bar",
-        "rel_x": 0.17759,
+        "rel_x": 0.186,
         "rel_y": 0.22924,
         "width": 24,
         "height": 66,
@@ -21,7 +21,7 @@
       {
         "field": "ascent_rate",
         "type": "ascent_chevrons",
-        "rel_x": 0.17125,
+        "rel_x": 0.18,
         "rel_y": 0.40864,
         "width": 32,
         "height": 94,
@@ -111,7 +111,14 @@
       }
     ],
     "path": "normal.png",
-    "scale": 0.5
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.175,
+      "y0": 0.168,
+      "x1": 0.906,
+      "y1": 0.832,
+      "shape": "rect"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

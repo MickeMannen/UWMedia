@@ -132,6 +132,13 @@
         "scale": 1.0,
         "label": "Persistent notification left of the NDL (manual p.13, p.23)"
       }
-    ]
+    ],
+    "screen": {
+      "x0": 0.1309,
+      "y0": 0.1633,
+      "x1": 0.868,
+      "y1": 0.838,
+      "shape": "rect"
+    }
   }
 }

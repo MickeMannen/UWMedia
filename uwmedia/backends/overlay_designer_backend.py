@@ -1616,8 +1616,9 @@ class OverlayDesignerBackend(QObject):
             lines = None
             try:
                 if kind == "text":
-                    text, _ = resolve_element_text(layout, elem.get("field", ""), wp, waypoints)
-                    text = str(text) if text not in (None, "") else None
+                    from gui.hud_renderer import apply_value_format
+                    text, raw = resolve_element_text(layout, elem.get("field", ""), wp, waypoints)
+                    text = str(apply_value_format(elem, text, raw)) if text not in (None, "") else None
                 elif kind == "badge":
                     lines = badge_lines(doc.rules_manufacturer, doc.model, elem, wp, waypoints)
                 result.append(element_native_bounds(elem, native_w, native_h, text=text, badge_lines=lines))
@@ -2203,6 +2204,28 @@ class OverlayDesignerBackend(QObject):
         canvas[:, xs[xs < w]] = (105, 105, 105)
         canvas[ys[ys < h], :] = (105, 105, 105)
 
+    def _draw_screen_edge(self, canvas: np.ndarray, layout) -> None:
+        """A thin dashed cyan line along the computer's screen edge (the
+        skin's `screen` area), so an element placed on the bezel is seen
+        at once: the renderer draws nothing outside it."""
+        from gui.hud_renderer import screen_box
+        skin = layout.get("hud_skin", {})
+        if not isinstance(skin.get("screen"), dict):
+            return
+        from utils.hud_designer import resolve_skin_position, skin_pixel_size
+        w, h = skin_pixel_size(skin)
+        x, y = resolve_skin_position(skin, canvas.shape[1], canvas.shape[0], w, h)
+        box = screen_box(skin, int(x), int(y), int(w), int(h))
+        if not box:
+            return
+        import cv2
+        x0, y0, x1, y1 = box
+        colour = (255, 220, 0)  # BGR cyan-ish
+        if skin["screen"].get("shape") == "ellipse":
+            cv2.ellipse(canvas, ((x0 + x1) // 2, (y0 + y1) // 2), ((x1 - x0) // 2, (y1 - y0) // 2), 0, 0, 360, colour, 1, cv2.LINE_AA)
+        else:
+            cv2.rectangle(canvas, (x0, y0), (x1, y1), colour, 1, cv2.LINE_AA)
+
     def _synthetic_background(self) -> np.ndarray:
         """A neutral "underwater" gradient with a soft vignette, sized to the
         current frame - what Frame preview composites onto when no video/
@@ -2239,6 +2262,7 @@ class OverlayDesignerBackend(QObject):
             layout = self._visible_layout(self.document.design_view_layout(zoom))
             try:
                 draw_hud(canvas, layout, wp, render_log=True, waypoints=waypoints)
+                self._draw_screen_edge(canvas, layout)
             except Exception as e:
                 print(f"Overlay Designer render error (design view): {e}")
         else:

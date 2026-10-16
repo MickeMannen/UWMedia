@@ -13,7 +13,7 @@
         "rel_x": 0.1479,
         "rel_y": 0.1776,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -21,7 +21,7 @@
         "rel_x": 0.1479,
         "rel_y": 0.2323,
         "color": "#FFFFFF",
-        "font_size": 44,
+        "font_size": 79,
         "scale": 1.0
       },
       {
@@ -29,7 +29,7 @@
         "rel_x": 0.3959,
         "rel_y": 0.1776,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -37,16 +37,17 @@
         "rel_x": 0.3959,
         "rel_y": 0.2323,
         "color": "#FFFFFF",
-        "font_size": 40,
-        "scale": 1.0
+        "font_size": 72,
+        "scale": 1.0,
+        "value_format": "minutes"
       },
       {
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.6438,
+        "rel_x": 0.6,
         "rel_y": 0.2733,
-        "font_size": 26,
-        "value_font_size": 40,
+        "font_size": 34,
+        "value_font_size": 48,
         "scale": 1.0,
         "depth_unit": "m",
         "title_box": false,
@@ -54,10 +55,10 @@
       },
       {
         "field": "custom:NDL",
-        "rel_x": 0.6438,
+        "rel_x": 0.6,
         "rel_y": 0.2733,
         "color": "#00ADED",
-        "font_size": 22,
+        "font_size": 30,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
@@ -67,10 +68,10 @@
       },
       {
         "field": "ndl",
-        "rel_x": 0.6438,
+        "rel_x": 0.6,
         "rel_y": 0.3189,
         "color": "#FFFFFF",
-        "font_size": 28,
+        "font_size": 50,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
@@ -83,7 +84,7 @@
         "rel_x": 0.1489,
         "rel_y": 0.4055,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -91,7 +92,7 @@
         "rel_x": 0.1489,
         "rel_y": 0.4602,
         "color": "#FFFFFF",
-        "font_size": 40,
+        "font_size": 72,
         "scale": 1.0
       },
       {
@@ -99,7 +100,7 @@
         "rel_x": 0.3991,
         "rel_y": 0.4055,
         "color": "#00ADED",
-        "font_size": 22,
+        "font_size": 30,
         "scale": 1.0
       },
       {
@@ -107,7 +108,7 @@
         "rel_x": 0.3991,
         "rel_y": 0.4602,
         "color": "#FFFFFF",
-        "font_size": 34,
+        "font_size": 61,
         "scale": 1.0
       },
       {
@@ -115,7 +116,7 @@
         "rel_x": 0.5852,
         "rel_y": 0.4055,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
@@ -123,7 +124,7 @@
         "rel_x": 0.5913,
         "rel_y": 0.4602,
         "color": "#FFFFFF",
-        "font_size": 40,
+        "font_size": 72,
         "scale": 1.0
       },
       {
@@ -131,7 +132,7 @@
         "rel_x": 0.756,
         "rel_y": 0.4739,
         "color": "#00ADED",
-        "font_size": 16,
+        "font_size": 22,
         "scale": 1.0
       },
       {
@@ -139,44 +140,51 @@
         "rel_x": 0.1479,
         "rel_y": 0.6335,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
         "field": "gasmix",
-        "rel_x": 0.1479,
+        "rel_x": 0.255,
         "rel_y": 0.6882,
         "color": "#FFFFFF",
-        "font_size": 40,
+        "font_size": 72,
         "scale": 1.0
       },
       {
         "field": "divemode",
         "rel_x": 0.1479,
-        "rel_y": 0.7611,
+        "rel_y": 0.688,
         "color": "#FFFFFF",
-        "font_size": 32,
+        "font_size": 56,
         "scale": 1.0
       },
       {
         "field": "custom:TTS",
-        "rel_x": 0.6438,
+        "rel_x": 0.6,
         "rel_y": 0.6335,
         "color": "#00ADED",
-        "font_size": 26,
+        "font_size": 35,
         "scale": 1.0
       },
       {
         "field": "tts",
-        "rel_x": 0.6438,
+        "rel_x": 0.6,
         "rel_y": 0.6882,
         "color": "#FFFFFF",
-        "font_size": 40,
+        "font_size": 72,
         "scale": 1.0
       }
     ],
     "path": "normal.png",
-    "scale": 0.75
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.1281,
+      "y0": 0.1548,
+      "x1": 0.873,
+      "y1": 0.8399,
+      "shape": "rect"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

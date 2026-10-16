@@ -83,7 +83,7 @@
         "type": "notice",
         "rel_x": 0.17,
         "rel_y": 0.62,
-        "width": 640,
+        "width": 600,
         "font_size": 60,
         "caption_font_size": 28,
         "scale": 1.0,
@@ -91,7 +91,14 @@
       }
     ],
     "path": "normal.png",
-    "scale": 0.75
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.12,
+      "y0": 0.21,
+      "x1": 0.8,
+      "y1": 0.8,
+      "shape": "rect"
+    }
   },
   "design_width": 1920,
   "design_height": 1080

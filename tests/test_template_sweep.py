@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from gui.hud_renderer import badge_lines, notice_for, resolve_element_text, rules_manufacturer
+from gui.hud_renderer import apply_value_format, badge_lines, notice_for, resolve_element_text, rules_manufacturer
 from utils.dummy_telemetry import STATE_OPTIONS, build_dummy_dive, forced_dive, waypoint_at
 from utils.hud_designer import element_kind, element_native_bounds
 from utils.hud_rules_engine import resolve_state
@@ -87,10 +87,10 @@ def sweep_page(layout, size, situation, wp, waypoints):
         name = elem.get("id") or elem.get("label") or elem.get("field", kind)
         text, lines = None, None
         if kind == "text":
-            text, _ = resolve_element_text(layout, elem.get("field", ""), wp, waypoints)
+            text, raw = resolve_element_text(layout, elem.get("field", ""), wp, waypoints)
             if text in (None, ""):
                 continue
-            text = str(text)
+            text = str(apply_value_format(elem, text, raw))
         elif kind == "badge":
             lines = badge_lines(manufacturer, model, elem, wp, waypoints)
             if not lines:
@@ -103,9 +103,16 @@ def sweep_page(layout, size, situation, wp, waypoints):
         boxes.append((name, kind, element_native_bounds(elem, size[0], size[1], text=text, badge_lines=lines)))
     issues = []  # (key, detail): the key names the pair / element, the detail the numbers
     w, h = size
+    screen = layout["hud_skin"].get("screen")
+    if isinstance(screen, dict):
+        # the computer's screen inside the skin: text must stay on the glass
+        sx0, sy0, sx1, sy1 = (float(screen[k]) * d for k, d in (("x0", w), ("y0", h), ("x1", w), ("y1", h)))
+        where = "the screen"
+    else:
+        sx0, sy0, sx1, sy1, where = 0.0, 0.0, w, h, "the skin"
     for name, kind, (x0, y0, x1, y1) in boxes:
-        if x0 < -SLACK or y0 < -SLACK or x1 > w + SLACK or y1 > h + SLACK:
-            issues.append((f"{name} leaves the skin", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of {w:.0f}x{h:.0f}"))
+        if x0 < sx0 - SLACK or y0 < sy0 - SLACK or x1 > sx1 + SLACK or y1 > sy1 + SLACK:
+            issues.append((f"{name} leaves {where}", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of ({sx0:.0f},{sy0:.0f})-({sx1:.0f},{sy1:.0f})"))
     textual = [(n, k, b) for n, k, b in boxes if k in ("text", "badge", "notice")]
     graphics = [(n, k, b) for n, k, b in boxes if k not in ("text", "badge", "notice")]
     for i, (na, ka, ba) in enumerate(textual):

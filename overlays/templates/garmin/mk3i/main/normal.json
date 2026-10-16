@@ -111,6 +111,13 @@
         "small_suffix": "seconds",
         "small_suffix_scale": 0.33
       }
-    ]
+    ],
+    "screen": {
+      "x0": 0.15,
+      "y0": 0.225,
+      "x1": 0.85,
+      "y1": 0.75,
+      "shape": "ellipse"
+    }
   }
 }

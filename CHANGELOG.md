@@ -50,6 +50,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   and the Descent X50i's no longer touch the digits.
 
 ### Changed
+- Overlays: every built-in template now knows where the computer's screen
+  is inside its picture. Nothing is drawn outside it (an alert box or a
+  wide value stops at the glass, as on the real device), the Overlay
+  Designer outlines the screen edge in the design view, and the layout check
+  reports anything placed on the bezel. A template sets it with a `screen`
+  entry on its skin (fractions of the picture, rectangle or ellipse).
+- Overlays: the Perdix 2, Petrel and Perdix 3 Tec pages use type about
+  twice as large, as the real Tec screens do, with the TTS right-aligned and
+  the Teric's TTS in whole minutes.
 - Overlays: Shearwater stop badges follow the manual's figures more closely:
   the check mark sits in front of the time or the stop time ("✓ 2:59",
   "6m ✓ 2min"), the up arrow shows only while approaching a deco stop and a
