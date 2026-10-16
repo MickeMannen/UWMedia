@@ -125,10 +125,12 @@ def sweep_page(layout, size, situation, wp, waypoints):
 
 def sweep_report(layout, size):
     """{issue key: [details...]} over every situation."""
+    from utils.hud_rules_engine import rule_overrides
     report = {}
-    for situation, wp, waypoints in situations():
-        for key, detail in sweep_page(layout, size, situation, wp, waypoints):
-            report.setdefault(key, []).append(detail)
+    with rule_overrides(layout.get("rules")):
+        for situation, wp, waypoints in situations():
+            for key, detail in sweep_page(layout, size, situation, wp, waypoints):
+                report.setdefault(key, []).append(detail)
     return report
 
 

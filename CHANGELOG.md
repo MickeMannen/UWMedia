@@ -59,6 +59,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Overlays: the Perdix 2, Petrel and Perdix 3 Tec pages use type about
   twice as large, as the real Tec screens do, with the TTS right-aligned and
   the Teric's TTS in whole minutes.
+- Overlays: on Shearwater main pages the safety stop counts down again once
+  the deco stops are cleared, as the manual describes for the recreational
+  modes; the deco-clear count-up stays on the Tec pages, where the computer
+  runs it. The safety stop is 3 minutes unless a template enables the
+  computer's Adapt rule, and the GTR slot reads "deco" while stops are
+  required.
 - Overlays: Shearwater stop badges follow the manual's figures more closely:
   the check mark sits in front of the time or the stop time ("✓ 2:59",
   "6m ✓ 2min"), the up arrow shows only while approaching a deco stop and a

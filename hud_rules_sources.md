@@ -138,6 +138,26 @@ carries its own `_source`; the table is the summary.
 | X50i main | the stop box takes the NDL corner and the tissue bar disappears; the alert sits in a bordered box top right over the tank name; alerts of two lines as the table prints them | real screenshots `test_data/dive_computers/garmin_x50i/x50i_safety_stop.png`, `x50i_deco_required_trimix_o2_17_he_40.png` (night mode, so the colours are not read from them); manual p.12-13 | verified (layout), assumed (box colours) |
 | mk3i main | Big Numbers layout | real screenshots `test_data/dive_computers/garmin_mk3i`; manual p.8 figure | verified |
 
+## Differential check against the simulator (`simulator.md` A7, 2026-10-16)
+
+Two scripted dives (the dummy-dive profile; a 36 m / 18 min Nx32 dive
+following the Perdix 2's stops with a 40 s violation and a paused safety
+stop) run in the simulator and through UWMedia's state machine on the same
+depths and stop data. Results, second by second:
+
+| Item | Result | Action |
+|---|---|---|
+| Deco phases (far / approach / at stop / violation), Perdix 2 | agree within 1 s | none |
+| Safety stop after deco, Perdix 2 | the simulator (and Perdix 2 p.28, Perdix 3 p.60) counts the safety stop down after the stops clear; UWMedia ran the deco-clear counter | `deco_clear.count_up` false at brand level; Tec pages set it true in their layout `rules` |
+| Safety stop duration | simulator 3 min (its default); UWMedia 5 min (Adapt: past 30 m) | 3 min fixed is the default; `adapt.enabled` turns the 5 min rule on. The manual (p.55) offers 3 min / Adapt / CntUp and names no default: assumed |
+| Safety stop timing (pending, counting, paused, resumed, complete) | identical after the change | none |
+| Garmin safety-stop window | identical (start within 1 m of 5 m, 3 min) | none |
+| Garmin safety stop after deco | the simulator shows one; UWMedia none (a real Mk3i log raised no safety-stop event after its deco) | kept: the real log wins |
+| GTR (Shearwater formula) | within 1 min over the whole dive | none; the GTR slot now reads "deco" during stops (p.26) rather than "wait" |
+| GF99 / SurfGF | within 2-6 points (different tissue bookkeeping) | none |
+| Low NDL alert | same second | none |
+| MISSED DECO STOP timing | the simulator raises its CEILING alarm at once; our notice after 30 s (assumed) | still assumed |
+
 ## Computed values and persistent notifications (`simulator.md` A6)
 
 | Rule key | Value | Source | Status |

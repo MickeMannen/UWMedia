@@ -1609,6 +1609,11 @@ class OverlayDesignerBackend(QObject):
         wp, waypoints = self._telemetry_for_render()
         native_w, native_h = doc.skin_native_size()
         layout = doc.layout
+        from utils.hud_rules_engine import rule_overrides
+        with rule_overrides(layout.get("rules")):
+            return self._native_bounds_for(doc, layout, wp, waypoints, native_w, native_h)
+
+    def _native_bounds_for(self, doc, layout, wp, waypoints, native_w, native_h) -> List[Tuple[float, float, float, float]]:
         result = []
         for elem in doc.elements:
             kind = element_kind(elem)
@@ -2364,9 +2369,10 @@ class OverlayDesignerBackend(QObject):
             manufacturer = self.document.rules_manufacturer if self.document else None
             model = self.document.model if self.document else None
             from utils.hud_notices import active_notice
-            from utils.hud_rules_engine import stop_phase
-            state, phase, _, _ = stop_phase(manufacturer, model, wp, waypoints)
-            notice = active_notice(manufacturer, model, wp, waypoints)
+            from utils.hud_rules_engine import rule_overrides, stop_phase
+            with rule_overrides(self.document.layout.get("rules") if self.document else None):
+                state, phase, _, _ = stop_phase(manufacturer, model, wp, waypoints)
+                notice = active_notice(manufacturer, model, wp, waypoints)
             depth = f"{wp.depth:.1f} m" if wp.depth is not None else "--"
             temp = f"{wp.temp:.1f} °C" if wp.temp is not None else "--"
             state_text = f"{state} ({phase})" if phase else state

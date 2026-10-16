@@ -64,8 +64,9 @@ def test_dummy_dive_passes_through_every_state_in_order():
     assert at(1300)[2] == "MISSED DECO STOP"  # 30 s above the stop
     assert at(1400)[:2] == ("deco", "at_stop")
     assert at(1440)[0] == "clear"  # the last stop cleared
-    assert at(1520)[0] in ("clear", "safety_stop")  # a Perdix counts the deco clear and the safety stop
-    assert at(1900) == ("clear", "clear", None)  # a Perdix keeps its deco-clear count-up to the surface
+    assert at(1520)[:2] == ("safety_stop", "counting")  # after deco the safety stop counts down (manual p.28)
+    assert at(1590)[:2] == ("safety_stop", "paused")
+    assert at(1900) == ("safety_stop", "complete", None)  # "Complete" until the dive ends
 
     # Garmin reads the same dive through its own alerts and margins
     g = ("Garmin", "mk3i")

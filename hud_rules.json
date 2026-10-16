@@ -31,7 +31,8 @@
       "adapt": {
         "deep_m": 30.0,
         "low_ndl_sec": 300,
-        "duration_sec": 300
+        "duration_sec": 300,
+        "enabled": false
       },
       "min_depth": 2.4,
       "max_depth": 8.3
@@ -112,7 +113,8 @@
       "ceiling_phase": true
     },
     "deco_clear": {
-      "count_up": true
+      "count_up": false,
+      "_source": "Perdix 3 Rev B p.60: 'By default, the safety stop counter is enabled in recreational modes and the deco clear counter is enabled in technical modes'; Perdix 2 Rec p.28: once the stops are complete the safety stop counts down. The Tec pages turn the counter on with a layout rule override ({\"rules\": {\"deco_clear\": {\"count_up\": true}}}); checked against the simulator's Perdix 2 (A7)"
     },
     "sidemount_switch": {
       "threshold_bar": 21.0,
@@ -338,7 +340,7 @@
       "deco": 1.61,
       "_source": "p.62"
     },
-    "_safety_stop": "p.27 (11 m trigger, countdown below 6 m, window 2.4-8.3 m, yellow when paused, reset below 11 m, Complete); adapt p.17; same on Peregrine TX Rev C p.26, Petrel 3 Rec Rev C p.26, Teric Rev H5 p.25, Tern Rev B-1 p.24, Perdix 3 Rev B p.58-59",
+    "_safety_stop": "p.27 (11 m trigger, countdown below 6 m, window 2.4-8.3 m, yellow when paused, reset below 11 m, Complete); adapt p.17; same on Peregrine TX Rev C p.26, Petrel 3 Rec Rev C p.26, Teric Rev H5 p.25, Tern Rev B-1 p.24, Perdix 3 Rev B p.58-59. Duration: 3 min fixed by default (Deco Setup p.55 offers 3 min, Adapt and CntUp; the default is taken as 3 min, as the simulator does); Adapt's 5 min rule stays available with adapt.enabled",
     "tank_reserve": {
       "default_bar": 50,
       "critical_min_bar": 21,

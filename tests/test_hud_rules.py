@@ -394,14 +394,33 @@ def test_shearwater_safety_stop_pauses_outside_2_4_to_8_3m_and_adapts_to_5min():
     left_before = safety_stop_phase("Shearwater", "Perdix 2", at[805], wps)[1]
     assert safety_stop_phase("Shearwater", "Perdix 2", at[855], wps)[1] == left_before  # paused at 1 m: no countdown
     assert safety_stop_phase("Shearwater", "Perdix 2", at[950], wps)[0] == "counting"
+    # Deco Setup (manual p.55) offers 3 min, Adapt and CntUp: 3 min fixed is the
+    # default, so a dive past 30 m still plans 3:00 ...
     deep = _profile([(0, 0), (60, 32), (300, 32), (600, 5), (1000, 5)])
-    assert safety_stop_phase("Shearwater", "Perdix 2", deep[200], deep) == ("pending", 300)  # Adapt: 5:00 past 30 m
+    assert safety_stop_phase("Shearwater", "Perdix 2", deep[200], deep) == ("pending", 180)
+    # ... and Adapt's 5:00 past 30 m (or under 5 min of NDL) applies once a page enables it
+    from utils.hud_rules_engine import rule_overrides
+    adapt_rule = dict(get_rule_config("Shearwater", "Perdix 2", "safety_stop"))
+    adapt_rule["adapt"] = {**adapt_rule["adapt"], "enabled": True}
     low_ndl = _profile([(0, 0), (60, 20), (600, 20), (700, 5), (1000, 5)])
     low_ndl[300].ndl = 240
-    assert safety_stop_phase("Shearwater", "Perdix 2", low_ndl[400], low_ndl) == ("pending", 300)
+    with rule_overrides({"safety_stop": adapt_rule}):
+        assert safety_stop_phase("Shearwater", "Perdix 2", deep[200], deep) == ("pending", 300)
+        assert safety_stop_phase("Shearwater", "Perdix 2", low_ndl[400], low_ndl) == ("pending", 300)
+    assert safety_stop_phase("Shearwater", "Perdix 2", low_ndl[400], low_ndl) == ("pending", 180)
 
 
-def test_shearwater_deco_clear_counts_up_and_replaces_the_safety_stop():
+def test_shearwater_deco_clear_counts_up_on_a_page_that_asks_for_it():
+    # Perdix 3 manual p.60: the deco clear counter is on by default in the
+    # technical modes only; a Tec page turns it on with a layout rule override.
+    from utils.hud_rules_engine import rule_overrides
+    with rule_overrides({"deco_clear": {"count_up": True}}):
+        wps = _check_deco_clear_count_up()
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Garmin", "x50i", at[2300], wps) == "normal"  # a Descent has no deco-clear counter
+
+
+def _check_deco_clear_count_up():
     wps = _profile([(0, 0), (120, 40), (1500, 40), (1700, 6), (2000, 6), (2100, 3), (2400, 3), (2430, 0)])
     for w in wps:
         if 1400 <= w.time_since_start < 2000:
@@ -414,8 +433,9 @@ def test_shearwater_deco_clear_counts_up_and_replaces_the_safety_stop():
     assert deco_clear_seconds("Shearwater", "Perdix 2", at[2000], wps) == 0
     assert deco_clear_seconds("Shearwater", "Perdix 2", at[2300], wps) == 300
     assert stop_phase("Shearwater", "Perdix 2", at[2300], wps) == ("clear", "clear", 300, None)
-    assert safety_stop_phase("Shearwater", "Perdix 2", at[2300], wps) == (None, 0)  # no safety stop after deco
-    assert resolve_state("Garmin", "x50i", at[2300], wps) == "normal"  # Garmin has no deco-clear counter
+    # the safety stop runs after deco too (manual p.28), but on this page the clear counter wins
+    assert safety_stop_phase("Shearwater", "Perdix 2", at[2300], wps)[0] in ("counting", "complete")
+    return wps
 
 
 def test_sidemount_switch_target_follows_the_21_bar_threshold():
@@ -499,3 +519,21 @@ def test_underscore_keys_in_rules_are_annotations_not_config(monkeypatch):
     badge = engine.get_badge_config("Shearwater", "Perdix 2", "safety_stop")
     assert badge == {"label": "SAFETY STOP", "color": "#00ADED"}
     assert engine.get_dynamic_color("Shearwater", "Perdix 2", "ndl", 240, "#000000") == "#FFFF00"
+
+
+
+def test_shearwater_safety_stop_follows_deco_on_a_recreational_page():
+    # Perdix 2 manual p.28: once all decompression stops are complete, the
+    # safety stop begins counting down (the main page; the simulator's Perdix 2
+    # agrees, A7). No count-up unless the page runs the deco clear counter.
+    wps = _profile([(0, 0), (60, 36), (1080, 36), (1200, 6), (1500, 6), (1510, 4.5), (1560, 4.5), (1600, 1.8), (1640, 1.8), (1650, 4.5), (1900, 4.5), (1950, 0)])
+    for w in wps:
+        if 1100 <= w.time_since_start <= 1500:
+            w.deco_stop_depth = w.next_stop_depth = 6.0
+            w.next_stop_time = 60
+    at = {w.time_since_start: w for w in wps}
+    assert resolve_state("Shearwater", "Perdix 2", at[1300], wps) == "deco"
+    assert stop_phase("Shearwater", "Perdix 2", at[1530], wps)[:2] == ("safety_stop", "counting")
+    assert stop_phase("Shearwater", "Perdix 2", at[1620], wps)[:2] == ("safety_stop", "paused")
+    assert stop_phase("Shearwater", "Perdix 2", at[1880], wps)[:2] == ("safety_stop", "complete")  # 3 min fixed by default
+    assert deco_clear_seconds("Shearwater", "Perdix 2", at[1530], wps) is None

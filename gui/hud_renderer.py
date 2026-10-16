@@ -356,7 +356,9 @@ def draw_hud(frame, layout, waypoint, preloaded_skin=None, render_log=False, way
     }
     screen = screen_box(hud_skin, skin_x, skin_y, w_hud, h_hud)
     before = frame.copy() if screen else None
-    draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=waypoints)
+    from utils.hud_rules_engine import rule_overrides
+    with rule_overrides(layout.get("rules")):
+        draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=waypoints)
     if screen:
         # Nothing is drawn outside the computer's screen: whatever the
         # elements put on the bezel (or beyond the skin) is undone, as on the
@@ -1631,8 +1633,12 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
         from utils.hud_gas import gas_time_remaining
         raw_val = gas_time_remaining(manufacturer, model, waypoint, waypoints)
         if raw_val is None:
-            from utils.hud_rules_engine import get_rule_config
-            return ("wait" if isinstance(get_rule_config(manufacturer, model, "gas_time"), dict) else "--"), None
+            from utils.hud_rules_engine import get_rule_config, resolve_state
+            if not isinstance(get_rule_config(manufacturer, model, "gas_time"), dict):
+                return "--", None
+            # Perdix 2 manual p.26: "wait" until two minutes of data; once deco
+            # stops are required the slot reads "deco" (GTR is for no-deco diving, p.44)
+            return ("deco" if resolve_state(manufacturer, model, waypoint, waypoints) == "deco" else "wait"), None
         return format_telemetry_value(field, raw_val), raw_val
     if field.startswith("custom:"):
         return field.replace("custom:", ""), None

@@ -1,9 +1,28 @@
+import contextlib
+import contextvars
 import json
 from typing import Dict, Any, List, Optional, Tuple
 
 from utils.resource_paths import find_resource
 
 _rules_cache = None
+
+
+# A page's own rule overrides (`"rules": {...}` at the top of its layout):
+# a Shearwater Tec page runs the deco-clear counter where the main page shows
+# the safety stop. Set for the duration of a render / measurement with
+# rule_overrides(); get_rule_config() reads them before the brand's rules.
+_rule_overrides: contextvars.ContextVar = contextvars.ContextVar("hud_rule_overrides", default=None)
+
+
+@contextlib.contextmanager
+def rule_overrides(overrides: Optional[Dict[str, Any]]):
+    """Apply a layout's `rules` block to every rule lookup inside the block."""
+    token = _rule_overrides.set(overrides if isinstance(overrides, dict) and overrides else None)
+    try:
+        yield
+    finally:
+        _rule_overrides.reset(token)
 
 
 def is_annotation_key(key: Any) -> bool:
@@ -69,6 +88,9 @@ def get_rule_config(manufacturer: Optional[str], model: Optional[str], rule_key:
     rules = load_rules_json()
     if is_annotation_key(rule_key):
         return None
+    overrides = _rule_overrides.get()
+    if overrides and rule_key in overrides:
+        return overrides[rule_key]
     # An annotation is never a brand or a model: look past it.
     if is_annotation_key(manufacturer):
         manufacturer = None
@@ -381,7 +403,7 @@ _timeline_cache: Dict[Any, Tuple[List[Any], Any]] = {}
 
 
 def _cached_timeline(kind: str, manufacturer: Optional[str], model: Optional[str], waypoints: List[Any], build) -> Any:
-    key = (kind, id(waypoints), len(waypoints), manufacturer, model)
+    key = (kind, id(waypoints), len(waypoints), manufacturer, model, repr(_rule_overrides.get()))
     cached = _timeline_cache.get(key)
     if cached is not None and cached[0] is waypoints:
         return cached[1]
@@ -476,27 +498,31 @@ def _shearwater_safety_timeline(cfg: Dict[str, Any], manufacturer, model, waypoi
     inside `count_range` (2.4-8.3 m), 'paused' outside it (time in
     yellow); 'complete' once it reaches zero. Adapt (`adapt`): the planned
     time becomes adapt.duration_sec (5:00) once the dive goes deeper than
-    adapt.deep_m or the NDL drops under adapt.low_ndl_sec. Mandatory deco
-    replaces the safety stop and, once cleared, the deco-clear counter
-    takes its place (p.28) - nothing here after deco."""
+    adapt.deep_m or the NDL drops under adapt.low_ndl_sec (only with
+    adapt.enabled: 3 min fixed is the default). Mandatory deco replaces the
+    safety stop; once cleared the stop starts over (p.28) - unless the page
+    runs the deco-clear counter instead (`deco_clear.count_up`, Tec pages),
+    which resolve_state() prefers."""
     duration = int(cfg.get("duration_sec", 180))
     trigger = float(cfg.get("trigger_max_depth", 11.0))
     start_below = float(cfg.get("start_below", 6.0))
     lo, hi = cfg.get("count_range", [2.4, 8.3])
     lo, hi = float(lo), float(hi)
-    adapt = cfg.get("adapt") if isinstance(cfg.get("adapt"), dict) else None
+    adapt = cfg.get("adapt") if isinstance(cfg.get("adapt"), dict) and cfg["adapt"].get("enabled") else None
 
     timeline: Dict[int, Tuple[Optional[str], int]] = {}
-    armed, started, planned, left, prev_t, had_deco = False, False, duration, duration, None, False
+    armed, started, planned, left, prev_t = False, False, duration, duration, None
     for wp in waypoints:
         t = getattr(wp, "time_since_start", 0) or 0
         depth = getattr(wp, "depth", 0.0) or 0.0
         dt = 0 if prev_t is None else max(0, t - prev_t)
         prev_t = t
         if _in_deco(manufacturer, model, wp):
-            had_deco = True
-        if had_deco:
-            timeline[t] = (None, 0)
+            # Deco stops replace the safety stop; once they are cleared it
+            # starts over (Perdix 2 manual p.28: "the safety stop will begin
+            # counting down"), pending again until shallower than 6 m.
+            armed, started, left = True, False, planned
+            timeline[t] = (None, planned)
             continue
         max_depth = getattr(wp, "max_depth", 0.0) or 0.0
         if not armed and max(max_depth, depth) > trigger:
@@ -575,7 +601,7 @@ def deco_clear_timeline(manufacturer: Optional[str], model: Optional[str], waypo
     if not waypoints:
         return None
     rule = get_rule_config(manufacturer, model, "deco_clear")
-    if not isinstance(rule, dict):
+    if not isinstance(rule, dict) or not rule.get("count_up", True):
         return None
 
     def build():

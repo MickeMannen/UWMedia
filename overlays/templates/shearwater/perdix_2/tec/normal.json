@@ -1,6 +1,11 @@
 {
   "manufacturer": "Shearwater",
   "model": "Perdix 2",
+  "rules": {
+    "deco_clear": {
+      "count_up": true
+    }
+  },
   "hud_skin": {
     "type": "image",
     "anchor": "BOTTOM_LEFT",
