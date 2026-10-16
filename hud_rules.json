@@ -48,12 +48,14 @@
         "color": "#00ADED",
         "value_color": "#FFFFFF",
         "counting_color": "#00C800",
-        "complete_color": "#00C800",
+        "complete_color": "#00ADED",
         "paused_value_color": "#FFFF00",
         "check_mark": true,
         "show_depth": false,
         "timer_format": "m:ss",
-        "value_align": "center"
+        "value_align": "center",
+        "complete_value_text": "Complete",
+        "complete_value_color": "#00C800"
       },
       "deco": {
         "label": "DECO STOP",
@@ -73,7 +75,7 @@
         "show_depth": false,
         "timer_format": "m:ss"
       },
-      "_source": "p.27-28, p.33 and the figures; real photo test_data/perdix2/Perdix_2_1.webp"
+      "_source": "p.27-28, p.33 and the figures; real photo test_data/perdix2/Perdix_2_1.webp; p.27-28 figures: check mark in front of the value (✓2:59, 20ft ✓2min), 'Complete' in green under the blue title when the countdown ends, up arrow only while approaching, down arrow above the stop"
     },
     "tissue_load": [
       {
@@ -140,7 +142,11 @@
           "violation_color": "#FFFF00",
           "ceiling_violation_color": "#FF0000"
         },
-        "_source": "Teric Rev H5 p.25-26: SAFETY in a green box while counting, SAFETY / PAUSED in yellow, SAFETY / CLEAR when done; DECO red; stop info yellow when above the stop but below the ceiling, flashing red above the ceiling (ceiling_violation_color needs the ceiling phase, A2)"
+        "_source": "Teric Rev H5 p.25-26: SAFETY in a green box while counting, SAFETY / PAUSED in yellow, SAFETY / CLEAR when done; DECO red; stop info yellow when above the stop but below the ceiling, flashing red above the ceiling (ceiling_violation_color needs the ceiling phase, A2); Teric p.13 (Tern p.12): the Deco Clear counter is a boxed green CLEAR title over the green count-up",
+        "clear": {
+          "title_box": true,
+          "value_color": "#00C800"
+        }
       },
       "notice_style": {
         "style": "banner",
@@ -218,7 +224,11 @@
           "violation_color": "#FFFF00",
           "ceiling_violation_color": "#FF0000"
         },
-        "_source": "Tern Rev B-1 p.24-25: SAFETY in a green box while counting, SAFETY / PAUSED in yellow, SAFETY / CLEAR when done; DECO red; stop info yellow when above the stop but below the ceiling, flashing red above the ceiling (ceiling_violation_color needs the ceiling phase, A2)"
+        "_source": "Tern Rev B-1 p.24-25: SAFETY in a green box while counting, SAFETY / PAUSED in yellow, SAFETY / CLEAR when done; DECO red; stop info yellow when above the stop but below the ceiling, flashing red above the ceiling (ceiling_violation_color needs the ceiling phase, A2); Teric p.13 (Tern p.12): the Deco Clear counter is a boxed green CLEAR title over the green count-up",
+        "clear": {
+          "title_box": true,
+          "value_color": "#00C800"
+        }
       },
       "notice_style": {
         "style": "banner",
@@ -727,43 +737,43 @@
       "notices": [
         {
           "id": "po2_crit_high",
-          "text": "ASCEND OR SWITCH GAS PO2 is high.",
+          "text": "ASCEND OR SWITCH GAS\nPO2 is high.",
           "caption": "",
           "when": "fit_alert",
           "alert": "po2_crit_high",
-          "_source": "X50i p.12"
+          "_source": "X50i p.12; two lines as the table prints it"
         },
         {
           "id": "po2_crit_low",
-          "text": "DESCEND OR SWITCH GAS PO2 is low.",
+          "text": "DESCEND OR SWITCH GAS\nPO2 is low.",
           "caption": "",
           "when": "fit_alert",
           "alert": "po2_crit_low",
-          "_source": "X50i p.12"
+          "_source": "X50i p.12; two lines as the table prints it"
         },
         {
           "id": "deco_ceiling_broken",
-          "text": "DESCEND TO {stop} You are above your deco ceiling.",
+          "text": "DESCEND TO {stop}\nYou are above your deco ceiling.",
           "caption": "",
           "when": "fit_alert",
           "alert": "deco_ceiling_broken",
-          "_source": "X50i p.12"
+          "_source": "X50i p.12; two lines as the table prints it"
         },
         {
           "id": "ascent_critical",
-          "text": "SLOW YOUR ASCENT Ascending too fast.",
+          "text": "SLOW YOUR ASCENT\nAscending too fast.",
           "caption": "",
           "when": "fit_alert",
           "alert": "ascent_critical",
-          "_source": "X50i p.13"
+          "_source": "X50i p.13; two lines as the table prints it"
         },
         {
           "id": "ndl_reached",
-          "text": "NDL exceeded. Deco required.",
+          "text": "NDL exceeded.\nDeco required.",
           "caption": "",
           "when": "fit_alert",
           "alert": "ndl_reached",
-          "_source": "X50i p.12"
+          "_source": "X50i p.12; two lines as the table prints it"
         },
         {
           "id": "approaching_first_deco_stop",

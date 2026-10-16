@@ -322,8 +322,8 @@ ColumnLayout {
                 // (a `style: "box"` badge - its label and value sizes are the text inside)
                 Label { text: "Width"; visible: inspector.sizedKind }
                 NumField { attr: "width"; value: inspector.sel.width; visible: inspector.sizedKind; ToolTip.text: inspector.kind === "badge" ? "Box width in skin px - the text inside follows Label size / Value size" : inspector.kind === "notice" ? "The message is shrunk to fit this width (skin px); the Confirm hint sits at its right edge" : ""; ToolTip.visible: hovered && ToolTip.text.length > 0 }
-                Label { text: "Height"; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) !== "banner") }
-                NumField { attr: "height"; value: inspector.sel.height; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) !== "banner") }
+                Label { text: "Height"; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) === "text") }
+                NumField { attr: "height"; value: inspector.sel.height; visible: inspector.sizedKind && !(inspector.kind === "notice" && String(inspector.sel.style) === "text") }
                 Label { text: "Up"; visible: inspector.kind === "ascent_chevrons" }
                 NumField { attr: "up_count"; value: inspector.sel.up_count; visible: inspector.kind === "ascent_chevrons"; ToolTip.text: "Number of upward (ascent) chevrons"; ToolTip.visible: hovered }
                 Label { text: "Down"; visible: inspector.kind === "ascent_chevrons" }
@@ -459,10 +459,10 @@ ColumnLayout {
                 ChoiceRow {
                     Layout.columnSpan: 3
                     visible: inspector.kind === "notice"
-                    attr: "style"; options: ["text", "banner"]; labels: ["Text", "Banner"]
+                    attr: "style"; options: ["text", "banner", "box"]; labels: ["Text", "Banner", "Box"]
                     current: String(inspector.sel.style)
                     HoverHandler { id: noticeStyleHover }
-                    ToolTip.text: "Text: caption and message in the notice colour (Perdix). Banner: a filled band with black text (Teric)."
+                    ToolTip.text: "Text: caption and message in the notice colour (Perdix). Banner: a filled band with black text (Teric). Box: a dark outlined box with a warning triangle (Descent X50i)."
                     ToolTip.visible: noticeStyleHover.hovered
                     ToolTip.delay: 400
                 }

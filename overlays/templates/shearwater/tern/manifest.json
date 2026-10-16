@@ -6,5 +6,18 @@
       "id": "main",
       "name": "Main Screen"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "As the Teric: manual Rev B-1 p.12, p.24-25"
+    ],
+    "assumed": [
+      "Field set never checked against a real Tern export"
+    ],
+    "not_shown": [
+      "Standard layout",
+      "Info pages"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

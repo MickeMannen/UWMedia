@@ -10,5 +10,21 @@
       "id": "gases",
       "name": "Gases"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Big Numbers layout against real screenshots (test_data/dive_computers/garmin_mk3i)",
+      "Colours and stop rules (manual p.7-8, p.10, p.13-14)"
+    ],
+    "assumed": [
+      "NDL colour bands",
+      "Reserve and critical pressure defaults"
+    ],
+    "not_shown": [
+      "Standard layout",
+      "Alert messages (full-screen on the watch; no notice element on this page)",
+      "Gauges (arcs)"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

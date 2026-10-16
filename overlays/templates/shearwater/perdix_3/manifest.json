@@ -14,5 +14,19 @@
       "id": "tec",
       "name": "Tec"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "SAFETY boxed title, PAUSED, SAFETY / CLEAR; DECO blue label over depth and minutes (manual Rev B p.58-60)",
+      "Tank rules (p.154)"
+    ],
+    "assumed": [
+      "Margins, padding and font sizes of all three pages were approximated from the figures, not measured on a device photo"
+    ],
+    "not_shown": [
+      "Persistent notifications",
+      "Info screens"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

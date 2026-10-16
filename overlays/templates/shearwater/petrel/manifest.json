@@ -10,5 +10,18 @@
       "id": "tec",
       "name": "Tec"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Same rules as the Perdix 2 (Petrel 3 Recreational manual Rev C p.26-27, p.56); Tec page row rules (Technical manual Rev B p.24-25)"
+    ],
+    "assumed": [
+      "Skin geometry from the Petrel 3 figures"
+    ],
+    "not_shown": [
+      "Persistent notifications",
+      "Info screens"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

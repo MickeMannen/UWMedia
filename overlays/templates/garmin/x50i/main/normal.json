@@ -21,7 +21,12 @@
         "width": 24,
         "height": 66,
         "marker_size": 8,
-        "label": "Tissue load"
+        "label": "Tissue load",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
       },
       {
         "id": "ascent_rate",
@@ -201,6 +206,20 @@
         "color": "#999999",
         "font_size": 43,
         "scale": 1.0
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "style": "box",
+        "rel_x": 0.44,
+        "rel_y": 0.183,
+        "width": 470,
+        "height": 62,
+        "font_size": 30,
+        "caption_font_size": 16,
+        "scale": 1.0,
+        "label": "Alert box (real screenshots: top right, over the tank name)"
       }
     ]
   }

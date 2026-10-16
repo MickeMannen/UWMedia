@@ -984,7 +984,7 @@ class OverlayDesignerBackend(QObject):
         elif key in ("reveal_profile", "stop_label"):
             doc.set_element_attr(index, key, True if bool(value) else None)
         elif key == "style":
-            if value not in ("segments", "fill", "text", "banner"):
+            if value not in ("segments", "fill", "text", "banner", "box"):
                 return
             default = _STYLE_DEFAULTS.get(element_kind(doc.element(index)), "segments")
             doc.set_element_attr(index, "style", None if value == default else value)

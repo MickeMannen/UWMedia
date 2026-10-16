@@ -63,6 +63,9 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   shading, Graph options); click a heading to fold or open it. The
   **Elements** heading folds the list the same way, showing the selected
   element's name while folded. The right-hand column scrolls.
+- A text element may carry `value_format` in its JSON (`"minutes"` for a
+  time in whole minutes, `"integer"` for a whole number) - the way a
+  Shearwater Tec row shows the dive time and stop depth.
 - **Ascent chevrons** follow the template's brand rules: Garmin gets chevrons
   over a divider bar (green / yellow / red, the lower one lit on descent),
   Shearwater six arrows and no bar - white under 9 m/min, yellow to 18,
@@ -96,7 +99,8 @@ log does not record when the diver pressed the button. Nothing is drawn
 while there is no notice. In the inspector: **Size** (message), **Caption
 size**, **Width** (the message shrinks to fit), **Style** (*Text*: caption
 and message in the notice colour; *Banner*: a filled band with black text
-and its own **Height**), **Confirm hint** (the button hint at the right,
+and its own **Height**; *Box*: a dark outlined box with a warning triangle,
+as a Descent X50i shows its alerts), **Confirm hint** (the button hint at the right,
 empty for none) and **Caption colour**. Tick **Hide while a notice shows** on
 the elements the notice covers - a Perdix replaces its whole bottom row with
 the message. The Shearwater Perdix 2, Petrel, Peregrine, Teric and Tern main

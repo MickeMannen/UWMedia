@@ -272,7 +272,7 @@ def element_native_bounds(
     if kind == "notice":
         # caption line over the message line, inside `width` (a banner has its own height)
         w = float(elem.get("width", 400))
-        if elem.get("style") == "banner":
+        if elem.get("style") in ("banner", "box"):
             return x, y, x + w, y + float(elem.get("height", 60))
         size = float(elem.get("font_size", 40)) * float(elem.get("scale", 1.0))
         cap = float(elem.get("caption_font_size", 18)) * float(elem.get("scale", 1.0))

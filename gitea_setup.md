@@ -1,6 +1,7 @@
 # Self-hosted Linux and Windows test runners (Gitea Actions on TrueNAS)
 
-Status: planned 2026-10-07, not set up yet.
+Status: planned 2026-10-07, not set up yet. Extended on 2026-10-16 by
+`local_ci.md` (macOS runner, phases for all three platforms); read that first.
 
 Goal: run the test suite on Linux and Windows automatically on every push to
 Gitea (`gitea.uklan`) while the TrueNAS server is up, without manual steps.

@@ -6,5 +6,21 @@
       "id": "main",
       "name": "Main Screen"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Deco row: NDL / TTS, DECO red, SAFETY boxed green, SAFETY / PAUSED, SAFETY / CLEAR, boxed CLEAR counter (manual Rev H5 p.13, p.25-26)",
+      "Banner notices: WARNING / INFO with a CLEAR tab (p.25-26)",
+      "Yellow above the stop, flashing red above the ceiling (p.26)"
+    ],
+    "assumed": [
+      "Banner size and position on the Big layout; the HIGH PPO2 banner wording"
+    ],
+    "not_shown": [
+      "Standard layout",
+      "Persistent warnings overlay (p.23)",
+      "Info pages"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

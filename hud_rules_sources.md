@@ -126,7 +126,19 @@ carries its own `_source`; the table is the summary.
 | Garmin | priority order | deduced (dangerous first; the manual lists alphabetically) | deduced |
 | Garmin | depth and stop badge yellow more than 2 m above the safety stop ceiling (`warn_above_m`, phase `warn`) | Mk3 p.13, X50i p.12 | verified |
 
-## Facts read but not yet in the rules (for `simulator.md` A5)
+## Display passes (`simulator.md` A5)
+
+| Template | Item | Source | Status |
+|---|---|---|---|
+| Perdix 2 main | zones, depth with small decimals, ascent arrows, NDL colours, safety stop pending with the NDL demoted below it | Rec manual p.12-13 figures | verified |
+| Perdix 2 main | check mark in front of the value ("✓2:59", "20ft ✓2min"), up arrow only while approaching, down arrow above the stop, "Complete" in green under a blue title when the countdown ends | p.27-28 figures | verified |
+| Perdix 2 main | Deco Clear counter look (green CLEAR, m:ss) | no figure in the recreational manual | assumed |
+| Perdix 2 / Petrel Tec | top row DEPTH / TIME / STOP / TIME with whole minutes and whole metres; once deco clears the STOP / TIME columns become a CLEAR count-up | Petrel 3 Technical manual Rev B p.24-25 (the Perdix 2's Tec layout is the same screen; its own technical manual is not on hand) | verified |
+| Teric, Tern | boxed green CLEAR counter over the green count-up; SAFETY / CLEAR | Teric p.13, Tern p.12 figures | verified |
+| X50i main | the stop box takes the NDL corner and the tissue bar disappears; the alert sits in a bordered box top right over the tank name; alerts of two lines as the table prints them | real screenshots `test_data/dive_computers/garmin_x50i/x50i_safety_stop.png`, `x50i_deco_required_trimix_o2_17_he_40.png` (night mode, so the colours are not read from them); manual p.12-13 | verified (layout), assumed (box colours) |
+| mk3i main | Big Numbers layout | real screenshots `test_data/dive_computers/garmin_mk3i`; manual p.8 figure | verified |
+
+## Facts read but not yet in the rules (for `simulator.md` A6)
 
 - Shearwater persistent notifications shown left of the NDL (Perdix 2
   p.23): `High CNS`, `MOD, go up`, `MOD, switch gas`, `Near MOD` (within

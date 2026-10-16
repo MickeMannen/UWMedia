@@ -678,8 +678,9 @@ def test_badge_lines_none_for_normal_and_three_lines_for_deco():
     deco = Waypoint(timestamp=datetime.now(), depth=12.0, time_since_start=0,
                     deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=180)
     lines = badge_lines("Shearwater", "Perdix 2", {**elem, "depth_unit": "m"}, deco)
-    # Perdix 2 manual p.33: "DECO STOP" in red, then "6m↑ 3min" in white on one line
-    assert [t for t, _, _ in lines] == ["DECO STOP", "6m↑ 3min"]
+    # Perdix 2 manual p.28, p.33: "DECO STOP" in red, then "6m 3min" in white on one
+    # line (the up arrow only while approaching the stop)
+    assert [t for t, _, _ in lines] == ["DECO STOP", "6m 3min"]
     assert [v for _, _, v in lines] == [False, True]
     assert [c for _, c, _ in lines] == [(255, 0, 0), (255, 255, 255)]
     # Garmin keeps its three lines
@@ -1100,8 +1101,14 @@ def test_perdix_badge_phases_from_the_manual():
     at_stop = Waypoint(timestamp=datetime.now(), depth=6.8, time_since_start=0, dive_time=0,
                        deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
     lines = badge_lines("Shearwater", "Perdix 2", elem, at_stop)
-    assert lines[0] == ("✓ DECO STOP", (0, 200, 0), False)       # green title with a check at the stop
-    assert lines[1][0] == "6m↑ 2min"
+    assert lines[0] == ("DECO STOP", (0, 200, 0), False)       # green title at the stop (p.28)
+    assert lines[1][0] == "6m✓ 2min"                           # the check mark in front of the time, as the figure
+    far = Waypoint(timestamp=datetime.now(), depth=20.0, time_since_start=0, dive_time=0,
+                   deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
+    assert badge_lines("Shearwater", "Perdix 2", elem, far)[1][0] == "6m 2min"  # no arrow far from the stop
+    above = Waypoint(timestamp=datetime.now(), depth=5.0, time_since_start=0, dive_time=0,
+                     deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
+    assert badge_lines("Shearwater", "Perdix 2", elem, above)[1][0] == "6m↓ 2min"  # "Descend to Deco Stop" figure
     approaching = Waypoint(timestamp=datetime.now(), depth=9.0, time_since_start=0, dive_time=0,
                            deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=120)
     assert badge_lines("Shearwater", "Perdix 2", elem, approaching)[0][1] == (255, 255, 0)  # yellow while approaching
@@ -1109,7 +1116,12 @@ def test_perdix_badge_phases_from_the_manual():
     counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
                         dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=150)
     sw = badge_lines("Shearwater", "Perdix 2", elem, counting)
-    assert [t for t, _, _ in sw] == ["✓ SAFETY STOP", "2:30"]
+    assert [t for t, _, _ in sw] == ["SAFETY STOP", "✓ 2:30"]  # p.28 figure: "✓2:59" under a green title
+    from utils.dummy_telemetry import build_dummy_dive, forced_dive, waypoint_at
+    done, history = forced_dive(waypoint_at(build_dummy_dive(), 720), "safety_done")
+    lines = badge_lines("Shearwater", "Perdix 2", elem, done, history)
+    assert [t for t, _, _ in lines] == ["SAFETY STOP", "Complete"]  # p.27: "the display changes to Complete"
+    assert [c for _, c, _ in lines] == [(0, 173, 237), (0, 200, 0)]  # blue title, green Complete (p.28 figure)
     assert sw[1][1] == (255, 255, 255)
     garmin = badge_lines("Garmin", "x50i", elem, counting)
     assert [t for t, _, _ in garmin] == ["STOP", "↑5m", "02:30"]
@@ -1201,7 +1213,7 @@ def test_perdix_3_badge_lines_and_boxed_title():
     assert badge_lines("Shearwater", "Perdix 3", elem, counting) == [("SAFETY", (0, 200, 0), False), ("3:22", (0, 200, 0), True)]
     deco = Waypoint(timestamp=datetime.now(), depth=23.6, time_since_start=0, dive_time=0,
                     deco_stop_depth=18.0, next_stop_depth=18.0, next_stop_time=60)
-    assert badge_lines("Shearwater", "Perdix 3", elem, deco) == [("DECO", (0, 173, 237), False), ("18m↑ 1min", (255, 255, 255), True)]
+    assert badge_lines("Shearwater", "Perdix 3", elem, deco) == [("DECO", (0, 173, 237), False), ("18m 1min", (255, 255, 255), True)]
     # the boxed title paints a green block behind "SAFETY" on the rendered page
     layout = _load_perdix3_layout("main")
     frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
@@ -1224,8 +1236,8 @@ def test_perdix_3_pages_hide_the_ndl_while_a_stop_shows(page):
 
 def test_shearwater_safety_stop_time_is_centred_under_the_title():
     # hud_rules.json gives the Shearwater safety stop value_align "center":
-    # the timer's ink is centred under "✓ SAFETY STOP" (check mark included),
-    # while the Garmin-style badge keeps every line on the left anchor.
+    # the timer's ink ("✓ 2:30", check mark included) is centred under
+    # "SAFETY STOP", while the Garmin-style badge keeps every line on the left anchor.
     from gui.hud_renderer import badge_title_ink_span, get_font
     layout = _shape_layout([{"type": "badge", "field": "state_badge", "font_size": 28, "value_font_size": 38,
                              "rel_x": 0.1, "rel_y": 0.1, "outline": False}], "Shearwater", "Perdix 2")
@@ -1233,8 +1245,8 @@ def test_shearwater_safety_stop_time_is_centred_under_the_title():
                         dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=150)
     frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
     draw_hud(frame, layout, counting, render_log=False)
-    green = (frame[:, :, 1] > 150) & (frame[:, :, 0] < 80) & (frame[:, :, 2] < 80)   # "✓ SAFETY STOP" in #00C800
-    white = (frame[:, :, 0] > 200) & (frame[:, :, 1] > 200) & (frame[:, :, 2] > 200)  # "2:30"
+    green = (frame[:, :, 1] > 150) & (frame[:, :, 0] < 80) & (frame[:, :, 2] < 80)   # "SAFETY STOP" in #00C800
+    white = (frame[:, :, 0] > 200) & (frame[:, :, 1] > 200) & (frame[:, :, 2] > 200)  # "✓ 2:30"
     assert green.any() and white.any()
     title_cols = np.where(green.any(axis=0))[0]
     timer_cols = np.where(white.any(axis=0))[0]

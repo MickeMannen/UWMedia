@@ -10,5 +10,23 @@
       "id": "gases",
       "name": "Gases"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Tissue, ascent, CNS and OTU colours (manual p.7, p.10)",
+      "Safety stop and deco stop boxes in the NDL corner, the tissue bar hidden meanwhile; alert box top right (real screenshots in test_data/dive_computers/garmin_x50i)",
+      "Alert texts (p.12-13), driven by the FIT log's own events"
+    ],
+    "assumed": [
+      "NDL colour bands (the manual only has alerts at 10 and 5 min)",
+      "Reserve and critical pressure defaults (50 / 25 bar)",
+      "Alert box colours (screenshots are in night mode)"
+    ],
+    "not_shown": [
+      "Dynamic depth page",
+      "Transceiver page",
+      "Compass"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

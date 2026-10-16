@@ -10,5 +10,24 @@
       "id": "tec",
       "name": "Tec"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Main screen zones, depth decimals, ascent arrows, NDL colours (Rec manual Rev C p.12-13)",
+      "Safety stop and deco stop badges: titles, check mark before the value, arrows, Complete (p.27-28)",
+      "Notification row: Warning / Alert, Confirm, yellow message (p.22, p.25-26)",
+      "Tank pressure on a yellow / red box below the reserve / critical pressure (p.40, p.57)",
+      "Tec page row rules: whole minutes, CLEAR counter (Petrel 3 Technical manual Rev B p.24-25)"
+    ],
+    "assumed": [
+      "Deco Clear counter look on the main page (green CLEAR, m:ss): no figure in the recreational manual",
+      "Notices stay 10 s: the device keeps them until a button press"
+    ],
+    "not_shown": [
+      "Persistent notifications left of the NDL (MOD, Near MOD, Better Gas, High CNS; p.23)",
+      "Surface interval and battery icon (p.12)",
+      "Info screens (p.14-16)"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }

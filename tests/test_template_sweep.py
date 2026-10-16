@@ -107,8 +107,9 @@ def sweep_page(layout, size, situation, wp, waypoints):
         if x0 < -SLACK or y0 < -SLACK or x1 > w + SLACK or y1 > h + SLACK:
             issues.append((f"{name} leaves the skin", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of {w:.0f}x{h:.0f}"))
     textual = [(n, k, b) for n, k, b in boxes if k in ("text", "badge", "notice")]
+    graphics = [(n, k, b) for n, k, b in boxes if k not in ("text", "badge", "notice")]
     for i, (na, ka, ba) in enumerate(textual):
-        for nb, kb, bb in textual[i + 1:]:
+        for nb, kb, bb in textual[i + 1:] + graphics:  # text against text, and text against an icon / bar / chevrons
             over = _overlap(ba, bb)
             if over:
                 issues.append((f"{na} overlaps {nb}", f"{situation}: by {over[0]:.0f}x{over[1]:.0f} px"))

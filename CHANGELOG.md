@@ -38,6 +38,23 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   and the Descent X50i's no longer touch the digits.
 
 ### Changed
+- Overlays: Shearwater stop badges follow the manual's figures more closely:
+  the check mark sits in front of the time or the stop time ("✓ 2:59",
+  "6m ✓ 2min"), the up arrow shows only while approaching a deco stop and a
+  down arrow when above it, and a finished safety stop reads "Complete"
+  under the blue title. The Teric and Tern deco-clear counter is a boxed
+  green CLEAR as on the watches.
+- Overlays: the Perdix 2 and Petrel Tec pages show the dive time and stop
+  time in whole minutes and the stop depth in whole metres, and once the
+  stops clear the STOP / TIME columns become the CLEAR count-up, as the
+  technical manual describes. Templates can ask for whole minutes or whole
+  numbers on any value (`value_format`).
+- Overlays: the Descent X50i page hides its tissue bar while the stop box
+  is up and shows the watch's alerts in a bordered box top right, as on
+  real screenshots; a third notice style, Box, is available in the designer.
+- Overlays: each built-in computer template now carries a note of what it
+  reproduces, what is assumed and what is not shown (`notes` in its
+  manifest).
 - Overlays: Teric and Tern templates show the safety stop as the watches do -
   "SAFETY" in a boxed title, "PAUSED" while paused - and their deco badge
   turns yellow, not red, when the diver is above the stop but still below

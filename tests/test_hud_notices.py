@@ -79,7 +79,7 @@ def test_single_waypoint_evaluation_for_forced_states():
     assert active_notice("Shearwater", "Perdix 2", _wp(0, 41.0))["text"] == "Depth Alert"
     assert active_notice("Shearwater", "Perdix 2", _wp(0, 20.0)) is None
     assert active_notice("Garmin", "mk3i", _wp(0, 20.0, dive_alerts=["ndl_reached"]))["text"] == "NDL exceeded. Decompression now required."
-    assert active_notice("Garmin", "x50i", _wp(0, 20.0, dive_alerts=["ndl_reached"]))["text"] == "NDL exceeded. Deco required."
+    assert active_notice("Garmin", "x50i", _wp(0, 20.0, dive_alerts=["ndl_reached"]))["text"] == "NDL exceeded.\nDeco required."  # two lines on the X50i
     assert active_notice("UnknownMfg", None, _wp(0, 20.0, po2=0.1)) is None
 
 

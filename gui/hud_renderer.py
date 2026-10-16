@@ -719,13 +719,15 @@ def _draw_check_mark(draw, x, y, size, color_rgb, outline=True):
 
 
 def badge_title_ink_span(font, text, size):
-    """(left, right) of a badge title's ink relative to its draw x - with
-    the check mark _draw_check_mark() strokes in front of a CHECK_MARK
-    title included, so a value line can be centred under the whole title."""
+    """(left, right) of a badge line's ink relative to its draw x - with the
+    check mark _draw_check_mark() strokes in front of a CHECK_MARK line
+    included, so a value line can be centred under the whole title (and a
+    "✓ 2:59" timer under its title)."""
     if text.startswith(CHECK_MARK):
         w = int(size * 0.9)
+        stroke = max(2, int(size / 8))  # the stroke's half width reaches left of its first point
         _, _, right, _ = font.getbbox(text[len(CHECK_MARK):])
-        return int(w * 0.05), w + int(size * 0.35) + right
+        return int(w * 0.05) - stroke // 2, w + int(size * 0.35) + right
     left, _, right, _ = font.getbbox(text)
     return left, right
 
@@ -810,19 +812,30 @@ def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     label = badge.get("label", state.upper())
     if phase and badge.get(f"{phase}_label"):
         label = badge[f"{phase}_label"]  # e.g. Perdix 3: "PAUSED" in place of "SAFETY"
-    if label and badge.get("check_mark") and phase in ("at_stop", "counting", "complete"):
-        label = "✓ " + label
     lines = [(label, _rgb(title_hex), False)] if label else []
+    # Perdix 2 manual p.27-28 figures: the check mark sits in front of the value
+    # ("✓2:59" while the safety stop counts, "20ft ✓2min" at the deco stop), the
+    # title keeps its colour.
+    check = bool(badge.get("check_mark")) and phase in ("at_stop", "counting")
 
     timer_format = elem.get("timer_format") or ("m:ss" if elem.get("style") == "box" else badge.get("timer_format", "mm:ss"))
     unit = elem.get("depth_unit", "")
     depth_is_value = elem.get("depth_font") != "label"
     show_depth = badge.get("show_depth", True) and stop_depth
     if show_depth and badge.get("inline"):
-        # "6m↑ 2min": the arrow flashes while approaching the stop
-        arrow = "↑" if phase != "approach" or blink_phase else " "
+        # "6m 2min" far from the stop; "6m↑ 2min" with the arrow flashing while
+        # approaching; "6m✓ 2min" at the stop; "6m↓ 2min" shallower than it
+        # (Perdix 2 manual p.28 figures).
+        if phase == "approach":
+            marker = "↑" if blink_phase else " "
+        elif check:
+            marker = CHECK_MARK.strip()
+        elif phase in ("violation", "ceiling_violation"):
+            marker = "↓"
+        else:
+            marker = ""
         timer = _format_stop_timer(seconds, timer_format) if seconds is not None else ""
-        lines.append((f"{stop_depth:.0f}{unit}{arrow} {timer}".rstrip(), _rgb(value_hex), True))
+        lines.append((f"{stop_depth:.0f}{unit}{marker} {timer}".rstrip(), _rgb(value_hex), True))
         return lines
     if show_depth:
         depth_hex = value_hex
@@ -832,7 +845,8 @@ def badge_lines(manufacturer, model, elem, waypoint, waypoints=None):
     if value_text:
         lines.append((value_text, _rgb(value_hex), True))
     elif seconds is not None:
-        lines.append((_format_stop_timer(seconds, timer_format), _rgb(value_hex), True))
+        timer = _format_stop_timer(seconds, timer_format)
+        lines.append(((CHECK_MARK if check else "") + timer, _rgb(value_hex), True))
     return lines
 
 
@@ -929,7 +943,7 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             dx, _, _ = text_anchor_shift(font, text, align, "top")
             x = int(round(abs_x + dx))
         if is_value and value_align == "center" and title_center is not None:
-            left, _, right, _ = font.getbbox(text)
+            left, right = badge_title_ink_span(font, text, final_size)  # the drawn check mark included
             x = int(round(title_center - (left + right) / 2.0))
         elif not is_value and title_center is None:
             left, right = badge_title_ink_span(font, text, final_size)
@@ -944,15 +958,21 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             y += int(final_size * 1.2) + pad
             continue
         o_dist = max(1, int(final_size / 20))
-        if text.startswith(CHECK_MARK):
-            # The bundled fonts have no ✓ glyph - draw the Perdix's check mark
-            # as a stroke in the line's colour, then the text after it.
-            text = text[len(CHECK_MARK):]
-            x = _draw_check_mark(draw, x, y, final_size, color_rgb, outline)
-        if outline:
-            for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
-                draw.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0))
-        draw.text((x, y), text, font=font, fill=color_rgb)
+        # The bundled fonts have no ✓ glyph - draw the Perdix's check mark as a
+        # stroke in the line's colour wherever it sits in the text ("✓ 2:59",
+        # "6m✓ 2min"), the text pieces around it.
+        pieces = text.split(CHECK_MARK.strip())
+        for i, piece in enumerate(pieces):
+            if i:
+                x = _draw_check_mark(draw, x, y, final_size, color_rgb, outline)
+            piece = piece.lstrip(" ") if i else piece
+            if not piece:
+                continue
+            if outline:
+                for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
+                    draw.text((x + dx, y + dy), piece, font=font, fill=(0, 0, 0))
+            draw.text((x, y), piece, font=font, fill=color_rgb)
+            x += draw.textlength(piece, font=font)
         y += int(final_size * 1.2)
 
 TANK_OUTLINE_DEFAULT_WIDTH = 2
@@ -1416,7 +1436,9 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
     the caption colour, the message under them in the notice colour, shrunk
     to fit `width`. "banner" (Teric manual p.26): a filled band `width` x
     `height` in the notice colour with the caption small above the message in
-    the text colour and the confirm hint at the right edge."""
+    the text colour and the confirm hint at the right edge. "box" (Descent
+    X50i screenshots): a dark box with a border in the notice colour, a
+    warning triangle and the message on up to two lines."""
     if not notice:
         return
     caption, confirm, message, style = notice_lines(elem, notice, manufacturer, model)
@@ -1434,6 +1456,29 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
     outline = elem.get("outline", False)
     cap_font = get_font(cap_size, family, weight)
     cap_h = int(cap_size * 1.25)
+
+    if style["style"] == "box":
+        # Descent X50i (real screenshots, test_data/dive_computers/garmin_x50i):
+        # the alert in a dark rounded box with a border in the notice colour,
+        # a warning triangle and the message on up to two lines.
+        height_px = max(4, int(float(elem.get("height", 60)) * scale))
+        pad = max(2, int(height_px * 0.1))
+        draw.rounded_rectangle([abs_x, abs_y, abs_x + width_px, abs_y + height_px], radius=max(2, int(height_px * 0.12)),
+                               fill=(20, 20, 20), outline=colour, width=max(1, int(height_px * 0.04)))
+        tri = int(height_px * 0.5)
+        tx, ty = abs_x + pad, abs_y + (height_px - tri) // 2
+        draw.polygon([(tx + tri // 2, ty), (tx, ty + tri), (tx + tri, ty + tri)], outline=colour, fill=None, width=max(1, tri // 10))
+        draw.text((tx + tri // 2 - cap_size // 5, ty + tri // 3), "!", font=cap_font, fill=colour)
+        inner_x = tx + tri + pad
+        inner_w = abs_x + width_px - pad - inner_x
+        # two lines at a sentence boundary when the text has one, else word-wrapped
+        text = message if "\n" in message else message.replace(". ", ".\n")
+        parts = [p.strip() for p in text.split("\n") if p.strip()][:2]
+        line_h = (height_px - 2 * pad) // max(1, len(parts))
+        font, size = _fit_font(draw, max(parts, key=len), min(msg_size, int(line_h * 0.8)), inner_w, family, weight)
+        for i, part in enumerate(parts):
+            draw.text((inner_x, abs_y + pad + i * line_h + (line_h - size) // 2), part, font=font, fill=text_colour)
+        return
 
     if style["style"] == "banner":
         height_px = max(4, int(float(elem.get("height", 60)) * scale))
@@ -1583,6 +1628,14 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             continue
 
         val, raw_val = resolve_element_text(layout, field, waypoint, waypoints)
+        value_format = elem.get("value_format")
+        if value_format and isinstance(raw_val, (int, float)) and not isinstance(raw_val, bool):
+            # Shearwater Tec row (Petrel 3 Technical manual p.24-25): dive time
+            # and stop time in whole minutes, the stop depth in whole metres.
+            if value_format == "minutes":
+                val = str(int(raw_val // 60))
+            elif value_format == "integer":
+                val = f"{raw_val:.0f}"
 
         if field == "ndl" and (raw_val is None or (isinstance(raw_val, (int, float)) and raw_val <= 0)):
             # In deco a Perdix shows NDL "0" in red (manual p.33) - for
