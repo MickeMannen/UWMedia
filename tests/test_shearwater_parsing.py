@@ -205,3 +205,10 @@ def test_csv_with_a_header_but_no_sample_table(tmp_path):
 ])
 def test_divemode(value, mode):
     assert _divemode(value) == mode
+
+
+def test_a_transmitter_status_is_no_reading(tmp_path):
+    records = (_record(0, "0", tank0pressurePSI="3000", tank3pressurePSI="8188")
+               + _record(2000, "5", tank0pressurePSI="2990", tank3pressurePSI="2500"))
+    w0, w1 = _parse(_write(tmp_path, _xml(records)))[0].waypoints
+    assert (list(w0.tanks), list(w1.tanks)) == (["T1"], ["T1", "T4"])

@@ -38,6 +38,10 @@ from parsers.deco_pass import apply_deco_and_gas, deco_gas, parse_gf
 PSI_TO_BAR = 0.0689476
 FT_TO_M = 0.3048
 TANK_COLUMNS = [f"Tank {n} pressure (PSI)" for n in range(1, 5)]
+# A transmitter's status word (no reading, no signal) exported as a
+# pressure: 12 bits of 2 psi, 8186-8190 psi - not a reading (the app's UDDF
+# export shows it as ~564 bar; parsers/uddf.py has the same rule).
+STATUS_PSI = 0xFF0 * 2
 
 # XML tag -> CSV column name, for both the header and the sample records.
 XML_TAGS = {
@@ -233,7 +237,7 @@ class ShearwaterParser(BaseParser):
             tanks = {}
             for n, column in enumerate(TANK_COLUMNS, start=1):
                 psi = _num(row.get(column))
-                if psi is not None and psi > 0:
+                if psi is not None and 0 < psi < STATUS_PSI:
                     tanks[f"T{n}"] = TankData(pressure_bar=psi * PSI_TO_BAR, o2_percent=o2, he_percent=he)
 
             po2 = _num(row.get("Average PPO2"))

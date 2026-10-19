@@ -20,6 +20,36 @@ _UNMAPPED_GARMIN_PRODUCTS = {
     4518: "descent_x50i",
 }
 
+# A Garmin rebreather's setpoint switches (dive_alert names) and which of
+# dive_settings' two setpoints (ccr_low_setpoint / ccr_high_setpoint) each
+# switches to. Confirmed against two Descent CCR dives: their records log no
+# po2, the setpoint in force is what the computer shows (as DiveSync reads it).
+SETPOINT_ALERTS = {
+    "setpoint_switch_auto_low": "low", "setpoint_switch_manual_low": "low",
+    "setpoint_switch_auto_high": "high", "setpoint_switch_manual_high": "high",
+}
+DILUENT_MODE = "closed_circuit_diluent"
+
+
+def setpoint_timeline(switches, setpoints):
+    """[(time, bar)] from the logged setpoint switches (time-sorted (time,
+    "low"/"high") pairs) and dive_settings' {"low": bar, "high": bar}: each
+    switch's setpoint from its time on, and before the first one the other
+    setpoint (a dive that first switches to high was on low until then).
+    No switch, or no value for the side switched to: nothing - none is
+    invented."""
+    out = []
+    for when, side in switches:
+        value = setpoints.get(side)
+        if value is not None:
+            out.append((when, float(value)))
+    if out:
+        first_side = switches[0][1]
+        before = setpoints.get("high" if first_side == "low" else "low")
+        if before is not None:
+            out.insert(0, (None, float(before)))
+    return out
+
 def remove_offset(dt: datetime) -> datetime:
     if dt is None:
         return None
@@ -151,9 +181,19 @@ class GarminParser(BaseParser):
             else:
                 tz = timezone.utc
             
+            # The activity's local/UTC pair gives the zone; the dive starts at
+            # the session's start_time where there is one - some files stamp
+            # the activity at the dive's end (two older Descent CCR dives and a
+            # Suunto Ocean); on the owner's own files the two are the same.
+            session_start = s_data[0].get("start_time") if s_data else None
+            if isinstance(session_start, int):
+                session_start = datetime.fromtimestamp(session_start + FIT_EPOCH_S, tz=timezone.utc)
+            if session_start is not None:
+                start_time_utc = session_start
+
             duration = a_data[0].get("total_timer_time", 0)
             end_time_utc = start_time_utc + timedelta(seconds=duration)
-            
+
             return start_time_utc, end_time_utc, duration, tz
 
         try:
@@ -219,7 +259,12 @@ class GarminParser(BaseParser):
             gas_switches.append((remove_offset(ts.astimezone(tz)), ev["data"]))
         gas_switches.sort(key=lambda pair: pair[0])
         default_gas = 0 if 0 in gas_dict else min(gas_dict, default=None)
-        active_gas = gas_switches[0][1] if gas_switches else default_gas
+        # The start-of-dive switch names the first gas; a dive that logs none
+        # (a Descent CCR dive whose first switch is the bailout 58 min in)
+        # breathes the first listed gas until its first switch.
+        starts_with_switch = bool(gas_switches) and \
+            gas_switches[0][0] <= remove_offset(start_time_utc.astimezone(tz)) + timedelta(seconds=60)
+        active_gas = gas_switches[0][1] if starts_with_switch else default_gas
 
         # Tank Updates
         tank_messages_dict = {}
@@ -275,6 +320,15 @@ class GarminParser(BaseParser):
             # profile) rather than the named string - normalize to str either way
             alert_events.append((remove_offset(ts.astimezone(tz)), str(alert)))
         alert_events.sort(key=lambda pair: pair[0])
+
+        # A rebreather dive: the setpoint in force from the switch alerts
+        settings = (messages.get("dive_settings_mesgs") or [{}])[0]
+        setpoints = {"low": settings.get("ccr_low_setpoint"), "high": settings.get("ccr_high_setpoint")}
+        setpoints_in_force = setpoint_timeline(
+            [(when, SETPOINT_ALERTS[name]) for when, name in alert_events if name in SETPOINT_ALERTS], setpoints)
+        setpoint_ptr = 0
+        setpoint = setpoints_in_force[0][1] if setpoints_in_force and setpoints_in_force[0][0] is None else None
+        rebreather = any(g["mode"] == DILUENT_MODE for g in gas_dict.values())
 
         # Process Waypoints (Records)
         waypoints = []
@@ -347,6 +401,25 @@ class GarminParser(BaseParser):
             while alert_ptr < len(alert_events) and alert_events[alert_ptr][0] <= ts_local:
                 wp_alerts.append(alert_events[alert_ptr][1])
                 alert_ptr += 1
+            while setpoint_ptr < len(setpoints_in_force) and (setpoints_in_force[setpoint_ptr][0] is None
+                                                               or setpoints_in_force[setpoint_ptr][0] <= ts_local):
+                setpoint = setpoints_in_force[setpoint_ptr][1]
+                setpoint_ptr += 1
+
+            # The breathed gas says the circuit: a diluent is on the loop, any
+            # other gas of a rebreather dive is bailout (open circuit).
+            gas = gas_dict.get(active_gas)
+            on_loop = rebreather and gas is not None and gas["mode"] == DILUENT_MODE
+            divemode = ("closedcircuit" if on_loop else "opencircuit") if rebreather else None
+            # PO2: the record's own, else the setpoint in force on the loop,
+            # else the breathed gas at this depth (no made-up constant).
+            po2 = record.get("po2")
+            if po2 is None:
+                if on_loop and setpoint is not None:
+                    po2 = setpoint
+                else:
+                    f_o2 = (gas["o2"] if gas and gas["o2"] else 21) / 100.0
+                    po2 = round((1.0 + depth / 10.0) * f_o2, 2)
 
             wp = Waypoint(
                 timestamp=ts_local,
@@ -369,7 +442,8 @@ class GarminParser(BaseParser):
                 rmv=float(record.get("rmv", 0.0)),
                 heart_rate=int(record.get("heart_rate", 0)),
                 cns=int(record.get("cns_load", 0)),
-                po2=float(record.get("po2", 1.2)),
+                po2=float(po2),
+                divemode=divemode,
                 tanks=dict(wp_tanks),
                 dive_alerts=wp_alerts,
             )

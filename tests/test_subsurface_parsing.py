@@ -290,3 +290,12 @@ def test_an_unreadable_gf_or_battery_is_empty_not_fatal(tmp_path):
     # empty, so the recompute fills it in: GF99 is 0 one minute into a 10 m
     # dive (tissues still on-gassing), and SurfGF comes along with it
     assert wp.gf == 0.0 and wp.surf_gf is not None
+
+
+def test_rebreather_cells_are_held_between_samples(tmp_path):
+    samples = ("<sample time='0:00 min' depth='0.0 m' sensor1='0.70 bar' sensor2='0.71 bar' sensor3='0.69 bar' />"
+               "<sample time='1:00 min' depth='20.0 m' sensor2='1.30 bar' />"
+               "<sample time='2:00 min' depth='0.0 m' />")
+    dive = _parse(tmp_path, _ssrf(
+        f"<dive date='2026-01-01' time='10:00:00'><divecomputer model='X' dctype='CCR'>{samples}</divecomputer></dive>"))[0]
+    assert [(wp.po2_1, wp.po2_2, wp.po2_3) for wp in dive.waypoints] == [(0.7, 0.71, 0.69), (0.7, 1.3, 0.69), (0.7, 1.3, 0.69)]

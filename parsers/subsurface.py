@@ -221,6 +221,7 @@ class SubsurfaceParser(BaseParser):
             waypoints = []
             current_max_depth = 0.0
             last_po2 = None
+            last_cells = {}
             current_active_tanks = {}
             # Tracks whether any *live* per-sample pressureN= reading was ever
             # seen for a cylinder - if not, its whole dive gets a start->end
@@ -274,6 +275,13 @@ class SubsurfaceParser(BaseParser):
                         pass
                 po2 = last_po2
 
+                # A rebreather's O2 cells (sensor1..sensor3, bar), held
+                # between the samples that log them, as Subsurface does.
+                for n in (1, 2, 3):
+                    cell = _optional_float((sample.get(f"sensor{n}") or "").replace("bar", "").strip())
+                    if cell is not None:
+                        last_cells[f"po2_{n}"] = round(cell, 2)
+
                 # TTS / NDL
                 tts_val = sample.get("tts")
                 tts = parse_time_str(tts_val) if tts_val else None
@@ -320,6 +328,7 @@ class SubsurfaceParser(BaseParser):
                     ndl=ndl,
                     tts=tts,
                     po2=po2,
+                    **last_cells,
                     gf=gf,
                     battery=battery,
                     time_since_start=seconds,

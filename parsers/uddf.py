@@ -20,6 +20,30 @@ def _number(text, kind):
         return None
 
 
+# The Shearwater app ("Shearwater Cloud Desktop") writes a tank pressure it
+# doesn't know as 0, and a transmitter's status word (no reading, no signal)
+# as a pressure masked to 12 bits of 2 psi - 8186-8190 psi, about 564 bar -
+# so on its files a tankpressure at or above this is no reading (DiveSync's
+# reader, same rule; confirmed against a real Perdix 2 export).
+SHEARWATER_APP_GENERATOR = "shearwater cloud"
+SHEARWATER_STATUS_BAR = 0xFF0 * 2 / 14.5037738          # ~562.6 bar
+# A rebreather's first three O2 cells (Waypoint.po2_1..3). APD's
+# Inspiration logs both controllers' readings of its three cells as six
+# o2sensors; the first controller's three are the cells, as Subsurface and
+# DiveSync keep them - the first three slots here.
+CELL_FIELDS = ("po2_1", "po2_2", "po2_3")
+
+
+def _po2_bar(text) -> Optional[float]:
+    """A waypoint PO2 in bar. UDDF says pascal (APD writes 70000.0 for
+    0.7 bar), but the Shearwater app and UWMedia's own writer write bar; no
+    PO2 is anywhere near 10 bar, so a larger value is pascal."""
+    value = _number(text, float)
+    if value is None:
+        return None
+    return round(value / 100000.0 if value > 10 else value, 2)
+
+
 class UDDFParser(BaseParser):
     def update_timezone(self, file_path: Path, offset_minutes: int):
         """Adds <timezone> tag to <dive> elements if missing."""
@@ -56,6 +80,13 @@ class UDDFParser(BaseParser):
         # Try to find device name
         device_name = root.xpath("string(.//*[local-name()='divecomputer']/*[local-name()='name'])")
         manufacturer = root.xpath("string(.//*[local-name()='generator']/*[local-name()='manufacturer']/*[local-name()='name'])")
+        generator = root.xpath("string(*[local-name()='generator']/*[local-name()='name'])").strip()
+        shearwater_app = generator.lower().startswith(SHEARWATER_APP_GENERATOR)
+
+        # A rebreather's O2 cells: measuredpo2 (or APD's ppo2) refs name an
+        # o2sensor; a cell's number is the o2sensor's place in the file.
+        cell_of = {sid: i for i, sid in enumerate(
+            el.get("id") for el in root.xpath(".//*[local-name()='o2sensor']") if el.get("id"))}
 
         # 2. Gas definitions
         gas_mixes = {}
@@ -129,6 +160,9 @@ class UDDFParser(BaseParser):
             active_mix_id = None
             last_po2 = None
             last_divemode = None
+            last_setpoint = None
+            last_cells: Dict[int, float] = {}
+            refs_seen = dict(cell_of)
             
             # 4. Process waypoints
             for sample in dive_elem.xpath(".//*[local-name()='waypoint']"):
@@ -178,11 +212,25 @@ class UDDFParser(BaseParser):
                 # PO2 (Prioritize UDDF with persistence)
                 po2_str = sample.xpath("string(*[local-name()='calculatedpo2'])")
                 if po2_str:
-                    try:
-                        last_po2 = round(float(po2_str), 2)
-                    except (ValueError, TypeError):
-                        pass
+                    value = _po2_bar(po2_str)
+                    if value is not None:
+                        last_po2 = value
                 po2 = last_po2
+
+                # Setpoint and O2 cells, held between the samples that log them
+                setpoint = _po2_bar(sample.xpath("string(*[local-name()='setpo2'])"))
+                if setpoint is not None:
+                    last_setpoint = setpoint
+                for elem in sample.xpath("*[local-name()='measuredpo2' or (local-name()='ppo2' and @ref)]"):
+                    value = _po2_bar(elem.text)
+                    ref = elem.get("ref", "")
+                    if value is None:
+                        continue
+                    if ref not in refs_seen:
+                        refs_seen[ref] = max(refs_seen.values(), default=-1) + 1
+                    if refs_seen[ref] < len(CELL_FIELDS):
+                        last_cells[refs_seen[ref]] = value
+                cells = {CELL_FIELDS[i]: v for i, v in last_cells.items()}
 
                 # Dive Mode - not present on every sample (confirmed against a
                 # real Shearwater CCR export: <divemode> only appears on some
@@ -193,6 +241,15 @@ class UDDFParser(BaseParser):
                 if divemode:
                     last_divemode = divemode
                 divemode = last_divemode
+
+                # A rebreather's PO2 where the file logs none: the cells'
+                # average, else the setpoint in force - not the open-circuit
+                # recompute below, which knows nothing of the loop.
+                if po2 is None and divemode in ("closedcircuit", "semiclosedcircuit"):
+                    if cells:
+                        po2 = round(sum(cells.values()) / len(cells), 2)
+                    elif last_setpoint is not None:
+                        po2 = last_setpoint
 
                 # Deco stop - prefer the file's own logged value (real depth
                 # computers/software use their own tuned algorithm) over our
@@ -249,6 +306,8 @@ class UDDFParser(BaseParser):
                     except (ValueError, TypeError):
                         continue
                     pressure_bar = pressure_pa / 100000.0 if pressure_pa > 5000 else pressure_pa
+                    if shearwater_app and (pressure_bar <= 0 or pressure_bar >= SHEARWATER_STATUS_BAR):
+                        continue  # the app's "unknown" or a transmitter status, not a reading
                     key = elem.get("ref") or str(idx)
                     tanks[key] = TankData(
                         pressure_bar=pressure_bar,
@@ -266,6 +325,7 @@ class UDDFParser(BaseParser):
                     tts=logged_tts,
                     cns=cns,
                     po2=po2,
+                    **cells,
                     divemode=divemode,
                     gf=gf,
                     battery=battery,

@@ -297,3 +297,55 @@ def test_an_unreadable_number_is_skipped_not_fatal(tmp_path):
     assert [wp.time_since_start for wp in dive.waypoints] == [0, 60, 180, 240]
     assert dive.waypoints[1].depth == 10.0
     assert dive.waypoints[2].battery is None
+
+
+def _shearwater_app(text):
+    return text.replace("<name>Test</name>", "<name>Shearwater Cloud Desktop</name>", 1)
+
+
+def test_shearwater_app_status_and_zero_pressures_are_no_reading(tmp_path):
+    """The Shearwater app exports a transmitter's status word as ~564 bar and
+    an unknown pressure as 0: neither is a reading on its files."""
+    wps = (_wp(0, 0, '<tankpressure ref="T1">20000000</tankpressure><tankpressure ref="T4">56450000</tankpressure>')
+           + _wp(60, 10, '<tankpressure ref="T1">19000000</tankpressure><tankpressure ref="T4">0</tankpressure>')
+           + _wp(120, 0, '<tankpressure ref="T1">18000000</tankpressure><tankpressure ref="T4">15000000</tankpressure>'))
+    w0, w1, w2 = _parse(tmp_path, _shearwater_app(_uddf(_dive(wps))))[0].waypoints
+    assert (list(w0.tanks), list(w1.tanks), list(w2.tanks)) == (["T1"], ["T1"], ["T1", "T4"])
+    assert w2.tanks["T4"].pressure_bar == 150.0
+    # Another program's 0 bar is kept as it was.
+    other = _parse(tmp_path, _uddf(_dive(wps)), name="other.uddf")[0].waypoints
+    assert other[1].tanks["T4"].pressure_bar == 0.0
+
+
+def test_po2_in_pascal_or_bar(tmp_path):
+    wps = (_wp(0, 0, "<calculatedpo2>70000.0</calculatedpo2>") + _wp(60, 10, "<calculatedpo2>1.2</calculatedpo2>")
+           + _wp(120, 0))
+    assert [wp.po2 for wp in _parse(tmp_path, _uddf(_dive(wps)))[0].waypoints] == [0.7, 1.2, 1.2]
+
+
+SENSORS = ('<rebreather id="r">' + "".join(f'<o2sensor id="c{n}"/>' for n in range(1, 7)) + "</rebreather>")
+
+
+def _cells_dive(tag, extra_first=""):
+    readings = "".join(f'<{tag} ref="c{n}">{v}</{tag}>' for n, v in
+                       zip(range(1, 7), (128000, 131000, 130000, 127000, 131000, 130000)))
+    return _dive(_wp(0, 0, '<divemode type="closedcircuit"/><setpo2 setby="computer">130000</setpo2>' + extra_first)
+                 + _wp(60, 20, readings) + _wp(120, 20) + _wp(180, 0))
+
+
+def test_measured_cells_and_the_loop_po2(tmp_path):
+    """measuredpo2 refs are the cells in o2sensor order (three slots); on the
+    loop with no calculatedpo2 the po2 is the cells' average, else the
+    setpoint - never the open-circuit recompute."""
+    text = _uddf(_cells_dive("measuredpo2"), extra=SENSORS)
+    w0, w1, w2, _ = _parse(tmp_path, text)[0].waypoints
+    assert (w0.po2_1, w0.po2) == (None, 1.3)
+    assert (w1.po2_1, w1.po2_2, w1.po2_3, w1.po2) == (1.28, 1.31, 1.3, 1.3)
+    assert w2.po2_1 == 1.28  # held until the next reading
+
+
+def test_apd_ppo2_refs_are_the_first_controllers_cells(tmp_path):
+    """APD writes its cells as <ppo2 ref=...>, both controllers' views of
+    three cells as six o2sensors: the first three are the cells."""
+    w1 = _parse(tmp_path, _uddf(_cells_dive("ppo2"), extra=SENSORS))[0].waypoints[1]
+    assert (w1.po2_1, w1.po2_2, w1.po2_3) == (1.28, 1.31, 1.3)

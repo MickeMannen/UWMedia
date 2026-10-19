@@ -100,7 +100,7 @@ def test_record_defaults_for_missing_fields(monkeypatch, tmp_path):
     assert len(dive.waypoints) == 2
     wp = dive.waypoints[0]
     assert (wp.depth, wp.temp, wp.ndl, wp.tts, wp.cns, wp.heart_rate) == (0.0, 0.0, 0, 0, 0, 0)
-    assert wp.po2 == 1.2
+    assert wp.po2 == 0.21  # no logged po2: air at this depth, no made-up constant
     assert wp.tanks == {} and wp.dive_alerts == []
     assert (dive.device, dive.manufactor) == (None, None)
 
@@ -293,3 +293,59 @@ def test_real_nitrox_dive_shows_its_mix():
     assert {wp.gasmix for wp in dive.waypoints} == {"Nx31"}
     tank, = dive.waypoints[-1].tanks.values()
     assert (tank.o2_percent, tank.he_percent) == (31.0, 0.0)
+
+
+def test_po2_without_a_logged_value_is_the_gas_at_depth(monkeypatch, tmp_path):
+    records = [{k: v for k, v in r.items() if k != "po2"} for r in _records(3, depth=20.0)]
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": records,
+        "dive_gas_mesgs": [{"message_index": 0, "oxygen_content": 32, "helium_content": 0, "status": "enabled"}],
+    })
+    assert [wp.po2 for wp in dive.waypoints] == [0.32, 0.96, 0.32]
+    assert {wp.divemode for wp in dive.waypoints} == {None}  # an open-circuit dive names no mode
+
+
+def test_rebreather_setpoints_from_the_switch_alerts_and_bailout(monkeypatch, tmp_path):
+    """A Descent CCR dive logs no po2: the setpoint in force (the other one
+    before the first switch) is the po2 on the loop; the bailout gas is open
+    circuit, its po2 the gas at depth. No switch logged at the start: the
+    first listed gas until the first switch."""
+    t = lambda s: START_UTC + timedelta(seconds=s)  # noqa: E731
+    records = [{"timestamp": t(60 * i), "depth": d} for i, d in enumerate([2.0, 30.0, 30.0, 30.0, 10.0, 0.0])]
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": records,
+        "dive_gas_mesgs": [{"message_index": 0, "oxygen_content": 18, "helium_content": 20, "mode": "closed_circuit_diluent", "status": "enabled"},
+                           {"message_index": 1, "oxygen_content": 50, "helium_content": 0, "mode": "open_circuit", "status": "enabled"}],
+        "dive_settings_mesgs": [{"ccr_low_setpoint": 0.7, "ccr_high_setpoint": 1.3}],
+        "event_mesgs": [{"timestamp": t(60), "event": "dive_alert", "dive_alert": "setpoint_switch_auto_high"},
+                        {"timestamp": t(180), "event": "dive_alert", "dive_alert": "setpoint_switch_manual_low"},
+                        {"timestamp": t(240), "event": "dive_gas_switched", "data": 1}],
+    })
+    wps = dive.waypoints
+    assert [wp.po2 for wp in wps] == [0.7, 1.3, 1.3, 0.7, 1.0, 0.5]
+    assert [wp.divemode for wp in wps] == ["closedcircuit"] * 4 + ["opencircuit"] * 2
+    assert "setpoint_switch_auto_high" in wps[1].dive_alerts
+
+
+def test_no_setpoint_without_a_switch(monkeypatch, tmp_path):
+    records = [{"timestamp": START_UTC + timedelta(seconds=60 * i), "depth": d} for i, d in enumerate([0.0, 20.0, 0.0])]
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": records,
+        "dive_gas_mesgs": [{"message_index": 0, "oxygen_content": 21, "helium_content": 0, "mode": "closed_circuit_diluent", "status": "enabled"}],
+        "dive_settings_mesgs": [{"ccr_low_setpoint": 0.7, "ccr_high_setpoint": 1.3}],
+    })
+    assert [wp.po2 for wp in dive.waypoints] == [0.21, 0.63, 0.21]  # the diluent at depth, no setpoint invented
+
+
+def test_the_session_start_wins_over_an_activity_stamped_at_the_end(monkeypatch, tmp_path):
+    end = START_UTC + timedelta(seconds=120)
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": [{"timestamp": end, "local_timestamp": _local_int(end, 7), "total_timer_time": 120.0}],
+        "session_mesgs": [{"start_time": START_UTC}],
+        "record_mesgs": _records(),
+    })
+    assert dive.start_time == datetime(2026, 5, 2, 10, 0, 0) and dive.timezone == "UTC+07:00"
+    assert [wp.time_since_start for wp in dive.waypoints] == [0, 60, 120]

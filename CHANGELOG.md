@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Garmin logs: a rebreather dive shows the setpoint in force as its PO2
+  (low until the switch to high, back to low near the surface) and the
+  circuit, open after a bailout; before, every sample read a made-up 1.2.
+  A log without PO2 values now shows the breathed gas's PO2 at depth.
+- Garmin logs: a dive that logs no gas switch at the start keeps its first
+  gas until the diver switches, instead of taking the later bailout gas for
+  the whole dive; and files that stamp the activity at the dive's end (some
+  older Descent and Suunto logs) start at the right time again.
+- Shearwater Cloud UDDF and XML exports: a transmitter with no signal no
+  longer shows as a ~564 bar tank, and an unknown pressure is not 0 bar.
+- Rebreather logs: the O2 cell readings are read from UDDF (including APD
+  Inspiration files) and Subsurface logs, and a UDDF log on the loop with no
+  logged PO2 shows the cells' average or the setpoint rather than an
+  open-circuit estimate. UDDF PO2 values written in pascal read correctly.
+
 ## [0.7.17] - 2026-10-16
 
 ### Added
