@@ -1,108 +1,57 @@
 {
-  "manufacturer": "Shearwater",
-  "model": "Peregrine",
-  "hud_skin": {
-    "type": "image",
-    "anchor": "BOTTOM_LEFT",
-    "ref_offset_x": 16.0,
-    "ref_offset_y": -16.0,
-    "opacity": 1.0,
-    "linked_elements": [
-      {
-        "field": "depth",
-        "rel_x": 0.1743,
-        "rel_y": 0.215,
-        "color": "#FFFFFF",
-        "font_size": 100,
-        "scale": 1.0,
-        "unit_suffix": true,
-        "unit_scale": 0.325,
-        "unit_dx": 7.5,
-        "unit_dy": -38.5,
-        "unit_color": "#00ADED",
-        "small_suffix": "decimals",
-        "small_suffix_scale": 0.35,
-        "unit_position": "below"
-      },
-      {
-        "field": "dive_time",
-        "rel_x": 0.1743,
-        "rel_y": 0.4746,
-        "color": "#FFFFFF",
-        "font_size": 60,
-        "scale": 1.0
-      },
-      {
-        "field": "state_badge",
-        "type": "badge",
-        "rel_x": 0.4679,
-        "rel_y": 0.215,
-        "font_size": 38,
-        "value_font_size": 64,
-        "scale": 1.0,
-        "depth_unit": "m"
-      },
-      {
-        "field": "ndl",
-        "rel_x": 0.6586,
-        "rel_y": 0.472,
-        "color": "#FFFFFF",
-        "font_size": 65,
-        "scale": 1.0
-      },
-      {
-        "field": "gasmix",
-        "rel_x": 0.19,
-        "rel_y": 0.695,
-        "color": "#FFFFFF",
-        "font_size": 55,
-        "scale": 1.0,
-        "hide_when_notice": true
-      },
-      {
-        "field": "custom:MAX",
-        "rel_x": 0.575,
-        "rel_y": 0.702,
-        "color": "#00ADED",
-        "font_size": 28,
-        "scale": 1.0,
-        "hide_when_notice": true
-      },
-      {
-        "field": "max_depth",
-        "rel_x": 0.64,
-        "rel_y": 0.69,
-        "color": "#FFFFFF",
-        "font_size": 50,
-        "scale": 1.0,
-        "hide_when_notice": true,
-        "unit_suffix": true,
-        "unit_scale": 0.35,
-        "unit_color": "#00ADED"
-      },
-      {
-        "id": "notice",
-        "field": "notice",
-        "type": "notice",
-        "rel_x": 0.17,
-        "rel_y": 0.62,
-        "width": 600,
-        "font_size": 60,
-        "caption_font_size": 28,
-        "scale": 1.0,
-        "label": "Notification row (manual p.21)"
-      }
-    ],
-    "path": "normal.png",
-    "scale": 0.75,
-    "screen": {
-      "x0": 0.17,
-      "y0": 0.214,
-      "x1": 0.795,
-      "y1": 0.795,
-      "shape": "rect"
+  "base": "../normal.json",
+  "linked_elements": [
+    {
+      "id": "label_max",
+      "field": "custom:MAX",
+      "rel_x": 0.4,
+      "rel_y": 0.609,
+      "color": "#00ADED",
+      "font_size": 30,
+      "scale": 1.0,
+      "hide_when_notice": true
+    },
+    {
+      "id": "max_depth",
+      "field": "max_depth",
+      "rel_x": 0.4,
+      "rel_y": 0.75026,
+      "color": "#FFFFFF",
+      "font_size": 61,
+      "scale": 1.0,
+      "valign": "bottom",
+      "hide_when_notice": true,
+      "unit_suffix": true,
+      "unit_scale": 0.35,
+      "unit_color": "#00ADED",
+      "small_suffix": "decimals",
+      "small_suffix_scale": 0.5
+    },
+    {
+      "id": "temp",
+      "field": "temp",
+      "rel_x": 0.69,
+      "rel_y": 0.688,
+      "color": "#FFFFFF",
+      "font_size": 40,
+      "scale": 1.0,
+      "valign": "bottom",
+      "hide_when_notice": true,
+      "unit_suffix": true,
+      "unit_scale": 0.5,
+      "unit_color": "#00ADED",
+      "value_format": "integer"
+    },
+    {
+      "id": "time_of_day",
+      "field": "time_of_day",
+      "rel_x": 0.69,
+      "rel_y": 0.765,
+      "color": "#FFFFFF",
+      "font_size": 40,
+      "scale": 1.0,
+      "valign": "bottom",
+      "hide_when_notice": true
     }
-  },
-  "design_width": 1920,
-  "design_height": 1080
+  ]
 }

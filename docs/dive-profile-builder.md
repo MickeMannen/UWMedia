@@ -167,7 +167,7 @@ serial are remembered between restarts; the start time is not.
 
 | Setting | Meaning |
 |---|---|
-| Dive computer | The computer the log poses as - one per overlay template UWMedia ships (Garmin Descent Mk3i / X50i, Shearwater Perdix 2 / Perdix 3 / Petrel / Peregrine / Teric / Tern). |
+| Dive computer | The computer the log poses as - one per overlay template UWMedia ships (Garmin Descent Mk3i / X50i, Shearwater Perdix 2 / Perdix 3 / Petrel 3 / Peregrine TX / Teric / Tern). |
 | Serial number | Digits only. |
 | Start | Local date and time the dive starts, `YYYY-MM-DD HH:MM`. Media is matched to a log by time, so set this to when your photos and videos were taken. Blank uses the time of saving. |
 

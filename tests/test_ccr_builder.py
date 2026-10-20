@@ -42,6 +42,7 @@ def test_old_single_switch_depth_becomes_the_high_depth():
     plan = DiveProfilePlan(dive_type="ccr", ccr_setpoint_switch_depth_m=9.0)
     assert (plan.ccr_high_setpoint_depth_m, plan.ccr_low_setpoint_depth_m) == (9.0, 3.0)
     assert DiveProfilePlan(computer="Shearwater Petrel").computer == "Shearwater Petrel 3"
+    assert DiveProfilePlan(computer="Shearwater Peregrine").computer == "Shearwater Peregrine TX"
 
 
 @pytest.mark.parametrize("suffix, writer", [(".uddf", write_uddf), (".ssrf", write_subsurface)])

@@ -180,6 +180,14 @@ log records a stopwatch start or reset): assumed.
 | Descent Mk3i | - | p.22 |
 | Descent X50i | - | p.17 |
 
+The Peregrine TX template also has the main screen's sidemount variant (T1
+and T2 in the bottom row, the green switch box on the tank to breathe from,
+p.41), the AI row's sidemount form (T1 | GTR / SM / SAC | T2, p.41
+combination table) and a mini-display page (MAX / PO2 / MOD beside TEMP /
+CLOCK, p.14); the ascent arrows and the N2 bar are on every page but the
+gauge (p.10-11). Three or four transmitters on one row, RTR, Gas Density and
+the No Comms / Low Bat transmitter warnings are not shown.
+
 ## Units (`display.depth_decimals`, `simulator.md` §7)
 
 | Brand / model | Rule | Source | Status |

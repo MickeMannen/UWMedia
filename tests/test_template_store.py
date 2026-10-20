@@ -25,9 +25,9 @@ from utils.template_store import (
     template_write_root,
 )
 
-# A flat (non-overlay) variant page for the plain save tests; the Perdix 2
-# main page is a shared base + overlays and has its own tests below.
-PERDIX = TemplateRef("shearwater", "peregrine", "main", "single_tank")
+# A flat (non-overlay) page for the plain save tests; the main pages with
+# tank variants are a shared base + overlays and have their own tests below.
+PERDIX = TemplateRef("shearwater", "peregrine", "info_temp", None)
 
 
 def _load(roots, ref=PERDIX):

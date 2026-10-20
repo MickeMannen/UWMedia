@@ -20,6 +20,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   battery, pressure, date and clock, as each model has them) on the Perdix 2,
   Perdix 3, Petrel, Peregrine, Teric and Tern - so a video can show the screen
   the diver had up.
+- Overlays: the Shearwater Peregrine TX gets its sidemount screens (T1 and
+  T2 with the green box on the tank to breathe from, and the T1 | GTR / SAC
+  | T2 air row), a mini-display page (MAX / PO2 / MOD beside temperature and
+  clock), and the ascent arrows and N2 bar its manual shows. The template
+  and the Dive Profile Builder now name it "Peregrine TX".
 - Overlays: Gauge-mode pages for every Shearwater and both Descents: depth,
   time, MAX and the running average depth, the stopwatch, temperature and
   clock, with no deco colours.

@@ -1,10 +1,14 @@
 {
   "manufacturer": "Shearwater",
-  "model": "Peregrine",
+  "model": "Peregrine TX",
   "pages": [
     {
       "id": "main",
       "name": "Main Screen"
+    },
+    {
+      "id": "mini",
+      "name": "Main: Mini displays (MAX / PO2 / MOD, TEMP / CLOCK)"
     },
     {
       "id": "info_ai",
@@ -43,20 +47,29 @@
     "verified": [
       "Same badges, notifications and tank rules as the Perdix 2 (Peregrine TX manual Rev C p.21-26, p.56)",
       "Info pages: the main screen with its bottom row replaced by one info screen - AI (T1 & GTR/SAC), MOD / MAX / PPO2, TEMP / CONSERV / CNS, GF99 / SurGF / CEIL, BATTERY, PRESSURE mBar SURF / NOW, DATE / CLOCK (Peregrine TX manual Rev C p.15 (row figure), p.16-20)",
-      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Peregrine TX manual Rev C p.33)"
+      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Peregrine TX manual Rev C p.33)",
+      "Main screen top half: ascent-rate arrows beside the depth and the N2 loading bar beside the NDL, on every page but the gauge (Peregrine TX manual Rev C p.10-11)",
+      "Main screen bottom row as shipped: the gas, MAX in the centre, Mini Display 1 (TEMP over CLOCK) on the right (p.10, p.14)",
+      "Mini page: Mini Display 2 (MAX / PO2 / MOD) in the centre and Mini Display 1 on the right (p.14 figure)",
+      "Sidemount: T1 and T2 on the main screen with the green switch box on the tank to breathe from (p.41, 21 bar default), and the AI row T1 | GTR / SM / SAC | T2 (p.41 combination table)"
     ],
     "assumed": [
       "Element placement from a pre-dive photo only; no live screen or log seen",
       "Info and gauge positions measured from the manual's figures and set on the main page's skin",
       "Gauge STOPWATCH shows the dive time: a log records no stopwatch start or reset",
       "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)",
-      "Gauge page: the photo's TIME / NDL titles and dividers painted out, one divider under the top row"
+      "Gauge page: the photo's TIME / NDL titles and dividers painted out, one divider under the top row",
+      "Mini page: the centre and right slots are set to the manual's example; on the device both are the diver's choice",
+      "Clock in 24 h (the manual's figures show am/pm)"
     ],
     "not_shown": [
       "Persistent notifications, surface screen",
-      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / Δ+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
+      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / \u0394+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
       "CONSERV level name (Low / Med / High) above the GF pair, and the battery type / nominal voltage beside BATTERY: not in the logs",
-      "Gauge page: no notification row and no resettable average (deco is not tracked in gauge mode)"
+      "Gauge page: no notification row and no resettable average (deco is not tracked in gauge mode)",
+      "Three and four transmitters (T1-T4 on one row, p.41): the overlay knows two tanks",
+      "No Comms and Low Bat transmitter warnings (p.39): the logs drop the transmitter status",
+      "RTR (sidemount redundant time remaining, p.41) and Gas Density (p.14): not computed"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

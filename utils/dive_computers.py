@@ -31,14 +31,14 @@ DIVE_COMPUTERS: Dict[str, DiveComputer] = {
         DiveComputer("Shearwater Perdix 2", "Shearwater", "Perdix 2"),
         DiveComputer("Shearwater Perdix 3", "Shearwater", "Perdix 3"),
         DiveComputer("Shearwater Petrel 3", "Shearwater", "Petrel 3"),
-        DiveComputer("Shearwater Peregrine", "Shearwater", "Peregrine"),
+        DiveComputer("Shearwater Peregrine TX", "Shearwater", "Peregrine TX"),
         DiveComputer("Shearwater Teric", "Shearwater", "Teric"),
         DiveComputer("Shearwater Tern", "Shearwater", "Tern"),
     )
 }
 DEFAULT_DIVE_COMPUTER = "Shearwater Perdix 2"
 # Labels older versions saved in plans and settings, and the computer they are now.
-LEGACY_LABELS = {"Shearwater Petrel": "Shearwater Petrel 3"}
+LEGACY_LABELS = {"Shearwater Petrel": "Shearwater Petrel 3", "Shearwater Peregrine": "Shearwater Peregrine TX"}
 
 
 def computer_label(label: str) -> str:

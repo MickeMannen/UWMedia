@@ -1,6 +1,6 @@
 {
   "manufacturer": "Shearwater",
-  "model": "Peregrine",
+  "model": "Peregrine TX",
   "hud_skin": {
     "type": "image",
     "anchor": "BOTTOM_LEFT",
@@ -23,6 +23,19 @@
         "small_suffix": "decimals",
         "small_suffix_scale": 0.35,
         "unit_position": "below"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.405,
+        "rel_y": 0.225,
+        "width": 22,
+        "height": 70,
+        "up_count": 6,
+        "down_count": 0,
+        "bar": false,
+        "label": "Ascent rate (manual p.11)"
       },
       {
         "field": "dive_time",
@@ -49,6 +62,19 @@
         "color": "#FFFFFF",
         "font_size": 65,
         "scale": 1.0
+      },
+      {
+        "id": "n2_bar",
+        "field": "gf",
+        "type": "tissue_bar",
+        "style": "fill",
+        "rel_x": 0.752,
+        "rel_y": 0.47,
+        "width": 24,
+        "height": 85,
+        "marker_size": 3,
+        "outline_color": "#00ADED",
+        "label": "N2 loading (manual p.10-11)"
       },
       {
         "id": "notice",
