@@ -188,6 +188,15 @@ CLOCK, p.14); the ascent arrows and the N2 bar are on every page but the
 gauge (p.10-11). Three or four transmitters on one row, RTR, Gas Density and
 the No Comms / Low Bat transmitter warnings are not shown.
 
+The Perdix 3 template has sidemount variants of the Tec page (the centre row
+T1 | SurfGF | T2, the green switch box on the label of the tank to breathe
+from, Rev B PDF p.113) and of Info: AI (T1 | GTR / SM / SAC | T2, PDF p.112
+combination table). Its Main Screen and Standard pages have sidemount
+variants too, on a skin of their own without the T1 slot: the AI row
+replaces the info row (PDF p.22 info row, p.112 combination table) and MAX
+takes the configurable slot (PDF p.22, p.147) - the manual has no figure of
+this layout. Three or four transmitters and RTR are not shown.
+
 ## Units (`display.depth_decimals`, `simulator.md` §7)
 
 | Brand / model | Rule | Source | Status |

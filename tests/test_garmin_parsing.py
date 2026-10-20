@@ -99,10 +99,20 @@ def test_record_defaults_for_missing_fields(monkeypatch, tmp_path):
     })
     assert len(dive.waypoints) == 2
     wp = dive.waypoints[0]
-    assert (wp.depth, wp.temp, wp.ndl, wp.tts, wp.cns, wp.heart_rate) == (0.0, 0.0, 0, 0, 0, 0)
+    assert (wp.depth, wp.temp, wp.ndl, wp.tts, wp.cns, wp.heart_rate) == (0.0, 0.0, None, 0, 0, 0)
     assert wp.po2 == 0.21  # no logged po2: air at this depth, no made-up constant
     assert wp.tanks == {} and wp.dive_alerts == []
     assert (dive.device, dive.manufactor) == (None, None)
+
+
+def test_missing_ndl_is_unbounded_and_a_logged_zero_is_deco(monkeypatch, tmp_path):
+    # A Descent leaves ndl_time out shallower than about 7.5 m and logs 0 in
+    # deco: the missing one read as 0, "00" on the overlay
+    records = _records(n=4)
+    del records[1]["ndl_time"]
+    records[2]["ndl_time"] = 0
+    dive, = _parse(monkeypatch, tmp_path, {"activity_mesgs": _activity(), "record_mesgs": records})
+    assert [wp.ndl for wp in dive.waypoints] == [1800, None, 0, 1800]
 
 
 def test_raw_integer_timestamps_are_fit_epoch_seconds(monkeypatch, tmp_path):

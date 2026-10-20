@@ -1,0 +1,37 @@
+{
+  "base": "../normal.json",
+  "linked_elements": [
+    {
+      "id": "top_tank_pressure",
+      "field": "primary_tank_pressure",
+      "rel_x": 0.5898,
+      "rel_y": 0.4788,
+      "color": "#FFFFFF",
+      "font_size": 75,
+      "scale": 1.0
+    },
+    {
+      "id": "gasmix",
+      "field": "gasmix",
+      "rel_x": 0.2239,
+      "rel_y": 0.7024,
+      "color": "#1A1A1A",
+      "font_size": 28,
+      "scale": 1.0
+    },
+    {
+      "id": "max_depth",
+      "field": "max_depth",
+      "rel_x": 0.3799,
+      "rel_y": 0.6653,
+      "color": "#FFFFFF",
+      "font_size": 75,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.373,
+      "unit_dx": -6.3,
+      "unit_dy": -22.0,
+      "unit_color": "#00ADED"
+    }
+  ]
+}

@@ -365,7 +365,7 @@ def _perdix_at_100(app):
 def test_elements_model_and_selection_slots():
     app = _perdix_at_100(OverlayDesignerBackend())
     rows = app.elements
-    assert rows[0] == {"index": 0, "field": "depth", "kind": "text", "label": "depth", "hidden": False}
+    assert rows[0] == {"index": 0, "field": "depth", "kind": "text", "label": "depth", "hidden": False, "shared": True}
     assert any(r["kind"] == "badge" for r in rows) and any(r["kind"] == "tank_icon" for r in rows)
     assert app.hasSelection is False and app.selectedElement["index"] == -1
     assert app.selectedElement["color"] == "#FFFFFF"  # defaults, never undefined
@@ -668,6 +668,23 @@ def test_dev_mode_saves_bundled_page_into_repo_tree(isolated_template_roots):
     assert overlay["base"] == "../normal.json" and "hud_skin" not in overlay
     assert list(roots["user"].iterdir()) == []
 
+
+def test_shared_tag_marks_the_base_elements_of_a_variant_page():
+    app = OverlayDesignerBackend()
+    app.onBrandSelected("Shearwater")  # Perdix 2 main, single tank: a shared base + the tank block
+    rows = app.elements
+    assert rows[0]["shared"] is True                      # the depth, from the base
+    assert any(not r["shared"] for r in rows)             # the variant's own tank block
+    app.selectElement(0)
+    assert app.selectedElement["shared"] is True
+    # a duplicate is a new element of this variant, not a second copy of the base one
+    app.duplicateSelected()
+    assert app.elements[-1]["shared"] is False
+    assert "id" not in app.document.elements[-1]
+    app.onBrandSelected("Garmin")
+    app.onComputerSelected("X50I")
+    app.onPageSelected("Gases")
+    assert app.elements and not any(r["shared"] for r in app.elements)  # a page without variants has nothing shared
 
 def test_overlay_generator_picks_up_new_templates_on_reload(isolated_template_roots):
     from uwmedia.backends.overlay_generator_backend import OverlayGeneratorBackend

@@ -439,7 +439,10 @@ class GarminParser(BaseParser):
                 next_stop_depth=float(record.get("next_stop_depth", 0.0)),
                 next_stop_time=int(record.get("next_stop_time", 0)),
                 tts=int(record.get("time_to_surface", 0)),
-                ndl=int(record.get("ndl_time", 0)),
+                # A Descent leaves ndl_time out where it computes no NDL
+                # (shallower than about 7.5 m: unbounded, None) and logs 0 in
+                # deco. It read as 0 there, "00" on the overlay (2026-10-20).
+                ndl=int(record["ndl_time"]) if record.get("ndl_time") is not None else None,
                 air_remaining=int(record.get("air_time_remaining", 0)),
                 # FIT logs it in m/s (positive = getting shallower); the HUD works in m/min.
                 ascent_rate=float(record.get("ascent_rate", 0.0)) * 60.0,

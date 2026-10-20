@@ -125,6 +125,14 @@ def test_overlay_filter_complex_overlays_layers_in_order_after_colour():
     assert overlay_filter_complex(None, []) == ("[0:v]null[v0]", "[v0]")
 
 
+def test_overlay_filter_complex_blends_a_10bit_source_in_10_bit():
+    # overlay's default yuv420 is 8-bit: a 10-bit clip with a HUD came out
+    # with 8-bit colour in a 10-bit file
+    graph, _ = overlay_filter_complex("lut3d=file='x.cube'", [(10, 20)], ten_bit=True)
+    assert graph.endswith("overlay=x=10:y=20:eof_action=repeat:format=yuv420p10[v1]")
+    assert "format=" not in overlay_filter_complex(None, [(0, 0)])[0].split("overlay")[1]
+
+
 def test_hw_decodable_rejects_10bit_422_h264():
     # VideoToolbox drops frames of Sony's 10-bit 4:2:2 H.264 instead of
     # falling back to software decoding

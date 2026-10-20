@@ -16,6 +16,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   movie (the new default) that drops onto the footage in any editor, a PNG
   sequence with alpha, or the video on black as before. Rendering from a
   photo with a transparent format gives a transparent PNG.
+- Overlay Designer: a small "shared" tag in the element list and the
+  inspector marks an element that every tank-setup variant of the page
+  shares, so you can tell before moving it that the move changes them all.
+  A duplicated or pasted element belongs to the variant being edited.
 - Overlays: rebreather (CCR) pages for the Shearwater Petrel (setpoint or
   three O2 cells), Perdix 3, Perdix 2 and Teric, and the Garmin Descent X50i
   and Mk3i. They show the setpoint in force, the cells (yellow when one
@@ -49,7 +53,18 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   brings its setpoints and switch depths along. The Petrel is now listed as
   the Petrel 3.
 
+- Overlays: Shearwater Perdix 3 sidemount pages - the Tec page with T1 and
+  T2 either side of SurfGF and the green box on the tank to breathe from,
+  and the AI info row T1 | GTR / SM / SAC | T2; the Main Screen and Standard
+  pages put that row along the bottom and MAX in the slot T1 had. A two-tank
+  dive picks them by itself.
+
 ### Changed
+- Overlays: the Garmin Descent Mk3i depth is centred, as on the watch, so a
+  shallow 5.0 no longer sits left of where a 30.0 would; on the standard
+  pages the DEPTH label is centred over it.
+- Overlay Designer: the one-letter Align, V-align, Orientation and unit
+  buttons say what they do when hovered.
 - Overlays: a trimix reads O₂ first ("18/45"), as both brands write it; it
   read "45/18" before.
 - Overlays: the Shearwater Tec pages show the circuit as OC / CC / BO rather
@@ -57,6 +72,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   runs into the NDL.
 
 ### Fixed
+- Overlays: the NDL on Garmin logs read "00" (red on the Shearwater pages)
+  whenever the dive was shallower than about 7.5 m, where a Descent logs no
+  NDL. It now shows "99+", as the computer does.
+- Color: a 10-bit video with an overlay kept its 10-bit colour only in name -
+  the corrected footage was blended with the HUD in 8-bit, which can band
+  smooth blue water. It now stays 10-bit all the way through.
 - Garmin logs: a rebreather dive shows the setpoint in force as its PO2
   (low until the switch to high, back to low near the surface) and the
   circuit, open after a bailout; before, every sample read a made-up 1.2.

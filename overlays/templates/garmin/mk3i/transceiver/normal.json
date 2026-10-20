@@ -96,21 +96,23 @@
       {
         "id": "label_depth",
         "field": "custom:DEPTH",
-        "rel_x": 0.5685,
+        "rel_x": 0.6321,
         "rel_y": 0.5035,
         "color": "#FFFFFF",
         "font_size": 26,
-        "scale": 1.0
+        "scale": 1.0,
+        "align": "center"
       },
       {
         "id": "depth",
         "field": "depth",
-        "rel_x": 0.5304,
+        "rel_x": 0.6321,
         "rel_y": 0.5356,
         "color": "#FFFFFF",
         "font_size": 74,
         "scale": 1.0,
-        "unit_suffix": true
+        "unit_suffix": true,
+        "align": "center"
       },
       {
         "id": "dive_time",

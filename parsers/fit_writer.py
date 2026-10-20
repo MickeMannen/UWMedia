@@ -134,11 +134,13 @@ def write_fit(
         write("record", timestamp=ts, depth=round(s.depth_m, 3), temperature=round(plan.water_temp_c),
               next_stop_depth=round(s.stop_depth_m, 1) if s.ceiling_m > 0 else 0.0,
               next_stop_time=s.stop_duration_sec if s.ceiling_m > 0 else 0,
-              time_to_surface=s.tts_sec, ndl_time=s.ndl_sec if s.ndl_sec is not None else 0,
+              time_to_surface=s.tts_sec,
               cns_load=int(s.cns_pct), ascent_rate=round(ascent_rate, 3),
               # a Descent on a CCR dive logs no record po2 (the setpoint is in
               # the alerts and dive_settings)
-              **({} if plan.is_ccr else {"po2": round(s.po2, 2)}))
+              **({} if plan.is_ccr else {"po2": round(s.po2, 2)}),
+              # an unbounded NDL is left out, as a Descent leaves it out shallow
+              **({} if s.ndl_sec is None else {"ndl_time": s.ndl_sec}))
         for tank in tanks:
             if tank.ref in s.tank_pressures:
                 write("tank_update", timestamp=ts, sensor=sensor_of[tank.ref],

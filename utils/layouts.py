@@ -202,12 +202,16 @@ def resolve_template_state(
 #   main/single_tank/normal.json  {"base": "../normal.json",
 #                                  "linked_elements": [...tank block...],
 #                                  "overrides": {"<id>": {"rel_x": ...}},   # optional
-#                                  "remove": ["<id>"]}                     # optional
+#                                  "remove": ["<id>"],                     # optional
+#                                  "skin": "normal.png"}                   # optional
+#
+# A variant whose screen differs from the base's (a slot label drawn in the
+# image) names its own skin image, beside the overlay, with "skin".
 #
 # load_layout_file() merges the two into the flat layout every consumer
 # already understands: base elements first (overrides applied, removed ones
 # dropped), then the variant's own elements; the skin path re-pointed at the
-# base's image. The merged layout is tagged so the Overlay Designer can put
+# base's image (or at the variant's own). The merged layout is tagged so the Overlay Designer can put
 # an edit back where it came from (utils/template_store.save_template):
 # LAYOUT_BASE_KEY on the layout (absolute base path) and ELEMENT_ORIGIN_KEY
 # on each element ("base", "override" or "variant"). Both are transient -
@@ -217,7 +221,9 @@ VARIANT_BASE_FIELD = "base"
 VARIANT_ELEMENTS_FIELD = "linked_elements"
 VARIANT_OVERRIDES_FIELD = "overrides"
 VARIANT_REMOVE_FIELD = "remove"
+VARIANT_SKIN_FIELD = "skin"
 LAYOUT_BASE_KEY = "_variant_of"
+LAYOUT_VARIANT_SKIN_KEY = "_variant_skin"
 ELEMENT_ORIGIN_KEY = "_origin"
 ORIGIN_BASE, ORIGIN_OVERRIDE, ORIGIN_VARIANT = "base", "override", "variant"
 
@@ -233,7 +239,9 @@ def variant_base_path(overlay_path: Path, data: Dict[str, Any]) -> Path:
 def merge_variant_layout(base: Dict[str, Any], overlay: Dict[str, Any], base_dir: Path, overlay_dir: Path) -> Dict[str, Any]:
     """The flat layout for a variant overlay on `base` (deep-copied), tagged
     with LAYOUT_BASE_KEY / ELEMENT_ORIGIN_KEY. Relative skin paths are
-    re-expressed relative to `overlay_dir`, where consumers resolve them."""
+    re-expressed relative to `overlay_dir`, where consumers resolve them;
+    an overlay's own "skin" replaces the base's image and tags the layout
+    with LAYOUT_VARIANT_SKIN_KEY."""
     import copy
     import os
 
@@ -242,6 +250,9 @@ def merge_variant_layout(base: Dict[str, Any], overlay: Dict[str, Any], base_dir
     raw = skin.get("path")
     if raw and not Path(raw).is_absolute():
         skin["path"] = os.path.relpath((Path(base_dir) / raw).resolve(), Path(overlay_dir).resolve()).replace(os.sep, "/")
+    if overlay.get(VARIANT_SKIN_FIELD):
+        skin["path"] = overlay[VARIANT_SKIN_FIELD]
+        layout[LAYOUT_VARIANT_SKIN_KEY] = True
     overrides = overlay.get(VARIANT_OVERRIDES_FIELD) or {}
     removed = set(overlay.get(VARIANT_REMOVE_FIELD) or [])
     merged: List[Dict[str, Any]] = []
@@ -262,7 +273,7 @@ def merge_variant_layout(base: Dict[str, Any], overlay: Dict[str, Any], base_dir
         merged.append(elem)
     skin["linked_elements"] = merged
     for key, value in overlay.items():
-        if key not in (VARIANT_BASE_FIELD, VARIANT_ELEMENTS_FIELD, VARIANT_OVERRIDES_FIELD, VARIANT_REMOVE_FIELD):
+        if key not in (VARIANT_BASE_FIELD, VARIANT_ELEMENTS_FIELD, VARIANT_OVERRIDES_FIELD, VARIANT_REMOVE_FIELD, VARIANT_SKIN_FIELD):
             layout[key] = value
     return layout
 
@@ -285,6 +296,25 @@ def load_layout_file(path) -> Dict[str, Any]:
     return layout
 
 
+def is_shared_element(elem: Dict[str, Any]) -> bool:
+    """True for a variant's element that comes unchanged from the shared
+    base - a move or edit of it is saved to the base, so every variant of
+    the page follows."""
+    return elem.get(ELEMENT_ORIGIN_KEY) == ORIGIN_BASE
+
+
+def as_new_element(elem: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep copy for a duplicate or a paste: a new element of the variant
+    being edited, so it drops the original's origin marker and id (an id
+    is what ties an element to the base)."""
+    import copy
+
+    clone = copy.deepcopy(elem)
+    clone.pop(ELEMENT_ORIGIN_KEY, None)
+    clone.pop("id", None)
+    return clone
+
+
 def strip_variant_markers(layout: Dict[str, Any]) -> Dict[str, Any]:
     """Deep copy without the transient overlay markers - what gets written,
     exported or compared."""
@@ -292,6 +322,7 @@ def strip_variant_markers(layout: Dict[str, Any]) -> Dict[str, Any]:
 
     data = copy.deepcopy(layout)
     data.pop(LAYOUT_BASE_KEY, None)
+    data.pop(LAYOUT_VARIANT_SKIN_KEY, None)
     for elem in data.get("hud_skin", {}).get("linked_elements", []):
         elem.pop(ELEMENT_ORIGIN_KEY, None)
     return data
@@ -305,7 +336,9 @@ def split_variant_layout(layout: Dict[str, Any], base: Dict[str, Any]) -> Tuple[
     in the overlay's overrides; elements the variant added, and any element
     without an origin (added while editing this variant), go to the
     overlay; base elements no longer present are listed under remove. The
-    skin and every non-element key follow the base."""
+    skin and every non-element key follow the base - except the image of a
+    variant with its own skin, which stays the variant's (as "normal.png"
+    beside the overlay, where the caller puts it)."""
     import copy
 
     base_elems = {e.get("id"): e for e in base.get("hud_skin", {}).get("linked_elements", []) if e.get("id")}
@@ -340,4 +373,7 @@ def split_variant_layout(layout: Dict[str, Any], base: Dict[str, Any]) -> Tuple[
         overlay[VARIANT_OVERRIDES_FIELD] = overrides
     if removed:
         overlay[VARIANT_REMOVE_FIELD] = removed
+    if layout.get(LAYOUT_VARIANT_SKIN_KEY):
+        new_base["hud_skin"]["path"] = base.get("hud_skin", {}).get("path")
+        overlay[VARIANT_SKIN_FIELD] = "normal.png"
     return new_base, overlay

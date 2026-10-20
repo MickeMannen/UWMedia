@@ -535,6 +535,15 @@ Item {
                                         acceptedModifiers: Qt.ControlModifier | Qt.MetaModifier | Qt.ShiftModifier
                                         onTapped: overlayDesignerBackend.toggleElement(modelData.index)
                                     }
+                                    Label {
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 30
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        visible: modelData.shared
+                                        text: "shared"
+                                        color: "#808080"
+                                        font.pixelSize: 10
+                                    }
                                     ToolButton {
                                         anchors.right: parent.right
                                         anchors.verticalCenter: parent.verticalCenter

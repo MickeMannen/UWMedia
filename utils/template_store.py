@@ -37,6 +37,7 @@ from PIL import Image
 from utils.layouts import (
     LAYOUT_BASE_KEY,
     VARIANT_BASE_FIELD,
+    VARIANT_SKIN_FIELD,
     bundled_templates_dir,
     list_templates,
     resolve_template_state,
@@ -221,7 +222,7 @@ def _save_variant_overlay(state_path: Path, base_path: Path, layout: Dict[str, A
     elements, skin and page-level keys into the base, the variant's own
     elements (and overrides / removals of base elements) into the overlay
     (utils.layouts.split_variant_layout). The skin image lives beside the
-    base."""
+    base, or beside the overlay for a variant with its own skin."""
     if not base_path.exists():
         raise TemplateStoreError(f"The shared base {base_path} for this variant is missing.")
     with open(base_path) as f:
@@ -229,7 +230,8 @@ def _save_variant_overlay(state_path: Path, base_path: Path, layout: Dict[str, A
     new_base, overlay = split_variant_layout(layout, base)
     source = Path(skin_source) if skin_source else _skin_source_from_layout(layout)
     if source is not None and layout.get("hud_skin", {}).get("type", "image") == "image":
-        _copy_skin(source, base_path.parent / SKIN_FILENAME)
+        skin_dir = state_path.parent if overlay.get(VARIANT_SKIN_FIELD) else base_path.parent
+        _copy_skin(source, skin_dir / SKIN_FILENAME)
     _write_json(base_path, normalized_layout(new_base))
     for elem in overlay.get("linked_elements", []):
         for key in ("rel_x", "rel_y"):

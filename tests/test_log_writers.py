@@ -205,6 +205,8 @@ def test_after_the_last_deco_stop_the_log_reads_as_no_deco_with_a_short_tts(fmt,
     assert after.tts == logged.tts_sec
     if fmt != "fit":
         assert after.ndl == 99 * 60  # unbounded NDL logged as the 99+ cap
+    else:
+        assert after.ndl is None  # left out, as a Descent leaves it out: unbounded, not 0
 
 
 def test_no_deco_tts_includes_the_safety_stop_until_deco_has_been_done():

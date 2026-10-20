@@ -16,7 +16,7 @@
         "id": "n2_tissue_load",
         "field": "n2_tissue_load",
         "type": "tissue_bar",
-        "rel_x": 0.19702,
+        "rel_x": 0.19596,
         "rel_y": 0.23323,
         "width": 24,
         "height": 66,
@@ -32,7 +32,7 @@
         "id": "ascent_rate",
         "field": "ascent_rate",
         "type": "ascent_chevrons",
-        "rel_x": 0.18061,
+        "rel_x": 0.18801,
         "rel_y": 0.3841,
         "width": 32,
         "height": 94,
@@ -69,31 +69,9 @@
         ]
       },
       {
-        "id": "state_badge",
-        "field": "state_badge",
-        "type": "badge",
-        "style": "box",
-        "rel_x": 0.17651,
-        "rel_y": 0.22513,
-        "width": 200,
-        "height": 88,
-        "font_size": 32,
-        "value_font_size": 58,
-        "depth_unit": "m",
-        "fill_colors": {
-          "safety_stop": "#6CC24A",
-          "deco": "#F5B21B",
-          "clear": "#F5B21B"
-        },
-        "text_color": "#000000",
-        "corner_radius": 6,
-        "padding": 6,
-        "label": "Stop / deco box"
-      },
-      {
         "id": "depth",
         "field": "depth",
-        "rel_x": 0.22016,
+        "rel_x": 0.22439,
         "rel_y": 0.38984,
         "color": "#FFFFFF",
         "font_size": 74,
@@ -212,6 +190,28 @@
         "caption_font_size": 18,
         "scale": 1.0,
         "label": "Alert box: fills the top-right cell (real screenshots x50i_sidemount_change_tank.png, x50i_deco_required_trimix_o2_17_he_40.png)"
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "style": "box",
+        "rel_x": 0.17757,
+        "rel_y": 0.22724,
+        "width": 200,
+        "height": 88,
+        "font_size": 32,
+        "value_font_size": 58,
+        "depth_unit": "m",
+        "fill_colors": {
+          "safety_stop": "#6CC24A",
+          "deco": "#F5B21B",
+          "clear": "#F5B21B"
+        },
+        "text_color": "#000000",
+        "corner_radius": 6,
+        "padding": 6,
+        "label": "Stop / deco box"
       }
     ],
     "screen": {

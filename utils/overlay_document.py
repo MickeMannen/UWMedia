@@ -260,8 +260,10 @@ class OverlayDocument:
         source = self.element(index)
         if source is None:
             return None
+        from utils.layouts import as_new_element
+
         self.push_undo()
-        clone = copy.deepcopy(source)
+        clone = as_new_element(source)
         clone["rel_x"] = _clamp_rel(clone.get("rel_x", 0.0) + 0.02)
         clone["rel_y"] = _clamp_rel(clone.get("rel_y", 0.0) + 0.02)
         self.elements.insert(index + 1, clone)

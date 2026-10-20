@@ -1,0 +1,158 @@
+{
+  "base": "../normal.json",
+  "skin": "normal.png",
+  "linked_elements": [
+    {
+      "id": "label_max",
+      "field": "custom:MAX",
+      "rel_x": 0.61,
+      "rel_y": 0.4005,
+      "color": "#00ADED",
+      "font_size": 40,
+      "scale": 1.0
+    },
+    {
+      "id": "max_depth",
+      "field": "max_depth",
+      "rel_x": 0.5898,
+      "rel_y": 0.4788,
+      "color": "#FFFFFF",
+      "font_size": 75,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.373,
+      "unit_dx": -6.3,
+      "unit_dy": -22.0,
+      "unit_color": "#00ADED"
+    },
+    {
+      "id": "label_t1",
+      "field": "custom:T1",
+      "rel_x": 0.155,
+      "rel_y": 0.6005,
+      "color": "#00ADED",
+      "font_size": 40,
+      "scale": 1.0,
+      "tank_switch_highlight": "primary"
+    },
+    {
+      "id": "primary_tank_icon",
+      "field": "primary_tank_pressure",
+      "rel_x": 0.215,
+      "rel_y": 0.607,
+      "type": "tank_icon",
+      "width": 12,
+      "height": 23,
+      "corner_radius": 2,
+      "style": "segments",
+      "segments": 5,
+      "segment_gap": 2,
+      "full_bar": 200,
+      "outline_color": "#9A9A9A",
+      "outline_width": 2,
+      "outline_gap": 3
+    },
+    {
+      "id": "primary_tank_pressure",
+      "field": "primary_tank_pressure",
+      "rel_x": 0.155,
+      "rel_y": 0.6653,
+      "color": "#FFFFFF",
+      "font_size": 70,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.26,
+      "unit_dx": 0.6,
+      "unit_dy": -34.0,
+      "unit_color": "#00ADED",
+      "unit_orientation": "stacked"
+    },
+    {
+      "id": "label_gtr",
+      "field": "custom:GTR",
+      "rel_x": 0.38,
+      "rel_y": 0.6005,
+      "color": "#00ADED",
+      "font_size": 34,
+      "scale": 1.0
+    },
+    {
+      "id": "gtr",
+      "field": "air_remaining",
+      "rel_x": 0.485,
+      "rel_y": 0.597,
+      "color": "#FFFFFF",
+      "font_size": 40,
+      "scale": 1.0
+    },
+    {
+      "id": "label_sm",
+      "field": "custom:SM",
+      "rel_x": 0.38,
+      "rel_y": 0.665,
+      "color": "#808080",
+      "font_size": 30,
+      "scale": 1.0
+    },
+    {
+      "id": "label_sac",
+      "field": "custom:SAC",
+      "rel_x": 0.38,
+      "rel_y": 0.725,
+      "color": "#00ADED",
+      "font_size": 34,
+      "scale": 1.0
+    },
+    {
+      "id": "sac",
+      "field": "pressure_sac",
+      "rel_x": 0.485,
+      "rel_y": 0.721,
+      "color": "#FFFFFF",
+      "font_size": 40,
+      "scale": 1.0
+    },
+    {
+      "id": "label_t2",
+      "field": "custom:T2",
+      "rel_x": 0.61331,
+      "rel_y": 0.59701,
+      "color": "#00ADED",
+      "font_size": 40,
+      "scale": 1.0,
+      "tank_switch_highlight": "secondary"
+    },
+    {
+      "id": "secondary_tank_icon",
+      "field": "secondary_tank_pressure",
+      "rel_x": 0.677,
+      "rel_y": 0.60889,
+      "type": "tank_icon",
+      "width": 12,
+      "height": 23,
+      "corner_radius": 2,
+      "style": "segments",
+      "segments": 5,
+      "segment_gap": 2,
+      "full_bar": 200,
+      "outline_color": "#9A9A9A",
+      "outline_width": 2,
+      "outline_gap": 3
+    },
+    {
+      "id": "secondary_tank_pressure",
+      "field": "secondary_tank_pressure",
+      "rel_x": 0.61867,
+      "rel_y": 0.66225,
+      "color": "#FFFFFF",
+      "font_size": 70,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.26,
+      "unit_dx": 0.6,
+      "unit_dy": -34.0,
+      "unit_color": "#00ADED",
+      "unit_orientation": "stacked"
+    }
+  ]
+}

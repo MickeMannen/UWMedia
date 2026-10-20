@@ -32,7 +32,7 @@
         "id": "ascent_rate",
         "field": "ascent_rate",
         "type": "ascent_chevrons",
-        "rel_x": 0.18061,
+        "rel_x": 0.18801,
         "rel_y": 0.3841,
         "width": 32,
         "height": 94,
@@ -93,7 +93,7 @@
       {
         "id": "depth",
         "field": "depth",
-        "rel_x": 0.22016,
+        "rel_x": 0.22614,
         "rel_y": 0.38984,
         "color": "#FFFFFF",
         "font_size": 74,

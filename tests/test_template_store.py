@@ -271,6 +271,25 @@ def test_dev_mode_save_of_a_variant_splits_into_base_and_overlay(isolated_templa
     assert not (path.parent / "normal.png").exists() and (path.parent.parent / "normal.png").exists()
 
 
+def test_dev_mode_save_of_a_variant_with_its_own_skin_leaves_the_base_image_alone(isolated_template_roots):
+    from utils.layouts import resolve_template_state
+
+    mark_as_checkout(isolated_template_roots)
+    ref = TemplateRef("shearwater", "perdix_3", "main", "sidemount")
+    path = resolve_template_state("shearwater", "perdix_3", "main", variant="sidemount")
+    base_png = (path.parent.parent / "normal.png").read_bytes()
+    side_png = (path.parent / "normal.png").read_bytes()
+    doc = OverlayDocument.load(path, ref=ref)
+    next(e for e in doc.elements if e.get("id") == "label_max")["rel_x"] = 0.62
+    save_template(ref, doc.render_layout())
+    base_after = json.loads((path.parent.parent / "normal.json").read_text())
+    overlay_after = json.loads(path.read_text())
+    assert base_after["hud_skin"]["path"] == "normal.png"
+    assert overlay_after["skin"] == "normal.png"
+    assert next(e for e in overlay_after["linked_elements"] if e["id"] == "label_max")["rel_x"] == 0.62
+    assert (path.parent.parent / "normal.png").read_bytes() == base_png
+    assert (path.parent / "normal.png").read_bytes() == side_png
+
 def test_save_as_of_a_variant_writes_a_flat_self_contained_page(isolated_template_roots):
     from utils.layouts import ELEMENT_ORIGIN_KEY, LAYOUT_BASE_KEY, resolve_template_state
 

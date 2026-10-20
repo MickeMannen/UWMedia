@@ -57,6 +57,20 @@ def test_ndl_dynamic_colors():
     assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 300, "#BLUE") == "#FFFFFF"
     assert get_dynamic_color("Shearwater", "Perdix 2", "ndl", 240, "#BLUE") == "#FFFF00"
 
+def test_an_unbounded_ndl_reads_99_plus_except_in_deco():
+    # A Descent logs no NDL shallower than about 7.5 m (None, unbounded):
+    # "99+" on both brands' pages, as the screens show it, not "--" or "00"
+    from models.dive import Waypoint
+    from datetime import datetime
+    from gui.hud_renderer import resolve_element_text
+    shallow = Waypoint(timestamp=datetime(2026, 8, 29, 13, 0), depth=5.0, max_depth=5.0, time_since_start=600, ndl=None)
+    deco = Waypoint(timestamp=datetime(2026, 8, 29, 13, 0), depth=12.0, max_depth=30.0, time_since_start=600, ndl=None,
+                    deco_stop_depth=6.0, next_stop_depth=6.0, next_stop_time=180)
+    for layout in ({"manufacturer": "Garmin", "model": "x50i"}, {"manufacturer": "Shearwater", "model": "Perdix 2"}):
+        assert resolve_element_text(layout, "ndl", shallow, [shallow]) == ("99+", None)
+        assert resolve_element_text(layout, "ndl", deco, [deco])[0] != "99+"
+
+
 def test_po2_dynamic_colors():
     # Perdix 2 manual p.19 / p.62: the PPO2 flashes red outside the PPO2
     # limits; the OC Deco limit (1.61 by default) is the band used so a deco

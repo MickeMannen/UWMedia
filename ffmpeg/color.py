@@ -799,7 +799,7 @@ class ColorCorrectionEngine:
             args.extend(["-i", str(input_path)])
             for concat_path, _x, _y in streams:
                 args.extend(["-f", "concat", "-safe", "0", "-i", str(concat_path)])
-            graph, out_label = overlay_filter_complex(color_vf, [(x, y) for _c, x, y in streams])
+            graph, out_label = overlay_filter_complex(color_vf, [(x, y) for _c, x, y in streams], is_10bit)
             args.extend(["-filter_complex", graph, "-map", out_label, "-map", "0:a?"])
             args.extend(self._output_args(input_path, output_path, creation_date, tz_offset_mins, is_10bit))
 

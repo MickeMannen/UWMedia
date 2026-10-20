@@ -125,6 +125,7 @@ ColumnLayout {
         property string attr
         property var options: []
         property var labels: []
+        property var tips: []  // one tooltip per option, for the one-letter labels
         property string current
         spacing: 4
         Repeater {
@@ -137,6 +138,9 @@ ColumnLayout {
                 highlighted: choiceRow.current === modelData
                 font.pixelSize: 12
                 onClicked: overlayDesignerBackend.setSelectedAttr(choiceRow.attr, modelData)
+                ToolTip.text: choiceRow.tips[index] || ""
+                ToolTip.visible: hovered && ToolTip.text.length > 0
+                ToolTip.delay: 400
             }
         }
     }
@@ -222,6 +226,16 @@ ColumnLayout {
                     font.bold: true
                     font.pixelSize: 14
                     elide: Text.ElideRight
+                }
+                Label {
+                    visible: !!inspector.sel.shared
+                    text: "shared"
+                    color: "#808080"
+                    font.pixelSize: 10
+                    rightPadding: 4
+                    HoverHandler { id: sharedHover }
+                    ToolTip.text: "Shared by every tank-setup variant of this page: moving or editing it changes them all"
+                    ToolTip.visible: sharedHover.hovered
                 }
                 ToolButton { text: "⤒"; Layout.preferredWidth: 30; onClicked: overlayDesignerBackend.sendToBack(); ToolTip.text: "Send to back (Shift-Cmd/Ctrl-[)"; ToolTip.visible: hovered }
                 ToolButton { text: "▲"; Layout.preferredWidth: 30; onClicked: overlayDesignerBackend.moveSelectedLayer(-1); ToolTip.text: "Send backward (Cmd/Ctrl-[)"; ToolTip.visible: hovered }
@@ -405,6 +419,9 @@ ColumnLayout {
                     Layout.columnSpan: 3
                     visible: inspector.kind === "text" || inspector.kind === "badge"
                     attr: "align"; options: ["left", "center", "right"]; labels: ["L", "C", "R"]
+                    tips: ["Left: the text starts at the element's position and grows to the right",
+                           "Centre: the text is centred on the element's position, so a number stays centred as it gets wider or narrower",
+                           "Right: the text ends at the element's position and grows to the left"]
                     current: String(inspector.sel.align)
                 }
                 Label { text: "V-align"; visible: inspector.kind === "text" || inspector.kind === "badge" }
@@ -412,6 +429,9 @@ ColumnLayout {
                     Layout.columnSpan: 3
                     visible: inspector.kind === "text" || inspector.kind === "badge"
                     attr: "valign"; options: ["top", "middle", "bottom"]; labels: ["T", "M", "B"]
+                    tips: ["Top: the text hangs below the element's position",
+                           "Middle: the text is centred vertically on the element's position",
+                           "Bottom: the text sits on top of the element's position"]
                     current: String(inspector.sel.valign)
                 }
                 // Vertical text (schema v2 `orientation`): stacked upright
@@ -423,10 +443,8 @@ ColumnLayout {
                     visible: inspector.kind === "text"
                     attr: "orientation"; options: ["horizontal", "stacked", "up", "down"]; labels: ["H", "S", "↑", "↓"]
                     current: String(inspector.sel.orientation)
-                    HoverHandler { id: orientationHover }
-                    ToolTip.text: "H: horizontal. S: stacked, one upright letter under the other. ↑ / ↓: turned on its side, reading bottom-to-top / top-to-bottom."
-                    ToolTip.visible: orientationHover.hovered
-                    ToolTip.delay: 400
+                    tips: ["Horizontal", "Stacked: one upright letter under the other",
+                           "Turned on its side, reading bottom to top", "Turned on its side, reading top to bottom"]
                 }
                 CheckBox {
                     Layout.columnSpan: 2
@@ -472,6 +490,7 @@ ColumnLayout {
                     Layout.columnSpan: 3
                     visible: inspector.sel.unit_suffix === true
                     attr: "unit_position"; options: ["right", "below"]; labels: ["Right", "Below"]
+                    tips: ["The unit after the value", "The unit under the value's last digits"]
                     current: String(inspector.sel.unit_position)
                 }
                 Label { text: "Size"; visible: inspector.sel.unit_suffix === true }
@@ -488,10 +507,7 @@ ColumnLayout {
                     visible: inspector.sel.unit_suffix === true
                     attr: "unit_orientation"; options: ["horizontal", "stacked"]; labels: ["H", "S"]
                     current: String(inspector.sel.unit_orientation)
-                    HoverHandler { id: unitOrientHover }
-                    ToolTip.text: "S: the unit's letters one under the other, as a Shearwater's B A R tag"
-                    ToolTip.visible: unitOrientHover.hovered
-                    ToolTip.delay: 400
+                    tips: ["The unit on one line", "The unit's letters one under the other, as a Shearwater's B A R tag"]
                 }
             }
             Section {

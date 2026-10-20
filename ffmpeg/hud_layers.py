@@ -202,13 +202,18 @@ def _concat_path(path: Path) -> str:
     return path.as_posix().replace("'", "'\\''")
 
 
-def overlay_filter_complex(color_vf, positions):
+def overlay_filter_complex(color_vf, positions, ten_bit=False):
     """FFmpeg filter graph: the source (input 0) through the colour
     correction `color_vf` (or untouched when None), then each HUD layer
     (inputs 1..N, at `positions`) overlaid in order - last on top. The HUD
-    goes on after the colour correction, so it keeps its own colours."""
+    goes on after the colour correction, so it keeps its own colours.
+
+    `overlay` blends in 8-bit 4:2:0 unless told otherwise, so a 10-bit
+    source (`ten_bit`) blends in yuv420p10: it kept the 10-bit colour only
+    without a HUD before (2026-10-20)."""
+    blend = ":format=yuv420p10" if ten_bit else ""
     parts = [f"[0:v]{color_vf or 'null'}[v0]"]
     for i, (x, y) in enumerate(positions, start=1):
         parts.append(f"[{i}:v]format=rgba[h{i}]")
-        parts.append(f"[v{i - 1}][h{i}]overlay=x={x}:y={y}:eof_action=repeat[v{i}]")
+        parts.append(f"[v{i - 1}][h{i}]overlay=x={x}:y={y}:eof_action=repeat{blend}[v{i}]")
     return ";".join(parts), f"[v{len(positions)}]"

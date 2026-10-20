@@ -67,7 +67,7 @@
       {
         "id": "depth",
         "field": "depth",
-        "rel_x": 0.37861,
+        "rel_x": 0.548,
         "rel_y": 0.41649,
         "color": "#FFFFFF",
         "font_size": 140,
@@ -77,7 +77,8 @@
         "unit_suffix": true,
         "unit_scale": 0.33,
         "unit_dx": 4.0,
-        "unit_dy": 0.0
+        "unit_dy": 0.0,
+        "align": "center"
       },
       {
         "id": "ascent_rate",

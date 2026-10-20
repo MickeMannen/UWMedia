@@ -402,8 +402,11 @@ def test_hud_renderer_badge_value_font_size_independent_of_label():
     assert max(big_sizes) > max(small_sizes)
 
 
-def _load_perdix3_layout(page):
-    state_path = resolve_template_state("shearwater", "perdix_3", page)
+def _load_perdix3_layout(page, variant=None):
+    # Main Screen, Standard, Tec and Info: AI have single-tank / sidemount variants: single tank unless asked
+    if variant is None and page in ("main", "standard", "tec", "info_ai"):
+        variant = "single_tank"
+    state_path = resolve_template_state("shearwater", "perdix_3", page, variant=variant)
     assert state_path is not None
     layout = strip_variant_markers(load_layout_file(state_path))
     layout["hud_skin"]["path"] = str((state_path.parent / layout["hud_skin"]["path"]).resolve())
@@ -1204,6 +1207,26 @@ def test_petrel_main_variants_share_a_base_like_the_perdix():
     row = [e["field"] for e in side["hud_skin"]["linked_elements"] if e[ELEMENT_ORIGIN_KEY] == "variant"]
     assert {"pressure_sac", "custom:SM", "secondary_tank_pressure", "primary_tank_pressure"} <= set(row)
     assert (page / "normal.png").exists() and not (page / "sidemount/normal.png").exists()
+
+
+@pytest.mark.parametrize("page", ["tec", "info_ai", "main", "standard"])
+def test_perdix_3_sidemount_pages_show_both_tanks_and_box_the_one_to_breathe(page):
+    # Perdix 3 manual Rev B PDF p.113: the Tec centre row T1 | SurfGF | T2,
+    # a green box on the label of the tank to breathe from (SM Switch 21 bar);
+    # p.112: the AI row T1 | GTR / SM / SAC | T2, the Main Screen / Standard info row
+    layout = _load_perdix3_layout(page, "sidemount")
+    elems = layout["hud_skin"]["linked_elements"]
+    assert {e.get("tank_switch_highlight") for e in elems} >= {"primary", "secondary"}
+    assert {"primary_tank_pressure", "secondary_tank_pressure"} <= {e["field"] for e in elems}
+
+    def green(t1, t2):
+        wp = Waypoint(timestamp=datetime.now(), depth=18.0, time_since_start=600, ndl=20 * 60,
+                      tanks={"T1": TankData(pressure_bar=t1, o2_percent=21.0), "T2": TankData(pressure_bar=t2, o2_percent=21.0)})
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        draw_hud(frame, layout, wp, render_log=False)
+        return ((frame[:, :, 1] > 150) & (frame[:, :, 0] < 60) & (frame[:, :, 2] < 60)).sum()
+
+    assert green(170, 130) > green(170, 165) + 200
 
 
 def test_perdix_3_badge_lines_and_boxed_title():

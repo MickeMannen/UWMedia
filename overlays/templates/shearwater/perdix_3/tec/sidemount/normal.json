@@ -1,0 +1,82 @@
+{
+  "base": "../normal.json",
+  "linked_elements": [
+    {
+      "id": "label_t1",
+      "field": "custom:T1",
+      "rel_x": 0.1489,
+      "rel_y": 0.4055,
+      "color": "#00ADED",
+      "font_size": 35,
+      "scale": 1.0,
+      "tank_switch_highlight": "primary"
+    },
+    {
+      "id": "primary_tank_pressure",
+      "field": "primary_tank_pressure",
+      "rel_x": 0.1489,
+      "rel_y": 0.4602,
+      "color": "#FFFFFF",
+      "font_size": 72,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.26,
+      "unit_dx": 0.6,
+      "unit_dy": -35.0,
+      "unit_color": "#00ADED",
+      "unit_orientation": "stacked"
+    },
+    {
+      "id": "label_surfgf",
+      "field": "custom:SurfGF",
+      "rel_x": 0.3991,
+      "rel_y": 0.4055,
+      "color": "#00ADED",
+      "font_size": 35,
+      "scale": 1.0
+    },
+    {
+      "id": "gf",
+      "field": "gf",
+      "rel_x": 0.4052,
+      "rel_y": 0.4602,
+      "color": "#FFFFFF",
+      "font_size": 72,
+      "scale": 1.0
+    },
+    {
+      "id": "label_percent",
+      "field": "custom:%",
+      "rel_x": 0.5,
+      "rel_y": 0.4739,
+      "color": "#00ADED",
+      "font_size": 22,
+      "scale": 1.0
+    },
+    {
+      "id": "label_t2",
+      "field": "custom:T2",
+      "rel_x": 0.6,
+      "rel_y": 0.4055,
+      "color": "#00ADED",
+      "font_size": 35,
+      "scale": 1.0,
+      "tank_switch_highlight": "secondary"
+    },
+    {
+      "id": "secondary_tank_pressure",
+      "field": "secondary_tank_pressure",
+      "rel_x": 0.6,
+      "rel_y": 0.4602,
+      "color": "#FFFFFF",
+      "font_size": 72,
+      "scale": 1.0,
+      "unit_suffix": true,
+      "unit_scale": 0.26,
+      "unit_dx": 0.6,
+      "unit_dy": -35.0,
+      "unit_color": "#00ADED",
+      "unit_orientation": "stacked"
+    }
+  ]
+}

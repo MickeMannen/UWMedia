@@ -1852,6 +1852,13 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
         raw_val = tank_data.name if tank_data else tank_name
         return format_telemetry_value(field, raw_val, display), raw_val
     raw_val = getattr(waypoint, field, None)
+    if field == "ndl" and raw_val is None and waypoint is not None:
+        # None is an unbounded NDL (a Descent logs none shallower than about
+        # 7.5 m): "99+" as the screens show it, but not in deco, where the
+        # brand's own deco handling (red "0", or the slot hidden) applies
+        from utils.hud_rules_engine import resolve_state
+        if resolve_state(manufacturer, model, waypoint, waypoints) != "deco":
+            return "99+", None
     return format_telemetry_value(field, raw_val, display), raw_val
 
 def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):

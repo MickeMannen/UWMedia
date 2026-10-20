@@ -6,12 +6,15 @@ Run it with `tests/run_tests.sh 3` (or 4, everything); plain `pytest`
 skips it. Its outputs stay in test_data/test_results/release_test for a
 look afterwards, and are replaced on the next run."""
 import json
+import platform
 import shutil
+import subprocess
 from datetime import datetime
 
 import pytest
 
 from conftest import LOGS_DIR, RELEASE_MEDIA, REPO_ROOT, TEST_DATA, run_cli
+from ffmpeg.ffmpeg_class import FfmpegClass
 from metadata.exif import MetadataHandler
 from parsers.garmin import GarminParser
 from parsers.uddf import UDDFParser
@@ -40,6 +43,34 @@ def _cli(*args):
     result = run_cli(*args)
     assert result.returncode == 0, f"cli_main.py {' '.join(map(str, args))} failed:\n{result.stderr[-2000:]}"
     return result
+
+
+def _hw_encoder():
+    """The hardware encoder --hw-accel should pick here, or skip: Linux has
+    none (libx265 by design), nor a Windows PC without an NVIDIA GPU."""
+    encoder = FfmpegClass(hw_accel=True).get_encoder()
+    if encoder == "libx265":
+        pytest.skip(f"no hardware encoder on this machine ({platform.system()})")
+    return encoder
+
+
+def _video_encoder(path):
+    """The encoder FFmpeg wrote into the video stream's tags, e.g.
+    "Lavc63.1.102 hevc_videotoolbox"."""
+    ff = FfmpegClass(hw_accel=False)
+    out = subprocess.check_output([
+        str(ff.ffprobe_path), "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream_tags=encoder", "-of", "default=nw=1:nk=1", str(path)
+    ], text=True)
+    return out.strip()
+
+
+def _assert_hw_encoded(path):
+    """A --hw-accel render really went through the hardware encoder. The
+    GUI's switch once never reached the CLI and every run fell back to
+    libx265 without a word."""
+    encoder = _hw_encoder()
+    assert encoder in _video_encoder(path), f"{path.name} was not encoded with {encoder}"
 
 
 class TestRelease:
@@ -119,6 +150,7 @@ class TestRelease:
 
         found = list(out.glob("release_test_test05_color.mp4"))
         assert len(found) == 1
+        _assert_hw_encoded(found[0])
 
     def test_06_color_correction_photo(self, out):
         """Verify photo color correction works on all JPGs in release_test directory."""
@@ -187,8 +219,27 @@ class TestRelease:
             _cli(*cmd)
 
         for t in target_list:
-            n = len(list(out.glob(f"release_test_test07_{t}.mp4")))
-            assert n == 1
+            found = list(out.glob(f"release_test_test07_{t}.mp4"))
+            assert len(found) == 1
+            _assert_hw_encoded(found[0])
+
+    def test_07b_hw_decode(self):
+        """The DJI clip (HEVC) decodes in hardware, and the Sony clip (H.264
+        10-bit 4:2:2, which VideoToolbox can't take) is left to software.
+        `-hwaccel_output_format videotoolbox_vld` keeps the frames in
+        hardware, so FFmpeg can't quietly fall back to the CPU."""
+        if platform.system() != "Darwin":
+            pytest.skip("hardware decode is checked on macOS (VideoToolbox) only")
+        ff = FfmpegClass(hw_accel=True)
+        dji = TEST_DATA_DIR / "DJI_20260502110658_0002_D_A001.MP4"
+        assert ff.hw_decodable(dji)
+        assert not ff.hw_decodable(TEST_DATA_DIR / "20251019_M0284.MP4")
+        result = subprocess.run([
+            str(ff.executable_path), "-v", "error", "-hwaccel", "videotoolbox",
+            "-hwaccel_output_format", "videotoolbox_vld", "-t", "1", "-i", str(dji),
+            "-an", "-f", "null", "-"
+        ], capture_output=True, text=True)
+        assert result.returncode == 0 and not result.stderr.strip(), result.stderr[-2000:]
 
     def test_08_overlay_photo(self, out):
         """Verify photo layout overlays work for different layout styles."""

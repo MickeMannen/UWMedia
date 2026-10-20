@@ -255,3 +255,32 @@ def test_split_puts_shared_edits_in_the_base_and_variant_edits_in_the_overlay(tm
     del merged["hud_skin"]["linked_elements"][1]  # ndl deleted while editing this variant
     _, new_overlay = split_variant_layout(merged, base)
     assert new_overlay["remove"] == ["ndl"]
+
+
+def test_a_variant_with_its_own_skin_keeps_it_through_merge_and_split(tmp_path):
+    from utils.layouts import LAYOUT_VARIANT_SKIN_KEY
+
+    base = _tiny_base()
+    overlay = {"base": "../normal.json", "skin": "normal.png", "linked_elements": []}
+    merged = merge_variant_layout(base, overlay, tmp_path, tmp_path / "sidemount")
+    assert merged["hud_skin"]["path"] == "normal.png" and merged[LAYOUT_VARIANT_SKIN_KEY]
+    assert "skin" not in merged
+    assert LAYOUT_VARIANT_SKIN_KEY not in strip_variant_markers(merged)
+    merged["hud_skin"]["path"] = str(tmp_path / "sidemount" / "normal.png")  # absolute, as the Designer saves it
+    new_base, new_overlay = split_variant_layout(merged, base)
+    assert new_base["hud_skin"]["path"] == "normal.png" and LAYOUT_VARIANT_SKIN_KEY not in new_base
+    assert new_overlay["skin"] == "normal.png"
+    # a variant without one follows the base's image, as before
+    _, plain = split_variant_layout(merge_variant_layout(base, {"base": "../normal.json"}, tmp_path, tmp_path / "x"), base)
+    assert "skin" not in plain
+
+
+@pytest.mark.parametrize("page", ["main", "standard"])
+def test_perdix_3_sidemount_pages_use_a_skin_without_the_t1_slot(page):
+    page_dir = Path("overlays/templates/shearwater/perdix_3") / page
+    single = load_layout_file(page_dir / "single_tank" / "normal.json")
+    side = load_layout_file(page_dir / "sidemount" / "normal.json")
+    assert single["hud_skin"]["path"] == "../normal.png"
+    assert side["hud_skin"]["path"] == "normal.png" and (page_dir / "sidemount" / "normal.png").exists()
+    fields = {e["field"] for e in side["hud_skin"]["linked_elements"]}
+    assert {"primary_tank_pressure", "secondary_tank_pressure", "custom:T1", "custom:T2", "max_depth"} <= fields

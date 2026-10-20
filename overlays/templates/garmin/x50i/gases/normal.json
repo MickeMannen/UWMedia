@@ -21,7 +21,7 @@
       {
         "field": "ascent_rate",
         "type": "ascent_chevrons",
-        "rel_x": 0.18,
+        "rel_x": 0.18801,
         "rel_y": 0.40864,
         "width": 32,
         "height": 94,

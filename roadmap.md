@@ -105,6 +105,8 @@ projects' sample dives. Manual pages: `hud_rules_sources.md`.
 - [ ] X50i dynamic depth's @+5 / Δ+5 / STOPS row and planned ascent; Mk3i tissue and ascent-rate arcs. Needs: what-if deco values for logs; an arc element.
 - [ ] Freedive pages and compass pages. Needs: a freediving session parser and a real freedive log (section 3); a heading in a log (no format carries one).
 - [x] Peregrine TX (2026-10-20): sidemount main and AI row, mini-display page, ascent arrows and N2 bar on every page; named "Peregrine TX" in the template list and the Builder.
+- [x] Perdix 3 sidemount (2026-10-20): Tec page T1 | SurfGF | T2 with the switch box, Info: AI T1 | GTR / SM / SAC | T2.
+- [x] Perdix 3 sidemount on the Main Screen and Standard pages (2026-10-21): a variant can carry its own skin (`"skin"` in the overlay); theirs has no T1 slot, MAX moves there and the AI row takes the info row.
 - [ ] Peregrine TX extras: three or four transmitters on one row (T1-T4, p.41), RTR, Gas Density, the No Comms / Low Bat transmitter warnings (the readers drop the transmitter status), the am / pm clock. Needs: more than two tanks in the overlay; a real Peregrine TX export.
 - [x] Fix `hud_rules_sources.md`: the Perdix 3 pages cited are printed pages (PDF page = printed + 2) - noted in the manuals table.
 

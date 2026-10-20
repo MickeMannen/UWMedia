@@ -115,7 +115,7 @@ from utils.hud_designer import (
     hit_test_bounds,
 )
 from utils.hud_rules_engine import is_annotation_key, load_rules_json, resolve_state, resolve_tank_variant
-from utils.layouts import list_templates, page_display_name, resolve_template_state, variant_display_name
+from utils.layouts import as_new_element, is_shared_element, list_templates, page_display_name, resolve_template_state, variant_display_name
 from utils.overlay_document import OverlayDocument, TemplateRef
 from utils.resource_paths import app_temp_dir
 from utils.template_store import (
@@ -703,7 +703,8 @@ class OverlayDesignerBackend(QObject):
 
     @Property(list, notify=documentChanged)
     def elements(self):
-        """Rows for the QML element list: [{index, field, kind, label}]."""
+        """Rows for the QML element list: [{index, field, kind, label, hidden,
+        shared}] - shared: a variant element from the page's shared base."""
         doc = self.document
         if doc is None:
             return []
@@ -711,6 +712,7 @@ class OverlayDesignerBackend(QObject):
             {
                 "index": i, "field": e.get("field", ""), "kind": element_kind(e),
                 "label": self._element_label(e), "hidden": i in self._hidden,
+                "shared": is_shared_element(e),
             }
             for i, e in enumerate(doc.elements)
         ]
@@ -872,13 +874,14 @@ class OverlayDesignerBackend(QObject):
                 "segments": 5, "segment_gap": 2, "full_bar": 200,
                 "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "source": "timed",
                 "unit_suffix": False, "unit_position": "right", "unit_scale": 0.35, "unit_dx": 0.0, "unit_dy": 0.0, "unit_color": "", "unit_orientation": "horizontal",
-                "max_width": 0,
+                "max_width": 0, "shared": False,
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
         field = elem.get("field", "")
         return {
             "index": self._selected_index,
             "kind": element_kind(elem),
+            "shared": is_shared_element(elem),
             "field": field,
             "is_custom": field.startswith("custom:"),
             "custom_text": field[len("custom:"):] if field.startswith("custom:") else "",
@@ -1373,7 +1376,7 @@ class OverlayDesignerBackend(QObject):
         doc.push_undo()
         clones = []
         for index in selection:
-            clone = copy.deepcopy(doc.elements[index])
+            clone = as_new_element(doc.elements[index])
             clone["rel_x"] = min(1.5, float(clone.get("rel_x", 0.0)) + 0.02)
             clone["rel_y"] = min(1.5, float(clone.get("rel_y", 0.0)) + 0.02)
             clones.append(clone)
@@ -1579,7 +1582,7 @@ class OverlayDesignerBackend(QObject):
         doc.push_undo()
         start = len(doc.elements)
         for elem in self._clipboard:
-            clone = copy.deepcopy(elem)
+            clone = as_new_element(elem)
             clone["rel_x"] = min(1.5, float(clone.get("rel_x", 0.0)) + 0.02)
             clone["rel_y"] = min(1.5, float(clone.get("rel_y", 0.0)) + 0.02)
             doc.elements.append(clone)

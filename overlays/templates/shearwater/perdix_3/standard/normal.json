@@ -9,6 +9,7 @@
     "opacity": 1.0,
     "linked_elements": [
       {
+        "id": "depth",
         "field": "depth",
         "rel_x": 0.2314,
         "rel_y": 0.2222,
@@ -25,6 +26,7 @@
         "unit_position": "below"
       },
       {
+        "id": "dive_time",
         "field": "dive_time",
         "rel_x": 0.2206,
         "rel_y": 0.4788,
@@ -33,6 +35,7 @@
         "scale": 1.0
       },
       {
+        "id": "label_ndl",
         "field": "custom:NDL",
         "rel_x": 0.595,
         "rel_y": 0.224,
@@ -46,6 +49,7 @@
         ]
       },
       {
+        "id": "label_min",
         "field": "custom:min",
         "rel_x": 0.649,
         "rel_y": 0.342,
@@ -59,6 +63,7 @@
         ]
       },
       {
+        "id": "state_badge",
         "field": "state_badge",
         "type": "badge",
         "rel_x": 0.556,
@@ -70,6 +75,7 @@
         "label": "Stop / deco (replaces NDL)"
       },
       {
+        "id": "ndl",
         "field": "ndl",
         "rel_x": 0.5543,
         "rel_y": 0.2937,
@@ -81,35 +87,6 @@
           "deco",
           "clear"
         ]
-      },
-      {
-        "field": "primary_tank_pressure",
-        "rel_x": 0.5898,
-        "rel_y": 0.4788,
-        "color": "#FFFFFF",
-        "font_size": 75,
-        "scale": 1.0
-      },
-      {
-        "field": "gasmix",
-        "rel_x": 0.2239,
-        "rel_y": 0.7024,
-        "color": "#1A1A1A",
-        "font_size": 28,
-        "scale": 1.0
-      },
-      {
-        "field": "max_depth",
-        "rel_x": 0.3799,
-        "rel_y": 0.6653,
-        "color": "#FFFFFF",
-        "font_size": 75,
-        "scale": 1.0,
-        "unit_suffix": true,
-        "unit_scale": 0.373,
-        "unit_dx": -6.3,
-        "unit_dy": -22.0,
-        "unit_color": "#00ADED"
       }
     ],
     "path": "normal.png",
