@@ -167,7 +167,24 @@
           "when": "po2_above",
           "bar": 1.61,
           "seconds": 30,
-          "_source": "Teric Rev H5 p.23 (warnings overlay lists HIGH PPO2; banner wording deduced from the Perdix 2's)"
+          "_source": "Teric Rev H5 p.23 (warnings overlay lists HIGH PPO2; banner wording deduced from the Perdix 2's)",
+          "circuits": [
+            "OC",
+            "BO"
+          ]
+        },
+        {
+          "id": "high_ppo2_cc",
+          "text": "HIGH PPO2",
+          "caption": "WARNING",
+          "when": "po2_above",
+          "bar": 1.6,
+          "seconds": 30,
+          "circuits": [
+            "CC",
+            "SC"
+          ],
+          "_source": "Teric Rev H5 p.70: CC Max 1.60 on the loop (banner as the OC HIGH PPO2)"
         },
         {
           "id": "missed_stop",
@@ -200,6 +217,30 @@
           "color": "#00ADED",
           "when": "safety_started",
           "_source": "Teric Rev H5 p.25 (p.24) figure 'INFO Safety Stop': an alert when in the safety stop range"
+        },
+        {
+          "id": "auto_sp_up",
+          "text": "Auto SP Up",
+          "caption": "INFO",
+          "color": "#00ADED",
+          "when": "setpoint_up",
+          "circuits": [
+            "CC",
+            "SC"
+          ],
+          "_source": "Teric Rev H5 p.33 figure 7: INFO band 'Auto SP Up' on the automatic switch to the high setpoint (a log does not say auto or manual: every rise shows it)"
+        },
+        {
+          "id": "auto_sp_down",
+          "text": "Auto SP Down",
+          "caption": "INFO",
+          "color": "#00ADED",
+          "when": "setpoint_down",
+          "circuits": [
+            "CC",
+            "SC"
+          ],
+          "_source": "Assumed from Teric Rev H5 p.33 'Auto SP Up'; the manual shows no figure for the switch down"
         }
       ],
       "display": {
@@ -208,6 +249,22 @@
           "imperial": 1
         },
         "_source": "Teric p.23 figure 103.6ft"
+      },
+      "circuit": {
+        "CC": {
+          "box": "#00C800",
+          "text": "#000000"
+        },
+        "BO": {
+          "box": "#FFFF00",
+          "text": "#000000"
+        },
+        "_source": "Perdix 3 Rev B PDF p.85, p.87; Teric Rev H5 p.12, p.33-34: rounded badges, CC green, BO yellow, black text (no OC badge is pictured)"
+      },
+      "setpoint": {
+        "high_color": "#00C800",
+        "low_color": "#FF00FF",
+        "_source": "Perdix 3 Rev B PDF p.42; Teric Rev H5 p.14: SP green for the high setpoint, magenta for the low"
       }
     },
     "Tern": {
@@ -322,6 +379,22 @@
           "at_stop_color": null
         },
         "_source": "Perdix 3 Rev B p.58-60"
+      },
+      "circuit": {
+        "CC": {
+          "box": "#00C800",
+          "text": "#000000"
+        },
+        "BO": {
+          "box": "#FFFF00",
+          "text": "#000000"
+        },
+        "_source": "Perdix 3 Rev B PDF p.85, p.87; Teric Rev H5 p.12, p.33-34: rounded badges, CC green, BO yellow, black text (no OC badge is pictured)"
+      },
+      "setpoint": {
+        "high_color": "#00C800",
+        "low_color": "#FF00FF",
+        "_source": "Perdix 3 Rev B PDF p.42; Teric Rev H5 p.14: SP green for the high setpoint, magenta for the low"
       }
     },
     "ascent_rate": [
@@ -387,7 +460,23 @@
         "caption": "Warning",
         "when": "po2_below",
         "bar": 0.18,
-        "_source": "Perdix 2 p.25: the PPO2 is below the limit set in the PPO2 limits menu (OC Min 0.18, p.62)"
+        "_source": "Perdix 2 p.25: the PPO2 is below the limit set in the PPO2 limits menu (OC Min 0.18, p.62)",
+        "circuits": [
+          "OC",
+          "BO"
+        ]
+      },
+      {
+        "id": "low_ppo2_cc",
+        "text": "LOW PPO2",
+        "caption": "Warning",
+        "when": "po2_below",
+        "bar": 0.4,
+        "circuits": [
+          "CC",
+          "SC"
+        ],
+        "_source": "Petrel 3 Technical Rev B p.25, p.81: LOW PPO2 below CC Min 0.40 on the loop"
       },
       {
         "id": "high_ppo2",
@@ -396,7 +485,24 @@
         "when": "po2_above",
         "bar": 1.61,
         "seconds": 30,
-        "_source": "Perdix 2 p.22, p.25: the average PPO2 above the PPO2 limit for more than 30 s (OC Deco 1.61 used, see _po2)"
+        "_source": "Perdix 2 p.22, p.25: the average PPO2 above the PPO2 limit for more than 30 s (OC Deco 1.61 used, see _po2)",
+        "circuits": [
+          "OC",
+          "BO"
+        ]
+      },
+      {
+        "id": "high_ppo2_cc",
+        "text": "HIGH PPO2",
+        "caption": "Warning",
+        "when": "po2_above",
+        "bar": 1.6,
+        "seconds": 30,
+        "circuits": [
+          "CC",
+          "SC"
+        ],
+        "_source": "Petrel 3 Technical Rev B p.81: on the loop the limits are CC Min 0.40 / CC Max 1.60, an alert after 30 s in both modes"
       },
       {
         "id": "missed_stop",
@@ -515,6 +621,35 @@
         "imperial": 0
       },
       "_source": "Perdix 2 p.12: 'When in meters, one decimal place is shown' (the feet figure shows 45 ft)"
+    },
+    "po2_cc": {
+      "min": 0.4,
+      "max": 1.6,
+      "color": "#FF0000",
+      "blink": true,
+      "_source": "Petrel 3 Technical Rev B p.13, p.18, p.81: on the loop the PPO2 flashes red below CC Min 0.40 / above CC Max 1.60 (Perdix 3 PDF p.41, Teric p.70 the same)"
+    },
+    "dil_po2": {
+      "min": 0.19,
+      "max": 1.65,
+      "color": "#FF0000",
+      "blink": true,
+      "_source": "Petrel 3 Technical Rev B p.18: DilPO2 flashes red below 0.19 or above 1.65 (Perdix 3 the same)"
+    },
+    "cells": {
+      "vote_fraction": 0.2,
+      "failed_color": "#FFFF00",
+      "min": 0.4,
+      "max": 1.6,
+      "out_of_range_color": "#FF0000",
+      "_source": "Petrel 3 Technical Rev B p.57, p.67: a cell more than 20 % from every other cell fails the vote and is yellow; with two cells a failed one below 0.4 / above 1.6 is red"
+    },
+    "circuit": {
+      "BO": {
+        "box": "#FFFF00",
+        "text": "#000000"
+      },
+      "_source": "Petrel 3 Technical Rev B p.14 and figures 13-16 p.37: 'BO displays in Yellow' (a yellow box, black text); OC / CC / SC in the main colour"
     }
   },
   "Garmin": {
@@ -638,6 +773,22 @@
           "color": "#FFFFFF",
           "clear_blink_depth": true
         }
+      },
+      "circuit": {
+        "CC": {
+          "box": "#000000",
+          "outline": "#FFFFFF",
+          "text": "#FFFFFF"
+        },
+        "_source": "Descent Mk3 p.24 figure (Big Numbers in CCR mode): CC in a white-outlined box under the gas; OC after a bailout, the same box (p.21: the label says CC or OC)",
+        "BO": {
+          "box": "#000000",
+          "outline": "#FFFFFF",
+          "text": "#FFFFFF"
+        }
+      },
+      "bailout": {
+        "_source": "Descent Mk3 p.28: on a bailout the dividing lines turn red, not the gas name (that is the X50i, p.20)"
       }
     },
     "_ndl": "assumed. The manuals only give Approaching NDL alerts at 10 and 5 min (Mk3 p.13, X50i p.12); real screenshots show the NDL white at 99+",
@@ -799,6 +950,22 @@
         "_order": "priority deduced (dangerous first); the manual lists the alerts alphabetically. Alerts with no wording in the manual (depth_alert, time_alert, po2_warn which only colours the value) are left out"
       },
       {
+        "id": "setpoint_switch_auto_high",
+        "text": "Switched to high setpoint.",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "setpoint_switch_auto_high",
+        "_source": "Mk3 p.34-35, X50i p.25-26 alert tables: the automatic setpoint switch"
+      },
+      {
+        "id": "setpoint_switch_auto_low",
+        "text": "Switched to low setpoint.",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "setpoint_switch_auto_low",
+        "_source": "Mk3 p.34-35, X50i p.25-26 alert tables: the automatic setpoint switch"
+      },
+      {
         "id": "sidemount_switch",
         "text": "Breathe from {tank}.",
         "caption": "",
@@ -931,6 +1098,22 @@
           "_source": "X50i p.12"
         },
         {
+          "id": "setpoint_switch_auto_high",
+          "text": "Switched to high setpoint.",
+          "caption": "",
+          "when": "fit_alert",
+          "alert": "setpoint_switch_auto_high",
+          "_source": "Mk3 p.34-35, X50i p.25-26 alert tables: the automatic setpoint switch"
+        },
+        {
+          "id": "setpoint_switch_auto_low",
+          "text": "Switched to low setpoint.",
+          "caption": "",
+          "when": "fit_alert",
+          "alert": "setpoint_switch_auto_low",
+          "_source": "Mk3 p.34-35, X50i p.25-26 alert tables: the automatic setpoint switch"
+        },
+        {
           "id": "sidemount_switch",
           "text": "Breathe from {tank}.",
           "caption": "",
@@ -953,6 +1136,20 @@
       "color": "#1E78FF",
       "text_color": "#FFFFFF",
       "_source": "Mk3 p.24 / X50i p.13 Enabling Sidemount Setup: 'when the pressure difference is greater than the configured threshold, an alert appears to remind you to breathe from the tank with the higher pressure'; 'The recommended breathing tank is highlighted in blue'. Switch Pressure is a setting; the default is not in the manual - 30 bar assumed (the owner's)"
+    },
+    "dil_po2": {
+      "min": 0.18,
+      "color": "#FFFF00",
+      "blink": true,
+      "_source": "Descent X50i p.25: 'Diluent PO2 is low' below 0.18 bar, the PO2 flashes yellow (Mk3 p.34: the same alert)"
+    },
+    "bailout": {
+      "gas_color": "#FF0000",
+      "_source": "Descent X50i p.20: on open circuit during a CCR dive 'The gas name turns red' (Mk3 p.28: the dividing lines turn red)"
+    },
+    "circuit_labels": {
+      "BO": "OC",
+      "_source": "Descent Mk3 p.21, X50i p.16-17: the label says whether CC or OC diving is active - a bailout reads OC"
     }
   },
   "default": {

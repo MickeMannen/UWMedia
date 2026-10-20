@@ -40,6 +40,16 @@ class SimulatedSample:
     # ceiling_m is at GF high (may the diver surface?); this one at GF low,
     # which is what places the first stop (plan_ascent).
     ceiling_gf_low_m: float = 0.0
+    setpoint: Optional[float] = None  # a CCR dive's setpoint in force while on the loop
+    cells: Tuple[float, ...] = ()  # a CCR dive's three O2 cell readings while on the loop (simulated_cells)
+
+
+def simulated_cells(po2: float, time_sec: int) -> Tuple[float, float, float]:
+    """Three O2 cell readings around the loop's PO2, as a rebreather's cells
+    read it: each a little off and wandering slowly (within 2 %, so they
+    always pass the ±20 % vote) - deterministic, so a written log is the
+    same every time."""
+    return tuple(round(po2 * (1.0 + 0.015 * math.sin(time_sec / 90.0 + k * 2.1)), 2) for k in range(3))
 
 
 def waypoint_phases(waypoints: List[PlannedWaypoint]) -> List[str]:
@@ -173,10 +183,13 @@ def expand_plan(plan: DiveProfilePlan) -> Tuple[List[Tuple[int, float, str]], Li
     return timeline, warnings
 
 
-def _effective_fractions(plan: DiveProfilePlan, gas: PlannedGas, depth_m: float) -> Tuple[float, float]:
+def _effective_fractions(plan: DiveProfilePlan, gas: PlannedGas, depth_m: float, setpoint: Optional[float] = None) -> Tuple[float, float]:
+    """The O2 / He fractions breathed: the gas's own on open circuit, on the
+    loop the diluent held at `setpoint` (the one in force, which the caller
+    tracks with DiveProfilePlan.next_setpoint; None = the low setpoint)."""
     if plan.on_loop(gas):
         ambient = SURFACE_PRESSURE_BAR + depth_m / 10.0
-        return ccr_effective_fractions(plan.setpoint_at(depth_m), ambient, gas.f_o2, gas.f_he)
+        return ccr_effective_fractions(setpoint if setpoint is not None else plan.ccr_low_setpoint, ambient, gas.f_o2, gas.f_he)
     return gas.f_o2, gas.f_he
 
 
@@ -189,6 +202,7 @@ def _mandatory_stop_schedule(
     gf_high: float,
     ascent_rate_mps: float = 0.15,
     max_seconds: int = 20000,
+    setpoint: Optional[float] = None,
 ) -> Tuple[int, float, int]:
     """Virtual ascent to the surface from `depth_m`, staying on `gas` the
     whole way - deliberately ignorant of any later gas switch the plan
@@ -222,7 +236,8 @@ def _mandatory_stop_schedule(
         if cur_depth > target_ceiling:
             step = min(cur_depth, ascent_rate_mps)
             cur_depth -= step
-            f_o2, f_he = _effective_fractions(plan, gas, cur_depth)
+            setpoint = plan.next_setpoint(setpoint, cur_depth)
+            f_o2, f_he = _effective_fractions(plan, gas, cur_depth, setpoint)
             sim.update(cur_depth, 1.0, f_o2, f_he)
             total_time += 1
             continue
@@ -235,7 +250,7 @@ def _mandatory_stop_schedule(
 
         duration = 0
         while total_time < max_seconds and sim.get_ceiling(gf_at(next_level)) > next_level:
-            f_o2, f_he = _effective_fractions(plan, gas, stop_depth)
+            f_o2, f_he = _effective_fractions(plan, gas, stop_depth, setpoint)
             sim.update(stop_depth, 10.0, f_o2, f_he)
             total_time += 10
             duration += 10
@@ -295,10 +310,13 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
     had_deco = False
     running_max = 0.0
 
+    setpoint: Optional[float] = None
     for i, (t, depth, gas_id) in enumerate(timeline):
         gas = plan.gas_by_id(gas_id)
         ambient = SURFACE_PRESSURE_BAR + depth / 10.0
-        f_o2, f_he = _effective_fractions(plan, gas, depth)
+        if plan.is_ccr:
+            setpoint = plan.next_setpoint(setpoint, depth)
+        f_o2, f_he = _effective_fractions(plan, gas, depth, setpoint)
         engine.update(depth, 1.0, f_o2, f_he)
 
         tank = breathing_from[gas_id]
@@ -329,7 +347,7 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
                 had_deco = True
                 last_ndl = None
                 last_tts, last_stop_depth, last_stop_duration = _mandatory_stop_schedule(
-                    plan, engine, depth, gas, gf_low, gf_high
+                    plan, engine, depth, gas, gf_low, gf_high, setpoint=setpoint
                 )
         elif not in_deco:
             last_ndl = max(0, last_ndl - 1) if last_ndl is not None else None
@@ -356,6 +374,8 @@ def simulate(plan: DiveProfilePlan, resolution_sec: int = 1) -> Tuple[List[Simul
                     cns_pct=engine.cns,
                     po2=round(ambient * f_o2, 3),
                     divemode="closedcircuit" if plan.on_loop(gas) else "opencircuit",
+                    setpoint=setpoint if plan.on_loop(gas) else None,
+                    cells=simulated_cells(ambient * f_o2, t) if plan.on_loop(gas) else (),
                     tank_pressure_bar=round(tank_pressure[tank], 1),
                     tank_ref=tank,
                     tank_pressures={ref: round(p, 1) for ref, p in tank_pressure.items()},
@@ -388,22 +408,25 @@ GAS_SWITCH_HOLD_SEC = 60
 MAX_ASCENT_PLAN_SEC = 6 * 3600
 
 
-def _loaded_engine(plan: DiveProfilePlan, until_sec: Optional[float] = None) -> Tuple[BuhlmannEngine, Optional[Tuple[int, float, str]]]:
+def _loaded_engine(plan: DiveProfilePlan, until_sec: Optional[float] = None) -> Tuple[BuhlmannEngine, Optional[Tuple[int, float, str]], Optional[float]]:
     """Tissue state at `until_sec` (default: the end of the plan's last
     waypoint) - the same per-second loading simulate() does, without its
     NDL/TTS lookahead. Also returns the (time, depth, gas_id) timeline entry
-    reached, None for an empty plan."""
+    reached, None for an empty plan, and a CCR dive's setpoint in force then."""
     timeline, _ = expand_plan(plan)
     engine = BuhlmannEngine(SURFACE_PRESSURE_BAR)
     reached = None
+    setpoint: Optional[float] = None
     for entry in timeline:
         t, depth, gas_id = entry
         if until_sec is not None and t > until_sec:
             break
-        f_o2, f_he = _effective_fractions(plan, plan.gas_by_id(gas_id), depth)
+        if plan.is_ccr:
+            setpoint = plan.next_setpoint(setpoint, depth)
+        f_o2, f_he = _effective_fractions(plan, plan.gas_by_id(gas_id), depth, setpoint)
         engine.update(depth, 1.0, f_o2, f_he)
         reached = entry
-    return engine, reached
+    return engine, reached, setpoint
 
 
 def plan_ascent(plan: DiveProfilePlan) -> Tuple[List[PlannedWaypoint], bool, List[Tuple[float, int, str]]]:
@@ -431,8 +454,8 @@ def plan_ascent(plan: DiveProfilePlan) -> Tuple[List[PlannedWaypoint], bool, Lis
 
     apply_auto_gases(plan)
     last = wps[-1]
-    engine, _ = _loaded_engine(plan)
-    return _ascent_from(plan, engine, last.depth_m, last.runtime_sec, plan.breathed_gas(plan.gas_by_id(last.gas_id)), last.gas_auto)
+    engine, _, setpoint = _loaded_engine(plan)
+    return _ascent_from(plan, engine, last.depth_m, last.runtime_sec, plan.breathed_gas(plan.gas_by_id(last.gas_id)), last.gas_auto, setpoint)
 
 
 def ascent_from_time(plan: DiveProfilePlan, time_sec: float) -> Tuple[bool, List[Tuple[float, int, str]], int]:
@@ -442,13 +465,13 @@ def ascent_from_time(plan: DiveProfilePlan, time_sec: float) -> Tuple[bool, List
     switches follow the waypoint covering that moment (auto or by hand).
     Plan waypoints are not changed (beyond apply_auto_gases, which
     simulate's caller already ran)."""
-    engine, reached = _loaded_engine(plan, until_sec=time_sec)
+    engine, reached, setpoint = _loaded_engine(plan, until_sec=time_sec)
     if reached is None or reached[1] <= 0:
         return False, [], 0
     t, depth, gas_id = reached
     covering = next((wp for wp in plan.sorted_waypoints() if wp.runtime_sec >= t), None)
     auto = covering.gas_auto if covering is not None else True
-    waypoints, deco_needed, stops = _ascent_from(plan, engine, depth, t, plan.gas_by_id(gas_id), auto)
+    waypoints, deco_needed, stops = _ascent_from(plan, engine, depth, t, plan.gas_by_id(gas_id), auto, setpoint)
     tts = waypoints[-1].runtime_sec - t if waypoints else 0
     return deco_needed, stops, tts
 
@@ -470,15 +493,18 @@ def deco_schedule_timeline(
     engine = BuhlmannEngine(SURFACE_PRESSURE_BAR)
     gf_high = plan.gf_high / 100.0
     out: List[Tuple[int, List[Tuple[float, int, str]]]] = []
+    setpoint: Optional[float] = None
     for t, depth, gas_id in timeline:
         gas = plan.gas_by_id(gas_id)
-        f_o2, f_he = _effective_fractions(plan, gas, depth)
+        if plan.is_ccr:
+            setpoint = plan.next_setpoint(setpoint, depth)
+        f_o2, f_he = _effective_fractions(plan, gas, depth, setpoint)
         engine.update(depth, 1.0, f_o2, f_he)
         if t % interval_sec or depth <= 0 or engine.get_ceiling(gf_high) <= 0:
             continue
         covering = next((wp for wp in wps if wp.runtime_sec >= t), None)
         auto = covering.gas_auto if covering is not None else True
-        _, _, stops = _ascent_from(plan, engine.clone(), depth, t, gas, auto)
+        _, _, stops = _ascent_from(plan, engine.clone(), depth, t, gas, auto, setpoint)
         out.append((t, stops))
     return out
 
@@ -490,9 +516,11 @@ def _ascent_from(
     start_sec: float,
     gas: PlannedGas,
     auto: bool,
+    setpoint: Optional[float] = None,
 ) -> Tuple[List[PlannedWaypoint], bool, List[Tuple[float, int, str]]]:
     """plan_ascent's schedule from an arbitrary (tissues, depth, time, gas)
-    state; `engine` is advanced in place."""
+    state - on a CCR dive `setpoint` is the one in force there, switched
+    down on the way up; `engine` is advanced in place."""
     gf_low, gf_high = plan.gf_low / 100.0, plan.gf_high / 100.0
     rate_mps = plan.default_ascent_rate / 60.0
     t = float(start_sec)
@@ -518,7 +546,10 @@ def _ascent_from(
         ))
 
     def breathe(d: float, seconds: float) -> None:
-        f_o2, f_he = _effective_fractions(plan, gas, d)
+        nonlocal setpoint
+        if plan.is_ccr:
+            setpoint = plan.next_setpoint(setpoint, d)
+        f_o2, f_he = _effective_fractions(plan, gas, d, setpoint)
         engine.update(d, seconds, f_o2, f_he)
 
     def switch_depths_between(shallow: float, deep: float) -> List[float]:

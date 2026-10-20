@@ -299,3 +299,47 @@ def test_rebreather_cells_are_held_between_samples(tmp_path):
     dive = _parse(tmp_path, _ssrf(
         f"<dive date='2026-01-01' time='10:00:00'><divecomputer model='X' dctype='CCR'>{samples}</divecomputer></dive>"))[0]
     assert [(wp.po2_1, wp.po2_2, wp.po2_3) for wp in dive.waypoints] == [(0.7, 0.71, 0.69), (0.7, 1.3, 0.69), (0.7, 1.3, 0.69)]
+
+
+def _ccr_dive(samples, events="", cylinders=None, dctype="CCR"):
+    cylinders = cylinders if cylinders is not None else (
+        "<cylinder description='Oxy' o2='100.0%' use='oxygen' />"
+        "<cylinder description='Dil' o2='18.0%' he='45.0%' use='diluent' />"
+        "<cylinder description='Stage' o2='50.0%' />")
+    return _ssrf(f"<dive date='2026-01-01' time='10:00:00'>{cylinders}"
+                 f"<divecomputer model='X' dctype='{dctype}'>{events}{samples}</divecomputer></dive>")
+
+
+def test_rebreather_loop_bailout_setpoint_and_gases(tmp_path):
+    """dctype CCR: on the loop on the diluent from the start; a gas change to a
+    cylinder that is neither diluent nor oxygen is a bailout; po2= on the loop
+    is the setpoint and dc_supplied_ppo2 the computer's PPO2."""
+    samples = ("<sample time='0:00 min' depth='2.0 m' po2='0.70 bar' dc_supplied_ppo2='0.68 bar' />"
+               "<sample time='1:00 min' depth='30.0 m' po2='1.30 bar' />"
+               "<sample time='2:00 min' depth='20.0 m' po2='1.00 bar' />"
+               "<sample time='3:00 min' depth='0.0 m' />")
+    events = "<event time='2:00 min' type='25' name='gaschange' cylinder='2' />"
+    w0, w1, w2, _ = _parse(tmp_path, _ccr_dive(samples, events))[0].waypoints
+    assert [w.circuit for w in (w0, w1, w2)] == ["CC", "CC", "BO"]
+    assert (w0.setpoint, w0.po2, w1.setpoint) == (0.7, 0.68, 1.3)
+    assert (w2.setpoint, w2.po2) == (None, 1.0)
+    assert (w1.gasmix, w2.gasmix) == ("18/45", "Nx50")
+    assert (w2.diluent_o2_percent, w2.diluent_he_percent) == (18.0, 45.0)  # kept for DilPO2 after the bailout
+    assert w1.tanks["Oxy"].o2_percent == 100.0
+
+
+def test_rebreather_modechange_events_set_the_circuit(tmp_path):
+    samples = "".join(f"<sample time='{m}:00 min' depth='20.0 m' po2='1.20 bar' />" for m in range(4))
+    events = ("<event time='1:00 min' type='8' name='modechange' divemode='OC' />"
+              "<event time='2:00 min' type='8' name='modechange' divemode='CCR' />")
+    wps = _parse(tmp_path, _ccr_dive(samples, events))[0].waypoints
+    assert [w.circuit for w in wps] == ["CC", "BO", "CC", "CC"]
+
+
+def test_open_circuit_gas_changes_and_two_cylinders_with_one_name(tmp_path):
+    cylinders = "<cylinder description='AL80' o2='21.0%' /><cylinder description='AL80' o2='50.0%' />"
+    samples = "".join(f"<sample time='{m}:00 min' depth='10.0 m' />" for m in range(3))
+    events = "<event time='1:00 min' type='25' name='gaschange' cylinder='1' />"
+    wps = _parse(tmp_path, _ccr_dive(samples, events, cylinders, dctype="OC"))[0].waypoints
+    assert [w.gasmix for w in wps] == ["AIR", "Nx50", "Nx50"]
+    assert [w.circuit for w in wps] == ["OC"] * 3 and set(wps[0].tanks) == {"AL80", "AL80 (2)"}

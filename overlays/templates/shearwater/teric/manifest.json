@@ -5,21 +5,72 @@
     {
       "id": "main",
       "name": "Main Screen"
+    },
+    {
+      "id": "standard",
+      "name": "Standard"
+    },
+    {
+      "id": "cc",
+      "name": "CC (Standard)",
+      "dive": "ccr"
+    },
+    {
+      "id": "info_ai",
+      "name": "Info: AI (T1 / SAC / GTR)"
+    },
+    {
+      "id": "info_max_avg",
+      "name": "Info: MAX / AVG"
+    },
+    {
+      "id": "info_mod",
+      "name": "Info: MOD / CNS / PPO2"
+    },
+    {
+      "id": "info_gf",
+      "name": "Info: GF / GF99 / SurfGF"
+    },
+    {
+      "id": "info_temp",
+      "name": "Info: TEMP / BATTERY"
+    },
+    {
+      "id": "info_mbar",
+      "name": "Info: mBar NOW / SURF"
+    },
+    {
+      "id": "info_time",
+      "name": "Info: TIME"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
       "Deco row: NDL / TTS, DECO red, SAFETY boxed green, SAFETY / PAUSED, SAFETY / CLEAR, boxed CLEAR counter (manual Rev H5 p.13, p.25-26)",
       "Banner notices: WARNING / INFO with a CLEAR tab (p.25-26)",
-      "Yellow above the stop, flashing red above the ceiling (p.26)"
+      "Yellow above the stop, flashing red above the ceiling (p.26)",
+      "Standard page: depth, deco row (NDL / stop, TTS), info row O2/He | PPO2, dive time, rows divided (manual Rev H5 p.11, p.14)",
+      "CC page: the Standard layout with the CC badge (green; BO yellow), info row O2/He | SP with SP green high / magenta low, PPO2 there on a bailout; Auto SP Up notice (p.12, p.14, p.33-34)",
+      "Info pages: the Standard page with its info row replaced by one info screen each, cyan titles over white values, no column divider (manual Rev H5 p.16)",
+      "Info: AI as the T1 & GTR/SAC screen (p.17); MAX / AVG (p.17); CNS / MOD / PPO2, DilPO2 in place of PPO2 on the loop (p.16, p.18); GF / GF99 / SurfGF (p.18); TEMP / BATTERY (p.19); mBar NOW / SURF (p.19); TIME (p.19)",
+      "Gauge page: GA badge, depth, MAX | STOPWATCH, AVG | TIME, dive time, rows divided (Big layout figure, p.35)",
+      "Info: TIME / EOD - EOD is the time now plus TTS (Teric p.19)"
     ],
     "assumed": [
-      "Banner size and position on the Big layout; the HIGH PPO2 banner wording"
+      "Banner size and position on the Big layout; the HIGH PPO2 banner wording",
+      "Standard and CC pages: row positions and font sizes measured from the manual's figures, not a device photo; the info row shows its default items",
+      "Info pages: three-column positions and the % / unit marks placed by eye from the p.16-19 strips; TEMP with one decimal, MOD in the circuit's breathed gas (the diluent on the loop)",
+      "Info: BATTERY shows the log's battery value as a percent; Shearwater exports record battery voltage, not percent",
+      "Gauge page: STOPWATCH is the dive time (a log records no stopwatch reset); the bottom row shows the dive time where the surface figure shows SURFACE; positions measured from the p.35 figure"
     ],
     "not_shown": [
-      "Standard layout",
       "Persistent warnings overlay (p.23)",
-      "Info pages"
+      "Info screens LAST DIVE (surface only), Compass (no heading in the logs), TISSUES, CEIL / @+5 / Δ+5 (what-if values not computed) (p.16-20)",
+      "Gauge page: the battery icon and the surface interval (p.35)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

@@ -67,7 +67,7 @@ from parsers.subsurface_writer import write_subsurface
 from parsers.uddf_writer import write_uddf
 from utils import units as U
 from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
-from utils.dive_computers import DIVE_COMPUTERS
+from utils.dive_computers import DIVE_COMPUTERS, computer_label
 from utils.dive_plan_engine import (
     DECO_SCHEDULE_INTERVAL_SEC,
     apply_auto_gases,
@@ -146,11 +146,13 @@ PERSISTED_PLAN_FIELDS = {
     "dive_type": ("dive_profile_dive_type", lambda v: v in DIVE_TYPE_LABELS),
     "ccr_low_setpoint": ("dive_profile_ccr_low_setpoint", _is_setpoint),
     "ccr_high_setpoint": ("dive_profile_ccr_high_setpoint", _is_setpoint),
-    "ccr_setpoint_switch_depth_m": ("dive_profile_ccr_switch_depth", _is_non_negative),
+    # the one switch depth older versions saved is the switch to the high setpoint
+    "ccr_high_setpoint_depth_m": ("dive_profile_ccr_switch_depth", _is_non_negative),
+    "ccr_low_setpoint_depth_m": ("dive_profile_ccr_low_switch_depth", _is_non_negative),
     "ccr_o2_tank_size_l": ("dive_profile_ccr_o2_tank_size", _is_positive),
     "ccr_o2_start_pressure_bar": ("dive_profile_ccr_o2_start_pressure", _is_positive),
     "sidemount_switch_bar": ("dive_profile_sidemount_switch_bar", _is_positive),
-    "computer": ("dive_profile_computer", lambda v: v in DIVE_COMPUTERS),
+    "computer": ("dive_profile_computer", lambda v: isinstance(v, str) and computer_label(v) in DIVE_COMPUTERS),
     "computer_serial": ("dive_profile_computer_serial", lambda v: isinstance(v, str) and v.isdigit()),
 }
 # Display label <-> PlannedGas.use_phase
@@ -322,7 +324,8 @@ class DiveProfileBackend(QObject):
         self._ccr_low_text = f"{plan.ccr_low_setpoint:g}"
         self._ccr_high_text = f"{plan.ccr_high_setpoint:g}"
         self._ccr_error_text = ""
-        self._ccr_switch_depth_text = f"{U.depth(plan.ccr_setpoint_switch_depth_m):.0f}"
+        self._ccr_high_depth_text = f"{U.depth(plan.ccr_high_setpoint_depth_m):.0f}"
+        self._ccr_low_depth_text = f"{U.depth(plan.ccr_low_setpoint_depth_m):.0f}"
         self._ccr_o2_size_text = f"{plan.ccr_o2_tank_size_l:g}"
         self._ccr_o2_start_text = f"{U.pressure(plan.ccr_o2_start_pressure_bar):.0f}"
         self._sidemount_switch_text = f"{U.pressure(plan.sidemount_switch_bar):.0f}"
@@ -417,6 +420,8 @@ class DiveProfileBackend(QObject):
         for attr, (key, is_valid) in PERSISTED_PLAN_FIELDS.items():
             value = fields.get(key)
             if value is not None and is_valid(value):
+                if attr == "computer":
+                    value = computer_label(value)  # a label older versions saved
                 setattr(self.dive_plan, attr, int(value) if attr == "planned_runtime_sec" else value)
 
     def _persist(self, attr):
@@ -688,13 +693,26 @@ class DiveProfileBackend(QObject):
         self._resimulate()
 
     @Property(str, notify=settingsChanged)
-    def ccrSwitchDepthText(self):
-        return self._ccr_switch_depth_text
+    def ccrHighDepthText(self):
+        """Depth the loop switches to the high setpoint on the way down."""
+        return self._ccr_high_depth_text
 
-    @ccrSwitchDepthText.setter
-    def ccrSwitchDepthText(self, value):
-        self._ccr_switch_depth_text = value
-        self._set_plan_number("ccr_setpoint_switch_depth_m", value, lambda v: v >= 0)
+    @ccrHighDepthText.setter
+    def ccrHighDepthText(self, value):
+        self._ccr_high_depth_text = value
+        self._set_plan_number("ccr_high_setpoint_depth_m", value, lambda v: v >= 0)
+        self.settingsChanged.emit()
+        self._resimulate()
+
+    @Property(str, notify=settingsChanged)
+    def ccrLowDepthText(self):
+        """Depth the loop switches back to the low setpoint on the way up."""
+        return self._ccr_low_depth_text
+
+    @ccrLowDepthText.setter
+    def ccrLowDepthText(self, value):
+        self._ccr_low_depth_text = value
+        self._set_plan_number("ccr_low_setpoint_depth_m", value, lambda v: v >= 0)
         self.settingsChanged.emit()
         self._resimulate()
 
@@ -1682,7 +1700,7 @@ class DiveProfileBackend(QObject):
             {"label": "PO2", "value": f"{sample.po2:.2f} bar (max {po2_limit:g})", "color": bad if po2_over else normal},
         ]
         if self.dive_plan.is_ccr:
-            loop = f"SP {self.dive_plan.setpoint_at(sample.depth_m):g}" if on_loop else "Bailout (OC)"
+            loop = f"SP {sample.setpoint:g}" if on_loop and sample.setpoint is not None else "Bailout (OC)"
             info.append({"label": "Loop", "value": loop, "color": normal if on_loop else bad})
         if sample.ceiling_m > 0:
             # Full schedule if the ascent started here - End dive's planner,

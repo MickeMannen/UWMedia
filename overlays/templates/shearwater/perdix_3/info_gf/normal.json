@@ -1,0 +1,164 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 3",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.2314,
+        "rel_y": 0.2222,
+        "color": "#FFFFFF",
+        "font_size": 100,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 7.5,
+        "unit_dy": -38.5,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.2206,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.595,
+        "rel_y": 0.224,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:min",
+        "rel_x": 0.649,
+        "rel_y": 0.342,
+        "color": "#00ADED",
+        "font_size": 34,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.556,
+        "rel_y": 0.23,
+        "font_size": 28,
+        "value_font_size": 38,
+        "scale": 1.0,
+        "depth_unit": "m",
+        "label": "Stop / deco (replaces NDL)"
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.5543,
+        "rel_y": 0.2937,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.5898,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF",
+        "rel_x": 0.215,
+        "rel_y": 0.6005,
+        "color": "#00ADED",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "gf_setting",
+        "rel_x": 0.155,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF99",
+        "rel_x": 0.415,
+        "rel_y": 0.6005,
+        "color": "#00ADED",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.5,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "align": "right"
+      },
+      {
+        "field": "custom:%",
+        "rel_x": 0.505,
+        "rel_y": 0.7105,
+        "color": "#00ADED",
+        "font_size": 24,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.655,
+        "rel_y": 0.6005,
+        "color": "#00ADED",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.655,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "value_format": "minutes"
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.1292,
+      "y0": 0.1561,
+      "x1": 0.81,
+      "y1": 0.8373,
+      "shape": "rect"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

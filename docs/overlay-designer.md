@@ -71,7 +71,12 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   element's name while folded. The right-hand column scrolls.
 - A text element may carry `value_format` in its JSON (`"minutes"` for a
   time in whole minutes, `"integer"` for a whole number) - the way a
-  Shearwater Tec row shows the dive time and stop depth.
+  Shearwater Tec row shows the dive time and stop depth; for a PO2
+  `"decimal2"` ("0.70", a Descent), `"decimal2_no_lead"` (".72", a
+  Shearwater) or `"decimal1"` ("1.3", a Petrel's setpoint).
+- `hide_in_circuits` (a list of `CC`, `SC`, `BO`, `OC`) makes an element step
+  aside on those circuits - on a CC page the setpoint gives its place to the
+  PPO2 on a bailout.
 - **Unit** (depth, pressure, temperature, SAC and MOD elements): tick
   **Show unit** and the element draws its own unit after the value - `m` or
   `ft`, `BAR` or `PSI`, `°C` or `°F` - following the app's unit system
@@ -128,6 +133,30 @@ the message. **Shows** switches a notice element between the computer's
 *Alerts* (timed, as above) and its *Persistent* notifications - the box a
 Perdix keeps left of the NDL while a situation lasts: MOD exceeded (red,
 with an up arrow), Near MOD (yellow), High CNS - drawn in the *Frame* style.
+
+### Rebreather (CC) pages
+
+A page marked `"dive": "ccr"` in its manifest previews a rebreather dive in
+the designer (setpoint switches, three cells with one drifting off, a
+bailout and the return to the loop). The fields a CC page uses: `circuit`
+(CC, SC, BO on a bailout - OC on a Descent - drawn on the brand's badge),
+`setpoint` (the setpoint in force, green high / magenta low on a Perdix 3 or
+Teric), `po2_1` .. `po2_3` (the cells, yellow when one fails the ±20 % vote),
+`diluent_po2`, and `gasmix`, which on a rebreather dive is the gas breathed -
+the diluent on the loop, the bailout gas after a bailout - not the first
+tank. Bundled CC pages: Petrel *CC (setpoint)* and *CC (3 cells)*, Perdix 3
+and Perdix 2 *CC (setpoint)*, Teric *CC (Standard)*, Descent X50i *CCR* and
+*Dynamic depth (CCR)*, Descent Mk3i *CCR (Big Numbers)* and *CCR (standard)*.
+
+### Info screens and gauge pages
+
+The Shearwater computers' info screens - what the diver pages through with
+the right button - are bundled as one page each (*Info: MOD / MAX / PPO2*,
+*Info: GF99 / SurGF / CEIL* ...), and every computer has a *Gauge* page.
+They use a few computed fields: `avg_depth` (the running average depth),
+`min_temp` (the coldest water so far), `gf_setting` ("40/85"), `date`, `eod`
+(the time of day to expect to surface: now plus TTS), `ambient_mbar` and
+`surface_mbar`.
 
 Some values no log records are computed from the dive and shown where a
 template asks for them: GF99 and surface GF (`gf`, `surf_gf`), the breathed

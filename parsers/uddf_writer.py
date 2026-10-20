@@ -11,6 +11,7 @@ from utils.dive_plan_engine import SimulatedSample
 
 UDDF_NS = "http://www.streit.cc/uddf/3.2/"
 NDL_CAP_SEC = 99 * 60  # "99+" - how an unbounded NDL is logged
+CCR_O2_MIX_ID = "ccr_o2"  # the mix a CCR dive's O2 cylinder holds (never breathed: no switchmix names it)
 _NSMAP = {None: UDDF_NS}
 
 
@@ -90,6 +91,12 @@ def write_uddf(
     _el(dc_manufacturer, "name", computer.manufacturer)
     _el(divecomputer, "model", computer.model)
     _el(divecomputer, "serialnumber", serial)
+    if plan.is_ccr:
+        # the rebreather's three O2 cells, which measuredpo2 refers to
+        rebreather = _el(equipment, "rebreather", id="rebreather")
+        _el(rebreather, "name", "Rebreather")
+        for n in range(1, 4):
+            _el(rebreather, "o2sensor", id=f"cell{n}")
 
     gasdefs = _el(root, "gasdefinitions")
     mix_ids = {}
@@ -101,6 +108,12 @@ def write_uddf(
         _el(mix, "o2", round(gas.f_o2, 4))
         _el(mix, "he", round(gas.f_he, 4))
         _el(mix, "maximumpo2", plan.ccr_high_setpoint if plan.on_loop(gas) else plan.max_po2_bottom)
+    if plan.is_ccr:
+        # the O2 cylinder's own mix, so its tankdata names what it holds
+        mix = _el(gasdefs, "mix", id=CCR_O2_MIX_ID)
+        _el(mix, "name", "O2")
+        _el(mix, "o2", 1.0)
+        _el(mix, "he", 0.0)
 
     decomodel = _el(root, "decomodel")
     buehlmann = _el(decomodel, "buehlmann", id="zhl16c")
@@ -119,6 +132,8 @@ def write_uddf(
         tankdata = _el(info_before, "tankdata", id=tank.ref)
         if tank.gas_id is not None:
             _el(tankdata, "link", ref=mix_ids[tank.gas_id])
+        elif tank.role == "oxygen":
+            _el(tankdata, "link", ref=CCR_O2_MIX_ID)
         _el(tankdata, "tankvolume", round(tank.size_l / 1000.0, 4))  # UDDF volumes are in m^3
         _el(tankdata, "tankpressurebegin", int(tank.start_pressure_bar * 100000))
         end_pressure = end_pressures.get(tank.ref, tank.start_pressure_bar)
@@ -143,8 +158,10 @@ def write_uddf(
                 _el(wp, "tankpressure", int(s.tank_pressures[tank.ref] * 100000), ref=tank.ref)
 
         _el(wp, "calculatedpo2", round(s.po2, 2))
-        if s.divemode == "closedcircuit":
-            _el(wp, "setpo2", plan.setpoint_at(s.depth_m), setby="computer")
+        if s.divemode == "closedcircuit" and s.setpoint is not None:
+            _el(wp, "setpo2", s.setpoint, setby="computer")
+        for n, cell in enumerate(s.cells, start=1):
+            _el(wp, "measuredpo2", cell, ref=f"cell{n}")
         if s.cns_pct:
             _el(wp, "cns", int(s.cns_pct))
         _el(wp, "divemode", type=s.divemode)

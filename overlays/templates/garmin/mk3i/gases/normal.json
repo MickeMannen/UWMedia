@@ -1,0 +1,136 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "label_current_gas",
+        "field": "custom:CURRENT GAS",
+        "rel_x": 0.5075,
+        "rel_y": 0.2407,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "gasmix",
+        "field": "gasmix",
+        "rel_x": 0.5075,
+        "rel_y": 0.267,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center",
+        "max_width": 200
+      },
+      {
+        "id": "label_gas_po2",
+        "field": "custom:GAS PO2",
+        "rel_x": 0.3778,
+        "rel_y": 0.3692,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "po2",
+        "field": "po2",
+        "rel_x": 0.3778,
+        "rel_y": 0.3955,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center",
+        "value_format": "decimal2"
+      },
+      {
+        "id": "label_surf_gf",
+        "field": "custom:SURF. GF",
+        "rel_x": 0.6372,
+        "rel_y": 0.3692,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "surf_gf",
+        "field": "surf_gf",
+        "rel_x": 0.6372,
+        "rel_y": 0.3955,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "label_gf99",
+        "field": "custom:GF99",
+        "rel_x": 0.3778,
+        "rel_y": 0.5035,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "gf",
+        "field": "gf",
+        "rel_x": 0.3778,
+        "rel_y": 0.5298,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "label_cns",
+        "field": "custom:CNS",
+        "rel_x": 0.6372,
+        "rel_y": 0.5035,
+        "color": "#FFFFFF",
+        "font_size": 24,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "cns",
+        "field": "cns",
+        "rel_x": 0.6372,
+        "rel_y": 0.5298,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.5075,
+        "rel_y": 0.6816,
+        "color": "#FFFFFF",
+        "font_size": 60,
+        "scale": 1.0,
+        "align": "center"
+      }
+    ],
+    "screen": {
+      "x0": 0.126,
+      "y0": 0.194,
+      "x1": 0.889,
+      "y1": 0.778,
+      "shape": "ellipse"
+    }
+  }
+}

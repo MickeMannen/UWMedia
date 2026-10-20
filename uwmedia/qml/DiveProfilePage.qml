@@ -257,18 +257,33 @@ Item {
                                 visible: diveProfileBackend.isCcr && text.length > 0
                             }
 
-                            Label { text: "SP switch depth (" + diveProfileBackend.depthUnit + ")"; visible: diveProfileBackend.isCcr }
-                            TextField {
+                            Label { text: "SP switch down/up (" + diveProfileBackend.depthUnit + ")"; visible: diveProfileBackend.isCcr }
+                            RowLayout {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 34
-                                font.pixelSize: 15
                                 visible: diveProfileBackend.isCcr
-                                placeholderText: "6"
-                                text: diveProfileBackend.ccrSwitchDepthText
-                                onTextEdited: diveProfileBackend.ccrSwitchDepthText = text
-                                ToolTip.visible: hovered
-                                ToolTip.delay: 500
-                                ToolTip.text: "Low setpoint shallower than this, high setpoint at and below it"
+                                TextField {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 34
+                                    font.pixelSize: 15
+                                    placeholderText: "8"
+                                    text: diveProfileBackend.ccrHighDepthText
+                                    onTextEdited: diveProfileBackend.ccrHighDepthText = text
+                                    ToolTip.visible: hovered
+                                    ToolTip.delay: 500
+                                    ToolTip.text: "Switch to the high setpoint descending through this depth"
+                                }
+                                Label { text: "/" }
+                                TextField {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 34
+                                    font.pixelSize: 15
+                                    placeholderText: "2"
+                                    text: diveProfileBackend.ccrLowDepthText
+                                    onTextEdited: diveProfileBackend.ccrLowDepthText = text
+                                    ToolTip.visible: hovered
+                                    ToolTip.delay: 500
+                                    ToolTip.text: "Back to the low setpoint ascending through this depth (dive computers want them 6 m apart)"
+                                }
                             }
 
                             Label { text: "O2 cylinder (L / " + diveProfileBackend.pressureUnit + ")"; visible: diveProfileBackend.isCcr }

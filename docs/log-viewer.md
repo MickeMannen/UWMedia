@@ -21,10 +21,16 @@ from the [Dive Profile Builder](dive-profile-builder.md)).
    - **Tanks / sensors**: each tank or transmitter with its mix and its start
      and end pressure;
    - the **depth profile** (with the deco ceiling when the log has one);
+   - on a rebreather dive, a **Rebreather** line (diluent, setpoints, time
+     on a bailout) and a **PO₂** strip under the profile: the PO₂, the
+     setpoint in force and the three O₂ cells, with bailouts shaded;
    - which data the log carries ("logged: NDL, TTS, ppO₂, heart rate…");
-   - **Events**: dive alerts and gas changes, at their dive time.
+   - **Events**: dive alerts and gas changes, at their dive time - on a
+     rebreather dive also setpoint changes, bailouts and the return to the
+     loop.
 3. **Samples** → **Show** opens the full sample table: time, depth,
-   temperature, NDL, TTS, gas and tank pressures. **Filter** narrows it down.
+   temperature, NDL, TTS, gas, PO₂, a rebreather's setpoint, cells and
+   circuit (CC / BO), and tank pressures. **Filter** narrows it down.
 
 Depths, pressures and temperatures show in the unit system chosen on the
 [Advanced](advanced.md#units) page; the logs themselves are not changed.

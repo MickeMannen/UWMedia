@@ -35,6 +35,12 @@ Conditions (`when`), with their parameters:
                       brand's sidemount_switch threshold; {tank} is the
                       one to breathe from (Descent "Breathe from %1.")
   near_mod            within `metres` above the MOD
+  setpoint_up         a rebreather's setpoint rises (Teric "Auto SP Up")
+  setpoint_down       a rebreather's setpoint falls
+Any entry may name `circuits` (["CC", "SC"], ["OC", "BO"]): it only holds
+while the waypoint's circuit (models.dive.Waypoint.circuit; a log that
+names none counts as "OC") is one of them - a Shearwater's PPO2 limits on
+the loop are CC Min / Max, on open circuit the OC ones.
 An entry with "enabled": false is kept for the record (a device alert that
 is off by default) and never fires.
 
@@ -121,6 +127,15 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
     waypoint; duration and edge conditions are handled by the timeline."""
     when = rule.get("when")
     ctx: Dict[str, Any] = {}
+    circuits = rule.get("circuits")
+    if circuits and (getattr(wp, "circuit", None) or "OC") not in circuits:
+        return False, ctx
+    if when in ("setpoint_up", "setpoint_down"):
+        now_sp, prev_sp = _num(getattr(wp, "setpoint", None)), _num(getattr(prev, "setpoint", None)) if prev is not None else None
+        if now_sp is None or prev_sp is None:
+            return False, ctx
+        ctx["setpoint"] = f"{now_sp:.1f}"
+        return (now_sp > prev_sp) if when == "setpoint_up" else (now_sp < prev_sp), ctx
     cns = _num(getattr(wp, "cns", None))
     if cns is not None:
         ctx["cns"] = int(cns)  # "{cns}" in a text (Garmin "CNS toxicity at %1%.")
@@ -224,10 +239,10 @@ def _build_timeline(manufacturer, model, waypoints) -> Dict[int, Optional[Dict[s
         for rule, st in zip(rules, state):
             now, ctx = _condition_now(rule, manufacturer, model, wp, prev, waypoints)
             when = rule.get("when")
-            edge = when in ("deco_required", "deco_cleared", "safety_started", "safety_complete")
+            edge = when in ("deco_required", "deco_cleared", "safety_started", "safety_complete", "setpoint_up", "setpoint_down")
             if edge:
                 # fires on the transition into (or, for the *_cleared / complete kinds, out of) the condition
-                into = when in ("deco_required", "safety_started", "safety_complete")
+                into = when in ("deco_required", "safety_started", "safety_complete", "setpoint_up", "setpoint_down")
                 fired = (now and not st["ctx"].get("_was")) if into else (not now and st["ctx"].get("_was"))
                 st["ctx"]["_was"] = now
                 if fired and (when != "deco_cleared" or prev is not None):

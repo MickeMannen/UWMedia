@@ -5,18 +5,59 @@
     {
       "id": "main",
       "name": "Main Screen"
+    },
+    {
+      "id": "standard",
+      "name": "Standard"
+    },
+    {
+      "id": "info_max_avg",
+      "name": "Info: MAX / AVG"
+    },
+    {
+      "id": "info_mod",
+      "name": "Info: MOD / CNS / PPO2"
+    },
+    {
+      "id": "info_gf",
+      "name": "Info: GF / GF99 / TTS"
+    },
+    {
+      "id": "info_temp",
+      "name": "Info: TEMP / BATTERY"
+    },
+    {
+      "id": "info_mbar",
+      "name": "Info: mBar NOW / SURF"
+    },
+    {
+      "id": "info_time",
+      "name": "Info: TIME"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
-      "As the Teric: manual Rev B-1 p.12, p.24-25"
+      "As the Teric: manual Rev B-1 p.12, p.24-25",
+      "Standard page: depth, deco row NDL / stop | MAX, info row O2 | SurfGF, dive time, rows divided (manual Rev B-1 p.10, p.12-14)",
+      "Info pages: the Standard page with its info row replaced by one info screen each, cyan titles over white values, no column divider (manual Rev B-1 p.15)",
+      "Info: MAX / AVG (p.16); CNS / MOD / PPO2 (p.15-16); GF / GF99 / TTS (p.17); TEMP / BATTERY (p.17); mBar NOW / SURF (p.17); TIME (p.18)",
+      "Gauge page: GA badge, depth, MAX | STOPWATCH, large dive time, rows divided (Big layout figure, p.31)",
+      "Info: TIME / EOD - EOD is the time now plus TTS (Tern p.18)"
     ],
     "assumed": [
-      "Field set never checked against a real Tern export"
+      "Field set never checked against a real Tern export",
+      "Standard page: row positions and font sizes measured from the manual's figure, not a device photo",
+      "Info pages: three-column positions and the % / unit marks placed by eye from the p.15-18 strips; TEMP with one decimal",
+      "Info: BATTERY shows the log's battery value as a percent; Shearwater exports record battery voltage, not percent",
+      "Gauge page: STOPWATCH is the dive time (a log records no stopwatch reset); the bottom row shows the dive time where the surface figure shows SURFACE; positions measured from the p.31 figure"
     ],
     "not_shown": [
-      "Standard layout",
-      "Info pages"
+      "Info screens LAST DIVE (surface only) and TISSUES (p.15-19)",
+      "Gauge page: the battery icon and the surface interval (p.31)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

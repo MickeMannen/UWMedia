@@ -40,6 +40,7 @@ from lxml import etree
 
 from models.dive import Dive
 from models.dive_plan import CCR_O2_TANK_REF, DiveProfilePlan, PlannedGas, PlannedWaypoint, split_sidemount_pair
+from parsers.uddf_writer import CCR_O2_MIX_ID
 from utils.dive_computers import DIVE_COMPUTERS
 
 PROFILE_TOLERANCE_M = 0.6
@@ -93,6 +94,26 @@ def computer_label_for(dive: Dive, fallback: str) -> str:
         if model and (model in device or device in model):
             return label
     return fallback
+
+
+def _setpoints_from_log(plan: DiveProfilePlan, dive: Dive) -> None:
+    """A CCR log's low and high setpoints and where it switched: the lowest
+    and highest setpoint its samples hold, the depth of the first switch up
+    (on the way down) and of the last switch down (on the way up). Left as
+    they are when the log has no setpoints, or only one."""
+    logged = [(wp.depth or 0.0, wp.setpoint) for wp in sorted(dive.waypoints, key=lambda w: w.time_since_start) if wp.setpoint is not None]
+    values = sorted({sp for _, sp in logged})
+    if not values or not all(0.4 <= v <= 1.6 for v in (values[0], values[-1])):
+        return
+    plan.ccr_low_setpoint, plan.ccr_high_setpoint = values[0], values[-1]
+    if len(values) < 2:
+        return
+    ups = [depth for (_, a), (depth, b) in zip(logged, logged[1:]) if b > a]
+    downs = [depth for (_, a), (depth, b) in zip(logged, logged[1:]) if b < a]
+    if ups:
+        plan.ccr_high_setpoint_depth_m = float(round(ups[0]))
+    if downs:
+        plan.ccr_low_setpoint_depth_m = float(round(downs[-1]))
 
 
 def mix_name(o2_percent: float, he_percent: float) -> str:
@@ -166,6 +187,8 @@ def _uddf_parts(path: Path) -> LoggedPlanParts:
     mixes: Dict[str, Tuple[str, float, float]] = {}
     for mix in root.xpath(".//*[local-name()='gasdefinitions']/*[local-name()='mix']"):
         mix_id = mix.get("id", "")
+        if mix_id == CCR_O2_MIX_ID:
+            continue  # a CCR O2 cylinder's own mix (UWMedia's writer), never a breathed gas
         name = text(mix, "*[local-name()='name']") or mix_id.split(":")[0]
         o2 = float(text(mix, "*[local-name()='o2']") or 0.21) * 100.0
         he = float(text(mix, "*[local-name()='he']") or 0.0) * 100.0
@@ -182,7 +205,7 @@ def _uddf_parts(path: Path) -> LoggedPlanParts:
     modes = {(_norm(m) or "") for m in root.xpath(".//*[local-name()='waypoint']/*[local-name()='divemode']/@type")}
     ccr = "closedcircuit" in modes
     parts.dive_type = "ccr" if ccr else "oc"
-    o2_tank = next((t for t in tanks if t[0] == CCR_O2_TANK_REF and t[1] is None), None) if ccr else None
+    o2_tank = next((t for t in tanks if t[0] == CCR_O2_TANK_REF and t[1] in (None, CCR_O2_MIX_ID)), None) if ccr else None
     if o2_tank:
         parts.ccr_o2_tank_size_l, parts.ccr_o2_start_pressure_bar = o2_tank[2], o2_tank[3]
     gas_tanks = [t for t in tanks if t is not o2_tank and t[1] in mixes]
@@ -574,6 +597,8 @@ def plan_from_log(path, dive: Dive, base: Optional[DiveProfilePlan] = None) -> D
         plan.max_po2_bottom = float(parts.max_po2_bottom)
     if parts.max_po2_deco and 0.5 <= parts.max_po2_deco <= 2.0:
         plan.max_po2_deco = float(parts.max_po2_deco)
+    if plan.is_ccr:
+        _setpoints_from_log(plan, dive)
     if parts.ccr_o2_tank_size_l:
         plan.ccr_o2_tank_size_l = float(parts.ccr_o2_tank_size_l)
     if parts.ccr_o2_start_pressure_bar:

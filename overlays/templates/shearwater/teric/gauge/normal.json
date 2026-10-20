@@ -1,0 +1,160 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Teric",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.53,
+        "rel_y": 0.307,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 5.4,
+        "unit_dy": -27.7,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35,
+        "label": "Gauge mode: depth (Teric manual Rev H5 p.35)",
+        "align": "center"
+      },
+      {
+        "field": "custom:GA",
+        "rel_x": 0.3423,
+        "rel_y": 0.3787,
+        "valign": "middle",
+        "color": "#FFFFFF",
+        "font_size": 20,
+        "scale": 1.0,
+        "align": "center",
+        "label": "GA badge: gauge mode (p.35)"
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.36,
+        "rel_y": 0.4404,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.41,
+        "rel_y": 0.4662,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "align": "right",
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_color": "#00ADED",
+        "max_width": 150
+      },
+      {
+        "field": "custom:STOPWATCH",
+        "rel_x": 0.665,
+        "rel_y": 0.4404,
+        "color": "#00ADED",
+        "font_size": 18,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.665,
+        "rel_y": 0.4662,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "field": "custom:AVG",
+        "rel_x": 0.36,
+        "rel_y": 0.5555,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "field": "avg_depth",
+        "rel_x": 0.41,
+        "rel_y": 0.5814,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "align": "right",
+        "hide_when_notice": true,
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_color": "#00ADED",
+        "max_width": 150
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.665,
+        "rel_y": 0.5555,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "field": "time_of_day",
+        "rel_x": 0.665,
+        "rel_y": 0.5814,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.5,
+        "rel_y": 0.666,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center",
+        "label": "Bottom row: dive time"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.2242,
+        "rel_y": 0.5485,
+        "font_size": 30,
+        "label": "Notices across the info row",
+        "style": "banner",
+        "width": 288,
+        "height": 70,
+        "caption_font_size": 14
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.17,
+      "y0": 0.29,
+      "x1": 0.83,
+      "y1": 0.76,
+      "shape": "ellipse"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

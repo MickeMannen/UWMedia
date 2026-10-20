@@ -326,6 +326,9 @@ def test_rebreather_setpoints_from_the_switch_alerts_and_bailout(monkeypatch, tm
     wps = dive.waypoints
     assert [wp.po2 for wp in wps] == [0.7, 1.3, 1.3, 0.7, 1.0, 0.5]
     assert [wp.divemode for wp in wps] == ["closedcircuit"] * 4 + ["opencircuit"] * 2
+    assert [wp.setpoint for wp in wps] == [0.7, 1.3, 1.3, 0.7, None, None]
+    assert [wp.gasmix for wp in wps] == ["18/20"] * 4 + ["Nx50"] * 2
+    assert {(wp.diluent_o2_percent, wp.diluent_he_percent) for wp in wps} == {(18.0, 20.0)}
     assert "setpoint_switch_auto_high" in wps[1].dive_alerts
 
 

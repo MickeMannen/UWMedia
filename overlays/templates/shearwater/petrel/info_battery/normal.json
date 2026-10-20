@@ -1,0 +1,148 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Petrel",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.75,
+    "linked_elements": [
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.20721,
+        "rel_y": 0.26513,
+        "color": "#FFFFFF",
+        "font_size": 121,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 9.1,
+        "unit_dy": -46.6,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35,
+        "max_width": 185
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.403,
+        "rel_y": 0.29,
+        "width": 34,
+        "height": 118,
+        "up_count": 6,
+        "down_count": 0,
+        "bar": false,
+        "label": "Ascent rate (Petrel 3 Rec manual p.11: six arrows, 1 per 3 m/min)"
+      },
+      {
+        "id": "label_time",
+        "field": "custom:TIME",
+        "rel_x": 0.12867,
+        "rel_y": 0.46166,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.18436,
+        "rel_y": 0.52873,
+        "color": "#FFFFFF",
+        "font_size": 82,
+        "scale": 1.0
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.475,
+        "rel_y": 0.25421,
+        "font_size": 31,
+        "value_font_size": 62,
+        "scale": 1.0,
+        "depth_unit": "m"
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.69,
+        "rel_y": 0.4601,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.69,
+        "rel_y": 0.51313,
+        "color": "#FFFFFF",
+        "font_size": 90,
+        "scale": 1.0
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.13,
+        "rel_y": 0.655,
+        "width": 660,
+        "font_size": 76,
+        "caption_font_size": 34,
+        "scale": 1.0,
+        "label": "Notification row (Petrel 3 Rec manual p.24)"
+      },
+      {
+        "id": "label_battery",
+        "field": "custom:BATTERY",
+        "rel_x": 0.43215,
+        "rel_y": 0.67173,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "battery",
+        "field": "battery",
+        "rel_x": 0.76191,
+        "rel_y": 0.82096,
+        "color": "#FFFFFF",
+        "font_size": 78,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true,
+        "value_format": "decimal2",
+        "align": "right"
+      },
+      {
+        "id": "battery_v",
+        "field": "custom:V",
+        "rel_x": 0.76535,
+        "rel_y": 0.82096,
+        "color": "#00ADED",
+        "font_size": 53,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true
+      }
+    ],
+    "screen": {
+      "x0": 0.123,
+      "y0": 0.248,
+      "x1": 0.81,
+      "y1": 0.8621,
+      "shape": "rect"
+    }
+  }
+}

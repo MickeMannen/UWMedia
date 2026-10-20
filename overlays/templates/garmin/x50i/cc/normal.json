@@ -1,0 +1,340 @@
+{
+  "manufacturer": "Garmin",
+  "model": "x50i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "n2_tissue_load",
+        "field": "n2_tissue_load",
+        "type": "tissue_bar",
+        "rel_x": 0.19702,
+        "rel_y": 0.23323,
+        "width": 24,
+        "height": 66,
+        "marker_size": 8,
+        "label": "Tissue load",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.18061,
+        "rel_y": 0.3841,
+        "width": 32,
+        "height": 94,
+        "up_count": 4,
+        "down_count": 1,
+        "label": "Ascent rate"
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.23624,
+        "rel_y": 0.25249,
+        "color": "#FFFFFF",
+        "font_size": 67,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.31849,
+        "rel_y": 0.30076,
+        "color": "#999999",
+        "font_size": 35,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "style": "box",
+        "rel_x": 0.17651,
+        "rel_y": 0.22513,
+        "width": 200,
+        "height": 88,
+        "font_size": 32,
+        "value_font_size": 58,
+        "depth_unit": "m",
+        "fill_colors": {
+          "safety_stop": "#6CC24A",
+          "deco": "#F5B21B",
+          "clear": "#F5B21B"
+        },
+        "text_color": "#000000",
+        "corner_radius": 6,
+        "padding": 6,
+        "label": "Stop / deco box"
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.22016,
+        "rel_y": 0.38984,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.473,
+        "unit_dx": -3.8,
+        "unit_dy": -3.4,
+        "unit_color": "#999999"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.20106,
+        "rel_y": 0.53061,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0
+      },
+      {
+        "id": "label_cc_dil",
+        "field": "custom:CC DIL",
+        "rel_x": 0.182,
+        "rel_y": 0.652,
+        "color": "#999999",
+        "font_size": 26,
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "CC DIL over the diluent (Descent X50i manual p.16)"
+      },
+      {
+        "id": "label_oc",
+        "field": "custom:OC",
+        "rel_x": 0.182,
+        "rel_y": 0.652,
+        "color": "#999999",
+        "font_size": 26,
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ],
+        "label": "On a bailout: OC and the bailout gas, its name red (p.20; the OC label is assumed)"
+      },
+      {
+        "id": "gasmix",
+        "field": "gasmix",
+        "rel_x": 0.182,
+        "rel_y": 0.7,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "max_width": 120
+      },
+      {
+        "id": "label_sp",
+        "field": "custom:SP",
+        "rel_x": 0.31,
+        "rel_y": 0.652,
+        "color": "#999999",
+        "font_size": 26,
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ]
+      },
+      {
+        "id": "setpoint",
+        "field": "setpoint",
+        "rel_x": 0.31,
+        "rel_y": 0.692,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "value_format": "decimal2",
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "The setpoint in force (p.16 'SP 0.70', p.21 'SP 1.30')"
+      },
+      {
+        "id": "label_po2",
+        "field": "custom:PO2",
+        "rel_x": 0.31,
+        "rel_y": 0.652,
+        "color": "#999999",
+        "font_size": 26,
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ]
+      },
+      {
+        "id": "po2",
+        "field": "po2",
+        "rel_x": 0.31,
+        "rel_y": 0.692,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "value_format": "decimal2",
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ]
+      },
+      {
+        "id": "label_max_depth",
+        "field": "custom:MAX. DEPTH",
+        "rel_x": 0.44361,
+        "rel_y": 0.42337,
+        "color": "#999999",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "id": "label_vsac",
+        "field": "custom:VSAC",
+        "rel_x": 0.72648,
+        "rel_y": 0.42337,
+        "color": "#999999",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.47607,
+        "rel_y": 0.48403,
+        "color": "#FFFFFF",
+        "font_size": 67,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.522,
+        "unit_dx": -6.1,
+        "unit_dy": -1.9,
+        "unit_color": "#999999"
+      },
+      {
+        "id": "volume_sac",
+        "field": "volume_sac",
+        "rel_x": 0.74583,
+        "rel_y": 0.48403,
+        "color": "#FFFFFF",
+        "font_size": 67,
+        "scale": 1.0
+      },
+      {
+        "id": "label_dil_po2",
+        "field": "custom:DILUENT PO2",
+        "rel_x": 0.445,
+        "rel_y": 0.61544,
+        "color": "#999999",
+        "font_size": 35,
+        "scale": 1.0,
+        "label": "DILUENT PO2 field (p.16)"
+      },
+      {
+        "id": "diluent_po2",
+        "field": "diluent_po2",
+        "rel_x": 0.47,
+        "rel_y": 0.66764,
+        "color": "#FFFFFF",
+        "font_size": 67,
+        "scale": 1.0,
+        "value_format": "decimal2"
+      },
+      {
+        "id": "tts",
+        "field": "tts",
+        "rel_x": 0.68368,
+        "rel_y": 0.67813,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      },
+      {
+        "id": "label_tts",
+        "field": "custom:TTS",
+        "rel_x": 0.731,
+        "rel_y": 0.61457,
+        "color": "#999999",
+        "font_size": 43,
+        "scale": 1.0
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "style": "box",
+        "rel_x": 0.438,
+        "rel_y": 0.225,
+        "width": 431,
+        "height": 108,
+        "font_size": 40,
+        "caption_font_size": 18,
+        "scale": 1.0,
+        "label": "Alert box: fills the top-right cell (real screenshots x50i_sidemount_change_tank.png, x50i_deco_required_trimix_o2_17_he_40.png)"
+      },
+      {
+        "id": "primary_tank_name",
+        "field": "primary_tank_name",
+        "rel_x": 0.59812,
+        "rel_y": 0.22015,
+        "color": "#FFFFFF",
+        "font_size": 43,
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "primary_tank_pressure_icon",
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.58085,
+        "rel_y": 0.31381,
+        "width": 18,
+        "height": 40,
+        "corner_radius": 2,
+        "draw_outline": true,
+        "outline_color": "#FFFFFF",
+        "outline_width": 2,
+        "outline_gap": 2,
+        "hide_when_notice": true
+      },
+      {
+        "id": "primary_tank_pressure",
+        "field": "primary_tank_pressure",
+        "rel_x": 0.62296,
+        "rel_y": 0.28613,
+        "color": "#FFFFFF",
+        "font_size": 67,
+        "scale": 1.0,
+        "hide_when_notice": true
+      }
+    ],
+    "screen": {
+      "x0": 0.175,
+      "y0": 0.213,
+      "x1": 0.906,
+      "y1": 0.832,
+      "shape": "rect"
+    }
+  }
+}

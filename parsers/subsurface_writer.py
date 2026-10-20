@@ -91,6 +91,7 @@ def write_subsurface(
     }
     if plan.is_ccr:
         dc_attrs["dctype"] = "CCR"
+        dc_attrs["no_o2sensors"] = "3"
     divecomputer = etree.SubElement(dive, "divecomputer", **dc_attrs)
     depths = [s.depth_m for s in samples]
     etree.SubElement(
@@ -135,7 +136,13 @@ def write_subsurface(
             attrs["ndl"] = _mmss(s.ndl_sec if s.ndl_sec is not None else NDL_CAP_SEC)  # None = unbounded, "99+"
         attrs["tts"] = _mmss(s.tts_sec)
         attrs["cns"] = f"{int(s.cns_pct)}%"
-        attrs["po2"] = f"{s.po2:.2f} bar"
+        # on the loop Subsurface's po2= is the setpoint, the cells sensorN
+        # and the computer's own reading dc_supplied_ppo2
+        attrs["po2"] = f"{s.setpoint if s.setpoint is not None else s.po2:.2f} bar"
+        for n, cell in enumerate(s.cells, start=1):
+            attrs[f"sensor{n}"] = f"{cell:.2f} bar"
+        if s.cells:
+            attrs["dc_supplied_ppo2"] = f"{s.po2:.2f} bar"
         etree.SubElement(divecomputer, "sample", **attrs)
 
     etree.ElementTree(root).write(str(file_path), pretty_print=True, xml_declaration=False, encoding="utf-8")

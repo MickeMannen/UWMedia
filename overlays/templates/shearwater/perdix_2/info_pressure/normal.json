@@ -1,0 +1,198 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 2",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.75,
+    "linked_elements": [
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.17335,
+        "rel_y": 0.1961,
+        "color": "#FFFFFF",
+        "font_size": 126,
+        "scale": 1.0,
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 9.4,
+        "unit_dy": -48.4,
+        "unit_color": "#00ADED",
+        "max_width": 210
+      },
+      {
+        "id": "label_time",
+        "field": "custom:TIME",
+        "rel_x": 0.13965,
+        "rel_y": 0.40273,
+        "color": "#00ADED",
+        "font_size": 36,
+        "scale": 1.0
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.16356,
+        "rel_y": 0.46577,
+        "color": "#FFFFFF",
+        "font_size": 88,
+        "scale": 1.0
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.495,
+        "rel_y": 0.21331,
+        "font_size": 29,
+        "value_font_size": 54,
+        "scale": 1.0,
+        "depth_unit": "m"
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.61581,
+        "rel_y": 0.41403,
+        "color": "#00ADED",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.71795,
+        "rel_y": 0.47071,
+        "color": "#FFFFFF",
+        "font_size": 87,
+        "scale": 1.0,
+        "align": "right"
+      },
+      {
+        "id": "n2_bar",
+        "field": "gf",
+        "type": "tissue_bar",
+        "style": "fill",
+        "rel_x": 0.7355,
+        "rel_y": 0.39588,
+        "width": 35,
+        "height": 145,
+        "marker_size": 3,
+        "outline_color": "#00ADED",
+        "label": "N2 loading"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.405,
+        "rel_y": 0.21,
+        "width": 30,
+        "height": 100,
+        "up_count": 6,
+        "down_count": 0,
+        "bar": false,
+        "label": "Ascent rate (manual p.12)"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.13,
+        "rel_y": 0.615,
+        "width": 590,
+        "font_size": 70,
+        "caption_font_size": 32,
+        "scale": 1.0,
+        "label": "Notification row (manual p.22)"
+      },
+      {
+        "id": "persistent_notice",
+        "field": "notice",
+        "type": "notice",
+        "style": "frame",
+        "source": "persistent",
+        "rel_x": 0.47463,
+        "rel_y": 0.385,
+        "width": 100,
+        "height": 125,
+        "font_size": 34,
+        "caption_font_size": 22,
+        "scale": 1.0,
+        "label": "Persistent notification left of the NDL (manual p.13, p.23)"
+      },
+      {
+        "id": "label_pressure",
+        "field": "custom:PRESSURE mBar",
+        "rel_x": 0.14079,
+        "rel_y": 0.62817,
+        "color": "#00ADED",
+        "font_size": 36,
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_surf",
+        "field": "custom:SURF",
+        "rel_x": 0.14079,
+        "rel_y": 0.79212,
+        "color": "#FFFFFF",
+        "font_size": 30,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true
+      },
+      {
+        "id": "surface_mbar",
+        "field": "surface_mbar",
+        "rel_x": 0.22976,
+        "rel_y": 0.79212,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_now",
+        "field": "custom:NOW",
+        "rel_x": 0.4934,
+        "rel_y": 0.79212,
+        "color": "#FFFFFF",
+        "font_size": 30,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true
+      },
+      {
+        "id": "ambient_mbar",
+        "field": "ambient_mbar",
+        "rel_x": 0.77484,
+        "rel_y": 0.79212,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_when_notice": true,
+        "align": "right"
+      }
+    ],
+    "screen": {
+      "x0": 0.1309,
+      "y0": 0.1633,
+      "x1": 0.79,
+      "y1": 0.838,
+      "shape": "rect"
+    }
+  }
+}

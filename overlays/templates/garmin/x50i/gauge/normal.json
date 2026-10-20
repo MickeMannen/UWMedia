@@ -1,0 +1,223 @@
+{
+  "manufacturer": "Garmin",
+  "model": "x50i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "label_stopwatch",
+        "field": "custom:Stopwatch",
+        "rel_x": 0.31924,
+        "rel_y": 0.23754,
+        "color": "#000000",
+        "font_size": 29,
+        "scale": 1.0,
+        "align": "center",
+        "font_weight": "bold"
+      },
+      {
+        "id": "stopwatch",
+        "field": "dive_time",
+        "rel_x": 0.29598,
+        "rel_y": 0.2907,
+        "color": "#000000",
+        "font_size": 44,
+        "scale": 1.0,
+        "align": "center",
+        "font_weight": "bold",
+        "label": "Stopwatch (the dive time: a log records no stopwatch reset)"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.18061,
+        "rel_y": 0.3841,
+        "width": 32,
+        "height": 94,
+        "up_count": 4,
+        "down_count": 1,
+        "label": "Ascent rate"
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.22304,
+        "rel_y": 0.39867,
+        "color": "#FFFFFF",
+        "font_size": 78,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_dx": -3.8,
+        "unit_dy": -3.4,
+        "unit_color": "#999999"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.22304,
+        "rel_y": 0.55648,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      },
+      {
+        "id": "label_gauge",
+        "field": "custom:Gauge",
+        "rel_x": 0.24524,
+        "rel_y": 0.75581,
+        "color": "#FFFFFF",
+        "font_size": 32,
+        "scale": 1.0,
+        "align": "center",
+        "valign": "middle",
+        "font_weight": "bold"
+      },
+      {
+        "id": "label_temp",
+        "field": "custom:TEMP.",
+        "rel_x": 0.31184,
+        "rel_y": 0.69601,
+        "color": "#999999",
+        "font_size": 25,
+        "scale": 1.0,
+        "font_weight": "bold"
+      },
+      {
+        "id": "temp",
+        "field": "temp",
+        "rel_x": 0.31184,
+        "rel_y": 0.74086,
+        "color": "#FFFFFF",
+        "font_size": 38,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.5,
+        "unit_dx": -2.0,
+        "unit_dy": -2.0,
+        "unit_color": "#999999"
+      },
+      {
+        "id": "label_max_depth",
+        "field": "custom:MAX. DEPTH",
+        "rel_x": 0.54228,
+        "rel_y": 0.43854,
+        "color": "#999999",
+        "font_size": 30,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.54228,
+        "rel_y": 0.49834,
+        "color": "#FFFFFF",
+        "font_size": 64,
+        "scale": 1.0,
+        "align": "center",
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_dx": -6.1,
+        "unit_dy": -1.9,
+        "unit_color": "#999999"
+      },
+      {
+        "id": "label_temp_right",
+        "field": "custom:MIN. TEMP",
+        "rel_x": 0.78436,
+        "rel_y": 0.43854,
+        "color": "#999999",
+        "font_size": 30,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "temp_right",
+        "field": "min_temp",
+        "rel_x": 0.78436,
+        "rel_y": 0.49834,
+        "color": "#FFFFFF",
+        "font_size": 64,
+        "scale": 1.0,
+        "align": "center",
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_dx": -4.0,
+        "unit_dy": -1.9,
+        "unit_color": "#999999",
+        "label": "MIN. TEMP on the watch: the current temperature (no minimum-temperature field)"
+      },
+      {
+        "id": "label_time_of_day",
+        "field": "custom:TIME OF DAY",
+        "rel_x": 0.54228,
+        "rel_y": 0.64618,
+        "color": "#999999",
+        "font_size": 30,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "time_of_day",
+        "field": "time_of_day",
+        "rel_x": 0.54228,
+        "rel_y": 0.70598,
+        "color": "#FFFFFF",
+        "font_size": 56,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "label_battery",
+        "field": "custom:BATTERY",
+        "rel_x": 0.78436,
+        "rel_y": 0.64618,
+        "color": "#999999",
+        "font_size": 30,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "battery",
+        "field": "battery",
+        "rel_x": 0.81184,
+        "rel_y": 0.69767,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0,
+        "align": "right",
+        "value_format": "integer"
+      },
+      {
+        "id": "battery_unit",
+        "field": "custom:%",
+        "rel_x": 0.81395,
+        "rel_y": 0.69767,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0
+      }
+    ],
+    "screen": {
+      "x0": 0.175,
+      "y0": 0.213,
+      "x1": 0.906,
+      "y1": 0.832,
+      "shape": "rect"
+    }
+  },
+  "rules": {
+    "ceiling_broken": null,
+    "_gauge": "Gauge mode computes no deco (Mk3 p.22, X50i p.17): the depth never flashes red for a ceiling"
+  }
+}

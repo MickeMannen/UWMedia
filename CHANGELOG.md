@@ -5,6 +5,42 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Overlays: rebreather (CCR) pages for the Shearwater Petrel (setpoint or
+  three O2 cells), Perdix 3, Perdix 2 and Teric, and the Garmin Descent X50i
+  and Mk3i. They show the setpoint in force, the cells (yellow when one
+  fails the vote), the diluent's PO2 and the CC badge, which turns to BO
+  (OC on a Descent) on a bailout, as the manuals picture it. Loop PO2 limits
+  and the setpoint-switch alerts come from the log.
+- Overlays: more of the computers' own pages - Teric and Tern Standard,
+  Descent Mk3i standard, transceiver and gases, and the Descent X50i
+  dynamic-depth page with the profile drawing itself as the dive plays.
+- Overlays: the Shearwater info screens as pages of their own - one page per
+  screen (AI, MOD / MAX / PPO2, GF99 / SurGF, temperature and CNS, MAX / AVG,
+  battery, pressure, date and clock, as each model has them) on the Perdix 2,
+  Perdix 3, Petrel, Peregrine, Teric and Tern - so a video can show the screen
+  the diver had up.
+- Overlays: Gauge-mode pages for every Shearwater and both Descents: depth,
+  time, MAX and the running average depth, the stopwatch, temperature and
+  clock, with no deco colours.
+- Log Viewer: a rebreather dive shows a PO₂ strip under the profile (PO₂,
+  setpoint, the three cells, bailouts shaded), its diluent, setpoints and
+  bailout time, PO₂ / setpoint / cells / circuit columns in the sample
+  table, and setpoint changes and bailouts among the events.
+- Dive Profile Builder: a CCR dive switches to the high setpoint on the way
+  down and back to the low one on the way up at two depths, as dive
+  computers do, and its logs carry the setpoint, three O₂ cells and - in a
+  FIT - the setpoint and bailout alerts a Descent logs. Opening a CCR log
+  brings its setpoints and switch depths along. The Petrel is now listed as
+  the Petrel 3.
+
+### Changed
+- Overlays: a trimix reads O₂ first ("18/45"), as both brands write it; it
+  read "45/18" before.
+- Overlays: the Shearwater Tec pages show the circuit as OC / CC / BO rather
+  than the log's own word ("opencircuit"), and a long trimix name no longer
+  runs into the NDL.
+
 ### Fixed
 - Garmin logs: a rebreather dive shows the setpoint in force as its PO2
   (low until the switch to high, back to low near the surface) and the
@@ -20,6 +56,15 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Inspiration files) and Subsurface logs, and a UDDF log on the loop with no
   logged PO2 shows the cells' average or the setpoint rather than an
   open-circuit estimate. UDDF PO2 values written in pascal read correctly.
+- Rebreather logs: a CCR dive is no longer taken for a sidemount dive (its O2
+  and diluent cylinders are not two sidemount tanks), and the deco values
+  computed for it follow the loop at its setpoint instead of open circuit.
+  Subsurface logs now give a CCR dive its circuit, bailouts, setpoint and
+  breathed gas, and two cylinders with the same name stay two tanks.
+- Garmin overlays: the PSAC field shows "--" until there is a value, as a
+  Descent does, not the Shearwater's "wait".
+- Shearwater Tec pages in feet: the STOP column showed the stop depth in
+  metres ("6" for a 20 ft stop); it now shows feet.
 
 ## [0.7.17] - 2026-10-16
 

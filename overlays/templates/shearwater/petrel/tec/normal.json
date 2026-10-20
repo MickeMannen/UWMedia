@@ -172,7 +172,7 @@
         "scale": 1.0
       },
       {
-        "field": "divemode",
+        "field": "circuit",
         "rel_x": 0.13009,
         "rel_y": 0.7237,
         "color": "#FFFFFF",
@@ -185,7 +185,8 @@
         "rel_y": 0.71589,
         "color": "#FFFFFF",
         "font_size": 91,
-        "scale": 1.0
+        "scale": 1.0,
+        "max_width": 218
       },
       {
         "field": "custom:NDL",

@@ -1,0 +1,236 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 3",
+  "rules": {
+    "deco_clear": {
+      "count_up": true
+    }
+  },
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "custom:DEPTH",
+        "rel_x": 0.1479,
+        "rel_y": 0.1776,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "depth",
+        "rel_x": 0.1479,
+        "rel_y": 0.2323,
+        "color": "#FFFFFF",
+        "font_size": 79,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.3959,
+        "rel_y": 0.1776,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.3959,
+        "rel_y": 0.2323,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0,
+        "value_format": "minutes"
+      },
+      {
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.59,
+        "rel_y": 0.2733,
+        "font_size": 34,
+        "value_font_size": 42,
+        "scale": 1.0,
+        "depth_unit": "m",
+        "title_box": false,
+        "label": "Deco (replaces NDL)"
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.6,
+        "rel_y": 0.2733,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.6,
+        "rel_y": 0.3189,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.1489,
+        "rel_y": 0.4055,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.1489,
+        "rel_y": 0.4602,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.35,
+        "unit_color": "#00ADED"
+      },
+      {
+        "field": "custom:SP",
+        "rel_x": 0.3991,
+        "rel_y": 0.4055,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0,
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "SP title (Perdix 3 Rev B PDF p.85: the Tec centre slot is SP in CC)"
+      },
+      {
+        "field": "custom:PPO2",
+        "rel_x": 0.3991,
+        "rel_y": 0.4055,
+        "color": "#00ADED",
+        "font_size": 30,
+        "scale": 1.0,
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ],
+        "label": "On a bailout the SP slot shows PPO2 (PDF p.87: \"the set point has disappeared\")"
+      },
+      {
+        "field": "setpoint",
+        "rel_x": 0.3991,
+        "rel_y": 0.4602,
+        "color": "#FFFFFF",
+        "font_size": 61,
+        "scale": 1.0,
+        "value_format": "decimal1",
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "Setpoint in force: green when high, magenta when low (PDF p.42)"
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.3991,
+        "rel_y": 0.4602,
+        "color": "#FFFFFF",
+        "font_size": 61,
+        "scale": 1.0,
+        "value_format": "decimal2_no_lead",
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ]
+      },
+      {
+        "field": "custom:SurfGF",
+        "rel_x": 0.5852,
+        "rel_y": 0.4055,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.5913,
+        "rel_y": 0.4602,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:%",
+        "rel_x": 0.756,
+        "rel_y": 0.4739,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:O2/HE",
+        "rel_x": 0.1479,
+        "rel_y": 0.6335,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.255,
+        "rel_y": 0.6882,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      },
+      {
+        "field": "circuit",
+        "rel_x": 0.1479,
+        "rel_y": 0.688,
+        "color": "#FFFFFF",
+        "font_size": 56,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.6,
+        "rel_y": 0.6335,
+        "color": "#00ADED",
+        "font_size": 35,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.6,
+        "rel_y": 0.6882,
+        "color": "#FFFFFF",
+        "font_size": 72,
+        "scale": 1.0
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.1281,
+      "y0": 0.1548,
+      "x1": 0.81,
+      "y1": 0.8399,
+      "shape": "rect"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

@@ -1,0 +1,137 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Perdix 3",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.2314,
+        "rel_y": 0.2222,
+        "color": "#FFFFFF",
+        "font_size": 100,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_position": "below",
+        "unit_scale": 0.325,
+        "unit_dx": 7.5,
+        "unit_dy": -38.5,
+        "unit_color": "#00ADED",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.35
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.2206,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:STOPWATCH",
+        "rel_x": 0.79,
+        "rel_y": 0.224,
+        "color": "#00C040",
+        "font_size": 38,
+        "scale": 1.0,
+        "align": "right",
+        "label": "Stopwatch title (green while running, PDF p.89)"
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.79,
+        "rel_y": 0.2937,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "align": "right",
+        "label": "Stopwatch: dive time (assumed - a log records no stopwatch reset)"
+      },
+      {
+        "field": "custom:CLOCK",
+        "rel_x": 0.79,
+        "rel_y": 0.41,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0,
+        "align": "right"
+      },
+      {
+        "field": "time_of_day",
+        "rel_x": 0.79,
+        "rel_y": 0.4788,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "align": "right"
+      },
+      {
+        "field": "custom:GA",
+        "rel_x": 0.208,
+        "rel_y": 0.702,
+        "color": "#FFC8F0",
+        "font_size": 34,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.4,
+        "rel_y": 0.6005,
+        "color": "#00ADED",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.33,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.373,
+        "unit_dx": -6.3,
+        "unit_dy": -22.0,
+        "unit_color": "#00ADED"
+      },
+      {
+        "field": "custom:AVG",
+        "rel_x": 0.64,
+        "rel_y": 0.6005,
+        "color": "#00ADED",
+        "font_size": 40,
+        "scale": 1.0
+      },
+      {
+        "field": "avg_depth",
+        "rel_x": 0.58,
+        "rel_y": 0.6653,
+        "color": "#FFFFFF",
+        "font_size": 75,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.373,
+        "unit_dx": -6.3,
+        "unit_dy": -22.0,
+        "unit_color": "#00ADED"
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.1292,
+      "y0": 0.1561,
+      "x1": 0.81,
+      "y1": 0.8373,
+      "shape": "rect"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

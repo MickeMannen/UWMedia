@@ -20,6 +20,8 @@ TANK_SENSOR_BASE = 100001
 # file_creator.software_version of a UWMedia-written FIT (the marker proper is
 # the developer_data_id's application_id - see plan_embed.FIT_APPLICATION_ID).
 PLAN_SOFTWARE_VERSION = 800
+# FIT dive_alert values for the CCR switches (garmin_fit_sdk's profile)
+DIVE_ALERT = {name: int(value) for value, name in Profile["types"]["dive_alert"].items()}
 
 
 def _mesg_num(name: str) -> int:
@@ -94,9 +96,9 @@ def write_fit(
           po2_warn=plan.max_po2_bottom, po2_critical=plan.max_po2_deco, po2_deco=plan.max_po2_deco,
           safety_stop_enabled=1, safety_stop_time=180,
           ccr_low_setpoint_switch_mode="automatic", ccr_low_setpoint=plan.ccr_low_setpoint,
-          ccr_low_setpoint_depth=plan.ccr_setpoint_switch_depth_m,
+          ccr_low_setpoint_depth=plan.ccr_low_setpoint_depth_m,
           ccr_high_setpoint_switch_mode="automatic", ccr_high_setpoint=plan.ccr_high_setpoint,
-          ccr_high_setpoint_depth=plan.ccr_setpoint_switch_depth_m)
+          ccr_high_setpoint_depth=plan.ccr_high_setpoint_depth_m)
     for gas in gases:
         write("dive_gas", message_index=gas_index[gas.id], helium_content=round(gas.he_percent),
               oxygen_content=round(gas.o2_percent), status="enabled",
@@ -105,8 +107,21 @@ def write_fit(
     write("event", timestamp=start_utc, event="timer", event_type="start", event_group=0)
 
     last_gas = None
+    last_setpoint = None
+    last_mode = None
     for i, s in enumerate(samples):
         ts = at(s.time_sec)
+        if plan.is_ccr:
+            # A Descent logs its CCR switches as dive alerts (FIT dive_alert
+            # 24-30), as the two real Descent CCR logs have them
+            if last_mode is not None and s.divemode != last_mode:
+                write("event", timestamp=ts, event="dive_alert", event_type="marker",
+                      data=DIVE_ALERT["switched_to_open_circuit" if s.divemode == "opencircuit" else "switched_to_closed_circuit"])
+            if s.setpoint is not None and last_setpoint is not None and s.setpoint != last_setpoint:
+                write("event", timestamp=ts, event="dive_alert", event_type="marker",
+                      data=DIVE_ALERT["setpoint_switch_auto_high" if s.setpoint > last_setpoint else "setpoint_switch_auto_low"])
+            last_mode = s.divemode
+            last_setpoint = s.setpoint if s.setpoint is not None else last_setpoint
         if s.gas_id != last_gas:
             if last_gas is not None:
                 write("event", timestamp=ts, event="dive_gas_switched", event_type="marker",
@@ -120,7 +135,10 @@ def write_fit(
               next_stop_depth=round(s.stop_depth_m, 1) if s.ceiling_m > 0 else 0.0,
               next_stop_time=s.stop_duration_sec if s.ceiling_m > 0 else 0,
               time_to_surface=s.tts_sec, ndl_time=s.ndl_sec if s.ndl_sec is not None else 0,
-              cns_load=int(s.cns_pct), po2=round(s.po2, 2), ascent_rate=round(ascent_rate, 3))
+              cns_load=int(s.cns_pct), ascent_rate=round(ascent_rate, 3),
+              # a Descent on a CCR dive logs no record po2 (the setpoint is in
+              # the alerts and dive_settings)
+              **({} if plan.is_ccr else {"po2": round(s.po2, 2)}))
         for tank in tanks:
             if tank.ref in s.tank_pressures:
                 write("tank_update", timestamp=ts, sensor=sensor_of[tank.ref],

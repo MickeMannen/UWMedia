@@ -30,16 +30,23 @@ DIVE_COMPUTERS: Dict[str, DiveComputer] = {
         DiveComputer("Garmin Descent X50i", "Garmin", "Descent X50i", fit_product=4518),
         DiveComputer("Shearwater Perdix 2", "Shearwater", "Perdix 2"),
         DiveComputer("Shearwater Perdix 3", "Shearwater", "Perdix 3"),
-        DiveComputer("Shearwater Petrel", "Shearwater", "Petrel"),
+        DiveComputer("Shearwater Petrel 3", "Shearwater", "Petrel 3"),
         DiveComputer("Shearwater Peregrine", "Shearwater", "Peregrine"),
         DiveComputer("Shearwater Teric", "Shearwater", "Teric"),
         DiveComputer("Shearwater Tern", "Shearwater", "Tern"),
     )
 }
 DEFAULT_DIVE_COMPUTER = "Shearwater Perdix 2"
+# Labels older versions saved in plans and settings, and the computer they are now.
+LEGACY_LABELS = {"Shearwater Petrel": "Shearwater Petrel 3"}
+
+
+def computer_label(label: str) -> str:
+    """A saved label as it is named today."""
+    return LEGACY_LABELS.get(label, label)
 
 
 def dive_computer(label: str) -> DiveComputer:
     """The computer for a plan's `computer` label; unknown labels fall back to
     the default rather than failing a save."""
-    return DIVE_COMPUTERS.get(label) or DIVE_COMPUTERS[DEFAULT_DIVE_COMPUTER]
+    return DIVE_COMPUTERS.get(computer_label(label)) or DIVE_COMPUTERS[DEFAULT_DIVE_COMPUTER]

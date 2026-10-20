@@ -450,8 +450,9 @@ class OverlayDesignerBackend(QObject):
 
         ref = TemplateRef(brand, computer, page, variant)
         self.document = OverlayDocument.load(state_path, ref=ref)
-        self.dummy_dive = build_dummy_dive(variant)
         page_entry = self._page_entry() or {}
+        # a CC page ("dive": "ccr" in its manifest entry) previews a rebreather dive
+        self.dummy_dive = build_dummy_dive(variant, ccr=page_entry.get("dive") == "ccr")
         self._page_origin = page_entry.get("origin", "bundled")
         self._can_save = self._page_origin == "user" or is_dev_mode()
         self._set_status(f"Loaded {ref.label}")

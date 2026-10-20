@@ -24,6 +24,10 @@ Item {
     readonly property color mutedColor: "#9AA0A6"
     readonly property color warnColor: "#F59E0B"
     property bool samplesOpen: false
+    // the samples table's columns, as log_viewer_backend.TABLE_COLUMNS lists
+    // them: Time, Depth, Temp, NDL, TTS, Gas, PO2, SP, Cells, Circuit, Tanks
+    // (the last fills the row)
+    readonly property var columnWidths: [80, 80, 80, 80, 80, 60, 50, 40, 130, 54, 260]
 
     // Opening the sample table scrolls it into view: it sits below the fold.
     function scrollToSamples() {
@@ -325,6 +329,7 @@ Item {
                             Field { label: "Longitude"; value: root.sel.lng || "" }
                             Field { label: "Exit latitude"; value: root.sel.exit_lat || "" }
                             Field { label: "Exit longitude"; value: root.sel.exit_lng || "" }
+                            Field { label: "Rebreather"; value: root.sel.rebreather || ""; fieldWidth: 316; Layout.columnSpan: 2; visible: !!root.sel.rebreather }
                         }
 
                         // tanks and their sensors
@@ -375,6 +380,10 @@ Item {
                             depthUnit: root.sel.depth_unit || "m"
                             showCeiling: !!root.sel.has_ceiling
                         }
+                        Po2Chart {
+                            Layout.fillWidth: true
+                            samples: root.sel.po2_samples || []
+                        }
                         Text {
                             visible: root.hasDive
                             text: root.sel.sample_count > 0
@@ -420,7 +429,7 @@ Item {
                         ]
                         Text {
                             visible: !root.samplesOpen
-                            text: "Every sample as the overlays read it: time, depth, temperature, NDL, TTS, gas and tank pressures."
+                            text: "Every sample as the overlays read it: time, depth, temperature, NDL, TTS, gas, PO2, a rebreather's setpoint, cells and circuit, and tank pressures."
                             color: root.mutedColor
                             font.pixelSize: 11
                             wrapMode: Text.WordWrap
@@ -455,8 +464,8 @@ Item {
                                 delegate: Label {
                                     required property string modelData
                                     required property int index
-                                    Layout.preferredWidth: index === 5 ? 60 : (index === 6 ? 260 : 80)
-                                    Layout.fillWidth: index === 6
+                                    Layout.preferredWidth: root.columnWidths[index] || 80
+                                    Layout.fillWidth: index === root.columnWidths.length - 1
                                     text: modelData
                                     font.bold: true
                                     font.pixelSize: 12
@@ -489,8 +498,8 @@ Item {
                                         delegate: Label {
                                             required property string modelData
                                             required property int index
-                                            Layout.preferredWidth: index === 5 ? 60 : (index === 6 ? 260 : 80)
-                                            Layout.fillWidth: index === 6
+                                            Layout.preferredWidth: root.columnWidths[index] || 80
+                                            Layout.fillWidth: index === root.columnWidths.length - 1
                                             text: modelData
                                             color: root.textColor
                                             font.pixelSize: 12

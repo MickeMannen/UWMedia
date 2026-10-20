@@ -833,7 +833,126 @@ def resolve_tank_variant(dive: Any) -> str:
     waypoints = getattr(dive, "waypoints", None) if dive is not None else None
     if not waypoints:
         return "single_tank"
+    if getattr(dive, "is_ccr", False) is True:
+        # A rebreather's O2 cylinder, diluent and bailouts are not sidemount
+        # tanks; its screen is a page of its own (the CC pages).
+        return "single_tank"
     unique_tanks: set = set()
     for wp in waypoints:
         unique_tanks.update(wp.tanks.keys())
     return "sidemount" if len(unique_tanks) >= 2 else "single_tank"
+
+
+CELL_FIELDS = ("po2_1", "po2_2", "po2_3")
+LOOP_CIRCUITS = ("CC", "SC")
+
+
+def failed_cells(values: Dict[int, float], fraction: float = 0.20) -> set:
+    """The cells that fail the vote: a cell passes when it is within
+    `fraction` of at least one other cell (Petrel 3 Technical manual p.57,
+    p.67: ±20 %); one cell alone is never voted out."""
+    if len(values) < 2:
+        return set()
+    failed = set()
+    for i, a in values.items():
+        if not any(abs(a - b) <= fraction * max(a, b) for j, b in values.items() if j != i):
+            failed.add(i)
+    return failed
+
+
+def _dive_setpoints(waypoint: Any) -> List[float]:
+    dive = getattr(waypoint, "_dive", None)
+    if dive is None:
+        return []
+    cached = getattr(dive, "_setpoints", None)
+    if cached is None or cached[0] != len(dive.waypoints):
+        values = sorted({wp.setpoint for wp in dive.waypoints if wp.setpoint is not None})
+        dive._setpoints = cached = (len(dive.waypoints), values)
+    return cached[1]
+
+
+def ccr_style(manufacturer: Optional[str], model: Optional[str], field: str, waypoint: Any, value: Any,
+              base_color: str, elapsed: Optional[float] = None) -> Optional[Dict[str, str]]:
+    """A rebreather screen's colours for one value, or None: {"color"} for
+    the text, or {"box", "color"} for a value on a filled box. From the
+    brand's rules: po2_cc (the loop PPO2 limits), cells (the vote), dil_po2,
+    setpoint (high / low), circuit (the CC / BO / OC badge) and bailout (a
+    Garmin's gas name on open circuit)."""
+    if waypoint is None:
+        return None
+    circuit = getattr(waypoint, "circuit", None)
+
+    def band(rule_key: str) -> Optional[Dict[str, str]]:
+        rule = get_rule_config(manufacturer, model, rule_key)
+        if not isinstance(rule, dict) or not isinstance(value, (int, float)):
+            return None
+        if ("min" in rule and value < rule["min"]) or ("max" in rule and value > rule["max"]):
+            color = rule.get("color", "#FF0000")
+            return {"color": resolve_blink_color(base_color, color, elapsed) if rule.get("blink") else color}
+        return None
+
+    if field == "po2" and circuit in LOOP_CIRCUITS:
+        return band("po2_cc")
+    if field == "diluent_po2":
+        return band("dil_po2")
+    if field in CELL_FIELDS and isinstance(value, (int, float)):
+        rule = get_rule_config(manufacturer, model, "cells")
+        if not isinstance(rule, dict):
+            return None
+        values = {i: v for i, f in enumerate(CELL_FIELDS) if (v := getattr(waypoint, f, None)) is not None}
+        index = CELL_FIELDS.index(field)
+        if index in failed_cells(values, float(rule.get("vote_fraction", 0.20))):
+            out = value < rule.get("min", 0.0) or value > rule.get("max", 99.0)
+            return {"color": rule.get("out_of_range_color" if out else "failed_color", "#FFFF00")}
+        return None
+    if field == "setpoint" and isinstance(value, (int, float)):
+        rule = get_rule_config(manufacturer, model, "setpoint")
+        setpoints = _dive_setpoints(waypoint)
+        if not isinstance(rule, dict) or len(setpoints) < 2:
+            return None
+        if value >= setpoints[-1]:
+            return {"color": rule.get("high_color", base_color)}
+        if value <= setpoints[0]:
+            return {"color": rule.get("low_color", base_color)}
+        return None
+    if field == "circuit" and circuit:
+        rule = get_rule_config(manufacturer, model, "circuit")
+        look = rule.get(circuit) if isinstance(rule, dict) else None
+        if isinstance(look, dict) and look.get("box"):
+            out = {"box": look["box"], "color": look.get("text", "#000000")}
+            if look.get("outline"):
+                out["outline"] = look["outline"]
+            return out
+        return None
+    if field == "gasmix" and circuit == "BO":
+        rule = get_rule_config(manufacturer, model, "bailout")
+        if isinstance(rule, dict) and rule.get("gas_color"):
+            return {"color": rule["gas_color"]}
+    return None
+
+
+def average_depth_at(waypoint: Any, waypoints: Optional[List[Any]]) -> Optional[float]:
+    """The dive's running average depth up to `waypoint` (time-weighted, the
+    way a Shearwater's AVG and a Descent's gauge AVG read it); the
+    waypoint's own depth without the dive at hand."""
+    if waypoint is None:
+        return None
+    if not waypoints:
+        return _num(getattr(waypoint, "depth", None))
+
+    def build():
+        out, area, prev = {}, 0.0, None
+        start = None
+        for wp in waypoints:
+            t, d = _num(getattr(wp, "time_since_start", None)), _num(getattr(wp, "depth", None))
+            if t is None or d is None:
+                continue
+            if prev is not None and t > prev[0]:
+                area += (t - prev[0]) * (d + prev[1]) / 2.0
+            start = t if start is None else start
+            prev = (t, d)
+            out[int(t)] = area / (t - start) if t > start else d
+        return out
+
+    timeline = _cached_timeline("avg_depth", None, None, waypoints, build)
+    return timeline.get(int(getattr(waypoint, "time_since_start", 0) or 0), _num(getattr(waypoint, "depth", None)))

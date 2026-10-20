@@ -102,7 +102,7 @@ def test_x50i_fit_round_trips_its_unmapped_product_id(tmp_path):
 @pytest.mark.parametrize("fmt", ["uddf", "ssrf"])
 def test_shearwater_computer_in_xml_formats(fmt, tmp_path):
     plan = _plan("oc")
-    plan.computer = "Shearwater Petrel"
+    plan.computer = "Shearwater Petrel 3"
     _, dive = _round_trip(plan, fmt, tmp_path)
     assert "Petrel" in dive.device and dive.manufactor == "Shearwater"
 

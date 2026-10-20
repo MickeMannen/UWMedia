@@ -72,7 +72,7 @@ def _gas(backend, name, o2, **texts):
 
 def test_typed_settings_apply_and_bad_text_is_kept_but_ignored(backend):
     for attr in ("descentRateText", "ascentRateText", "waterTempText", "sacText", "bottomPo2Text",
-                 "decoPo2Text", "maxDepthText", "runtimeText", "ccrSwitchDepthText", "ccrO2SizeText",
+                 "decoPo2Text", "maxDepthText", "runtimeText", "ccrHighDepthText", "ccrLowDepthText", "ccrO2SizeText",
                  "ccrO2StartText", "sidemountSwitchText"):
         setattr(backend, attr, "abc")
         assert getattr(backend, attr) == "abc"
@@ -83,18 +83,19 @@ def test_typed_settings_apply_and_bad_text_is_kept_but_ignored(backend):
 
     backend.maxDepthText = "40"
     backend.runtimeText = "45:30"
-    backend.ccrSwitchDepthText = "6"
+    backend.ccrHighDepthText = "6"
+    backend.ccrLowDepthText = "1"
     backend.ccrO2SizeText = "3"
     backend.ccrO2StartText = "200"
     backend.sidemountSwitchText = "30"
     assert (plan.max_depth_m, plan.planned_runtime_sec) == (40, 45 * 60 + 30)
-    assert (plan.ccr_setpoint_switch_depth_m, plan.ccr_o2_tank_size_l, plan.ccr_o2_start_pressure_bar) == (6, 3, 200)
+    assert (plan.ccr_high_setpoint_depth_m, plan.ccr_low_setpoint_depth_m, plan.ccr_o2_tank_size_l, plan.ccr_o2_start_pressure_bar) == (6, 1, 3, 200)
     assert plan.sidemount_switch_bar == 30
     assert backend.scaleDefined
 
     again = DiveProfileBackend()
     assert (again.maxDepthText, again.runtimeText) == ("40", "45.5")
-    assert (again.ccrSwitchDepthText, again.ccrO2SizeText, again.ccrO2StartText) == ("6", "3", "200")
+    assert (again.ccrHighDepthText, again.ccrLowDepthText, again.ccrO2SizeText, again.ccrO2StartText) == ("6", "1", "3", "200")
     assert again.sidemountSwitchText == "30"
 
 
@@ -128,7 +129,7 @@ def test_saved_setpoints_in_the_wrong_order_are_made_consistent(settings_file):
     set_field("dive_profile_ccr_switch_depth", 0)
     backend = DiveProfileBackend()
     assert (backend.ccrLowSetpointText, backend.ccrHighSetpointText) == ("1", "1")
-    assert backend.dive_plan.ccr_setpoint_switch_depth_m == 0
+    assert backend.dive_plan.ccr_high_setpoint_depth_m == 0
 
 
 @pytest.mark.parametrize("low, high, error", [

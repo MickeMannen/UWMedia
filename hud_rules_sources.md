@@ -25,7 +25,7 @@ rule below was checked against the manuals listed.
 | Model | File | Revision |
 |---|---|---|
 | Shearwater Perdix 2 (recreational modes) | `Perdix-2_RECREATIONAL_Manual_RevC.pdf` | Rev C (2022-06-30) |
-| Shearwater Perdix 3 | `Perdix_3_Operating_Instructions_RevB.pdf` | Rev B |
+| Shearwater Perdix 3 | `Perdix_3_Operating_Instructions_RevB.pdf` | Rev B (its printed page numbers run 2 behind the PDF's: the Perdix 3 pages cited before 2026-10-20, e.g. "p.58-60", are printed pages, PDF p.60-62; the CCR rows below cite PDF pages) |
 | Shearwater Petrel 3 (recreational) | `Petrel-3_RECREATIONAL_Manual_RevC.pdf` | Rev C |
 | Shearwater Petrel 3 (technical) | `Petrel-3_Technical_Manual_RevB.pdf` | Rev B |
 | Shearwater Peregrine TX | `Peregrine_TX_Manual_RevC_….pdf` | Rev C (2024-04-23) |
@@ -132,6 +132,53 @@ carries its own `_source`; the table is the summary.
 | X50i | alert box fills the top-right cell of the grid (from the column divider to the right edge, the first row's height), dark with a border in the alert's colour; a warning has the triangle in a left column, an information alert (Breathe from ...) a blue border, no triangle and centred text; the cell's own fields step aside | real screenshots `x50i_deco_required_trimix_o2_17_he_40.png`, `x50i_sidemount_change_tank.png`, `x50i_safety_stop.png` | verified (from the photos) |
 | X50i | the glass starts at 0.213 of the skin PNG's height (the bezel above it is dark too) | measured in `overlays/templates/garmin/x50i/main/normal.png` | verified |
 | mk3i | ascent rate: three chevrons up, a bar, one down, lit green / yellow / red by the `ascent_rate` bands | real screenshot `mk3i_main_sidemount.BMP` (the shape); Mk3 EN-US p.23 (the colours) | verified |
+
+## Rebreather (CCR), added 2026-10-20
+
+What the CC pages and rules draw (`ccr_style`, `utils/hud_rules_engine.py`;
+`Waypoint.circuit`, `setpoint`, `diluent_po2`, `po2_1..3`). The Perdix 2's
+own CC/BO manual (its Technical Modes manual) is not on hand; the Perdix 2 CC
+page follows the Petrel 3 Technical manual and is marked assumed.
+
+| Brand / model | Rule key | Value | Source | Status |
+|---|---|---|---|---|
+| Shearwater | `po2_cc` | loop PPO2 flashing red below CC Min 0.40 / above CC Max 1.60 | Petrel 3 Technical Rev B p.13, p.18, p.81; Perdix 3 PDF p.41; Teric p.70 | verified |
+| Shearwater | `dil_po2` | DilPO2 flashing red below 0.19 / above 1.65 | Petrel 3 Technical p.18; Perdix 3 the same | verified |
+| Shearwater | `cells` | a cell more than 20 % from every other cell fails the vote: yellow; a failed cell below 0.4 / above 1.6 red | Petrel 3 Technical p.57, p.67 ("VOTING FAILED" alternating with the readings is not drawn) | verified |
+| Shearwater | `circuit` | OC / CC / SC in the main colour, BO on a yellow box | Petrel 3 Technical p.14, figures 13-16 p.37 | verified |
+| Perdix 3, Teric | `circuit` | CC green badge, BO yellow badge, black text | Perdix 3 PDF p.85, p.87; Teric p.12, p.33-34 | verified |
+| Perdix 3, Teric | `setpoint` | SP green for the high setpoint, magenta for the low | Perdix 3 PDF p.42; Teric p.14 | verified |
+| Shearwater | notices `low_ppo2_cc`, `high_ppo2_cc` | LOW / HIGH PPO2 against CC Min 0.40 / CC Max 1.60 on the loop (after 30 s for HIGH); the OC entries hold on OC / BO only | Petrel 3 Technical p.25, p.81 | verified |
+| Teric | notices `auto_sp_up`, `auto_sp_down` | INFO band "Auto SP Up" when the setpoint rises | Teric p.33 figure 7; "Auto SP Down" is not pictured; a log does not say auto or manual, so every change shows it | Up verified, Down assumed |
+| Garmin | `dil_po2` | the PO2 flashes yellow below 0.18 | X50i p.25 ("Diluent PO2 is low"), Mk3 p.34 | verified |
+| Garmin | `bailout.gas_color` | the gas name red on open circuit during a CCR dive | X50i p.20 | verified |
+| mk3i | `bailout` | no red gas; the Mk3 turns the dividing lines red instead (not drawn: the Big Numbers screen has none) | Mk3 p.28 | verified |
+| mk3i | `circuit` | CC (OC after a bailout) in a white-outlined box under the gas | Mk3 p.21, p.24 figures | verified |
+| Garmin | `circuit_labels` | a bailout reads OC | Mk3 p.21, X50i p.16-17 | verified |
+| Garmin | notices `setpoint_switch_auto_high` / `_low` | "Switched to high setpoint." / "Switched to low setpoint." on the FIT alert | Mk3 p.34-35, X50i p.25-26 | verified |
+| Garmin | the setpoint in force from the `setpoint_switch_*` alerts and `dive_settings` ccr_low / ccr_high_setpoint; the circuit from the breathed gas's mode (`closed_circuit_diluent` = loop) | two real Descent CCR FIT logs (no record PO2); Mk3 p.14-15, X50i p.9 | verified |
+
+## Info-screen and gauge pages, added 2026-10-20
+
+Each page's manifest cites the figure it follows; the values come from the
+log or are computed: `avg_depth` (time-weighted running average), `min_temp`
+(coldest so far), `gf_setting` (the log's GF low / high), `date`, `eod` (now
+plus TTS, Teric p.19 / Tern p.18), `ambient_mbar` / `surface_mbar` (1013 mbar
+plus 100.5 mbar per metre, not a logged barometer: assumed). A gauge page
+switches `ceiling_broken` off in its layout rules (a gauge-mode computer
+computes no deco, Mk3 p.22, X50i p.17). The stopwatch is the dive time (no
+log records a stopwatch start or reset): assumed.
+
+| Model | Info screens | Gauge |
+|---|---|---|
+| Perdix 2 | Rec manual p.16-21 | p.34 |
+| Petrel 3 | Rec manual p.15-20 | p.33 |
+| Peregrine TX | p.15-20 | p.33 |
+| Perdix 3 | PDF p.36-49 (figure p.37) | PDF p.88-89 |
+| Teric | p.16-19 | p.35 |
+| Tern | PDF p.15-18 | PDF p.31 |
+| Descent Mk3i | - | p.22 |
+| Descent X50i | - | p.17 |
 
 ## Units (`display.depth_decimals`, `simulator.md` §7)
 

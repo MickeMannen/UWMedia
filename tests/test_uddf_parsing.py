@@ -349,3 +349,22 @@ def test_apd_ppo2_refs_are_the_first_controllers_cells(tmp_path):
     three cells as six o2sensors: the first three are the cells."""
     w1 = _parse(tmp_path, _uddf(_cells_dive("ppo2"), extra=SENSORS))[0].waypoints[1]
     assert (w1.po2_1, w1.po2_2, w1.po2_3) == (1.28, 1.31, 1.3)
+
+
+def test_rebreather_setpoint_diluent_and_a_tanks_own_mix(tmp_path):
+    """The setpoint counts only on the loop, the diluent stays after a
+    bailout, and a tank whose tankdata links a mix keeps that mix."""
+    mixes = AIR_MIX + TX_MIX + '<mix id="o2"><name>O2</name><o2>1.0</o2></mix>'
+    tankdata = '<tankdata id="T1"><link ref="o2"/></tankdata><tankdata id="T2"><link ref="tx"/></tankdata>'
+    wps = (_wp(0, 0, '<divemode type="closedcircuit"/><switchmix ref="tx"/><setpo2>0.7</setpo2>'
+                     '<tankpressure ref="T1">200</tankpressure><tankpressure ref="T2">190</tankpressure>')
+           + _wp(60, 30, "<setpo2>130000</setpo2>")
+           + _wp(120, 20, '<divemode type="opencircuit"/><switchmix ref="air"/>') + _wp(180, 0))
+    dive = _parse(tmp_path, _uddf(f'<dive id="d"><informationbeforedive><datetime>2026-01-01T10:00:00</datetime></informationbeforedive>'
+                                  f'{tankdata}<samples>{wps}</samples></dive>', mixes=mixes))[0]
+    w0, w1, w2, _ = dive.waypoints
+    assert [w.circuit for w in (w0, w1, w2)] == ["CC", "CC", "BO"]
+    assert (w0.setpoint, w1.setpoint, w2.setpoint) == (0.7, 1.3, None)
+    assert (w1.po2, w1.gasmix, w2.gasmix) == (1.3, "18/45", "AIR")
+    assert (w2.diluent_o2_percent, w2.diluent_he_percent) == (18.0, 45.0)
+    assert (w0.tanks["T1"].o2_percent, w0.tanks["T2"].o2_percent) == (100.0, 18.0)

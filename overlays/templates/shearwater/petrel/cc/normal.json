@@ -1,0 +1,288 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Petrel",
+  "rules": {
+    "deco_clear": {
+      "count_up": true
+    }
+  },
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "custom:DEPTH",
+        "rel_x": 0.13723,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0
+      },
+      {
+        "field": "depth",
+        "rel_x": 0.1358,
+        "rel_y": 0.32751,
+        "color": "#FFFFFF",
+        "font_size": 76,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.35575,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.34861,
+        "rel_y": 0.31816,
+        "color": "#FFFFFF",
+        "font_size": 81,
+        "scale": 1.0,
+        "value_format": "minutes"
+      },
+      {
+        "field": "custom:STOP",
+        "rel_x": 0.52,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0,
+        "hide_in_states": [
+          "clear"
+        ]
+      },
+      {
+        "field": "deco_stop_depth",
+        "rel_x": 0.565,
+        "rel_y": 0.32751,
+        "color": "#FFFFFF",
+        "font_size": 76,
+        "scale": 1.0,
+        "value_format": "integer",
+        "hide_in_states": [
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:TIME",
+        "rel_x": 0.685,
+        "rel_y": 0.25577,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0,
+        "hide_in_states": [
+          "clear"
+        ]
+      },
+      {
+        "field": "next_stop_time",
+        "rel_x": 0.72,
+        "rel_y": 0.32596,
+        "color": "#FFFFFF",
+        "font_size": 76,
+        "scale": 1.0,
+        "value_format": "minutes",
+        "hide_in_states": [
+          "clear"
+        ]
+      },
+      {
+        "id": "clear_counter",
+        "field": "state_badge",
+        "type": "badge",
+        "rel_x": 0.52,
+        "rel_y": 0.256,
+        "font_size": 39,
+        "value_font_size": 74,
+        "scale": 1.0,
+        "timer_format": "m:ss",
+        "hide_in_states": [
+          "deco",
+          "safety_stop"
+        ],
+        "label": "Deco clear counter (Petrel 3 Tech manual p.25: CLEAR replaces STOP / TIME)"
+      },
+      {
+        "field": "primary_tank_name",
+        "rel_x": 0.14295,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "primary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.2115,
+        "rel_y": 0.46322,
+        "width": 21,
+        "height": 37,
+        "corner_radius": 4
+      },
+      {
+        "field": "primary_tank_pressure",
+        "rel_x": 0.15,
+        "rel_y": 0.52561,
+        "color": "#FFFFFF",
+        "font_size": 78,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.231,
+        "unit_dx": -3.0,
+        "unit_dy": -55.0,
+        "unit_color": "#00ADED",
+        "max_width": 154
+      },
+      {
+        "field": "setpoint",
+        "rel_x": 0.465,
+        "rel_y": 0.5,
+        "color": "#FFFFFF",
+        "font_size": 104,
+        "scale": 1.0,
+        "align": "center",
+        "value_format": "decimal1",
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "Setpoint in force, no title (Petrel 3 Technical manual p.10: always the centre position in CC)"
+      },
+      {
+        "field": "custom:PPO2",
+        "rel_x": 0.465,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 39,
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ],
+        "label": "On a bailout: the PPO2 in the setpoint's place (assumed, as the Perdix 3 does, PDF p.87)"
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.465,
+        "rel_y": 0.52249,
+        "color": "#FFFFFF",
+        "font_size": 81,
+        "scale": 1.0,
+        "align": "center",
+        "value_format": "decimal2_no_lead",
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ]
+      },
+      {
+        "field": "secondary_tank_name",
+        "rel_x": 0.548,
+        "rel_y": 0.45854,
+        "color": "#00ADED",
+        "font_size": 38,
+        "scale": 1.0
+      },
+      {
+        "field": "secondary_tank_pressure",
+        "type": "tank_icon",
+        "rel_x": 0.63363,
+        "rel_y": 0.46322,
+        "width": 21,
+        "height": 37,
+        "corner_radius": 4
+      },
+      {
+        "field": "secondary_tank_pressure",
+        "rel_x": 0.61213,
+        "rel_y": 0.52561,
+        "color": "#FFFFFF",
+        "font_size": 78,
+        "scale": 1.0,
+        "unit_suffix": true,
+        "unit_scale": 0.231,
+        "unit_dx": -3.0,
+        "unit_dy": -55.0,
+        "unit_color": "#00ADED",
+        "max_width": 154
+      },
+      {
+        "field": "custom:O2/HE",
+        "rel_x": 0.29433,
+        "rel_y": 0.65662,
+        "color": "#00ADED",
+        "font_size": 43,
+        "scale": 1.0
+      },
+      {
+        "field": "circuit",
+        "rel_x": 0.13009,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 87,
+        "scale": 1.0
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.28006,
+        "rel_y": 0.71589,
+        "color": "#FFFFFF",
+        "font_size": 91,
+        "scale": 1.0,
+        "max_width": 218
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.51,
+        "rel_y": 0.65662,
+        "color": "#00ADED",
+        "font_size": 43,
+        "scale": 1.0
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.53,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 70,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.8,
+        "rel_y": 0.65818,
+        "color": "#00ADED",
+        "font_size": 44,
+        "scale": 1.0,
+        "align": "right"
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.8,
+        "rel_y": 0.7237,
+        "color": "#FFFFFF",
+        "font_size": 64,
+        "scale": 1.0,
+        "align": "right"
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.75,
+    "screen": {
+      "x0": 0.123,
+      "y0": 0.248,
+      "x1": 0.81,
+      "y1": 0.8621,
+      "shape": "rect"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

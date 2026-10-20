@@ -160,7 +160,7 @@
         "scale": 1.0
       },
       {
-        "field": "divemode",
+        "field": "circuit",
         "rel_x": 0.1479,
         "rel_y": 0.688,
         "color": "#FFFFFF",

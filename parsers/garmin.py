@@ -70,14 +70,16 @@ def timezone_from_pair(local_dt: datetime, utc_dt: datetime) -> timezone:
 def _add_ceilings(waypoints: List[Waypoint], gas_dict: Dict) -> None:
     """FIT logs the computer's own next stop but no ceiling, GF99 or SurfGF -
     recompute them with the same Buhlmann pass the UDDF/Subsurface parsers
-    already run. Treats every gas as open circuit."""
+    already run. On a rebreather's loop the setpoint through the diluent,
+    otherwise every gas as open circuit."""
     gases = [
         GasDefinition(f"{g['o2']}/{g['he']}", g["o2"] / 100.0, g["he"] / 100.0, max(0.0, (1.4 / (g["o2"] / 100.0) - 1.0) * 10.0))
         for g in gas_dict.values() if g["status"] and g["o2"]
     ] or [GasDefinition("AIR", 0.21, 0.0, 56.0)]
     try:
         results = DiveDecompressor(simulation_interval=10).process_waypoints(
-            [{"divetime": wp.time_since_start, "datetime": wp.timestamp, "depth": wp.depth or 0.0} for wp in waypoints],
+            [{"divetime": wp.time_since_start, "datetime": wp.timestamp, "depth": wp.depth or 0.0, "setpoint": wp.setpoint,
+              "diluent_o2_percent": wp.diluent_o2_percent, "diluent_he_percent": wp.diluent_he_percent} for wp in waypoints],
             gases,
         )
     except Exception as e:
@@ -329,6 +331,9 @@ class GarminParser(BaseParser):
         setpoint_ptr = 0
         setpoint = setpoints_in_force[0][1] if setpoints_in_force and setpoints_in_force[0][0] is None else None
         rebreather = any(g["mode"] == DILUENT_MODE for g in gas_dict.values())
+        # The diluent DilPO2 shows, also after a bailout: the one last breathed
+        # on the loop, before that the first listed
+        diluent = next((g for _, g in sorted(gas_dict.items()) if g["mode"] == DILUENT_MODE), None)
 
         # Process Waypoints (Records)
         waypoints = []
@@ -411,6 +416,8 @@ class GarminParser(BaseParser):
             gas = gas_dict.get(active_gas)
             on_loop = rebreather and gas is not None and gas["mode"] == DILUENT_MODE
             divemode = ("closedcircuit" if on_loop else "opencircuit") if rebreather else None
+            if on_loop:
+                diluent = gas
             # PO2: the record's own, else the setpoint in force on the loop,
             # else the breathed gas at this depth (no made-up constant).
             po2 = record.get("po2")
@@ -444,6 +451,11 @@ class GarminParser(BaseParser):
                 cns=int(record.get("cns_load", 0)),
                 po2=float(po2),
                 divemode=divemode,
+                setpoint=setpoint if on_loop else None,
+                gas_o2_percent=float(gas["o2"]) if rebreather and gas else None,
+                gas_he_percent=float(gas["he"]) if rebreather and gas else None,
+                diluent_o2_percent=float(diluent["o2"]) if rebreather and diluent else None,
+                diluent_he_percent=float(diluent["he"]) if rebreather and diluent else None,
                 tanks=dict(wp_tanks),
                 dive_alerts=wp_alerts,
             )

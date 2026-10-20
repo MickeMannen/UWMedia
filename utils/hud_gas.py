@@ -17,7 +17,12 @@ from utils.hud_rules_engine import _cached_timeline, _num, get_rule_config, tank
 
 
 def gas_o2_fraction(waypoint: Any) -> Optional[float]:
-    """O2 fraction of the gas breathed (the primary tank's mix), or None."""
+    """O2 fraction of the gas breathed - the log's own (a rebreather's
+    diluent on the loop, whose MOD a Petrel shows, Tech manual p.18), else
+    the primary tank's mix - or None."""
+    own = _num(getattr(waypoint, "gas_o2_percent", None))
+    if own is not None and own > 0:
+        return own / 100.0
     tanks = getattr(waypoint, "tanks", None) or {}
     for tank in tanks.values():
         o2 = _num(getattr(tank, "o2_percent", None))

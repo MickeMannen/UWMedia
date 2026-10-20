@@ -116,7 +116,8 @@ def test_user_pages_are_added_beside_bundled_pages(isolated_template_roots, caps
     templates = list_templates()
     perdix = templates["shearwater"]["perdix_2"]
     pages = {p["id"]: p for p in perdix["pages"]}
-    assert list(pages) == ["main", "tec", "my_main"]  # bundled first, user appended, no duplicate
+    bundled = [p["id"] for p in json.loads((roots["bundled"] / "shearwater" / "perdix_2" / "manifest.json").read_text())["pages"]]
+    assert list(pages) == bundled + ["my_main"]  # bundled first, user appended, no duplicate
     assert pages["main"]["name"] == "Main Screen" and pages["main"]["origin"] == "bundled"
     assert pages["my_main"]["origin"] == "user" and pages["my_main"]["path"] == mine.parent
     assert perdix["origin"] == "bundled" and perdix["user_path"] == roots["user"] / "shearwater" / "perdix_2"

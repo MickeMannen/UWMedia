@@ -1,0 +1,192 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Teric",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.535,
+        "rel_y": 0.3182,
+        "color": "#FFFFFF",
+        "font_size": 58,
+        "scale": 1.0,
+        "align": "center",
+        "label": "Top row: depth (Teric manual Rev H5 p.11)"
+      },
+      {
+        "field": "state_badge",
+        "rel_x": 0.2162,
+        "rel_y": 0.438,
+        "color": "#FFFFFF",
+        "font_size": 20,
+        "scale": 1.0,
+        "type": "badge"
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.236,
+        "rel_y": 0.4404,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.236,
+        "rel_y": 0.4662,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.5792,
+        "rel_y": 0.4404,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.5792,
+        "rel_y": 0.4662,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0,
+        "value_format": "minutes"
+      },
+      {
+        "field": "custom:O2/He",
+        "rel_x": 0.2162,
+        "rel_y": 0.5555,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "field": "gasmix",
+        "rel_x": 0.2162,
+        "rel_y": 0.5814,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "max_width": 150,
+        "hide_when_notice": true
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.5,
+        "rel_y": 0.666,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "scale": 1.0,
+        "align": "center",
+        "label": "Bottom row: dive time"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.2242,
+        "rel_y": 0.5485,
+        "font_size": 30,
+        "label": "Notices across the info row (p.33 figure 7, p.24-26)",
+        "style": "banner",
+        "width": 288,
+        "height": 70,
+        "caption_font_size": 14
+      },
+      {
+        "field": "circuit",
+        "rel_x": 0.29,
+        "rel_y": 0.36,
+        "color": "#FFFFFF",
+        "font_size": 30,
+        "scale": 1.0,
+        "label": "CC badge, BO on a bailout (p.12, p.33-34)"
+      },
+      {
+        "field": "custom:SP",
+        "rel_x": 0.5792,
+        "rel_y": 0.5555,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "field": "setpoint",
+        "rel_x": 0.5792,
+        "rel_y": 0.5814,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "value_format": "decimal1",
+        "hide_in_circuits": [
+          "BO",
+          "OC"
+        ],
+        "label": "SP: green high, magenta low (p.14); PPO2 there on a bailout (p.34 'BO Home')",
+        "hide_when_notice": true
+      },
+      {
+        "field": "custom:PPO2",
+        "rel_x": 0.5792,
+        "rel_y": 0.5555,
+        "color": "#00ADED",
+        "font_size": 20,
+        "scale": 1.0,
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "field": "po2",
+        "rel_x": 0.5792,
+        "rel_y": 0.5814,
+        "color": "#FFFFFF",
+        "font_size": 40,
+        "scale": 1.0,
+        "value_format": "decimal2_no_lead",
+        "hide_in_circuits": [
+          "CC",
+          "SC"
+        ],
+        "hide_when_notice": true
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.17,
+      "y0": 0.29,
+      "x1": 0.83,
+      "y1": 0.76,
+      "shape": "ellipse"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

@@ -140,7 +140,8 @@ def test_save_as_under_bundled_computer_creates_self_contained_user_page(isolate
 
     templates = list_templates()
     pages = {p["id"]: p for p in templates["shearwater"]["perdix_2"]["pages"]}
-    assert set(pages) == {"main", "tec", "my_main"}
+    bundled = {p["id"] for p in json.loads((roots["bundled"] / "shearwater" / "perdix_2" / "manifest.json").read_text())["pages"]}
+    assert set(pages) == bundled | {"my_main"}
     assert pages["my_main"]["origin"] == "user" and pages["main"]["origin"] == "bundled"
     assert templates["shearwater"]["perdix_2"]["origin"] == "bundled"
     assert resolve_template_state("shearwater", "perdix_2", "my_main") == path
@@ -181,13 +182,14 @@ def test_save_as_over_existing_user_page_respects_overwrite_flag(isolated_templa
 def test_save_as_in_dev_mode_refuses_any_existing_id(isolated_template_roots):
     roots = isolated_template_roots
     mark_as_checkout(roots)
+    bundled = [p["id"] for p in json.loads((roots["bundled"] / "shearwater" / "perdix_2" / "manifest.json").read_text())["pages"]]
     layout = _load(roots).render_layout()
     with pytest.raises(TemplateExistsError):
         save_template_as(layout, TemplateRef("shearwater", "perdix_2", "tec"), "Tec")
     path = save_template_as(layout, TemplateRef("shearwater", "perdix_2", "extra"), "Extra")
     assert path.is_relative_to(roots["bundled"])  # dev mode writes into the repo tree
     manifest = json.loads((roots["bundled"] / "shearwater" / "perdix_2" / "manifest.json").read_text())
-    assert [p["id"] for p in manifest["pages"]] == ["main", "tec", "extra"]
+    assert [p["id"] for p in manifest["pages"]] == bundled + ["extra"]
 
 
 def test_save_as_new_custom_computer(isolated_template_roots):

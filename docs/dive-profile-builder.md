@@ -100,7 +100,7 @@ All of these are remembered between restarts.
 | Water temp | Temperature written into every sample. |
 | SAC rate | Surface air consumption in L/min, used for every gas's tank pressure. |
 | Max PO2 bottom / deco | The highest PO2 you accept on the bottom and on deco. Sets each gas's MOD. |
-| Setpoint low / high, SP switch depth | CCR only - see [CCR](#ccr). |
+| Setpoint low / high, SP switch down/up | CCR only - see [CCR](#ccr). |
 | O2 cylinder (L / bar) | CCR only - size and start pressure of the O2 cylinder. |
 | Switch tanks every (bar) | Sidemount only - see [Sidemount](#sidemount). |
 | Max depth / Planned runtime | The chart's scale. |
@@ -141,15 +141,24 @@ versions (tanks `T1L`/`T1R`) open as a left and a right tank.
 ### CCR
 
 The gas ticked **Diluent (the loop)** is the rebreather loop: its PO2 is held
-at the **low setpoint** (default 0.7) shallower than the **SP switch depth**
-(default 6 m) and at the **high setpoint** (default 1.3) at and below it. Every
-other gas is open-circuit **bailout**. Bailout is only used where you pick it
+at the **low setpoint** (default 0.7) from the start, switches to the **high
+setpoint** (default 1.3) descending through the first **SP switch down/up**
+depth (default 8 m) and back to the low one ascending through the second
+(default 2 m) - as a Descent or a Shearwater switches automatically; keep the
+two about 6 m apart, as the computers require. Every other gas is
+open-circuit **bailout**. Bailout is only used where you pick it
 for a waypoint in the Waypoints editor - Auto always stays on the loop, and End
 dive ascends on the loop without gas switches. Only one gas can be the diluent;
 switching the dive type to CCR makes the first gas the diluent if none is.
 
 The table's *Type* column shows `DIL` / `BAILOUT` on a CCR dive, and on a
 sidemount dive the tank column shows each tank's side (`T1 Left`, `T2 Right`).
+
+A CCR log the Builder writes looks like a real one: the setpoint in force on
+every sample, three O2 cell readings around the loop's PO2, the O2 cylinder
+with its own mix, and - in a FIT - no measured PO2 but the setpoint switches
+and bailouts as the dive alerts a Descent logs. Opening such a log from another
+program brings its low and high setpoints and switch depths along.
 
 ## Log details
 

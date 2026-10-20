@@ -24,6 +24,10 @@ from utils.layouts import list_templates, load_layout_file, resolve_template_sta
 KNOWN = Path(__file__).parent / "template_sweep_known.json"
 SLACK = 2.0  # px of overlap or overhang that counts as touching, not colliding
 DUMMY_MOMENTS = (400, 930, 1160, 1300, 1600)  # bottom, HIGH PPO2, fast ascent, missed stop, reserve
+# a CC page ("dive": "ccr" in its manifest) also at these moments of the
+# rebreather dive: low setpoint, high setpoint, a cell out of the vote,
+# bailout at the stop, the setpoint switch back down
+CCR_MOMENTS = (20, 600, 930, 1300, 1580)
 
 
 def bundled_pages():
@@ -41,6 +45,13 @@ def bundled_pages():
     return out
 
 
+def page_is_ccr(brand, computer, page):
+    """The manifest marks the page as a rebreather screen ("dive": "ccr")."""
+    manifest = list_templates().get(brand, {}).get(computer) or {}
+    entry = next((p for p in manifest.get("pages", []) if p["id"] == page), {})
+    return entry.get("dive") == "ccr"
+
+
 def load_page(brand, computer, page, variant):
     path = resolve_template_state(brand, computer, page, variant)
     layout = strip_variant_markers(load_layout_file(path))
@@ -53,15 +64,15 @@ def load_page(brand, computer, page, variant):
     return layout, size
 
 
-def situations():
-    dive = build_dummy_dive("single_tank")
+def situations(ccr=False):
+    dive = build_dummy_dive("single_tank", ccr=ccr)
     base = waypoint_at(dive, 12 * 60)
     for state in STATE_OPTIONS:
         if state == "auto":
             continue
         wp, history = forced_dive(base, state)
         yield state, wp, history
-    for t in DUMMY_MOMENTS:
+    for t in DUMMY_MOMENTS + (CCR_MOMENTS if ccr else ()):
         yield f"dive@{t}", waypoint_at(dive, t), dive.waypoints
 
 
@@ -82,6 +93,8 @@ def sweep_page(layout, size, situation, wp, waypoints):
     for elem in elements:
         kind = element_kind(elem)
         if state in (elem.get("hide_in_states") or ()):
+            continue
+        if (getattr(wp, "circuit", None) or "OC") in (elem.get("hide_in_circuits") or ()):
             continue
         if notice is not None and elem.get("hide_when_notice"):
             continue
@@ -139,12 +152,12 @@ def _inside_ellipse(box, screen):
     return all(((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 <= 1.0 for px, py in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)))
 
 
-def sweep_report(layout, size):
+def sweep_report(layout, size, ccr=False):
     """{issue key: [details...]} over every situation."""
     from utils.hud_rules_engine import rule_overrides
     report = {}
     with rule_overrides(layout.get("rules")):
-        for situation, wp, waypoints in situations():
+        for situation, wp, waypoints in situations(ccr):
             for key, detail in sweep_page(layout, size, situation, wp, waypoints):
                 report.setdefault(key, []).append(detail)
     return report
@@ -166,7 +179,7 @@ def test_bundled_page_lays_out_in_every_state(brand, computer, page, variant, un
     entry is keyed `<page>@imperial`."""
     layout, size = load_page(brand, computer, page, variant)
     with U.units_override(units):
-        report = sweep_report(layout, size)
+        report = sweep_report(layout, size, ccr=page_is_ccr(brand, computer, page))
     key = _page_key(brand, computer, page, variant)
     known = dict(_known().get(key, {}))
     if units == U.IMPERIAL:

@@ -143,11 +143,51 @@ def _stop_time_left(t: int) -> Optional[int]:
     return max(0, 120 - (t - 1320))
 
 
-def build_dummy_dive(variant: Optional[str] = "single_tank") -> Dive:
+# A rebreather version of the same dive (build_dummy_dive(ccr=True), for the
+# CC pages): a 0.7 bar setpoint switched to 1.3 below 6 m on the way down
+# (the Builder's and a Descent's default switch depth) and back to 0.7 at the
+# 1.8 m pause; three cells around the setpoint, cell 3 drifting low during
+# the deep excursion (out of the vote); a bailout to EAN50 for the deco stop
+# and its violation, back on the loop when the stop clears.
+_CCR_DILUENT = (18.0, 45.0)
+_CCR_BAILOUT = (50.0, 0.0)
+_CCR_HIGH_SP_S = 40        # passing 6 m on the way down
+_CCR_LOW_SP_S = 1570       # the pause at 1.8 m
+_CCR_BAILOUT_S = (1200, 1440)
+_CCR_ALERTS = {
+    _CCR_HIGH_SP_S: ["setpoint_switch_auto_high"],
+    _CCR_LOW_SP_S: ["setpoint_switch_auto_low"],
+    _CCR_BAILOUT_S[0]: ["switched_to_open_circuit"],
+    _CCR_BAILOUT_S[1]: ["switched_to_closed_circuit"],
+}
+
+
+def _ccr_fields(t: int, depth: float, ambient: float) -> Dict[str, Any]:
+    bailout = _CCR_BAILOUT_S[0] <= t < _CCR_BAILOUT_S[1]
+    gas = _CCR_BAILOUT if bailout else _CCR_DILUENT
+    fields: Dict[str, Any] = {
+        "divemode": "opencircuit" if bailout else "closedcircuit",
+        "gas_o2_percent": gas[0], "gas_he_percent": gas[1],
+        "diluent_o2_percent": _CCR_DILUENT[0], "diluent_he_percent": _CCR_DILUENT[1],
+    }
+    setpoint = 1.3 if _CCR_HIGH_SP_S <= t < _CCR_LOW_SP_S else 0.7
+    setpoint = min(setpoint, round(ambient * 0.98, 2))  # pure O2 at the surface cannot reach more
+    drift = 0.45 if 900 <= t < 990 else 0.0
+    fields.update(po2_1=round(setpoint + 0.02, 2), po2_2=round(setpoint - 0.01, 2), po2_3=round(setpoint - 0.03 - drift, 2))
+    if bailout:
+        fields.update(setpoint=None, po2=round(ambient * gas[0] / 100.0, 2))
+    else:
+        fields.update(setpoint=setpoint, po2=setpoint)
+    return fields
+
+
+def build_dummy_dive(variant: Optional[str] = "single_tank", ccr: bool = False) -> Dive:
     """A deterministic 32-minute synthetic dive (see the module docstring).
     `variant` only decides the tank count (2 for "sidemount", else 1) so
-    resolve_tank_variant() on the result round-trips to the same variant."""
-    keys = _tank_keys(variant)
+    resolve_tank_variant() on the result round-trips to the same variant.
+    `ccr`: the rebreather version (see _CCR_DILUENT) with an O2 cylinder and
+    the diluent as its tanks."""
+    keys = ["O2", "DIL"] if ccr else _tank_keys(variant)
     pressures: Dict[str, float] = {k: 200.0 for k in keys}
     waypoints: List[Waypoint] = []
     max_depth = 0.0
@@ -204,6 +244,15 @@ def build_dummy_dive(variant: Optional[str] = "single_tank") -> Dive:
             )
             for key in keys
         }
+        extra: Dict[str, Any] = {}
+        alerts = list(_ALERTS.get(t, []))
+        if ccr:
+            # the loop uses little gas: O2 and diluent drain slowly and evenly
+            for key, mix in (("O2", (100.0, 0.0)), ("DIL", _CCR_DILUENT)):
+                tanks[key] = tanks[key].model_copy(update={"o2_percent": mix[0], "he_percent": mix[1], "mode": "CC",
+                                                           "pressure_bar": round(200.0 - t / DUMMY_DURATION_S * (40.0 if key == "O2" else 25.0), 1)})
+            extra = _ccr_fields(t, depth, ambient)
+            alerts += _CCR_ALERTS.get(t, [])
 
         waypoints.append(
             Waypoint(
@@ -225,11 +274,10 @@ def build_dummy_dive(variant: Optional[str] = "single_tank") -> Dive:
                 n2_tissue_load=round(min(150.0, depth * 3.0 + bottom_min * 1.5), 1),
                 heart_rate=int(78 + 10 * math.sin(t / 240.0)),
                 cns=int(min(45, bottom_min * 1.4 + (10 if max_depth > 40 else 0))),
-                po2=round(0.32 * ambient, 2),
-                divemode="OC",
+                **({"po2": round(0.32 * ambient, 2), "divemode": "OC"} if not ccr else extra),
                 gf=round(min(110.0 if in_deco else 85.0, depth * 1.8 + bottom_min * 1.2), 1),
                 battery=87.0,
-                dive_alerts=list(_ALERTS.get(t, [])),
+                dive_alerts=alerts,
             )
         )
 
@@ -239,6 +287,7 @@ def build_dummy_dive(variant: Optional[str] = "single_tank") -> Dive:
         waypoints=waypoints,
         device="Synthetic dive computer",
         manufactor="UWMedia",
+        gf_low=40, gf_high=85,  # a Shearwater's default conservatism, Med (Perdix 2 manual p.18)
         duration_seconds=DUMMY_DURATION_S,
         log_filename="dummy_telemetry",
     )

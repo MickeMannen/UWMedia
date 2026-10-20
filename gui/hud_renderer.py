@@ -271,7 +271,7 @@ def text_anchor_shift(font, text, align="left", valign="top"):
 UNIT_KIND_OF_FIELD = {
     "depth": "depth", "max_depth": "depth", "deco_stop_depth": "depth", "next_stop_depth": "depth", "ceiling": "depth", "mod": "depth",
     "primary_tank_pressure": "pressure", "secondary_tank_pressure": "pressure",
-    "temp": "temp", "pressure_sac": "sac", "volume_sac": "volume_rate",
+    "temp": "temp", "pressure_sac": "sac", "volume_sac": "volume_rate", "avg_depth": "depth", "min_temp": "temp",
 }
 
 
@@ -1554,15 +1554,17 @@ def _draw_tank_fill(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w
 
     draw.rounded_rectangle([abs_x, abs_y, abs_x + w, abs_y + h], radius=radius, fill=color_rgb)
 
-def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb):
+def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb, outline_rgb=None):
     """A filled rounded box behind `text` drawn at (abs_x, abs_y) - the way a
     Perdix highlights a tank to switch to (manual p.42) or a tank pressure
-    below the reserve (p.40)."""
+    below the reserve (p.40); with `outline_rgb` an outlined one (a
+    Descent's CC box, Mk3 manual p.24)."""
     left, top, right, bottom = font.getbbox(text)
     pad = max(1, int(size * 0.15))
     draw.rounded_rectangle(
         [abs_x + left - pad, abs_y + top - pad, abs_x + right + pad, abs_y + bottom + pad],
         radius=max(1, int(size * 0.15)), fill=box_rgb,
+        outline=outline_rgb, width=max(1, int(size * 0.08)) if outline_rgb else 0,
     )
 
 
@@ -1728,8 +1730,29 @@ def apply_value_format(elem, val, raw_val):
         return val
     if value_format == "minutes":
         return str(int(raw_val // 60))
+    # a value with a unit is formatted in the unit system in force, not as
+    # the SI number the log holds (a stop depth in feet, a temperature in °F)
+    from utils import units as U
+    field = elem.get("field", "")
+    kind = unit_kind_of(field)
+    if kind == "depth":
+        raw_val = U.stop_depth(raw_val) if field in ("deco_stop_depth", "next_stop_depth") else U.depth(raw_val)
+    elif kind == "temp":
+        raw_val = U.temperature(raw_val)
+    elif kind == "pressure":
+        raw_val = U.pressure(raw_val)
     if value_format == "integer":
         return f"{raw_val:.0f}"
+    # PPO2 the way each screen writes it: Garmin "0.70" (Descent X50i manual
+    # p.16), a Shearwater ".41" / "1.05" with no leading zero (Petrel 3
+    # Technical manual p.37), the Petrel's setpoint "1.3" (p.10)
+    if value_format == "decimal2":
+        return f"{raw_val:.2f}"
+    if value_format == "decimal1":
+        return f"{raw_val:.1f}"
+    if value_format == "decimal2_no_lead":
+        text = f"{raw_val:.2f}"
+        return text[1:] if text.startswith("0.") else text
     return val
 
 
@@ -1748,6 +1771,37 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
     if field == "time_of_day":
         val = waypoint.timestamp.strftime("%H:%M") if waypoint is not None and waypoint.timestamp else None
         return val, None
+    if field == "eod":
+        # end of dive: the time of day the diver can expect to surface, now plus TTS (Teric manual p.19, Tern p.18)
+        if waypoint is None or not waypoint.timestamp:
+            return None, None
+        from datetime import timedelta
+        return (waypoint.timestamp + timedelta(seconds=int(waypoint.tts or 0))).strftime("%H:%M"), None
+    if field == "date":
+        # a Shearwater's DATE info screen: "03-Mar-20" (Perdix 2 manual p.16)
+        val = waypoint.timestamp.strftime("%d-%b-%y") if waypoint is not None and waypoint.timestamp else None
+        return val, None
+    if field == "avg_depth":
+        from utils.hud_rules_engine import average_depth_at
+        raw_val = average_depth_at(waypoint, waypoints)
+        return format_telemetry_value("max_depth", raw_val, display), raw_val
+    if field == "min_temp":
+        # the coldest water so far (a Descent X50i gauge page's MIN. TEMP, manual p.17)
+        temps = [wp.temp for wp in (waypoints or [waypoint]) if wp is not None and wp.temp is not None
+                 and wp.time_since_start <= (waypoint.time_since_start if waypoint is not None else 0)]
+        raw_val = min(temps) if temps else None
+        return format_telemetry_value("temp", raw_val, display), raw_val
+    if field == "gf_setting":
+        # the conservatism the dive was made with, "40/85" (Perdix 2 p.18); the brand's default without one in the log
+        dive = getattr(waypoint, "_dive", None) if waypoint is not None else None
+        low, high = getattr(dive, "gf_low", None), getattr(dive, "gf_high", None)
+        return (f"{low}/{high}" if low and high else "--"), None
+    if field in ("ambient_mbar", "surface_mbar"):
+        # the PRESSURE info screen in mbar: the surface pressure and the
+        # pressure now (salt water, 100.5 mbar per metre)
+        depth = (getattr(waypoint, "depth", None) or 0.0) if waypoint is not None and field == "ambient_mbar" else 0.0
+        raw_val = int(round(1013 + depth * 100.5))
+        return str(raw_val), raw_val
     if field == "ndl_before_clear":
         from utils.hud_rules_engine import get_ndl_before_clear
         raw_val = get_ndl_before_clear(manufacturer, model, waypoint, waypoints)
@@ -1776,6 +1830,15 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
             # stops are required the slot reads "deco" (GTR is for no-deco diving, p.44)
             return ("deco" if resolve_state(manufacturer, model, waypoint, waypoints) == "deco" else "wait"), None
         return format_telemetry_value(field, raw_val, display), raw_val
+    if field == "circuit":
+        # CC / SC / BO / OC, in the brand's own words (a Descent says OC on a bailout)
+        raw_val = getattr(waypoint, "circuit", None) if waypoint is not None else None
+        labels = get_rule_config(manufacturer, model, "circuit_labels")
+        shown = labels.get(raw_val, raw_val) if isinstance(labels, dict) and raw_val else raw_val
+        return (shown or "--"), raw_val
+    if field == "pressure_sac" and getattr(waypoint, "pressure_sac", None) is None and \
+            not isinstance(get_rule_config(manufacturer, model, "gas_time"), dict):
+        return "--", None  # "wait" is a Shearwater's (Perdix 2 manual p.41); a Descent shows no value yet
     if field.startswith("custom:"):
         return field.replace("custom:", ""), None
     if field.startswith("tank_pressure:"):
@@ -1831,6 +1894,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     for elem in linked_elements:
         field = elem.get("field", "")
         if hud_state is not None and hud_state in (elem.get("hide_in_states") or ()):
+            continue
+        if elem.get("hide_in_circuits") and (getattr(waypoint, "circuit", None) or "OC") in elem["hide_in_circuits"]:
+            # a CC page's setpoint steps aside on a bailout, its PPO2 on the loop
             continue
         if notice is not None and elem.get("hide_when_notice"):
             continue
@@ -1918,6 +1984,16 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 elif float(raw_val) > float(gf_high):
                     color_hex = gf_rule.get("above_gf_high", "#FFFF00")
         box_rgb = None
+        from utils.hud_rules_engine import ccr_style
+        ccr = ccr_style(manufacturer, model, field, waypoint, raw_val, color_hex, elapsed)
+        box_outline_rgb = None
+        if ccr:
+            # a rebreather's loop PPO2, cells, DilPO2, setpoint, CC / BO badge
+            color_hex = ccr.get("color", color_hex)
+            if ccr.get("box"):
+                box_rgb = _rgb(ccr["box"])
+            if ccr.get("outline"):
+                box_outline_rgb = _rgb(ccr["outline"])
         if field in ("primary_tank_pressure", "secondary_tank_pressure") or field.startswith("tank_pressure:"):
             # Below the reserve / critical pressure: a Shearwater puts the
             # value on a yellow / red box (Perdix 2 manual p.40), a Descent
@@ -2015,7 +2091,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 box_rgb = _rgb(str(rule.get("color", "#00C800")))
                 color_rgb = _rgb(str(rule.get("text_color", "#000000")))
         if box_rgb is not None:
-            _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb)
+            _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb, box_outline_rgb)
             outline = False
 
         o_dist = max(1, int(final_size / 20))

@@ -1,0 +1,116 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "po2",
+        "field": "po2",
+        "rel_x": 0.4465,
+        "rel_y": 0.2787,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0,
+        "align": "right",
+        "value_format": "decimal2",
+        "label": "PO2 (Mk3 manual p.21); on a CCR loop the setpoint in force"
+      },
+      {
+        "id": "gasmix",
+        "field": "gasmix",
+        "rel_x": 0.477,
+        "rel_y": 0.2787,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0,
+        "max_width": 150
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NDL",
+        "rel_x": 0.4007,
+        "rel_y": 0.5035,
+        "color": "#FFFFFF",
+        "font_size": 26,
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.4007,
+        "rel_y": 0.5356,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "state_badge",
+        "field": "state_badge",
+        "rel_x": 0.2939,
+        "rel_y": 0.521,
+        "color": "#FFFFFF",
+        "font_size": 30,
+        "scale": 1.0,
+        "type": "badge",
+        "label": "Stop / deco: the ceiling and its time left of the depth (p.28-29)"
+      },
+      {
+        "id": "label_depth",
+        "field": "custom:DEPTH",
+        "rel_x": 0.5685,
+        "rel_y": 0.5035,
+        "color": "#FFFFFF",
+        "font_size": 26,
+        "scale": 1.0
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.5304,
+        "rel_y": 0.5356,
+        "color": "#FFFFFF",
+        "font_size": 74,
+        "scale": 1.0,
+        "unit_suffix": true
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.5075,
+        "rel_y": 0.6816,
+        "color": "#FFFFFF",
+        "font_size": 60,
+        "scale": 1.0,
+        "align": "center"
+      }
+    ],
+    "screen": {
+      "x0": 0.126,
+      "y0": 0.194,
+      "x1": 0.889,
+      "y1": 0.778,
+      "shape": "ellipse"
+    }
+  }
+}

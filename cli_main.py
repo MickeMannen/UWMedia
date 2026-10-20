@@ -350,6 +350,18 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "n2_tissue_load",
         # the device's own notification (gui/hud_renderer._draw_notice)
         "notice",
+        # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py properties)
+        "circuit",
+        "diluent_po2",
+        # info screens and gauge pages (gui/hud_renderer.resolve_element_text)
+        "avg_depth",
+        "min_temp",
+        "eod",
+        "gf_setting",
+        "mod",  # the breathed gas's MOD (utils/hud_gas.py)
+        "date",
+        "ambient_mbar",
+        "surface_mbar",
     }
     
     layout_fields = [elem.get("field") for elem in linked_elements if elem.get("field")]

@@ -52,6 +52,27 @@ def synthetic_plan(start, computer="Shearwater Perdix 2", bottom_min=40, depth_m
     return plan
 
 
+def synthetic_ccr_plan(start, computer="Shearwater Petrel 3"):
+    """A rebreather dive the way a real one goes: on the loop (18/45 diluent,
+    setpoints 0.7 / 1.3) to 40 m, the low setpoint until 8 m on the way down,
+    a bailout to EAN50 at 15 m on the way up, back on the loop at the 6 m stop
+    and the low setpoint again above 2 m - the stand-in for a real CCR log."""
+    from models.dive_plan import DiveProfilePlan, PlannedGas, PlannedWaypoint
+
+    return DiveProfilePlan(
+        name="Synthetic CCR dive", dive_type="ccr", gf_low=40, gf_high=85, water_temp_c=24.0,
+        computer=computer, start_time=start,
+        gases=[PlannedGas(id="Dil", gas_type="trimix", o2_percent=18.0, he_percent=45.0, diluent=True, tank_ref="T1", tank_size_l=3.0),
+               PlannedGas(id="EAN50", gas_type="nitrox", o2_percent=50.0, tank_ref="T2", tank_size_l=7.0)],
+        waypoints=[PlannedWaypoint(runtime_sec=180, depth_m=40.0, gas_id="Dil", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=1200, depth_m=40.0, gas_id="Dil", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=1500, depth_m=15.0, gas_id="Dil", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=1800, depth_m=6.0, gas_id="EAN50", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=2400, depth_m=6.0, gas_id="Dil", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=2500, depth_m=1.0, gas_id="Dil", gas_auto=False),
+                   PlannedWaypoint(runtime_sec=2560, depth_m=0.0, gas_id="Dil", gas_auto=False)])
+
+
 def write_synthetic_log(path, start, computer="Shearwater Perdix 2"):
     """Writes a synthetic dive as UDDF, FIT or Subsurface (by `path`'s
     suffix: .uddf / .fit / .ssrf) with the app's own writers."""

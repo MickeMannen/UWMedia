@@ -295,15 +295,22 @@ class DiveDecompressor:
                     # others pause. We'll pause/reset if they surface.
                     if depth < 1.0: self.safety_stop_triggered = False 
             
-            # Find current gas (simplification: pick best available gas for current depth)
-            active_gas = self._get_best_gas(depth, gases)
+            # A rebreather on the loop breathes its setpoint through the
+            # diluent (the waypoint's own setpoint and diluent); otherwise
+            # the best available gas for the depth (a simplification)
+            loop = data.get('loop')
+            ambient = self.engine.surface_pressure + depth / 10.0
+            if loop:
+                active_gas = self._loop_gas(loop, ambient)
+            else:
+                active_gas = self._get_best_gas(depth, gases)
             
             # Update master tissue state (1 second)
             self.engine.update(depth, 1.0, active_gas.f_o2, active_gas.f_he)
             
             # 2. Stateful TTS Look-Ahead Simulation
             if sec % self.sim_interval == 0:
-                tts, ceiling = self._simulate_tts(depth, active_gas, gases, max_depth=running_max_depth)
+                tts, ceiling = self._simulate_tts(depth, active_gas, gases, max_depth=running_max_depth, loop=loop)
                 last_tts = tts
                 last_ceiling = ceiling
             else:
@@ -311,7 +318,6 @@ class DiveDecompressor:
                 if 3.0 <= depth <= 6.0 and last_tts > 0:
                     last_tts = max(0, last_tts - 1)
             
-            ambient = self.engine.surface_pressure + depth / 10.0
             results[sec] = TTSDataPoint(
                 timestamp=timestamp,
                 depth=depth,
@@ -321,10 +327,25 @@ class DiveDecompressor:
                 gf_current=round(self.engine.gradient_factor(ambient), 1),
                 surf_gf=round(self.engine.gradient_factor(self.engine.surface_pressure), 1),
                 cns=self.engine.cns,
-                po2=(self.engine.surface_pressure + (depth / 10.0)) * active_gas.f_o2
+                po2=loop[0] if loop else ambient * active_gas.f_o2
             )
             
         return results
+
+    def _loop_gas(self, loop: Tuple[float, float, float], ambient: float) -> GasDefinition:
+        """The loop's gas at this ambient pressure: (setpoint bar, diluent
+        O2 and He fractions) through ccr_effective_fractions."""
+        setpoint, dil_o2, dil_he = loop
+        f_o2, f_he = ccr_effective_fractions(setpoint, ambient, dil_o2, dil_he)
+        return GasDefinition("CCR", f_o2, f_he, 999.0)
+
+    @staticmethod
+    def waypoint_loop(wp: dict) -> Optional[Tuple[float, float, float]]:
+        """(setpoint, diluent fO2, fHe) of a waypoint dict on the loop, else None."""
+        setpoint, dil_o2 = wp.get('setpoint'), wp.get('diluent_o2_percent')
+        if setpoint is None or dil_o2 is None:
+            return None
+        return float(setpoint), float(dil_o2) / 100.0, float(wp.get('diluent_he_percent') or 0.0) / 100.0
 
     def _interpolate_profile(self, waypoints: List[dict]) -> Dict[int, dict]:
         """Ensures the profile has data points for every 1-second interval."""
@@ -354,14 +375,23 @@ class DiveDecompressor:
                 
             full_timeline[s] = {
                 'depth': depth,
-                'datetime': p1['datetime'] # Approximate
+                'datetime': p1['datetime'], # Approximate
+                'loop': self.waypoint_loop(p1),
             }
         return full_timeline
 
-    def _simulate_tts(self, current_depth: float, current_gas: GasDefinition, all_gases: List[GasDefinition], max_depth: float = 0.0) -> Tuple[int, float]:
+    def _simulate_tts(self, current_depth: float, current_gas: GasDefinition, all_gases: List[GasDefinition], max_depth: float = 0.0,
+                      loop: Optional[Tuple[float, float, float]] = None) -> Tuple[int, float]:
         """
-        Runs a virtual ascent to calculate TTS and current ceiling.
+        Runs a virtual ascent to calculate TTS and current ceiling. On the
+        loop (`loop` = setpoint, diluent fractions) the ascent stays on the
+        loop at the same setpoint.
         """
+        def gas_at(depth: float) -> GasDefinition:
+            if loop:
+                return self._loop_gas(loop, self.engine.surface_pressure + depth / 10.0)
+            return self._get_best_gas(depth, all_gases)
+
         # Clone current engine state to avoid modifying master tissues
         sim_engine = self.engine.clone()
         current_ceiling = sim_engine.get_ceiling(self.gf_high)
@@ -399,7 +429,7 @@ class DiveDecompressor:
                 total_time += 1
                 
                 # Update simulation state
-                sim_gas = self._get_best_gas(sim_depth, all_gases)
+                sim_gas = gas_at(sim_depth)
                 sim_engine.update(sim_depth, 1.0, sim_gas.f_o2, sim_gas.f_he)
             else:
                 # Mandatory Deco Stop Logic
@@ -414,6 +444,8 @@ class DiveDecompressor:
                 # gf_slope = (sim_depth / current_depth) # simplified
                 
                 # For look-ahead, we step through time at the stop
+                if loop:
+                    sim_gas = gas_at(stop_depth)
                 while True:
                     # Check ceiling at next stop (stop_depth - 3)
                     next_stop_ceiling = sim_engine.get_ceiling(self.gf_high)

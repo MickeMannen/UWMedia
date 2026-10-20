@@ -43,12 +43,13 @@ from utils.config import get_config
 
 LAST_FOLDER_FIELD = "log_viewer_folder"
 
-TABLE_COLUMNS = ["time", "depth", "temp", "ndl", "tts", "gas", "tanks"]
+TABLE_COLUMNS = ["time", "depth", "temp", "ndl", "tts", "gas", "po2", "setpoint", "cells", "circuit", "tanks"]
 
 
 def table_headers() -> List[str]:
     from utils import units as U
-    return ["Time", f"Depth ({U.depth_label()})", f"Temp ({U.temperature_label()})", "NDL (s)", "TTS (s)", "Gas", "Tanks"]
+    return ["Time", f"Depth ({U.depth_label()})", f"Temp ({U.temperature_label()})", "NDL (s)", "TTS (s)", "Gas",
+            "PO2", "SP", "Cells", "Circuit", "Tanks"]
 
 
 # The chart draws at most this many points; a 1 s FIT log of an hour's dive
@@ -77,6 +78,7 @@ CHANNEL_LABELS = [
     ("cns", "CNS"),
     ("po2", "ppO₂"),
     ("po2_1", "ppO₂ cells"),
+    ("setpoint", "setpoint"),
     ("n2_tissue_load", "N₂ tissue load"),
     ("ascent_rate", "ascent rate"),
     ("air_remaining", "gas time remaining"),
@@ -190,16 +192,34 @@ def _tanks(dive: Dive, reverse_map: Dict[str, str]) -> List[Dict[str, Any]]:
     return tanks
 
 
+def _knows_gas(wp) -> bool:
+    return bool(wp.tanks) or wp.gas_o2_percent is not None
+
+
+def _cells(wp) -> str:
+    return " / ".join(f"{c:.2f}" for c in (wp.po2_1, wp.po2_2, wp.po2_3) if c is not None)
+
+
 def _events(dive: Dive) -> List[str]:
+    """Alerts, gas changes, and on a rebreather dive the circuit (bailout,
+    back on the loop) and setpoint changes."""
     events: List[str] = []
-    previous_gas = None
+    previous_gas = previous_circuit = previous_setpoint = None
     for wp in dive.waypoints:
         at = _clock(wp.time_since_start)
         for alert in wp.dive_alerts:
             if alert.startswith(IGNORED_ALERTS):
                 continue
             events.append(f"{at}  {alert.replace('_', ' ')}")
-        if wp.tanks:
+        circuit = wp.circuit
+        if dive.is_ccr and previous_circuit is not None and circuit != previous_circuit:
+            events.append(f"{at}  {'bailout to open circuit' if circuit == 'BO' else 'back on the loop'}")
+        previous_circuit = circuit or previous_circuit
+        if wp.setpoint is not None:
+            if previous_setpoint is not None and wp.setpoint != previous_setpoint:
+                events.append(f"{at}  setpoint {previous_setpoint:g} → {wp.setpoint:g}")
+            previous_setpoint = wp.setpoint
+        if _knows_gas(wp):
             gas = wp.gasmix
             if previous_gas is not None and gas != previous_gas:
                 events.append(f"{at}  gas change: {previous_gas} → {gas}")
@@ -221,6 +241,47 @@ def _chart_samples(dive: Dive) -> List[Dict[str, float]]:
         {"time": wp.time_since_start, "depth": U.depth(wp.depth), "ceiling": U.depth(wp.ceiling or 0.0)}
         for wp in picked
     ]
+
+
+def _po2_samples(dive: Dive) -> List[Dict[str, Any]]:
+    """The PO2 strip under the profile: per (thinned) sample the PO2, the
+    setpoint and the three cells (-1 = none), and whether the diver is on a
+    bailout - for a dive with a setpoint or cells; [] otherwise."""
+    if not any(wp.setpoint is not None or wp.po2_1 is not None for wp in dive.waypoints):
+        return []
+    points = [wp for wp in dive.waypoints if wp.depth is not None]
+    step = max(1, -(-len(points) // MAX_CHART_POINTS))
+    picked = points[::step]
+    if points and picked[-1] is not points[-1]:
+        picked.append(points[-1])
+
+    def value(v):
+        return float(v) if v is not None else -1.0
+
+    return [
+        {"time": wp.time_since_start, "po2": value(wp.po2), "setpoint": value(wp.setpoint),
+         "c1": value(wp.po2_1), "c2": value(wp.po2_2), "c3": value(wp.po2_3), "bailout": wp.circuit == "BO"}
+        for wp in picked
+    ]
+
+
+def _rebreather(dive: Dive) -> str:
+    """One line for a rebreather dive: the diluent, the setpoints and the
+    time on a bailout; "" for an open-circuit dive."""
+    if not dive.is_ccr:
+        return ""
+    parts = ["CCR"]
+    diluent = next((wp for wp in dive.waypoints if wp.diluent_o2_percent is not None), None)
+    if diluent is not None:
+        parts.append("diluent " + mix_name(diluent.diluent_o2_percent, diluent.diluent_he_percent or 0.0))
+    setpoints = sorted({wp.setpoint for wp in dive.waypoints if wp.setpoint is not None})
+    if setpoints:
+        parts.append("setpoint " + " / ".join(f"{sp:g}" for sp in setpoints))
+    wps = dive.waypoints
+    bailout_s = sum(b.time_since_start - a.time_since_start for a, b in zip(wps, wps[1:]) if a.circuit == "BO")
+    if bailout_s:
+        parts.append(f"bailout {_minutes(bailout_s)}")
+    return ", ".join(parts)
 
 
 def dive_details(dive: Dive, reverse_map: Dict[str, str]) -> Dict[str, Any]:
@@ -258,6 +319,8 @@ def dive_details(dive: Dive, reverse_map: Dict[str, str]) -> Dict[str, Any]:
         "tanks": _tanks(dive, reverse_map),
         "samples": samples,
         "has_ceiling": any(s["ceiling"] > 0 for s in samples),
+        "po2_samples": _po2_samples(dive),
+        "rebreather": _rebreather(dive),
         "sample_count": len(dive.waypoints),
         "channels": present,
         "events": _events(dive),
@@ -283,7 +346,11 @@ def sample_rows(dive: Dive, reverse_map: Dict[str, str]) -> List[Dict[str, str]]
                 "temp": _num(wp.temp, "°C").rsplit(" ", 1)[0] if wp.temp is not None else "",
                 "ndl": str(wp.ndl) if wp.ndl is not None else "",
                 "tts": str(wp.tts) if wp.tts is not None else "",
-                "gas": wp.gasmix if wp.tanks else "",
+                "gas": wp.gasmix if _knows_gas(wp) else "",
+                "po2": f"{wp.po2:.2f}" if wp.po2 is not None else "",
+                "setpoint": f"{wp.setpoint:g}" if wp.setpoint is not None else "",
+                "cells": _cells(wp),
+                "circuit": wp.circuit if dive.is_ccr else "",
                 "tanks": "; ".join(_format_tank_reading(k, t, reverse_map) for k, t in wp.tanks.items()),
             }
         )

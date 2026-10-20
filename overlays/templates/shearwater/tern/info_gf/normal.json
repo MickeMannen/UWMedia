@@ -1,0 +1,181 @@
+{
+  "manufacturer": "Shearwater",
+  "model": "Tern",
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "linked_elements": [
+      {
+        "field": "depth",
+        "rel_x": 0.5,
+        "rel_y": 0.3196,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0,
+        "align": "center",
+        "label": "Top row: depth (Tern manual Rev B-1 p.10)"
+      },
+      {
+        "field": "state_badge",
+        "rel_x": 0.2463,
+        "rel_y": 0.4241,
+        "color": "#FFFFFF",
+        "font_size": 22,
+        "scale": 1.0,
+        "type": "badge"
+      },
+      {
+        "field": "custom:NDL",
+        "rel_x": 0.264,
+        "rel_y": 0.4262,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "ndl",
+        "rel_x": 0.264,
+        "rel_y": 0.4487,
+        "color": "#FFFFFF",
+        "font_size": 48,
+        "scale": 1.0,
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "field": "custom:MAX",
+        "rel_x": 0.5708,
+        "rel_y": 0.4262,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0,
+        "label": "Deco row right slot: MAX by default (p.10)"
+      },
+      {
+        "field": "max_depth",
+        "rel_x": 0.5472,
+        "rel_y": 0.4487,
+        "color": "#FFFFFF",
+        "font_size": 46,
+        "scale": 1.0
+      },
+      {
+        "field": "custom:GF",
+        "rel_x": 0.335,
+        "rel_y": 0.5266,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true,
+        "label": "Info row: GF / GF99 / TTS (Tern manual Rev B-1)"
+      },
+      {
+        "field": "gf_setting",
+        "rel_x": 0.335,
+        "rel_y": 0.5492,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true,
+        "max_width": 110
+      },
+      {
+        "field": "custom:GF99",
+        "rel_x": 0.5,
+        "rel_y": 0.5266,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "field": "custom:%",
+        "rel_x": 0.534,
+        "rel_y": 0.5652,
+        "color": "#00ADED",
+        "font_size": 21,
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "field": "gf",
+        "rel_x": 0.53,
+        "rel_y": 0.5492,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "scale": 1.0,
+        "align": "right",
+        "hide_when_notice": true
+      },
+      {
+        "field": "custom:TTS",
+        "rel_x": 0.665,
+        "rel_y": 0.5266,
+        "color": "#00ADED",
+        "font_size": 22,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "field": "tts",
+        "rel_x": 0.665,
+        "rel_y": 0.5492,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true,
+        "value_format": "minutes"
+      },
+      {
+        "field": "dive_time",
+        "rel_x": 0.5118,
+        "rel_y": 0.623,
+        "color": "#FFFFFF",
+        "font_size": 54,
+        "scale": 1.0,
+        "align": "center",
+        "label": "Bottom row: dive time"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.2549,
+        "rel_y": 0.5205,
+        "font_size": 36,
+        "label": "Notices across the info row (p.24-25)",
+        "style": "banner",
+        "width": 356,
+        "height": 90,
+        "caption_font_size": 18
+      }
+    ],
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.205,
+      "y0": 0.295,
+      "x1": 0.795,
+      "y1": 0.705,
+      "shape": "ellipse"
+    }
+  },
+  "design_width": 1920,
+  "design_height": 1080
+}

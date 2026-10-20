@@ -6,6 +6,7 @@ logs under test_data/logs. The backend is built with background=False so
 reading happens inline; the tank mapping and settings.json are stubbed so
 nothing outside the test's tmp_path is read or written.
 """
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -195,7 +196,7 @@ def test_sample_table_and_filter(backend):
     rows = backend.tableRows
     assert len(rows) == 2612
     assert len(rows[0]) == len(backend.tableHeaders)
-    assert "Right (3456789)" in rows[100][6]
+    assert "Right (3456789)" in rows[100][-1]  # the Tanks column comes last
     backend.filterText = "12:05:18"
     assert len(backend.tableRows) == 1
     # a new selection clears the filter
@@ -236,3 +237,42 @@ def test_units_change_refreshes_the_selected_dive(backend):
     with U.units_override("metric"):
         backend.unitsChanged()
     assert backend.selected["max_depth"] == metric_depth
+
+
+def test_a_ccr_dive_shows_its_po2_strip_columns_events_and_rebreather_line():
+    from conftest import synthetic_ccr_plan
+    from parsers.uddf_writer import write_uddf
+    from utils.dive_plan_engine import simulate
+    import tempfile
+    from pathlib import Path
+    from parsers.registry import parse_log_file
+
+    plan = synthetic_ccr_plan(datetime(2026, 3, 1, 9, 0))
+    samples, _ = simulate(plan, resolution_sec=2)
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "ccr.uddf"
+        write_uddf(plan, samples, path)
+        dive, = parse_log_file(path)
+    details = lvb.dive_details(dive, {})
+    assert details["rebreather"].startswith("CCR, diluent Tx 18/45, setpoint 0.7 / 1.3, bailout ")
+    strip = details["po2_samples"]
+    assert strip and any(p["bailout"] for p in strip) and all(p["setpoint"] == -1 for p in strip if p["bailout"])
+    assert {"setpoint", "ppO₂ cells"} <= set(details["channels"])
+    events = details["events"]
+    assert any("setpoint 0.7 → 1.3" in e for e in events) and any("bailout to open circuit" in e for e in events)
+    assert any("back on the loop" in e for e in events) and any("gas change: 18/45 → Nx50" in e for e in events)
+    row = next(r for r in lvb.sample_rows(dive, {}) if r["circuit"] == "CC" and r["setpoint"] == "1.3")
+    assert row["gas"] == "18/45" and len(row["cells"].split(" / ")) == 3
+    assert len(lvb.table_headers()) == len(lvb.TABLE_COLUMNS)
+
+
+def test_an_open_circuit_dive_has_no_po2_strip():
+    from parsers.registry import parse_log_file
+    from conftest import write_synthetic_log
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as folder:
+        dive, = parse_log_file(write_synthetic_log(Path(folder) / "oc.uddf", datetime(2026, 3, 1, 9, 0)))
+    details = lvb.dive_details(dive, {})
+    assert details["po2_samples"] == [] and details["rebreather"] == ""

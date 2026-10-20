@@ -93,6 +93,17 @@ def _optional_float(value: Optional[str]) -> Optional[float]:
     except ValueError:
         return None
 
+def _gas_fields(cylinders, breathed, diluent) -> dict:
+    """The breathed gas and the diluent as Waypoint fields; nothing for a
+    cylinder that isn't known (the first tank's mix stays the gas)."""
+    out = {}
+    if breathed is not None and breathed < len(cylinders):
+        out.update(gas_o2_percent=cylinders[breathed]["o2"], gas_he_percent=cylinders[breathed]["he"])
+    if diluent is not None and diluent < len(cylinders):
+        out.update(diluent_o2_percent=cylinders[diluent]["o2"], diluent_he_percent=cylinders[diluent]["he"])
+    return out
+
+
 class SubsurfaceParser(BaseParser):
     def parse(self, file_path: Path) -> List[Dive]:
         try:
@@ -154,6 +165,7 @@ class SubsurfaceParser(BaseParser):
                 start_str = cyl.get("start")
                 end_str = cyl.get("end")
                 cylinders.append({
+                    "use": cyl.get("use"),  # "diluent" / "oxygen" on a rebreather dive
                     "index": idx,
                     "size": size,
                     "workpressure": workpressure,
@@ -207,7 +219,27 @@ class SubsurfaceParser(BaseParser):
                     cyl_desc = cylinders[idx]["description"]
                     tank_serial = cyl_desc if cyl_desc else str(idx+1)
                 
-                tank_keys[idx] = get_config().map_tank_name(tank_serial)
+                key = get_config().map_tank_name(tank_serial)
+                if key in tank_keys.values():
+                    key = f"{key} ({idx + 1})"  # two cylinders with one description stay two tanks
+                tank_keys[idx] = key
+
+            # A rebreather dive (dctype CCR / SCR): which cylinder is breathed
+            # (gaschange events), the circuit (modechange events, else a switch
+            # to a cylinder that is neither diluent nor oxygen is a bailout).
+            dctype = (divecomputer_elem.get("dctype") or "").upper()
+            loop_mode = {"CCR": "closedcircuit", "SCR": "semiclosedcircuit"}.get(dctype)
+            events = []
+            for ev in divecomputer_elem.xpath("event"):
+                if ev.get("time") and ev.get("name") in ("gaschange", "modechange"):
+                    events.append((parse_time_str(ev.get("time")), ev))
+            events.sort(key=lambda pair: pair[0])
+            has_modechange = any(ev.get("name") == "modechange" for _, ev in events)
+            diluents = [c["index"] for c in cylinders if c["use"] == "diluent"]
+            breathed_cyl = (diluents[0] if diluents else 0) if cylinders else None
+            diluent_cyl = diluents[0] if loop_mode and diluents else None
+            divemode_now = loop_mode
+            event_ptr = 0
 
             # Get water temperature metadata
             water_temp_elem = divecomputer_elem.find("temperature")
@@ -221,6 +253,8 @@ class SubsurfaceParser(BaseParser):
             waypoints = []
             current_max_depth = 0.0
             last_po2 = None
+            last_setpoint = None
+            last_dc_po2 = None
             last_cells = {}
             current_active_tanks = {}
             # Tracks whether any *live* per-sample pressureN= reading was ever
@@ -266,14 +300,43 @@ class SubsurfaceParser(BaseParser):
                 if temp_val:
                     current_temp = parse_temp_str(temp_val)
 
-                # PO2
+                # Gas and circuit changes up to this sample
+                while event_ptr < len(events) and events[event_ptr][0] <= seconds:
+                    ev = events[event_ptr][1]
+                    event_ptr += 1
+                    if ev.get("name") == "modechange" and loop_mode:
+                        divemode_now = loop_mode if (ev.get("divemode") or "").upper() in ("CCR", "SCR", "PSCR") else "opencircuit"
+                        continue
+                    cyl_attr = ev.get("cylinder")
+                    if cyl_attr is not None and cyl_attr.isdigit() and int(cyl_attr) < len(cylinders):
+                        breathed_cyl = int(cyl_attr)
+                    if loop_mode and not has_modechange and breathed_cyl is not None:
+                        use = cylinders[breathed_cyl]["use"]
+                        if use == "diluent":
+                            divemode_now = loop_mode
+                        elif use != "oxygen":
+                            divemode_now = "opencircuit"
+                on_loop = divemode_now in ("closedcircuit", "semiclosedcircuit")
+                if on_loop and breathed_cyl is not None and cylinders[breathed_cyl]["use"] == "diluent":
+                    diluent_cyl = breathed_cyl
+
+                # PO2 - on the loop Subsurface's po2= is the setpoint and
+                # dc_supplied_ppo2 the computer's own reading
                 po2_val = sample.get("po2")
+                setpoint = None
                 if po2_val:
                     try:
                         last_po2 = round(float(po2_val.replace("bar", "").strip()), 2)
                     except ValueError:
                         pass
-                po2 = last_po2
+                if on_loop:
+                    if po2_val and last_po2:  # a 0.0 bar po2 (some OSTC samples) is no setpoint
+                        last_setpoint = last_po2
+                    setpoint = last_setpoint
+                    dc_po2 = _optional_float((sample.get("dc_supplied_ppo2") or "").replace("bar", "").strip())
+                    if dc_po2 is not None:
+                        last_dc_po2 = round(dc_po2, 2)
+                po2 = (last_dc_po2 if on_loop and last_dc_po2 is not None else last_po2)
 
                 # A rebreather's O2 cells (sensor1..sensor3, bar), held
                 # between the samples that log them, as Subsurface does.
@@ -329,6 +392,9 @@ class SubsurfaceParser(BaseParser):
                     tts=tts,
                     po2=po2,
                     **last_cells,
+                    divemode=divemode_now,
+                    setpoint=setpoint,
+                    **_gas_fields(cylinders, breathed_cyl if events or loop_mode else None, diluent_cyl),
                     gf=gf,
                     battery=battery,
                     time_since_start=seconds,

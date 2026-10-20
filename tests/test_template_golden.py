@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from gui.hud_renderer import draw_hud
-from test_template_sweep import bundled_pages, load_page
+from test_template_sweep import CCR_MOMENTS, bundled_pages, load_page, page_is_ccr
 from utils import units as U
 from utils.dummy_telemetry import build_dummy_dive, forced_dive, waypoint_at
 
@@ -37,9 +37,14 @@ def golden_name(brand, computer, page, variant, state, units=U.METRIC):
     return "__".join(p for p in (brand, computer, page, variant, state) if p) + suffix + ".png"
 
 
-def render_half(layout, state):
-    dive = build_dummy_dive("single_tank")
-    wp, history = forced_dive(waypoint_at(dive, 12 * 60), state)
+def render_half(layout, state, ccr=False):
+    """`state` is a forced state, or "ccr@<seconds>" for a moment of the
+    rebreather dive (CC pages)."""
+    dive = build_dummy_dive("single_tank", ccr=ccr)
+    if state.startswith("ccr@"):
+        wp, history = waypoint_at(dive, int(state[4:])), dive.waypoints
+    else:
+        wp, history = forced_dive(waypoint_at(dive, 12 * 60), state)
     frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
     draw_hud(frame, layout, wp, waypoints=history, render_log=False)
     mask = frame.max(axis=2) > 0
@@ -56,13 +61,16 @@ def _cases():
             yield (*page, state, U.METRIC)
         for state in IMPERIAL_STATES:
             yield (*page, state, U.IMPERIAL)
+        if page_is_ccr(*page[:3]):
+            for t in CCR_MOMENTS:
+                yield (*page, f"ccr@{t}", U.METRIC)
 
 
 @pytest.mark.parametrize("brand,computer,page,variant,state,units", list(_cases()), ids=lambda v: str(v))
 def test_golden_image(brand, computer, page, variant, state, units, request, tmp_path):
     layout, _ = load_page(brand, computer, page, variant)
     with U.units_override(units):
-        image = render_half(layout, state)
+        image = render_half(layout, state, ccr=page_is_ccr(brand, computer, page))
     path = GOLDEN_DIR / golden_name(brand, computer, page, variant, state, units)
     if request.config.getoption("--update-golden"):
         GOLDEN_DIR.mkdir(parents=True, exist_ok=True)

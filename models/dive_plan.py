@@ -110,9 +110,15 @@ class DiveProfilePlan(BaseModel):
     max_depth_m: Optional[float] = Field(None, gt=0, description="Planned max depth - fixes the chart's depth axis so waypoints can be placed by clicking")
     planned_runtime_sec: Optional[int] = Field(None, gt=0, description="Planned runtime - fixes the chart's time axis the same way")
     dive_type: DiveType = "oc"
-    ccr_low_setpoint: float = Field(0.7, ge=0.4, le=1.6, description="Loop PO2 shallower than ccr_setpoint_switch_depth_m")
-    ccr_high_setpoint: float = Field(1.3, ge=0.4, le=1.6, description="Loop PO2 at and below ccr_setpoint_switch_depth_m")
-    ccr_setpoint_switch_depth_m: float = Field(6.0, ge=0, description="Auto setpoint switch depth, used both ways")
+    ccr_low_setpoint: float = Field(0.7, ge=0.4, le=1.6, description="Loop PO2 from the start, and again once back above ccr_low_setpoint_depth_m")
+    ccr_high_setpoint: float = Field(1.3, ge=0.4, le=1.6, description="Loop PO2 once deeper than ccr_high_setpoint_depth_m")
+    # Auto setpoint switching as a Descent or a Shearwater does it: to the high
+    # setpoint descending through one depth, back to the low one ascending
+    # through a shallower one (Descent Mk3 manual p.14-15: at least 6.1 m
+    # apart; Petrel 3 Technical manual p.77: 6 m). Defaults as two real
+    # Descent CCR logs have them.
+    ccr_high_setpoint_depth_m: float = Field(8.0, ge=0, description="Switch to the high setpoint descending through this depth")
+    ccr_low_setpoint_depth_m: float = Field(2.0, ge=0, description="Switch back to the low setpoint ascending through this depth")
     ccr_o2_tank_size_l: float = Field(3.0, gt=0)
     ccr_o2_start_pressure_bar: float = Field(200.0, ge=0)
     sidemount_switch_bar: float = Field(30.0, gt=0, description="Sidemount: switch to the other tank of a pair once the one breathed is this far below it")
@@ -122,6 +128,29 @@ class DiveProfilePlan(BaseModel):
     computer_serial: str = Field("12345678", description="Digits only - FIT stores the serial as a number")
     gases: List[PlannedGas] = Field(default_factory=list)
     waypoints: List[PlannedWaypoint] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _current_computer_label(cls, data):
+        """A plan embedded in a log an older version wrote may name a
+        computer by its old label ("Shearwater Petrel")."""
+        if isinstance(data, dict) and isinstance(data.get("computer"), str):
+            from utils.dive_computers import computer_label
+            data = {**data, "computer": computer_label(data["computer"])}
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _two_setpoint_depths(cls, data):
+        """Plans saved with one switch depth used both ways keep it as the
+        depth of the switch to the high setpoint, the low one 6 m above."""
+        if isinstance(data, dict) and "ccr_setpoint_switch_depth_m" in data:
+            data = dict(data)
+            old = data.pop("ccr_setpoint_switch_depth_m")
+            if old is not None and "ccr_high_setpoint_depth_m" not in data:
+                data["ccr_high_setpoint_depth_m"] = old
+                data.setdefault("ccr_low_setpoint_depth_m", max(0.0, float(old) - 6.0))
+        return data
 
     @model_validator(mode="before")
     @classmethod
@@ -163,8 +192,15 @@ class DiveProfilePlan(BaseModel):
         """Breathing this gas means breathing the rebreather loop."""
         return self.is_ccr and gas.diluent
 
-    def setpoint_at(self, depth_m: float) -> float:
-        return self.ccr_high_setpoint if depth_m >= self.ccr_setpoint_switch_depth_m else self.ccr_low_setpoint
+    def next_setpoint(self, current: Optional[float], depth_m: float) -> float:
+        """The setpoint in force at `depth_m` after `current` (None at the
+        start of the dive): high once deeper than the high depth, low once
+        shallower than the low depth, otherwise unchanged."""
+        if depth_m > self.ccr_high_setpoint_depth_m:
+            return self.ccr_high_setpoint
+        if depth_m < self.ccr_low_setpoint_depth_m or current is None:
+            return self.ccr_low_setpoint
+        return current
 
     def sidemount_tanks(self) -> Optional[Tuple[PlannedGas, PlannedGas]]:
         """(left, right) of a sidemount dive; None on other dive types or

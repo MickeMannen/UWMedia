@@ -1,0 +1,144 @@
+{
+  "manufacturer": "Garmin",
+  "model": "mk3i",
+  "design_width": 1920,
+  "design_height": 1080,
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "linked_elements": [
+      {
+        "id": "label_avg_depth",
+        "field": "custom:AVG",
+        "rel_x": 0.32225,
+        "rel_y": 0.3167,
+        "color": "#FFFFFF",
+        "font_size": 26,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "avg_depth",
+        "field": "avg_depth",
+        "rel_x": 0.32225,
+        "rel_y": 0.3449,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "label_max_depth",
+        "field": "custom:MAX",
+        "rel_x": 0.69364,
+        "rel_y": 0.3167,
+        "color": "#FFFFFF",
+        "font_size": 26,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.69364,
+        "rel_y": 0.3449,
+        "color": "#FFFFFF",
+        "font_size": 66,
+        "scale": 1.0,
+        "align": "center"
+      },
+      {
+        "id": "label_gauge",
+        "field": "custom:GAUGE",
+        "rel_x": 0.23699,
+        "rel_y": 0.47939,
+        "color": "#FFFFFF",
+        "font_size": 34,
+        "scale": 1.0,
+        "align": "center",
+        "valign": "middle",
+        "font_weight": "bold"
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.37861,
+        "rel_y": 0.41649,
+        "color": "#FFFFFF",
+        "font_size": 140,
+        "scale": 1.0,
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.67,
+        "unit_suffix": true,
+        "unit_scale": 0.33,
+        "unit_dx": 4.0,
+        "unit_dy": 0.0
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "ascent_chevrons",
+        "rel_x": 0.793,
+        "rel_y": 0.428,
+        "width": 46,
+        "height": 100,
+        "up_count": 3,
+        "down_count": 1,
+        "label": "Ascent rate (manual p.23: green / yellow / red by rate)"
+      },
+      {
+        "id": "stopwatch",
+        "field": "dive_time",
+        "rel_x": 0.25723,
+        "rel_y": 0.57267,
+        "color": "#000000",
+        "font_size": 104,
+        "scale": 1.0,
+        "small_suffix": "seconds",
+        "small_suffix_scale": 0.33,
+        "label": "Stopwatch (the dive time: a log records no stopwatch reset)"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.57803,
+        "rel_y": 0.57267,
+        "color": "#FFFFFF",
+        "font_size": 104,
+        "scale": 1.0,
+        "small_suffix": "seconds",
+        "small_suffix_scale": 0.33
+      },
+      {
+        "id": "temp",
+        "field": "temp",
+        "rel_x": 0.53035,
+        "rel_y": 0.70065,
+        "color": "#FFFFFF",
+        "font_size": 58,
+        "scale": 1.0,
+        "align": "center",
+        "unit_suffix": true,
+        "unit_scale": 0.45,
+        "unit_dx": 3.0,
+        "unit_dy": 0.0
+      }
+    ],
+    "screen": {
+      "x0": 0.118,
+      "y0": 0.196,
+      "x1": 0.908,
+      "y1": 0.79,
+      "shape": "ellipse"
+    }
+  },
+  "rules": {
+    "ceiling_broken": null,
+    "_gauge": "Gauge mode computes no deco (Mk3 p.22, X50i p.17): the depth never flashes red for a ceiling"
+  }
+}

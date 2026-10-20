@@ -9,18 +9,74 @@
     {
       "id": "tec",
       "name": "Tec"
+    },
+    {
+      "id": "cc",
+      "name": "CC (setpoint)",
+      "dive": "ccr"
+    },
+    {
+      "id": "cc_cells",
+      "name": "CC (3 cells)",
+      "dive": "ccr"
+    },
+    {
+      "id": "info_ai",
+      "name": "Info: AI (T1 / GTR / SAC)"
+    },
+    {
+      "id": "info_mod",
+      "name": "Info: MOD / MAX / PPO2"
+    },
+    {
+      "id": "info_temp",
+      "name": "Info: TEMP / CONSERV / CNS"
+    },
+    {
+      "id": "info_gf",
+      "name": "Info: GF99 / SurGF / CEIL"
+    },
+    {
+      "id": "info_battery",
+      "name": "Info: BATTERY"
+    },
+    {
+      "id": "info_pressure",
+      "name": "Info: PRESSURE mBar SURF / NOW"
+    },
+    {
+      "id": "info_date",
+      "name": "Info: DATE / CLOCK"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
-      "Same rules as the Perdix 2 (Petrel 3 Recreational manual Rev C p.26-27, p.56); Tec page row rules (Technical manual Rev B p.24-25)"
+      "Same rules as the Perdix 2 (Petrel 3 Recreational manual Rev C p.26-27, p.56); Tec page row rules (Technical manual Rev B p.24-25)",
+      "CC pages: centre row with the internal setpoint between the two transmitters, or the three cell PPO2s (Technical manual Rev B p.10, p.13); CC / BO mode label, BO on a yellow box (p.14, p.37); cells yellow when out of the ±20 % vote, red below 0.4 / above 1.6 (p.57, p.67); loop PPO2 limits 0.40 / 1.60 and DilPO2 0.19 / 1.65 (p.18, p.81)",
+      "Info pages: the main screen with its bottom row replaced by one info screen - AI (T1 & GTR/SAC, and T1, T2 & GTR/SAC on a sidemount dive), MOD / MAX / PPO2, TEMP / CONSERV / CNS, GF99 / SurGF / CEIL, BATTERY, PRESSURE mBar SURF / NOW, DATE / CLOCK (Petrel 3 Rec manual Rev C p.15 (row figure), p.16-20)",
+      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Petrel 3 Rec manual Rev C p.33)"
     ],
     "assumed": [
-      "Skin geometry from the Petrel 3 figures"
+      "Skin geometry from the Petrel 3 figures",
+      "CC (setpoint) on a bailout shows the PPO2 in the setpoint's place, as the Perdix 3 does (its PDF p.87); the Petrel manual pictures BO only with cells",
+      "Transmitter labels and pressures come from the log's first and second tank (a Petrel names them D1 / O2 by the diver's setup)",
+      "Info and gauge positions measured from the manual's figures and set on the main page's skin",
+      "Gauge STOPWATCH shows the dive time: a log records no stopwatch start or reset",
+      "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)",
+      "Info pages draw the photo's info-row divider full width, as the info-screen figure shows it"
     ],
     "not_shown": [
       "Persistent notifications",
-      "Info screens"
+      "VOTING FAILED alternating with the readings (p.67)",
+      "Millivolts and stack-timer info screens (p.17, p.21)",
+      "SC/BO FiO2 cells (p.39)",
+      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / Δ+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
+      "CONSERV level name (Low / Med / High) above the GF pair, and the battery type / nominal voltage beside BATTERY: not in the logs",
+      "Gauge page: no notification row and no resettable average (deco is not tracked in gauge mode)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

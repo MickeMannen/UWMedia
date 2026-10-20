@@ -154,6 +154,17 @@ class UDDFParser(BaseParser):
                 continue
             
             tz_offset_str = dive_elem.xpath("string(*[local-name()='timezone'])")
+
+            # A tank's own mix where its tankdata links one (UWMedia's builder
+            # links each cylinder; the Shearwater app links none): by the
+            # tankdata id, and as T<n> for the n-th tankdata (the app's refs).
+            tank_mix = {}
+            for n, tankdata in enumerate(dive_elem.xpath(".//*[local-name()='tankdata']"), start=1):
+                link = tankdata.xpath("string(*[local-name()='link']/@ref)")
+                if link in gas_mixes:
+                    tank_mix.setdefault(f"T{n}", link)
+                    if tankdata.get("id"):
+                        tank_mix[tankdata.get("id")] = link
             
             waypoints = []
             current_max_depth = 0.0
@@ -161,6 +172,7 @@ class UDDFParser(BaseParser):
             last_po2 = None
             last_divemode = None
             last_setpoint = None
+            diluent_id = None
             last_cells: Dict[int, float] = {}
             refs_seen = dict(cell_of)
             
@@ -288,6 +300,12 @@ class UDDFParser(BaseParser):
                 mix_ref = sample.xpath("string(*[local-name()='switchmix']/@ref)")
                 if mix_ref:
                     active_mix_id = mix_ref
+                # A rebreather's diluent: the mix breathed on the loop, kept after a bailout
+                on_loop = divemode in ("closedcircuit", "semiclosedcircuit")
+                if on_loop and active_mix_id in gas_mixes:
+                    diluent_id = active_mix_id
+                breathed = gas_mixes.get(active_mix_id)
+                diluent = gas_mixes.get(diluent_id)
 
                 # Tank data - a sidemount/multi-tank dive reports one
                 # <tankpressure ref="T1">/<tankpressure ref="T2"> element per
@@ -296,8 +314,8 @@ class UDDFParser(BaseParser):
                 # silently dropping every tank past the first. Gas info still
                 # comes from whichever mix is currently active - UDDF doesn't
                 # link a tank ref to its own configured mix independent of
-                # that, so a stage/deco bottle with a different gas than the
-                # one being breathed won't get its own o2/he here.
+                # that unless its tankdata links one (tank_mix above); an
+                # unlinked tank shows the breathed mix.
                 tanks = {}
                 gas_info = gas_mixes.get(active_mix_id, {"o2": 21.0, "he": 0.0, "name": "AIR"})
                 for idx, elem in enumerate(sample.xpath("*[local-name()='tankpressure']"), start=1):
@@ -309,11 +327,12 @@ class UDDFParser(BaseParser):
                     if shearwater_app and (pressure_bar <= 0 or pressure_bar >= SHEARWATER_STATUS_BAR):
                         continue  # the app's "unknown" or a transmitter status, not a reading
                     key = elem.get("ref") or str(idx)
+                    own = gas_mixes.get(tank_mix.get(key)) or gas_info
                     tanks[key] = TankData(
                         pressure_bar=pressure_bar,
-                        o2_percent=gas_info["o2"],
-                        he_percent=gas_info["he"],
-                        name=gas_info["name"],
+                        o2_percent=own["o2"],
+                        he_percent=own["he"],
+                        name=own["name"],
                     )
                 
                 waypoints.append(Waypoint(
@@ -327,6 +346,11 @@ class UDDFParser(BaseParser):
                     po2=po2,
                     **cells,
                     divemode=divemode,
+                    setpoint=last_setpoint if on_loop else None,
+                    gas_o2_percent=breathed["o2"] if breathed else None,
+                    gas_he_percent=breathed["he"] if breathed else None,
+                    diluent_o2_percent=diluent["o2"] if diluent else None,
+                    diluent_he_percent=diluent["he"] if diluent else None,
                     gf=gf,
                     battery=battery,
                     time_since_start=seconds,

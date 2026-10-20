@@ -59,6 +59,17 @@ class Waypoint(BaseModel):
     cleared_gas_mix: Optional[str] = Field(
         None, description="Backup/next gas shown during a gas-switch prompt (Shearwater); distinct from the currently-breathed gasmix"
     )
+    setpoint: Optional[float] = Field(
+        None, description="A rebreather's setpoint in force (bar) while on the loop; None on open circuit or bailout"
+    )
+    gas_o2_percent: Optional[float] = Field(
+        None, description="O2 % of the gas breathed (the diluent on the loop, the bailout gas on open circuit), apart from the tanks; None = the first tank's mix"
+    )
+    gas_he_percent: Optional[float] = Field(None, description="He % of the gas breathed (see gas_o2_percent)")
+    diluent_o2_percent: Optional[float] = Field(
+        None, description="A rebreather dive's diluent O2 %, kept after a bailout (DilPO2 still shows it)"
+    )
+    diluent_he_percent: Optional[float] = Field(None, description="A rebreather dive's diluent He %")
     po2_1: Optional[float] = Field(None, description="CCR cell 1 partial pressure of oxygen (bar) - distinct from the single OC po2 reading")
     po2_2: Optional[float] = Field(None, description="CCR cell 2 partial pressure of oxygen (bar)")
     po2_3: Optional[float] = Field(None, description="CCR cell 3 partial pressure of oxygen (bar)")
@@ -110,17 +121,41 @@ class Waypoint(BaseModel):
         return second_tank.name or key
 
     @property
+    def circuit(self) -> Optional[str]:
+        """The circuit label a dive computer shows: "CC" on the loop, "SC"
+        semi-closed, "BO" on open circuit during a rebreather dive (bailout),
+        otherwise "OC" - also when the log names no mode (a Tec screen's
+        mode label reads OC then)."""
+        mode = (self.divemode or "").lower()
+        if mode in ("closedcircuit", "cc", "ccr"):
+            return "CC"
+        if mode in ("semiclosedcircuit", "sc", "scr"):
+            return "SC"
+        return "BO" if self._dive is not None and self._dive.is_ccr else "OC"
+
+    @property
+    def diluent_po2(self) -> Optional[float]:
+        """PO2 of the diluent at this depth (DilPO2), on a rebreather dive."""
+        if self.diluent_o2_percent is None:
+            return None
+        return round((1.0 + (self.depth or 0.0) / 10.0) * self.diluent_o2_percent / 100.0, 2)
+
+    @property
     def gasmix(self) -> str:
-        """Returns the gas mix string for the primary tank."""
-        if not self.tanks:
+        """The gas breathed: gas_o2/he_percent where the log names it (a
+        rebreather's diluent, a bailout gas), else the first tank's mix."""
+        if self.gas_o2_percent is not None:
+            o2 = round(self.gas_o2_percent)
+            he = round(self.gas_he_percent or 0.0)
+        elif not self.tanks:
             return "N/A"
-        
-        first_tank = next(iter(self.tanks.values()))
-        o2 = round(first_tank.o2_percent)
-        he = round(first_tank.he_percent)
-        
+        else:
+            first_tank = next(iter(self.tanks.values()))
+            o2 = round(first_tank.o2_percent)
+            he = round(first_tank.he_percent)
+
         if he != 0:
-            return f"{he:02d}/{o2:02d}"
+            return f"{o2:02d}/{he:02d}"  # O2 first, as both brands show a trimix (Petrel 3 Tech p.10 "18/45")
         elif o2 >= 22:
             return f"Nx{o2:02d}"
         elif o2 == 21:
@@ -156,6 +191,15 @@ class Dive(BaseModel):
         """Set back-reference to parent dive on all waypoints."""
         for wp in self.waypoints:
             wp._dive = self
+
+    @property
+    def is_ccr(self) -> bool:
+        """A rebreather dive: some waypoint is on the loop."""
+        cached = getattr(self, "_is_ccr", None)
+        if cached is None or cached[0] != len(self.waypoints):
+            value = any(wp.divemode in ("closedcircuit", "semiclosedcircuit") for wp in self.waypoints)
+            self._is_ccr = cached = (len(self.waypoints), value)
+        return cached[1]
 
     @property
     def max_depth(self) -> float:

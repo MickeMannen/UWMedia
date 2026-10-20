@@ -13,19 +13,76 @@
     {
       "id": "tec",
       "name": "Tec"
+    },
+    {
+      "id": "cc",
+      "name": "CC (setpoint)",
+      "dive": "ccr"
+    },
+    {
+      "id": "info_ai",
+      "name": "Info: AI"
+    },
+    {
+      "id": "info_max_avg",
+      "name": "Info: MAX / AVG"
+    },
+    {
+      "id": "info_mod",
+      "name": "Info: CNS / MOD / PPO2"
+    },
+    {
+      "id": "info_mod_cc",
+      "name": "Info: CNS / MOD / DilPO2",
+      "dive": "ccr"
+    },
+    {
+      "id": "info_gf",
+      "name": "Info: GF / GF99 / TTS"
+    },
+    {
+      "id": "info_temp_battery",
+      "name": "Info: TEMP / BATTERY"
+    },
+    {
+      "id": "info_pressure",
+      "name": "Info: PRESSURE"
+    },
+    {
+      "id": "info_date_clock",
+      "name": "Info: DATE / CLOCK"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
       "SAFETY boxed title, PAUSED, SAFETY / CLEAR; DECO blue label over depth and minutes (manual Rev B p.58-60)",
-      "Tank rules (p.154)"
+      "Tank rules (p.154)",
+      "CC page: the Tec layout with SP in the centre slot, green high / magenta low, PPO2 there on a bailout; CC green / BO yellow badges (Rev B PDF p.42, p.85, p.87); loop PPO2 limits 0.40 / 1.60 (PDF p.41)",
+      "Info pages: one page per info screen, in the manual order, each replacing the bottom row of the main page (Rev B PDF p.37 figure)",
+      "Info: AI - T1 pressure, GTR, SAC, grey T1 tags (PDF p.37, p.38 T1 & GTR/SAC)",
+      "Info: MAX / AVG (PDF p.37, p.40)",
+      "Info: CNS / MOD / PPO2, PPO2 as .21 (PDF p.37, p.41-42); CC page Info: CNS / MOD / DilPO2 (PDF p.37, p.41)",
+      "Info: GF / GF99 / TTS - GF setting 50/85, GF99 with %, TTS in minutes (PDF p.37, p.43-44)",
+      "Info: TEMP / BATTERY (PDF p.37, p.40, p.46); Info: PRESSURE mBar SURF / NOW (PDF p.37, p.46-47); Info: DATE / CLOCK (PDF p.37, p.46)",
+      "Gauge page: Standard / Big layout - depth, time, STOPWATCH (green while running) top right, CLOCK, GA badge, MAX / AVG bottom row, no NDL and no tissue bar (PDF p.88-89)"
     ],
     "assumed": [
-      "Margins, padding and font sizes of all three pages were approximated from the figures, not measured on a device photo"
+      "Margins, padding and font sizes of all three pages were approximated from the figures, not measured on a device photo",
+      "Info pages: title and value sizes match the main page bottom row, column positions approximated from the PDF p.37 figure",
+      "Info: TEMP shows one decimal in metric (the figure shows whole degrees), battery as a percent from the log",
+      "Info: PRESSURE - surface 1013 mbar and now from depth (salt water), not the logged barometer",
+      "Gauge: STOPWATCH shows the dive time - a log records no stopwatch start or reset; the stopwatch title is always green (running)",
+      "Gauge: the TIME label is kept from the main page skin; the figure shows no temperature, so none is drawn"
     ],
     "not_shown": [
       "Persistent notifications",
-      "Info screens"
+      "Info screens LAST DIVE (surface only), Compass (no heading in the logs) and TISSUES (no tissue-graph element) (PDF p.37-39, p.48-49)",
+      "Info: AI battery icons and multi-transmitter (T2-T4) variants (PDF p.38)",
+      "Gauge: the Tec-layout gauge screen, RATE, resettable average depth, stopwatch stopped (red) state (PDF p.88-89)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

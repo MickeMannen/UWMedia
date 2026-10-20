@@ -20,7 +20,8 @@ def _dive(samples):
 def test_shearwater_notice_table_is_in_priority_order_and_sourced():
     rules = notice_rules("Shearwater", "Perdix 2")
     ids = [r["id"] for r in rules]
-    assert ids[:4] == ["low_ppo2", "high_ppo2", "missed_stop", "fast_ascent"]
+    # each PPO2 limit twice: open circuit (OC Min / Deco) and on the loop (CC Min / Max)
+    assert ids[:6] == ["low_ppo2", "low_ppo2_cc", "high_ppo2", "high_ppo2_cc", "missed_stop", "fast_ascent"]
     assert "time_alert" not in ids  # off by default on the device (manual p.24)
     assert all(r.get("_source") for r in rules)
     style = notice_style("Shearwater", "Perdix 2")

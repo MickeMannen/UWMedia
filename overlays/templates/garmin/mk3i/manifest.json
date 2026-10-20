@@ -7,23 +7,56 @@
       "name": "Main Screen"
     },
     {
+      "id": "cc",
+      "name": "CCR (Big Numbers)",
+      "dive": "ccr"
+    },
+    {
+      "id": "standard",
+      "name": "Standard"
+    },
+    {
+      "id": "standard_cc",
+      "name": "CCR (standard)",
+      "dive": "ccr"
+    },
+    {
+      "id": "transceiver",
+      "name": "Transceiver"
+    },
+    {
       "id": "gases",
       "name": "Gases"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
       "Big Numbers layout against real screenshots (test_data/dive_computers/garmin_mk3i)",
-      "Colours and stop rules (manual p.7-8, p.10, p.13-14)"
+      "Colours and stop rules (manual p.7-8, p.10, p.13-14)",
+      "CCR (Big Numbers) page: CC in an outlined box under the gas, OC after a bailout, PO2 at the bottom (manual p.21, p.24); 'Switched to high / low setpoint.' from the log's alerts (p.34-35)",
+      "Standard page: PO2 and gas, the transmitters, NDL / DEPTH, dive time (manual p.21 figure); CCR (standard): the same with CC / OC above (p.21)",
+      "Transceiver page: PSAC / ATR, the transmitters, NDL / DEPTH, dive time (p.26-27 figure)",
+      "Gauge page: AVG / MAX, the blue GAUGE box by the depth, ascent chevrons, the stopwatch in a white box beside the dive time, the temperature at the bottom (manual p.22 figure)",
+      "Gauge page: no deco colours (layout rules switch ceiling_broken off - a gauge-mode computer computes no deco)"
     ],
     "assumed": [
       "NDL colour bands",
-      "Reserve and critical pressure defaults"
+      "Reserve and critical pressure defaults",
+      "Gases page: the same fields as the X50i's (CURRENT GAS, GAS PO2, SURF. GF, GF99, CNS), laid out for the round screen - a configured page, not pictured in the manual",
+      "Standard and transceiver pages: positions measured from the manual's figures, not a device photo",
+      "Gauge page: the stopwatch shows the dive time (a log records no stopwatch start or reset)",
+      "Gauge page: positions measured from the manual's figure, not a device photo; the temperature with its unit (the figure shows only °)"
     ],
     "not_shown": [
-      "Standard layout",
       "Alert messages (full-screen on the watch; no notice element on this page)",
-      "Gauges (arcs)"
+      "Gauges (arcs)",
+      "Red dividing lines on a bailout (p.28): the Big Numbers screen has none",
+      "Tissue-load and ascent-rate arcs on the standard and transceiver pages (no arc element yet)",
+      "Gauge page: the compass tape and heading at the top (no log holds a heading)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

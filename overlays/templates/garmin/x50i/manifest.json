@@ -9,23 +9,49 @@
     {
       "id": "gases",
       "name": "Gases"
+    },
+    {
+      "id": "cc",
+      "name": "CCR",
+      "dive": "ccr"
+    },
+    {
+      "id": "dynamic_depth",
+      "name": "Dynamic depth"
+    },
+    {
+      "id": "dynamic_depth_cc",
+      "name": "Dynamic depth (CCR)",
+      "dive": "ccr"
+    },
+    {
+      "id": "gauge",
+      "name": "Gauge"
     }
   ],
   "notes": {
     "verified": [
       "Tissue, ascent, CNS and OTU colours (manual p.7, p.10)",
       "Safety stop and deco stop boxes in the NDL corner, the tissue bar hidden meanwhile; alert box top right (real screenshots in test_data/dive_computers/garmin_x50i)",
-      "Alert texts (p.12-13), driven by the FIT log's own events"
+      "Alert texts (p.12-13), driven by the FIT log's own events",
+      "CCR page: CC DIL over the diluent, SP with the setpoint in force, DILUENT PO2 field (manual p.16, p.21); the bailout gas name red (p.20); 'Switched to high / low setpoint.' alerts from the log (p.25-26); DilPO2 flashing yellow below 0.18 (p.25)",
+      "Dynamic depth page: the profile so far with the ceiling, MAX and TTS below, the left column as on the main page (manual p.21)",
+      "Gauge page: the white Stopwatch box in the NDL corner, the blue Gauge box with TEMP. in place of the gas, MAX. DEPTH, TIME OF DAY and BATTERY on the right (manual p.17 figure); MIN. TEMP the coldest water so far",
+      "Gauge page: no deco colours (layout rules switch ceiling_broken off - a gauge-mode computer computes no deco)"
     ],
     "assumed": [
       "NDL colour bands (the manual only has alerts at 10 and 5 min)",
       "Reserve and critical pressure defaults (50 / 25 bar)",
-      "Alert box colours (screenshots are in night mode)"
+      "Alert box colours (screenshots are in night mode)",
+      "CCR page on a bailout: the label reads OC and SP becomes PO2 (not pictured)",
+      "Gauge page: the stopwatch shows the dive time (a log records no stopwatch start or reset)",
+      "Gauge page: positions measured from the manual's figure, not a device photo"
     ],
     "not_shown": [
-      "Dynamic depth page",
       "Transceiver page",
-      "Compass"
+      "Compass",
+      "Dynamic depth page: the @+5 / Δ+5 (NDL Δ3M) / STOPS row and the planned ascent with its gas and setpoint switches (what-if values the logs do not hold)",
+      "Gauge page: the compass and heading (top right; no log holds a heading)"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }
