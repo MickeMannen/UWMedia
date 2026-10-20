@@ -2,7 +2,7 @@
 
 Small test media that live in git. They are used by the render tests in
 place of the private full-size originals in `test_data/` (see
-`testing_plan.md`, "Fixture layout").
+`docs/history/testing_plan.md`, "Fixture layout").
 
 Rules (`CONTRIBUTING.md`):
 - Every file is reviewed by the owner, picture and metadata, before it is

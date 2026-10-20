@@ -22,7 +22,7 @@ signing stay on GitHub (`build.yml`).
 - `gitea_setup.md`: Linux runner as a TrueNAS Docker app, Windows runner as
   a TrueNAS VM, workflow sketch, setup steps, and the note that Gitea was
   unreachable on several days in early October.
-- `testing_plan.md` Phase 5 has the open item "Windows and macOS runners".
+- `roadmap.md` §6 carries the open item for the runners (it came from the test-suite review in `docs/history/testing_plan.md`).
 
 ## 3. Constraints that shape the design
 
@@ -126,7 +126,7 @@ GitHub workflow alone):
 | 5 | Tart base image and the ephemeral-clone loop on the Mac, replacing the host-mode runner (which stays registered as a fallback label) | half a day | two pushes in a row each run in a fresh clone |
 | 6 | Later: Briefcase build jobs on the Windows and Linux runners to smoke-test installers on a clean VM (unsigned; signing stays on GitHub) | 1 day | the nightly run leaves a `.msi` and a `.deb` as artifacts |
 
-Tick "Windows and macOS runners" in `testing_plan.md` after phase 3.
+Tick the runner item in `roadmap.md` after phase 3.
 
 ## 7. Risks
 

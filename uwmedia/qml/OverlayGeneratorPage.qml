@@ -239,6 +239,30 @@ ScrollView {
 
                     RowLayout {
                         Layout.fillWidth: true
+                        spacing: 12
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            // 2026-10-17, per the user: a transparent movie by
+                            // default instead of video on black. See
+                            // OUTPUT_FORMAT_CHOICES.
+                            Label { text: "Output format" }
+                            ComboBox {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 34
+                                font.pixelSize: 15
+                                model: overlayGeneratorBackend.outputFormatList
+                                currentIndex: overlayGeneratorBackend.outputFormatIndex
+                                onActivated: (index) => overlayGeneratorBackend.outputFormat = model[index]
+                                ToolTip.text: "Transparent ProRes 4444 drops onto the footage in any editor with nothing to key out. PNG sequence writes one frame per file into a folder. Video on black is the old output: key out the black."
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 400
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
                         Label { text: "Skip if target exists"; color: overlayGeneratorBackend.logFileMode ? "#9AA0A6" : Material.foreground }
                         Switch {
                             enabled: !overlayGeneratorBackend.logFileMode

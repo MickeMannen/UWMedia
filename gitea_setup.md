@@ -69,7 +69,7 @@ Start from `.github/workflows/tests.yml` and change:
    `test_data` share; set the VM to autostart.
 5. Add `.gitea/workflows/tests.yml` (see above), push a branch to `gitea`
    and check that both jobs run.
-6. Tick off "Windows and macOS runners" in `testing_plan.md` once results
+6. Tick off the runner phases in `roadmap.md` once results
    are in.
 
 ## Before starting

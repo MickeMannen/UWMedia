@@ -27,8 +27,9 @@ Follow `CONTRIBUTING.md`:
 - Always pass `tests/run_tests.sh` a choice (1-5) when there is no
   terminal.
 - Report failures as they are. Don't skip or weaken tests to make them pass.
-- `testing_plan.md` is the working doc for the test suite. Tick items off
-  there as they are done.
+- `roadmap.md` is the one list of future work, tests included. Tick items
+  off there as they land; the test-suite review that shaped the suite is
+  kept in `docs/history/testing_plan.md`.
 
 ## Changelog
 User-facing changes get a bullet under `## [Unreleased]` in `CHANGELOG.md`.

@@ -127,6 +127,95 @@ ScrollView {
                         }
                         Label { text: colorBackend.scrubTimeText }
                     }
+
+                    // Clock offset (2026-10-17): the camera's clock against the
+                    // dive computer's, set while watching the overlay on the
+                    // preview. Seconds by nudging or by typing the dive time the
+                    // computer shows in this frame; whole hours for a camera
+                    // left on home time. The run matches every file with it.
+                    RowLayout {
+                        Layout.preferredWidth: root.previewWidth
+                        spacing: 4
+                        enabled: colorBackend.canSync
+                        Label { text: "Clock offset" }
+                        Item { Layout.fillWidth: true }
+                        Repeater {
+                            model: [[-60, "-1m"], [-10, "-10s"], [-1, "-1s"], [1, "+1s"], [10, "+10s"], [60, "+1m"]]
+                            Button {
+                                text: modelData[1]
+                                flat: true
+                                leftPadding: 2
+                                rightPadding: 2
+                                font.pixelSize: 13
+                                Layout.preferredWidth: 46
+                                Layout.preferredHeight: 30
+                                onClicked: colorBackend.nudgeOffset(modelData[0])
+                                ToolTip.text: "Move the overlay against the footage until its depth follows the scene"
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 400
+                            }
+                        }
+                        Label { Layout.preferredWidth: 72; horizontalAlignment: Text.AlignRight; text: colorBackend.offsetSecondsText }
+                        Button {
+                            text: "0"
+                            flat: true
+                            leftPadding: 2
+                            rightPadding: 2
+                            font.pixelSize: 13
+                            Layout.preferredWidth: 30
+                            Layout.preferredHeight: 30
+                            onClicked: colorBackend.resetOffset()
+                            ToolTip.text: "Back to no correction"
+                            ToolTip.visible: hovered
+                            ToolTip.delay: 400
+                        }
+                    }
+                    RowLayout {
+                        Layout.preferredWidth: root.previewWidth
+                        spacing: 6
+                        enabled: colorBackend.canSync
+                        Label { text: "Computer shows" }
+                        TextField {
+                            id: diveTimeField
+                            Layout.preferredWidth: 80
+                            Layout.preferredHeight: 34
+                            placeholderText: "mm:ss"
+                            onAccepted: colorBackend.syncToDiveTime(text)
+                        }
+                        Button {
+                            text: "Set"
+                            enabled: diveTimeField.text.length > 0
+                            Layout.preferredHeight: 34
+                            onClicked: colorBackend.syncToDiveTime(diveTimeField.text)
+                            ToolTip.text: "Scrub to a frame where the dive computer is readable, type the dive time it shows, and this frame becomes that moment of the dive"
+                            ToolTip.visible: hovered
+                            ToolTip.delay: 400
+                        }
+                        Item { Layout.fillWidth: true }
+                        Label { text: "Hours" }
+                        SpinBox {
+                            Layout.preferredWidth: 110
+                            Layout.preferredHeight: 34
+                            from: -12
+                            to: 14
+                            value: colorBackend.offsetHours
+                            editable: false
+                            textFromValue: function(value, locale) { return (value > 0 ? "+" : "") + value + " h" }
+                            valueFromText: function(text, locale) { return parseInt(text) || 0 }
+                            onValueModified: colorBackend.offsetHours = value
+                            ToolTip.text: "Whole hours, for a camera left on home time"
+                            ToolTip.visible: hovered
+                            ToolTip.delay: 400
+                        }
+                    }
+                    Label {
+                        Layout.preferredWidth: root.previewWidth
+                        visible: text.length > 0
+                        text: colorBackend.offsetText
+                        color: "#9AA0A6"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
 

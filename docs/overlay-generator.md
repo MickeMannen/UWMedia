@@ -30,10 +30,23 @@ in your video editor.
    upscaled); **Full frame** renders the whole 1920×1080 or 3840×2160 frame
    with the overlay where the template places it, so it drops onto the
    footage with nothing to position - key out the black in your editor.
-5. **Skip if target exists** skips files already rendered, so an interrupted
+5. **Output format** - **Transparent video (ProRes 4444 .mov)**, the
+   default: the overlay on a transparent background that drops onto the
+   footage in any editor with nothing to key out. **PNG sequence** writes
+   one frame per file, with alpha, into a folder named like the video would
+   have been. **Video on black (HEVC .mp4)** is the old output; key out the
+   black in your editor.
+6. **Skip if target exists** skips files already rendered, so an interrupted
    batch can be resumed.
-6. **Hardware acceleration** uses the GPU encoder where available.
-7. Press **▶ Start** (**■ Abort** stops it).
+7. **Hardware acceleration** uses the GPU encoder where available (the
+   HEVC output; ProRes and PNG are encoded in software).
+8. Press **▶ Start** (**■ Abort** stops it).
+
+Files are matched to the log by the time the camera wrote. If the camera's
+clock is a little off, so that the overlay runs ahead of or behind the
+footage, slide the overlay clip against the footage in your editor; a camera
+left on home time is matched with the same offset the Color page uses only
+there.
 
 Only one batch job (Color, Overlay Generator or Convertion) can run at a time.
 
@@ -61,8 +74,9 @@ For a dive with no video, for example one saved by the
 **Dive logs** to **Log file (render without video)**, pick the log in that
 same field and press **▶ Start**. Every selected overlay is rendered for
 the whole dive, start to end at 30 frames per second, into the output
-folder as `<log name>_<overlay>.mp4` (an existing file is never
-overwritten; a numbered copy is written instead). **Source**, **Output
+folder as `<log name>_<overlay>.mov` (or `.mp4` / a folder, per **Output
+format**; an existing file is never overwritten, a numbered copy is written
+instead). **Source**, **Output
 filename** and **Skip if target exists** are greyed out because this mode
 does not use them; **Overlay size** applies as usual. The switch and both
 paths are remembered, so flipping back to **Log directory** brings back the

@@ -30,6 +30,32 @@ ApplicationWindow {
     Material.primary: "#00A6ED"
     Material.background: "#1F1F1F"
 
+    // Tooltips (2026-10-17): the Material style draws its tooltip as a
+    // dark grey box at 90 % opacity, forced to the dark theme, so on this
+    // dark page it hardly stood out from the panes. Every `ToolTip.text`
+    // in the app goes through one shared tooltip, so it is restyled once
+    // here: a light box with dark text, the way Material does it on a
+    // dark surface.
+    Component {
+        id: tooltipBackground
+        Rectangle {
+            color: "#ECECEC"
+            radius: 4
+            border.color: "#B0B0B0"
+            border.width: 1
+        }
+    }
+    Item {
+        // The attached ToolTip needs an Item; the window itself is not one.
+        id: tooltipStyler
+        Component.onCompleted: {
+            const tip = tooltipStyler.ToolTip.toolTip
+            tip.background = tooltipBackground.createObject(tooltipStyler)  // an Item parent for now; the tooltip takes it over
+            tip.Material.foreground = "#1A1A1A"  // the tooltip's text follows it
+            tip.font.pixelSize = 13
+        }
+    }
+
     // Matches this app's own former PAGES order exactly (itself
     // matching the original Toga app's SECTIONS order, back when
     // this was uwmedia_qt_beta - see qml_development.md).

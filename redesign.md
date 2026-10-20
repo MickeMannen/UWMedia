@@ -1,6 +1,6 @@
 # Processing redesign: from CLI subprocess to a dedicated worker
 
-Status: **draft 2** (2026-10-16). Draft 1 (2026-10-03) gave the findings and a recommendation. Draft 2 records the owner's decisions and narrows the plan to them. No code has changed. Items marked "to verify" have not been checked yet.
+Status: **draft 2** (2026-10-16). Draft 1 (2026-10-03) gave the findings and a recommendation. Draft 2 records the owner's decisions and narrows the plan to them. The open items are also listed in `roadmap.md` §1. No code has changed. Items marked "to verify" have not been checked yet.
 
 ## 0. Decisions (owner, 2026-10-16)
 

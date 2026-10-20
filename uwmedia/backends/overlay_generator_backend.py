@@ -34,6 +34,7 @@ from PySide6.QtCore import Property, QObject, QProcess, Signal, Slot
 
 from parsers.registry import LOG_FILE_FILTER
 from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
+from ffmpeg.overlay_output import HEVC, PNG, PRORES
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
 from utils.progress_lines import LineBuffer, finished_text
@@ -75,6 +76,17 @@ LEGACY_RENDER_LOG_FORMAT_LABELS = {
 # design frame (what every render was until now), 4K twice that so it drops
 # onto 4K footage 1:1; "Full frame" renders the whole frame with the overlay
 # where the layout anchors it, so there is nothing to position in the editor.
+# "Output format" (2026-10-17, per the user): label -> --overlay-format.
+# A transparent ProRes 4444 movie is the default - it drops onto the
+# footage in any editor with nothing to key out; the PNG sequence is for
+# editors that want frames; the HEVC on black is what every render was
+# before.
+OUTPUT_FORMAT_CHOICES = [
+    ("Transparent video (ProRes 4444 .mov)", PRORES),
+    ("PNG sequence (folder of frames with alpha)", PNG),
+    ("Video on black (HEVC .mp4)", HEVC),
+]
+OUTPUT_FORMAT_DEFAULT = OUTPUT_FORMAT_CHOICES[0][0]
 OVERLAY_SIZE_CHOICES = [
     ("1080p (template size)", "1080p", False),
     ("4K (2×)", "4k", False),
@@ -128,6 +140,7 @@ class OverlayGeneratorBackend(QObject):
         self._filename_format_by_label = dict(RENDER_LOG_FORMAT_PRESETS)
         self._filename_format = RENDER_LOG_FORMAT_DEFAULT
         self._overlay_size = OVERLAY_SIZE_DEFAULT
+        self._output_format = OUTPUT_FORMAT_DEFAULT
 
         self.process = None
         self._line_buffer = LineBuffer()
@@ -173,6 +186,9 @@ class OverlayGeneratorBackend(QObject):
         size_label = fields.get("hudpage_overlay_size")
         if size_label in {label for label, _, _ in OVERLAY_SIZE_CHOICES}:
             self._overlay_size = size_label
+        fmt_label = fields.get("hudpage_output_format")
+        if fmt_label in {label for label, _ in OUTPUT_FORMAT_CHOICES}:
+            self._output_format = fmt_label
 
     @Property(str, notify=fieldsChanged)
     def sourceText(self):
@@ -217,6 +233,30 @@ class OverlayGeneratorBackend(QObject):
     @Property(int, notify=fieldsChanged)
     def overlaySizeIndex(self):
         return self.overlaySizeList.index(self._overlay_size)
+
+    @Property(list, constant=True)
+    def outputFormatList(self):
+        return [label for label, _ in OUTPUT_FORMAT_CHOICES]
+
+    @Property(str, notify=fieldsChanged)
+    def outputFormat(self):
+        return self._output_format
+
+    @outputFormat.setter
+    def outputFormat(self, value):
+        if value == self._output_format or value not in self.outputFormatList:
+            return
+        self._output_format = value
+        set_field("hudpage_output_format", value)
+        self.fieldsChanged.emit()
+
+    @Property(int, notify=fieldsChanged)
+    def outputFormatIndex(self):
+        return self.outputFormatList.index(self._output_format)
+
+    def _output_format_args(self):
+        fmt = next(f for label, f in OUTPUT_FORMAT_CHOICES if label == self._output_format)
+        return ["--overlay-format", fmt]
 
     def _overlay_size_args(self):
         """CLI arguments for the chosen Overlay size (both render modes)."""
@@ -637,6 +677,7 @@ class OverlayGeneratorBackend(QObject):
         pattern = self._filename_format_by_label.get(self._filename_format)
         if pattern:
             args += ["--render-log-filename-format", pattern]
+        args += self._output_format_args()
         args += self._overlay_size_args()
         if self._hw_accel:
             args.append("--hw-accel")
@@ -647,6 +688,7 @@ class OverlayGeneratorBackend(QObject):
         `<output> --render-log <log> --layout <layout>` (the CLI names the
         file <log stem>_<layout>.mp4 and never overwrites)."""
         args = [self._output_text.strip(), "--render-log", self._log_file_text.strip(), "--layout", str(layout_path)]
+        args += self._output_format_args()
         args += self._overlay_size_args()
         if self._hw_accel:
             args.append("--hw-accel")

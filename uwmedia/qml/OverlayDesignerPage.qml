@@ -379,7 +379,8 @@ Item {
                     Button {
                         // Play / pause: the slider runs at 10x so a moment in a
                         // long log is found by watching, not by dragging.
-                        text: overlayDesignerBackend.playing ? "\u275A\u275A" : "\u25B6"
+                        // "■" and "▶" are in every default UI font; the heavy-bar pause glyph was not (it rendered blank)
+                        text: overlayDesignerBackend.playing ? "\u25A0" : "\u25B6"
                         flat: true
                         Layout.preferredHeight: 34
                         Layout.preferredWidth: 34

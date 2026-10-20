@@ -6,6 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- Color: a **Clock offset** under the preview lines the camera's clock up
+  with the dive computer's - scrub to a frame where the computer is
+  readable, type the dive time it shows, and the overlay lands on that
+  moment; nudge by seconds when the computer is not in view, whole hours for
+  a camera left on home time. The preview follows, and every file in the run
+  is matched with the offset while keeping its own time.
+- Overlay Generator: an **Output format** choice - a transparent ProRes 4444
+  movie (the new default) that drops onto the footage in any editor, a PNG
+  sequence with alpha, or the video on black as before. Rendering from a
+  photo with a transparent format gives a transparent PNG.
 - Overlays: rebreather (CCR) pages for the Shearwater Petrel (setpoint or
   three O2 cells), Perdix 3, Perdix 2 and Teric, and the Garmin Descent X50i
   and Mk3i. They show the setpoint in force, the cells (yellow when one
@@ -70,6 +80,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Descent does, not the Shearwater's "wait".
 - Shearwater Tec pages in feet: the STOP column showed the stop depth in
   metres ("6" for a 20 ft stop); it now shows feet.
+- All pages: tooltips were a dark grey box on the dark page and hardly stood
+  out; they are now a light box with dark text.
+- Overlay Designer: the Play button's pause icon was invisible.
 
 ## [0.7.17] - 2026-10-16
 

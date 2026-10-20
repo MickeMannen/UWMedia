@@ -286,8 +286,21 @@ def test_hud_arguments_follow_the_form(gen, tmp_path):
     assert gen._build_hud_args(layout) == [
         str(tmp_path / "media"), str(tmp_path / "out"), "--logs", str(tmp_path / "logs"),
         "--layout", str(layout), "--render-video-log", "--no-overwrite",
-        "--render-log-filename-format", "{filename}_{hud}", "--overlay-size", "4k", "--hw-accel",
+        "--render-log-filename-format", "{filename}_{hud}", "--overlay-format", "prores",
+        "--overlay-size", "4k", "--hw-accel",
     ]
+
+
+def test_output_format_reaches_the_cli(gen, tmp_path):
+    """Output format: transparent ProRes by default, PNG sequence or HEVC on
+    black by choice. Files are matched by their own time: no --media-shift."""
+    assert gen.outputFormatIndex == 0 and "ProRes" in gen.outputFormat
+    gen.outputFormat = gen.outputFormatList[1]
+    args = gen._build_log_args(tmp_path / "hud.json")
+    assert args[args.index("--overlay-format") + 1] == "png"
+    gen.outputFormat = gen.outputFormatList[2]
+    assert "hevc" in gen._build_hud_args(tmp_path / "hud.json")
+    assert "--media-shift" not in gen._build_hud_args(tmp_path / "hud.json")
 
 
 def test_packaged_app_runs_itself_without_python_m(gen, monkeypatch, tmp_path):

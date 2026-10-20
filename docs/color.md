@@ -23,8 +23,19 @@ with optional telemetry overlays burned in.
    made lower-case, e.g. `DSC06641.JPG` → `DSC06641.jpg`), **Original +
    color** adds `_color` to it (`DSC06641_color.jpg`), or name files by the
    date + time taken (`20260905_143000`) or date + time + `_color`.
-5. **Hardware acceleration** uses the GPU encoder where available.
-6. Press **▶ Start** (it becomes **■ Abort** while running). Progress is
+5. **Clock offset**, under the preview - if the overlay runs ahead of or
+   behind the footage, the camera's clock is off against the dive
+   computer's. Scrub to a frame where the computer is readable, type the
+   dive time it shows into **Computer shows** (`12:34`) and press **Set**:
+   that frame becomes that moment of the dive. Without the computer in view,
+   nudge with the **-1m … +1m** buttons until the overlay's depth follows the
+   scene; **0** clears it. **Hours** is for a camera left on home time. The
+   preview follows every change, and every file in the run is matched with
+   the offset (the files' own times are written to the output unchanged).
+   The offset is remembered, so the next run from the same camera starts
+   from it.
+6. **Hardware acceleration** uses the GPU encoder where available.
+7. Press **▶ Start** (it becomes **■ Abort** while running). Progress is
    shown for the current file and overall, with the time spent and, once a
    few percent are done, an estimate of the time left. The line stays after
    the run ("Finished in 13:41").

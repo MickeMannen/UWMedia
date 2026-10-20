@@ -59,6 +59,7 @@ from models.dive import Waypoint
 from models.manager import DiveManager
 from parsers.registry import parse_log_file
 from utils.app_settings import dialog_dir, get_fields, remember_dialog_dir, set_field
+from utils.clock_offset import format_offset, parse_dive_time
 from utils.color_profiles import load_merged_color_profiles
 from utils.display_paths import contract_home_path
 from utils.resource_paths import app_temp_dir
@@ -166,6 +167,7 @@ class ColorBackend(QObject):
     hwAccelChanged = Signal()
     colorProfileChanged = Signal()
     filenameFormatChanged = Signal()
+    clockOffsetChanged = Signal()
     scrubChanged = Signal()
     previewChanged = Signal()
     overlaysChanged = Signal()
@@ -216,6 +218,11 @@ class ColorBackend(QObject):
         self._logs_text = ""
         self._color_checked = True
         self._hw_accel = True
+        # Clock offset (2026-10-17): the camera's clock against the dive
+        # computer's, whole hours + seconds, set on the preview and sent to
+        # the run as --media-shift (utils/clock_offset.py).
+        self._offset_hours = 0
+        self._offset_seconds = 0.0
         self._color_profiles = _load_color_profiles()
         self._color_profile = self._color_profiles[0]
         self._filename_format_by_label = _filename_format_choices()
@@ -254,6 +261,11 @@ class ColorBackend(QObject):
         profile = fields.get("color_profile")
         if profile and profile in self._color_profiles:
             self._color_profile = profile
+        try:
+            self._offset_hours = int(fields.get("color_offset_hours") or 0)
+            self._offset_seconds = float(fields.get("color_offset_seconds") or 0.0)
+        except (TypeError, ValueError):
+            self._offset_hours, self._offset_seconds = 0, 0.0
         fmt_label = fields.get("filename_format_select")
         fmt_label = LEGACY_PRESET_LABELS.get(fmt_label, fmt_label)
         if fmt_label and fmt_label in self._filename_format_by_label:
@@ -501,10 +513,18 @@ class ColorBackend(QObject):
         self._match_dive_to_media()
         self._redraw_preview()
 
+    def _media_shift_seconds(self):
+        """The clock offset in force: hours + seconds (test doubles skip __init__)."""
+        return getattr(self, "_offset_hours", 0) * 3600.0 + getattr(self, "_offset_seconds", 0.0)
+
+    def _match_time(self):
+        """The preview file's start on the dive computer's clock."""
+        return self.preview_creation_date + timedelta(seconds=self._media_shift_seconds())
+
     def _match_dive_to_media(self):
         if not self.preview_creation_date:
             return
-        self.preview_current_dive = self.dive_manager.find_dive_for_timestamp(self.preview_creation_date)
+        self.preview_current_dive = self.dive_manager.find_dive_for_timestamp(self._match_time())
         if self.preview_current_dive:
             elapsed = self._scrub_value / self.preview_video_fps if self.preview_video_cap else 0
             self._sync_waypoint(elapsed)
@@ -515,7 +535,7 @@ class ColorBackend(QObject):
         if not self.preview_current_dive or not self.preview_creation_date:
             self.preview_current_waypoint = None
             return
-        target_ts = self.preview_creation_date + timedelta(seconds=elapsed_seconds)
+        target_ts = self._match_time() + timedelta(seconds=elapsed_seconds)
         wp = None
         for w in self.preview_current_dive.waypoints:
             if w.timestamp >= target_ts:
@@ -1178,6 +1198,99 @@ class ColorBackend(QObject):
     # module's own docstring for why this isn't deferred either).
     # ------------------------------------------------------------------
 
+    # -- Clock offset (utils/clock_offset.py): the camera's clock against the
+    # dive computer's. Whole hours for a camera left on home time, seconds
+    # found on the preview: type the dive time the computer shows in the
+    # frame, or nudge until the overlay's depth follows the scene. The run
+    # adds the total to every file's time before matching (--media-shift);
+    # the file's own time is written to the output unchanged. --------------
+
+    @Property(int, notify=clockOffsetChanged)
+    def offsetHours(self):
+        return self._offset_hours
+
+    @offsetHours.setter
+    def offsetHours(self, value):
+        value = int(value)
+        if value == self._offset_hours:
+            return
+        self._offset_hours = value
+        set_field("color_offset_hours", value)
+        self._offset_changed()
+
+    @Property(float, notify=clockOffsetChanged)
+    def offsetSeconds(self):
+        return self._offset_seconds
+
+    @Property(str, notify=clockOffsetChanged)
+    def offsetSecondsText(self):
+        return format_offset(self._offset_seconds)
+
+    @Property(str, notify=clockOffsetChanged)
+    def offsetText(self):
+        """The offset in force, under the controls; empty when there is none."""
+        total = self._media_shift_seconds()
+        if not total:
+            return ""
+        return f"{format_offset(total)} added to every file's time before it is matched to the log"
+
+    @Property(bool, notify=previewChanged)
+    def canSync(self):
+        """A previewed file with a date and at least one dive loaded."""
+        return self.preview_creation_date is not None and bool(self.dive_manager.dives)
+
+    @Slot(float)
+    def nudgeOffset(self, seconds):
+        self._set_offset_seconds(self._offset_seconds + float(seconds))
+
+    @Slot()
+    def resetOffset(self):
+        self._set_offset_seconds(0.0)
+
+    def _set_offset_seconds(self, seconds):
+        self._offset_seconds = float(seconds)
+        set_field("color_offset_seconds", self._offset_seconds)
+        self._offset_changed()
+
+    def _offset_changed(self):
+        self.clockOffsetChanged.emit()
+        self._match_dive_to_media()
+        self._redraw_preview()
+
+    def _dive_for_sync(self):
+        """The dive the typed time refers to: the matched one, else the one
+        whose start is nearest the file's time on the current offset."""
+        if self.preview_current_dive is not None:
+            return self.preview_current_dive
+        dives = list(self.dive_manager.dives.values())
+        if not dives:
+            return None
+        media = self._match_time()
+        return min(dives, key=lambda d: abs((d.start_time - media).total_seconds()))
+
+    @Slot(str, result=bool)
+    def syncToDiveTime(self, text):
+        """The computer in the previewed frame shows dive time `text` ("12:34"):
+        set the seconds so that this frame lands on that moment of the dive.
+        Returns False (with a status line) when it can't."""
+        seconds = parse_dive_time(text)
+        if seconds is None:
+            self._set_status(f"Not a dive time: {text!r} (use mm:ss)")
+            return False
+        if self.preview_creation_date is None:
+            self._set_status("Select a source first - the offset is between its clock and the computer's")
+            return False
+        dive = self._dive_for_sync()
+        if dive is None:
+            self._set_status("Select a dive logs folder first")
+            return False
+        elapsed = self._scrub_value / self.preview_video_fps if self.preview_video_cap else 0.0
+        on_computer = dive.start_time + timedelta(seconds=seconds)
+        on_camera = self.preview_creation_date + timedelta(hours=self._offset_hours, seconds=elapsed)
+        self._set_offset_seconds((on_computer - on_camera).total_seconds())
+        self._set_status(f"Synced: this frame is dive time {text.strip()} - clock offset {format_offset(self._media_shift_seconds())}")
+        return True
+
     def _build_args(self):
         args = []
         source = self._source_text.strip()
@@ -1188,6 +1301,9 @@ class ColorBackend(QObject):
             args.append(output)
         if self._logs_text.strip():
             args += ["--logs", self._logs_text.strip()]
+        shift = self._media_shift_seconds()
+        if shift:
+            args += ["--media-shift", f"{shift:g}"]
         if self._color_checked:
             args += ["--color", self._color_profile]
         if self.color_overlay_instances:

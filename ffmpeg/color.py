@@ -745,8 +745,14 @@ class ColorCorrectionEngine:
                       layout_path: Optional[Path] = None,
                       overlay_instances: Optional[list] = None,
                       tz_offset_mins: Optional[int] = None,
-                      color_correct: bool = True):
+                      color_correct: bool = True,
+                      match_date: Optional[datetime] = None):
         """Colour correction plus HUD overlays, all composited by FFmpeg.
+
+        `match_date` is the time the footage starts on the dive computer's
+        clock (the file's creation date plus the camera's clock offset,
+        --media-shift); it drives which sample each frame shows.
+        `creation_date` stays the file's own time, written to the output.
 
         The HUD changes only when the dive sample does, so each layer is
         drawn once per sample as a transparent PNG (ffmpeg/hud_layers.py)
@@ -778,7 +784,7 @@ class ColorCorrectionEngine:
             streams = []
             if dive and dive.waypoints:
                 layers = self._hud_layers(layout_path, overlay_instances, width, height)
-                segments = hud_segments(dive, creation_date, fps, total_frames)
+                segments = hud_segments(dive, match_date or creation_date, fps, total_frames)
                 steps = max(1, len(layers) * len(segments))
                 for li, layer in enumerate(layers):
                     def on_segment(i, li=li):

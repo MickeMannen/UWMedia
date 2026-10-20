@@ -24,6 +24,7 @@ from utils.dependency_check import check_dependencies
 from utils.resource_paths import app_temp_dir, prune_temp_dirs
 from utils.progress_lines import emit
 from utils.convert_naming import CONVERT_RESOLUTIONS, convert_output_filename
+from ffmpeg.overlay_output import DEFAULT_FORMAT as DEFAULT_OVERLAY_FORMAT, FORMATS as OVERLAY_FORMATS, FrameSink, has_alpha, output_path_for, render_frame
 
 import cv2
 import numpy as np
@@ -130,11 +131,12 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     # 2. Determine Output Filename: divelog filename + layoutname.mp4
     layout_name = args.original_layout_stem or "default"
     
+    overlay_format = getattr(args, "overlay_format", DEFAULT_OVERLAY_FORMAT)
     if output_dir.suffix: # User specified a full path as output
-        target_path = output_dir
+        target_path = output_path_for(overlay_format, output_dir)
     else:
         filename = f"{log_path.stem}_{layout_name}.mp4"
-        target_path = output_dir / filename
+        target_path = output_path_for(overlay_format, output_dir / filename)
         target_path = get_unique_path(target_path)
 
     print(f"Output path: {target_path}")
@@ -153,63 +155,17 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
     fps = 30.0
     total_frames = int(duration * fps)
     
-    cmd = [
-        str(ff.get_path()), '-y',
-        '-f', 'rawvideo', '-vcodec', 'rawvideo',
-        '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
-        '-i', '-', 
-        '-vcodec', ff.get_encoder(),
-        '-pix_fmt', 'yuv420p',
-        '-tag:v', 'hvc1', # Force HEVC
-        *ff.quality_args(),
-        str(target_path)
-    ]
-
-    if not args.debug:
-        cmd.extend(["-nostats", "-loglevel", "error"])
-
-    print(f"Generating video frames ({total_frames} frames)...")
-    import subprocess as sp
+    print(f"Generating video frames ({total_frames} frames, {overlay_format})...")
     from gui.hud_renderer import draw_hud
-    import threading
-    from queue import Queue
-    
-    process = sp.Popen(cmd, stdin=sp.PIPE)
-    
-    # Pre-allocate a reusable frame buffer (avoids np.zeros allocation per waypoint change)
+
+    # Pre-allocated canvases: black always; white too when the format
+    # carries alpha (ffmpeg/overlay_output.py). The sink encodes (or
+    # writes PNGs) on its own thread while the main thread draws.
     frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
-    cached_bytes = None
+    white_buffer = np.zeros((height, width, 3), dtype=np.uint8) if has_alpha(overlay_format) else None
     last_wp = None
-    
-    # Create a dummy waypoint for when current_wp is None
-    # This allows draw_hud to still render something (which will show "--" due to format_telemetry_value)
-    dummy_wp = Waypoint(timestamp=dive.start_time, depth=None, temp=None, time_since_start=0)
 
-    # =====================================================================
-    # Threaded Pipeline: Render → Write
-    # - Main thread: renders HUD frames (CPU-bound, Pillow text drawing)
-    # - Write thread: writes bytes to FFmpeg stdin (I/O-bound)
-    # Bounded queue prevents memory blowup while overlapping render + encode.
-    # =====================================================================
-    WRITE_QUEUE_SIZE = 8
-    write_q = Queue(maxsize=WRITE_QUEUE_SIZE)
-    write_error = [None]
-    _SENTINEL = None
-
-    def _write_worker():
-        """Writes pre-serialized frame bytes to FFmpeg stdin."""
-        try:
-            while True:
-                data = write_q.get()
-                if data is _SENTINEL:
-                    break
-                process.stdin.write(data)
-        except Exception as e:
-            write_error[0] = e
-
-    write_thread = threading.Thread(target=_write_worker, name="ffmpeg-write", daemon=True)
-    write_thread.start()
-
+    sink = FrameSink(overlay_format, ff, width, height, fps, target_path, debug=args.debug).start()
     try:
         # Use rate_noinv_fmt (string) instead of rate_noinv (float/None) to avoid crash at t=0
         bar_format = "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_noinv_fmt}]"
@@ -229,15 +185,12 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                 wp_timestamp = wp.timestamp if wp else None
                 last_wp_timestamp = last_wp.timestamp if last_wp else None
                 
-                if cached_bytes is None or wp_timestamp != last_wp_timestamp:
-                    # Clear and redraw on the pre-allocated buffer
-                    frame_buffer[:] = 0
-                    draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), render_log=canvas_render_log, waypoints=dive.waypoints)
-                    # Cache the serialized bytes so identical frames don't re-serialize
-                    cached_bytes = frame_buffer.tobytes()
+                changed = i == 0 or wp_timestamp != last_wp_timestamp
+                if changed:
+                    frame = render_frame(layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0), draw_hud, frame_buffer, white_buffer,
+                                         render_log=canvas_render_log, waypoints=dive.waypoints)
                     last_wp = wp
-                
-                write_q.put(cached_bytes)
+                sink.put(frame, changed)
                 pbar.update(1)
 
                 # Surfaced to the GUI (uwmedia/app.py parses this to drive the
@@ -250,16 +203,13 @@ def process_log_only(log_path: Path, output_dir: Path, args, manager, tmp_hud_di
                     emit(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}")
                     last_emitted_pct = pct
     finally:
-        write_q.put(_SENTINEL)
-        write_thread.join(timeout=10)
-        process.stdin.close()
-        process.wait()
-
-    # Propagate any write thread errors
-    if write_error[0]:
-        raise write_error[0]
+        sink.close()
 
     # 5. Write Date Taken / Creation Date metadata to matching Log Time
+    # (a PNG sequence is a folder: nothing to tag)
+    if target_path.is_dir():
+        print(f"\nDone: {target_path.name}/ ({sink.frames} frames)")
+        return
     print("Writing creation date metadata...")
     try:
         from metadata.exif import MetadataHandler
@@ -497,6 +447,8 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
         except Exception as e:
             print(f"Error formatting render-log filename with pattern '{args.render_log_filename_format}': {e}")
             filename = f"{source.stem}_{layout_name}{source.suffix.lower()}"
+        is_video_source = source.suffix.lower() in ['.mp4', '.mov', '.m4v', '.mkv', '.avi']
+        filename = output_path_for(getattr(args, "overlay_format", DEFAULT_OVERLAY_FORMAT), Path(filename), is_video_source).name
     elif forced_filename:
         # If forced, still ensure extension is lower case if it has one
         p = Path(forced_filename)
@@ -623,8 +575,14 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         stats["total_time"] = time.time() - t_file_start
         return stats
 
-    # Match Dive
-    dive = manager.find_dive_for_timestamp(creation_date) if manager.dives else None
+    # Match Dive - on the dive computer's clock: the file's time plus the
+    # camera's clock offset (--media-shift), while creation_date itself
+    # stays what the output is stamped with.
+    media_shift = float(getattr(args, "media_shift", 0.0) or 0.0)
+    match_date = creation_date + timedelta(seconds=media_shift)
+    if media_shift:
+        print(f"Media shift: {media_shift:+.0f} s -> matching at {match_date}")
+    dive = manager.find_dive_for_timestamp(match_date) if manager.dives else None
     if manager.dives and not dive:
         print("Warning: No matching dive log found for this file.")
         print(f"Creation Date: {creation_date}")
@@ -646,6 +604,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
         hud_skin = layout.get("hud_skin", {})
         skin_path = hud_skin.get("path")
 
+        overlay_format = getattr(args, "overlay_format", DEFAULT_OVERLAY_FORMAT)
         if is_video:
             # Probe original video properties (for fps and duration)
             cap = cv2.VideoCapture(str(source))
@@ -654,29 +613,10 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             cap.release()
 
             ff = FfmpegClass(hw_accel=args.hw_accel, debug=args.debug)
-            cmd = [
-                str(ff.get_path()), '-y',
-                '-f', 'rawvideo', '-vcodec', 'rawvideo',
-                '-s', f'{width}x{height}', '-pix_fmt', 'bgr24', '-r', str(fps),
-                '-i', '-', 
-                '-vcodec', ff.get_encoder(),
-                '-pix_fmt', 'yuv420p',
-                '-tag:v', 'hvc1',
-                *ff.quality_args(),
-                str(target_path)
-            ]
-            if not args.debug:
-                cmd.extend(["-nostats", "-loglevel", "error"])
-
-            import subprocess as sp
-            import threading
-            from queue import Queue
             from gui.hud_renderer import draw_hud
 
-            process = sp.Popen(cmd, stdin=sp.PIPE)
-
             frame_buffer = np.zeros((height, width, 3), dtype=np.uint8)
-            cached_bytes = None
+            white_buffer = np.zeros((height, width, 3), dtype=np.uint8) if has_alpha(overlay_format) else None
             last_wp = None
 
             # Load layout has been moved earlier to determine resolution.
@@ -691,24 +631,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     if preloaded_skin.shape[2] == 4:
                         preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
 
-            WRITE_QUEUE_SIZE = 8
-            write_q = Queue(maxsize=WRITE_QUEUE_SIZE)
-            write_error = [None]
-            _SENTINEL = None
-
-            def _write_worker():
-                try:
-                    while True:
-                        data = write_q.get()
-                        if data is _SENTINEL:
-                            break
-                        process.stdin.write(data)
-                except Exception as e:
-                    write_error[0] = e
-
-            write_thread = threading.Thread(target=_write_worker, name="ffmpeg-write", daemon=True)
-            write_thread.start()
-
+            sink = FrameSink(overlay_format, ff, width, height, fps, target_path, debug=args.debug).start()
             try:
                 # disable when piped (see the other render loop's tqdm call for why -
                 # unthrottled \r redraws with no newline freeze the GUI's log widget)
@@ -716,19 +639,18 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     last_emitted_pct = 0.0
                     for i in range(total_frames):
                         elapsed = i / fps
-                        current_time = creation_date + timedelta(seconds=elapsed)
+                        current_time = match_date + timedelta(seconds=elapsed)
                         wp = dive.get_waypoint_at(current_time) if dive else None
 
                         wp_timestamp = wp.timestamp if wp else None
                         last_wp_timestamp = last_wp.timestamp if last_wp else None
 
-                        if cached_bytes is None or wp_timestamp != last_wp_timestamp:
-                            frame_buffer[:] = 0
-                            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0, time_since_start=0), render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
-                            cached_bytes = frame_buffer.tobytes()
+                        changed = i == 0 or wp_timestamp != last_wp_timestamp
+                        if changed:
+                            frame = render_frame(layout, wp or Waypoint(timestamp=current_time, depth=0, temp=0, time_since_start=0), draw_hud, frame_buffer, white_buffer,
+                                                 render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
                             last_wp = wp
-
-                        write_q.put(cached_bytes)
+                        sink.put(frame, changed)
                         pbar.update(1)
 
                         # Surfaced to the GUI, same marker/throttling as
@@ -743,13 +665,7 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                             emit(f"UWMEDIA_FFMPEG_PROGRESS {pct:.1f}")
                             last_emitted_pct = pct
             finally:
-                write_q.put(_SENTINEL)
-                write_thread.join(timeout=10)
-                process.stdin.close()
-                process.wait()
-
-            if write_error[0]:
-                raise write_error[0]
+                sink.close()
 
             proc_time = time.time() - t_proc_start
             stats["stages"].append({"name": "Telemetry Video Render", "time": proc_time})
@@ -767,8 +683,17 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                         preloaded_skin[:, :, 3] = (preloaded_skin[:, :, 3] * skin_opacity).astype(np.uint8)
 
             from gui.hud_renderer import draw_hud
-            wp = dive.get_waypoint_at(creation_date) if dive else None
-            draw_hud(frame_buffer, layout, wp or Waypoint(timestamp=creation_date, depth=0, temp=0, time_since_start=0), render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+            wp = dive.get_waypoint_at(match_date) if dive else None
+            white_buffer = np.zeros((height, width, 3), dtype=np.uint8) if has_alpha(overlay_format) else None
+            frame_buffer = render_frame(layout, wp or Waypoint(timestamp=match_date, depth=0, temp=0, time_since_start=0), draw_hud, frame_buffer, white_buffer,
+                                        render_log=canvas_render_log, preloaded_skin=preloaded_skin, waypoints=dive.waypoints if dive else None)
+            if white_buffer is not None:
+                # a transparent PNG, whatever the source photo's type
+                cv2.imwrite(str(target_path), frame_buffer)
+                proc_time = time.time() - t_proc_start
+                stats["stages"].append({"name": "Telemetry Photo Render", "time": proc_time})
+                stats["total_time"] = time.time() - t_file_start
+                return stats
 
             subsampling = -1
             qtables = None
@@ -796,15 +721,17 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
             stats["stages"].append({"name": "Telemetry Photo Render", "time": proc_time})
 
         # Post-process metadata to preserve QuickTime date taken / Exif
-        print("Post-processing metadata...")
-        t_meta_start = time.time()
-        try:
-            forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
-            meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
-            meta_time = time.time() - t_meta_start
-            stats["stages"].append({"name": "Metadata Copying", "time": meta_time})
-        except Exception as e:
-            print(f"Warning: Failed to copy metadata: {e}")
+        # (a PNG sequence is a folder: nothing to tag)
+        if not target_path.is_dir():
+            print("Post-processing metadata...")
+            t_meta_start = time.time()
+            try:
+                forced_tz_mins = int(args.force_media_tz * 60) if args.force_media_tz is not None else None
+                meta_handler.copy_all(source, target_path, force_tz_mins=forced_tz_mins, custom_tags=args.modify_quicktime)
+                meta_time = time.time() - t_meta_start
+                stats["stages"].append({"name": "Metadata Copying", "time": meta_time})
+            except Exception as e:
+                print(f"Warning: Failed to copy metadata: {e}")
 
         stats["total_time"] = time.time() - t_file_start
         return stats
@@ -859,7 +786,8 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                 layout_path=args.layout,
                 overlay_instances=args.overlay_instances,
                 tz_offset_mins=tz_offset_mins,
-                color_correct=needs_color
+                color_correct=needs_color,
+                match_date=match_date,
             )
             proc_time = time.time() - t_proc_start
             
@@ -920,8 +848,8 @@ def process_single_file(source: Path, output_dir: Path, args, manager, meta_hand
                     t_overlay = time.time()
                     from gui.hud_renderer import draw_hud, resolve_overlay_instance_layout
 
-                    # Match waypoint to photo creation time
-                    wp = dive.get_waypoint_at(creation_date)
+                    # Match waypoint to the photo's time on the computer's clock
+                    wp = dive.get_waypoint_at(match_date)
                     if wp:
                         if args.layout:
                             with open(args.layout, 'r') as f:
@@ -1103,6 +1031,12 @@ def main():
              'Default: "{filename}_{hud}"',
     )
 
+    parser.add_argument("--media-shift", type=float, default=0.0,
+                        help="Seconds added to each file's creation time before it is matched to the dive log: a camera "
+                             "clock offset set on the Color page (utils/clock_offset.py). The output keeps the file's own time.")
+    parser.add_argument("--overlay-format", choices=list(OVERLAY_FORMATS), default=DEFAULT_OVERLAY_FORMAT,
+                        help="Telemetry-only renders (--render-log / --render-video-log): prores = transparent ProRes 4444 .mov, "
+                             "png = a folder of PNG frames with alpha, hevc = HEVC .mp4 on black (default).")
     parser.add_argument("--units", choices=["metric", "imperial"], default=None,
                         help="Units for the overlays: metric (m, bar, °C) or imperial (ft, psi, °F). Default: the app's Advanced setting.")
 

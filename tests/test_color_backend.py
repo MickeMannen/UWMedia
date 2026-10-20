@@ -391,6 +391,38 @@ def test_arguments_carry_logs_overlays_and_switches(color, tmp_path):
     saved = json.loads(overlays_file.read_text())
     assert len(saved) == 1 and saved[0]["scale"] == 1.0
     assert args[-2:] == ["--keep-filename", "--hw-accel"]
+    assert "--media-shift" not in args  # no clock offset set
+
+
+def test_clock_offset_is_set_on_the_preview_and_reaches_the_run(color, settings_file):
+    """Clock offset: the previewed frame shows dive time 12:34 on the computer,
+    so the seconds become whatever puts this frame there; nudges add to it,
+    hours add on top; the preview re-matches and the run gets --media-shift."""
+    from datetime import datetime, timedelta
+    from models.dive import Dive, Waypoint
+    from models.manager import DiveManager
+    start = datetime(2026, 1, 1, 10, 0, 0)
+    dive = Dive(start_time=start, end_time=start + timedelta(minutes=30),
+                waypoints=[Waypoint(timestamp=start + timedelta(seconds=t), time_since_start=t, depth=t / 60) for t in range(0, 1800, 10)])
+    color.dive_manager = DiveManager()
+    color.dive_manager.add_dives([dive])
+    color.preview_creation_date = start - timedelta(minutes=5)  # the camera says 09:55 for a photo taken at 10:12:34
+    color.preview_video_cap = None
+    color._match_dive_to_media()
+    assert color.canSync is True
+    assert color.syncToDiveTime("12:34") is True
+    assert color.offsetSeconds == pytest.approx(5 * 60 + 754)
+    assert color.preview_current_dive is dive and color.preview_current_waypoint.timestamp == start + timedelta(seconds=760)
+    color.nudgeOffset(-10)
+    assert color.offsetSeconds == pytest.approx(1044) and "+17 min 24 s" in color.offsetText
+    assert color._build_args()[color._build_args().index("--media-shift") + 1] == "1044"
+    color.offsetHours = 2
+    assert color._build_args()[color._build_args().index("--media-shift") + 1] == "8244" and "+2 h 17 min 24 s" in color.offsetText
+    assert get_fields()["color_offset_hours"] == 2 and get_fields()["color_offset_seconds"] == pytest.approx(1044)
+    assert color.syncToDiveTime("nonsense") is False and "Not a dive time" in color.statusText
+    color.offsetHours = 0
+    color.resetOffset()
+    assert color.offsetText == "" and "--media-shift" not in color._build_args()
 
 
 def test_packaged_app_runs_itself_without_python_m(color, monkeypatch, tmp_path):
