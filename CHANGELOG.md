@@ -60,6 +60,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   dive picks them by itself.
 
 ### Changed
+- Color Tuning: the image and profile buttons are one row, and they and the
+  Original / Adjusted previews stay at the top while only the sliders
+  scroll, so both images stay in view as you tune.
+- Overlay Designer and Dive Profile Builder: the pages fit the default
+  window - the Designer's inspector and the Builder's chart and buttons no
+  longer run off the right edge (the Designer's time scrub has a row of its
+  own; the Builder's chart shrinks to fit).
 - Overlays: the Garmin Descent Mk3i depth is centred, as on the watch, so a
   shallow 5.0 no longer sits left of where a 30.0 would; on the standard
   pages the DEPTH label is centred over it.

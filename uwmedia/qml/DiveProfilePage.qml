@@ -788,7 +788,8 @@ Item {
             spacing: 8
 
             RowLayout {
-                Layout.preferredWidth: 700
+                Layout.fillWidth: true
+                Layout.maximumWidth: 700
                 Label {
                     Layout.fillWidth: true
                     text: "Click to add a waypoint · drag a point to move it · right-click to delete · hover for NDL/PO2"
@@ -802,127 +803,140 @@ Item {
                 }
             }
 
-            Rectangle {
-                Layout.preferredWidth: 700
-                Layout.preferredHeight: 420
-                color: "#000000"
+            // The chart keeps the backend's 700 x 420 canvas (waypoint clicks and
+            // drags are in its pixels) and is scaled down to fit a narrower
+            // column, so the page fits the default window (2026-10-21).
+            Item {
+                id: chartBox
+                Layout.fillWidth: true
+                Layout.maximumWidth: 700
+                Layout.preferredHeight: 420 * chartScale
+                readonly property real chartScale: Math.min(1, width / 700)
 
-                Image {
-                    anchors.fill: parent
-                    source: diveProfileBackend.previewImageSource
-                    fillMode: Image.Stretch
-                    cache: false
-                }
-
-                // Gesture split: a short left click on empty space adds a
-                // waypoint, press on a waypoint + drag moves it, drag on
-                // empty space scrubs, right-click on a waypoint deletes it.
-                MouseArea {
-                    id: chartMouse
-                    anchors.fill: parent
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    hoverEnabled: true
-                    readonly property real dragThreshold: 4
-                    property int dragRow: -1
-                    property int hoverRow: -1
-                    property real pressX: 0
-                    property real pressY: 0
-                    property bool moved: false
-                    property real hoverX: 0
-                    property real hoverY: 0
-                    cursorShape: dragRow >= 0 ? Qt.ClosedHandCursor
-                                 : hoverRow >= 0 ? Qt.OpenHandCursor : Qt.CrossCursor
-
-                    onPressed: (mouse) => {
-                        if (mouse.button === Qt.RightButton) {
-                            const row = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
-                            if (row >= 0)
-                                diveProfileBackend.removeWaypointAtRow(row)
-                            hoverRow = -1
-                            return
-                        }
-                        pressX = mouse.x
-                        pressY = mouse.y
-                        moved = false
-                        dragRow = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
-                    }
-                    onPositionChanged: (mouse) => {
-                        hoverX = mouse.x
-                        hoverY = mouse.y
-                        if (!(pressedButtons & Qt.LeftButton)) {
-                            hoverRow = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
-                            diveProfileBackend.onScrub(mouse.x)
-                            return
-                        }
-                        if (!moved && Math.hypot(mouse.x - pressX, mouse.y - pressY) > dragThreshold)
-                            moved = true
-                        if (!moved)
-                            return
-                        if (dragRow >= 0)
-                            diveProfileBackend.moveWaypoint(dragRow, mouse.x, mouse.y)
-                        else
-                            diveProfileBackend.onScrub(mouse.x)
-                    }
-                    onReleased: (mouse) => {
-                        if (mouse.button !== Qt.LeftButton)
-                            return
-                        if (dragRow >= 0 && moved) {
-                            diveProfileBackend.dropWaypoint(dragRow)
-                        } else if (dragRow >= 0) {
-                            wpListView.currentIndex = dragRow
-                            diveProfileBackend.selectWaypointRow(dragRow)
-                        } else if (!moved) {
-                            if (diveProfileBackend.scaleDefined) {
-                                diveProfileBackend.addWaypointAt(mouse.x, mouse.y)
-                            } else {
-                                root.pendingClickX = mouse.x
-                                root.pendingClickY = mouse.y
-                                scaleDialog.open()
-                            }
-                        }
-                        dragRow = -1
-                    }
-                    onExited: {
-                        hoverRow = -1
-                        diveProfileBackend.clearCursor()
-                    }
-                }
-
-                // Hover readout for the profile point under the mouse
-                // (DiveProfileBackend.cursorInfo), kept inside the chart.
                 Rectangle {
-                    id: hoverBox
-                    visible: chartMouse.containsMouse && chartMouse.dragRow < 0
-                             && diveProfileBackend.cursorInfo.length > 0
-                    width: hoverGrid.implicitWidth + 16
-                    height: hoverGrid.implicitHeight + 12
-                    x: Math.max(0, chartMouse.hoverX + 16 + width > parent.width
-                                   ? chartMouse.hoverX - 16 - width : chartMouse.hoverX + 16)
-                    y: Math.max(0, Math.min(parent.height - height, chartMouse.hoverY - height / 2))
-                    color: "#E6111827"
-                    radius: 4
-                    border.color: "#4B5563"
+                    width: 700
+                    height: 420
+                    scale: chartBox.chartScale
+                    transformOrigin: Item.TopLeft
+                    color: "#000000"
 
-                    ColumnLayout {
-                        id: hoverGrid
-                        anchors.centerIn: parent
-                        spacing: 2
-                        Repeater {
-                            model: diveProfileBackend.cursorInfo
-                            delegate: RowLayout {
-                                required property var modelData
-                                spacing: 10
-                                Label {
-                                    Layout.preferredWidth: 64
-                                    text: modelData.label
-                                    color: "#9CA3AF"
-                                    font.pixelSize: 12
+                    Image {
+                        anchors.fill: parent
+                        source: diveProfileBackend.previewImageSource
+                        fillMode: Image.Stretch
+                        cache: false
+                    }
+
+                    // Gesture split: a short left click on empty space adds a
+                    // waypoint, press on a waypoint + drag moves it, drag on
+                    // empty space scrubs, right-click on a waypoint deletes it.
+                    MouseArea {
+                        id: chartMouse
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        hoverEnabled: true
+                        readonly property real dragThreshold: 4
+                        property int dragRow: -1
+                        property int hoverRow: -1
+                        property real pressX: 0
+                        property real pressY: 0
+                        property bool moved: false
+                        property real hoverX: 0
+                        property real hoverY: 0
+                        cursorShape: dragRow >= 0 ? Qt.ClosedHandCursor
+                                     : hoverRow >= 0 ? Qt.OpenHandCursor : Qt.CrossCursor
+
+                        onPressed: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                const row = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
+                                if (row >= 0)
+                                    diveProfileBackend.removeWaypointAtRow(row)
+                                hoverRow = -1
+                                return
+                            }
+                            pressX = mouse.x
+                            pressY = mouse.y
+                            moved = false
+                            dragRow = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
+                        }
+                        onPositionChanged: (mouse) => {
+                            hoverX = mouse.x
+                            hoverY = mouse.y
+                            if (!(pressedButtons & Qt.LeftButton)) {
+                                hoverRow = diveProfileBackend.waypointIndexAt(mouse.x, mouse.y)
+                                diveProfileBackend.onScrub(mouse.x)
+                                return
+                            }
+                            if (!moved && Math.hypot(mouse.x - pressX, mouse.y - pressY) > dragThreshold)
+                                moved = true
+                            if (!moved)
+                                return
+                            if (dragRow >= 0)
+                                diveProfileBackend.moveWaypoint(dragRow, mouse.x, mouse.y)
+                            else
+                                diveProfileBackend.onScrub(mouse.x)
+                        }
+                        onReleased: (mouse) => {
+                            if (mouse.button !== Qt.LeftButton)
+                                return
+                            if (dragRow >= 0 && moved) {
+                                diveProfileBackend.dropWaypoint(dragRow)
+                            } else if (dragRow >= 0) {
+                                wpListView.currentIndex = dragRow
+                                diveProfileBackend.selectWaypointRow(dragRow)
+                            } else if (!moved) {
+                                if (diveProfileBackend.scaleDefined) {
+                                    diveProfileBackend.addWaypointAt(mouse.x, mouse.y)
+                                } else {
+                                    root.pendingClickX = mouse.x
+                                    root.pendingClickY = mouse.y
+                                    scaleDialog.open()
                                 }
-                                Label {
-                                    text: modelData.value
-                                    color: modelData.color
-                                    font.pixelSize: 12
-                                    font.bold: modelData.label === "Gas"
+                            }
+                            dragRow = -1
+                        }
+                        onExited: {
+                            hoverRow = -1
+                            diveProfileBackend.clearCursor()
+                        }
+                    }
+
+                    // Hover readout for the profile point under the mouse
+                    // (DiveProfileBackend.cursorInfo), kept inside the chart.
+                    Rectangle {
+                        id: hoverBox
+                        visible: chartMouse.containsMouse && chartMouse.dragRow < 0
+                                 && diveProfileBackend.cursorInfo.length > 0
+                        width: hoverGrid.implicitWidth + 16
+                        height: hoverGrid.implicitHeight + 12
+                        x: Math.max(0, chartMouse.hoverX + 16 + width > parent.width
+                                       ? chartMouse.hoverX - 16 - width : chartMouse.hoverX + 16)
+                        y: Math.max(0, Math.min(parent.height - height, chartMouse.hoverY - height / 2))
+                        color: "#E6111827"
+                        radius: 4
+                        border.color: "#4B5563"
+
+                        ColumnLayout {
+                            id: hoverGrid
+                            anchors.centerIn: parent
+                            spacing: 2
+                            Repeater {
+                                model: diveProfileBackend.cursorInfo
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    spacing: 10
+                                    Label {
+                                        Layout.preferredWidth: 64
+                                        text: modelData.label
+                                        color: "#9CA3AF"
+                                        font.pixelSize: 12
+                                    }
+                                    Label {
+                                        text: modelData.value
+                                        color: modelData.color
+                                        font.pixelSize: 12
+                                        font.bold: modelData.label === "Gas"
+                                    }
                                 }
                             }
                         }
@@ -931,16 +945,20 @@ Item {
             }
 
             Label {
-                Layout.preferredWidth: 700
+                Layout.fillWidth: true
+                Layout.maximumWidth: 700
                 text: diveProfileBackend.statusText
                 color: diveProfileBackend.statusIsError ? "#EF4444" : "#9AA0A6"
                 wrapMode: Text.WordWrap
             }
 
             RowLayout {
+                Layout.fillWidth: true
+                Layout.maximumWidth: 700
                 spacing: 8
                 Button {
-                    Layout.preferredWidth: 200
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 200
                     text: "Open log…"
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
@@ -948,7 +966,8 @@ Item {
                     onClicked: diveProfileBackend.openLog()
                 }
                 Button {
-                    Layout.preferredWidth: 200
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 200
                     text: "End dive"
                     enabled: diveProfileBackend.waypointRows.length > 0
                     ToolTip.visible: hovered
@@ -957,7 +976,8 @@ Item {
                     onClicked: diveProfileBackend.endDive()
                 }
                 Button {
-                    Layout.preferredWidth: 200
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 200
                     text: "Save log…"
                     highlighted: true
                     ToolTip.visible: hovered
@@ -967,7 +987,8 @@ Item {
                 }
             }
             Label {
-                Layout.preferredWidth: 700
+                Layout.fillWidth: true
+                Layout.maximumWidth: 700
                 text: diveProfileBackend.endDiveStatusText
                 color: "#9AA0A6"
                 wrapMode: Text.WordWrap

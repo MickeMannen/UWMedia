@@ -46,9 +46,14 @@ Item {
     // breaks a declarative binding, still gets overridden the next time the
     // backend re-resolves a selection (e.g. the variant auto-pick after a
     // dive log is loaded).
+    // Each one gives up width down to its minimum when the window is
+    // narrow, so the rows never push the inspector off the page.
     component CascadeCombo: ComboBox {
         id: combo
         property int backendIndex: 0
+        Layout.fillWidth: true
+        Layout.minimumWidth: 100
+        Layout.maximumWidth: Layout.preferredWidth
         Layout.preferredHeight: 34
         font.pixelSize: 14
         Binding { target: combo; property: "currentIndex"; value: combo.backendIndex }
@@ -331,9 +336,10 @@ Item {
                     Layout.minimumHeight: 240
                 }
 
-                // Telemetry row - source, state and time scrub on one line
-                // (2026-09-28, per the user). The data readout moved to the
-                // status line below.
+                // Telemetry row - source, state and units; the time scrub has
+                // its own row below (2026-10-21: on one line they were wider
+                // than the canvas column of the default window). The data
+                // readout is on the status line.
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -374,8 +380,13 @@ Item {
                         ToolTip.text: "Preview this page in metres or feet; the app's setting (Advanced) is not changed"
                         ToolTip.visible: hovered
                     }
+                }
 
-                    Label { text: "Time"; font.pixelSize: 12; Layout.leftMargin: 8 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Label { text: "Time"; font.pixelSize: 12 }
                     Button {
                         // Play / pause: the slider runs at 10x so a moment in a
                         // long log is found by watching, not by dragging.
@@ -524,6 +535,8 @@ Item {
                                     height: 28
                                     text: modelData.label + "  ·  " + modelData.kind
                                     font.pixelSize: 12
+                                    // room for the eye button, and the "shared" tag when shown
+                                    rightPadding: modelData.shared ? 76 : 32
                                     opacity: modelData.hidden ? 0.45 : 1.0
                                     highlighted: overlayDesignerBackend.selectedIndices.indexOf(modelData.index) >= 0
                                     // plain click selects; Cmd/Ctrl/Shift-click toggles membership
