@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.18] - 2026-10-21
 
 ### Added
 - Color: a **Clock offset** under the preview lines the camera's clock up
@@ -39,6 +39,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   | T2 air row), a mini-display page (MAX / PO2 / MOD beside temperature and
   clock), and the ascent arrows and N2 bar its manual shows. The template
   and the Dive Profile Builder now name it "Peregrine TX".
+- Overlays: Shearwater Perdix 3 sidemount pages - the Tec page with T1 and
+  T2 either side of SurfGF and the green box on the tank to breathe from,
+  and the AI info row T1 | GTR / SM / SAC | T2; the Main Screen and Standard
+  pages put that row along the bottom and MAX in the slot T1 had. A two-tank
+  dive picks them by itself.
 - Overlays: Gauge-mode pages for every Shearwater and both Descents: depth,
   time, MAX and the running average depth, the stopwatch, temperature and
   clock, with no deco colours.
@@ -52,12 +57,6 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   FIT - the setpoint and bailout alerts a Descent logs. Opening a CCR log
   brings its setpoints and switch depths along. The Petrel is now listed as
   the Petrel 3.
-
-- Overlays: Shearwater Perdix 3 sidemount pages - the Tec page with T1 and
-  T2 either side of SurfGF and the green box on the tank to breathe from,
-  and the AI info row T1 | GTR / SM / SAC | T2; the Main Screen and Standard
-  pages put that row along the bottom and MAX in the slot T1 had. A two-tank
-  dive picks them by itself.
 
 ### Changed
 - Color Tuning: the image and profile buttons are one row, and they and the
