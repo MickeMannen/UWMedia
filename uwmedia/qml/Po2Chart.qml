@@ -17,8 +17,8 @@ ColumnLayout {
     readonly property color axisColor: "#444444"
     readonly property color labelColor: "#9AA0A6"
     readonly property bool hasCells: {
-        var s = samples || []
-        for (var i = 0; i < s.length; i++) if (s[i].c1 >= 0) return true
+        const s = samples || []
+        for (let i = 0; i < s.length; i++) if (s[i].c1 >= 0) return true
         return false
     }
     spacing: 4

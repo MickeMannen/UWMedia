@@ -83,4 +83,9 @@ def test_qmllint_finds_nothing():
     result = subprocess.run([qmllint, "--unqualified", "disable", "--max-warnings", "0", *files],
                             capture_output=True, text=True, timeout=120)
     report = result.stdout + result.stderr
+    if result.returncode != 0 and "Warning:" not in report:
+        # qmllint 6.12 can fail on --max-warnings without printing the
+        # warning; its JSON report always carries it.
+        report += subprocess.run([qmllint, "--unqualified", "disable", "--json", "-", *files],
+                                 capture_output=True, text=True, timeout=120).stdout
     assert result.returncode == 0 and "Warning:" not in report, report
