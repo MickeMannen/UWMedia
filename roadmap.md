@@ -51,7 +51,6 @@ Facts read but not in the rules yet:
 - [ ] Garmin OTU colours, the NO COMMS transceiver display, lock-out after three minutes above the ceiling, a `locked` state.
 - [ ] Shearwater "Better Gas" notice and gas-name colours (need the gas list), Teric / Tern persistent warnings overlay.
 - [ ] Garmin sidemount switch pressure default (30 bar assumed), Garmin reserve / critical defaults (50 / 25 bar assumed), tissue-load bands. Mk3i tank icon fill colour (the X50i's is blue, screenshots 2026-11-10; the Mk3i keeps green until seen).
-- [ ] Bug (next bugfixing round, noted 2026-11-10): the "Slow your ascent" notice ("Ascending too fast. Slow your ascent.", the fast-ascent alert) is drawn outside its rectangle on the X50i main page; the text should fit inside the alert box like the "Breathe from" notice does.
 - [ ] X50i DIVE END box: the blue box with a countdown in the NDL corner once the diver surfaces (`test_data/dive_computers/screen_shots/3466.bmp`); needs a surface state and what the timer counts.
 - [ ] What-if values (Shearwater `@+5` / `Δ+5`, Garmin `NDL Δ 3M`): only if a page needs them.
 

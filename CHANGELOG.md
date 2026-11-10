@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- Overlays: the Descent X50i alert box no longer lets a line in capitals
+  ("SLOW YOUR ASCENT") run past its border; every line of the alert is
+  fitted inside the box.
+
 ## [0.7.19] - 2026-11-10
 
 ### Added

@@ -137,3 +137,20 @@ def test_tank_icon_fill_level_follows_the_pressure():
     half = _count(_render(_layout([icon]), _wp(114.0, 114.0)), BLUE)
     assert 0.45 * full < half < 0.55 * full
     assert _count(_render(_layout([dict(icon, fill_level=False)]), _wp(114.0, 114.0)), BLUE) == full
+
+
+def test_alert_box_fits_the_widest_line_not_the_longest():
+    """The X50i alert box fits its font to every line in pixels: "SLOW YOUR
+    ASCENT" has fewer characters than "Ascending too fast." but is wider, and
+    a fit to the longest string alone ran the capitals past the border."""
+    from PIL import Image, ImageDraw
+
+    from gui.hud_renderer import _fit_font, fit_font_lines
+    draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    lines = ["SLOW YOUR ASCENT", "Ascending too fast."]
+    width = 300
+    only_longest, _ = _fit_font(draw, max(lines, key=len), 46, width, None, "bold")
+    assert draw.textlength(lines[0], font=only_longest) > width  # the bug: capitals overflow
+    font, size = fit_font_lines(draw, lines, 46, width, None, "bold")
+    assert all(draw.textlength(line, font=font) <= width for line in lines)
+    assert size < 46

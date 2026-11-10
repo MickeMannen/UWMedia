@@ -1708,6 +1708,17 @@ def _fit_font(draw, text, size, width_px, family, weight, floor=8):
     return font, size
 
 
+def fit_font_lines(draw, lines, size, width_px, family, weight, floor=8):
+    """The largest font at or under `size` at which every one of `lines`
+    fits `width_px`. Measured in pixels, not characters: "SLOW YOUR ASCENT"
+    is shorter than "Ascending too fast." but wider, and fitting only the
+    longest string sent the capitals past the alert box's border."""
+    font, size = _fit_font(draw, lines[0], size, width_px, family, weight, floor)
+    for line in lines[1:]:
+        font, size = _fit_font(draw, line, size, width_px, family, weight, floor)
+    return font, size
+
+
 def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
     """A device notification (schema element type "notice"): the active
     notice's message in the brand's style. "text" (Perdix 2 manual p.22): the
@@ -1778,7 +1789,7 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         text = message if "\n" in message else message.replace(". ", ".\n")
         parts = [p.strip() for p in text.split("\n") if p.strip()][:2]
         line_h = (height_px - 2 * pad) // max(1, len(parts))
-        font, size = _fit_font(draw, max(parts, key=len), min(msg_size, int(line_h * 0.8)), inner_w, family, weight)
+        font, size = fit_font_lines(draw, parts, min(msg_size, int(line_h * 0.8)), inner_w, family, weight)
         for i, part in enumerate(parts):
             x = inner_x if icon else inner_x + (inner_w - draw.textlength(part, font=font)) // 2
             draw.text((x, abs_y + pad + i * line_h + (line_h - size) // 2), part, font=font, fill=text_colour)
