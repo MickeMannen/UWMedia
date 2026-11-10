@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.19] - 2026-11-10
 
 ### Added
 - Overlay Designer: a **Tank switch arrows** element - the Descent's
@@ -22,7 +22,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Overlays: on an X50i sidemount dive the pressure of the tank to breathe
   from turns blue and two triangles march towards it while the SM label and
   tank icons step aside, and the alert reads "Breathe from Left Tank
-  (Micke01)." with the tank's side, as the device shows it, instead of a
+  (T2)." with the tank's side, as the device shows it, instead of a
   blue box round the tank name. The tank icons empty as the pressure drops,
   as on the device.
 
