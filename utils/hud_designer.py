@@ -22,6 +22,7 @@ from gui.hud_renderer import (
     fitted_font_size,
     text_anchor_shift,
     text_parts,
+    tank_switch_arrows_geometry,
     tissue_bar_geometry,
     unit_suffix_geometry,
     unit_suffix_text,
@@ -90,7 +91,7 @@ def skin_pixel_size(skin: Dict[str, Any]) -> Tuple[float, float]:
 
 
 
-ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice")
+ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows")
 
 
 def element_kind(element: Dict[str, Any]) -> str:
@@ -99,7 +100,7 @@ def element_kind(element: Dict[str, Any]) -> str:
     kind = element.get("type")
     if kind == "graph" or element.get("field") == "depth_graph":
         return "graph"
-    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons", "notice"):
+    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows"):
         return kind
     return "text"
 
@@ -123,6 +124,11 @@ def element_defaults(kind: str, field: str) -> Dict[str, Any]:
         # The device's own notification (gui.hud_renderer._draw_notice): the
         # message fitted into `width`, a caption line above it.
         base.update({"type": "notice", "field": "notice", "width": 400, "height": 60, "font_size": 40, "caption_font_size": 18, "scale": 1.0})
+    elif kind == "tank_switch_arrows":
+        # the Descent's triangles pointing at the sidemount tank to breathe
+        # from (gui.hud_renderer._draw_tank_switch_arrows); nothing while
+        # the tanks are within the switch pressure
+        base.update({"type": "tank_switch_arrows", "field": "tank_switch", "width": 23, "height": 44, "gap": 13, "count": 2})
     else:
         base.update({"color": "#FFFFFF", "font_size": 30, "scale": 1.0})
     return base
@@ -165,6 +171,10 @@ def parse_layout_elements(hud_skin: Dict[str, Any]) -> List[Dict[str, Any]]:
         elif kind == "notice":
             entry["field"] = field or "notice"
             for key, default in (("width", 400), ("height", 60), ("font_size", 40), ("caption_font_size", 18), ("scale", 1.0)):
+                entry.setdefault(key, default)
+        elif kind == "tank_switch_arrows":
+            entry["field"] = field or "tank_switch"
+            for key, default in (("width", 23), ("height", 44), ("gap", 13), ("count", 2)):
                 entry.setdefault(key, default)
         else:
             entry["field"] = field
@@ -259,6 +269,9 @@ def element_native_bounds(
     if kind == "ascent_chevrons":
         w, h, _, _ = ascent_chevron_geometry(elem)
         return x, y, x + w, y + h
+    if kind == "tank_switch_arrows":
+        w, h, gap, count = tank_switch_arrows_geometry(elem)
+        return x, y, x + count * w + (count - 1) * gap, y + h
     if kind == "tank_icon" and elem.get("style") == "segments":
         n, gap, _, pad, stroke, nose, nub = tank_segments_geometry(elem)
         seg_w, seg_h = float(elem.get("width", 12)), float(elem.get("height", 23))

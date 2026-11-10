@@ -179,8 +179,8 @@ ADD_ELEMENT_PRESETS = {
     DIVE_TIME_SMALL_SECONDS: ("dive_time", "seconds"),
 }
 
-_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "max_width", "unit_scale", "unit_dx", "unit_dy", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
-_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "max_width", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar"}
+_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "max_width", "unit_scale", "unit_dx", "unit_dy", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
+_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "max_width", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar"}
 _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill", "notice": "text"}
 # A graph's deco-stop shading colour when the inspector switches it on.
 DEFAULT_STOPS_COLOR = "#FFA500"
@@ -870,9 +870,9 @@ class OverlayDesignerBackend(QObject):
                 "background_color": "#000000", "background_opacity": GRAPH_BACKGROUND_OPACITY,
                 "small_suffix": "", "small_suffix_scale": SMALL_SUFFIX_DEFAULT_SCALE,
                 "draw_outline": False, "outline_color": "#FFFFFF", "outline_width": 2, "outline_gap": 4,
-                "up_count": 4, "down_count": 1, "bar": True, "style": "segments",
-                "segments": 5, "segment_gap": 2, "full_bar": 200,
-                "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "source": "timed",
+                "up_count": 4, "down_count": 1, "bar": True, "style": "segments", "gap": 13, "count": 2,
+                "segments": 5, "segment_gap": 2, "full_bar": 200, "empty_bar": 0, "fill_level": False,
+                "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "hide_when_switch": False, "source": "timed",
                 "unit_suffix": False, "unit_position": "right", "unit_scale": 0.35, "unit_dx": 0.0, "unit_dy": 0.0, "unit_color": "", "unit_orientation": "horizontal",
                 "max_width": 0, "shared": False,
             }
@@ -931,11 +931,15 @@ class OverlayDesignerBackend(QObject):
             "segments": elem.get("segments", 5),
             "segment_gap": elem.get("segment_gap", 2),
             "full_bar": elem.get("full_bar", 200),
+            # a fill-style icon that empties with the pressure (gui.hud_renderer.tank_fill_fraction)
+            "empty_bar": elem.get("empty_bar", 0),
+            "fill_level": bool(elem.get("fill_level", False)),
             # notice element (gui.hud_renderer._draw_notice)
             "caption_font_size": elem.get("caption_font_size", 18),
             "confirm_text": elem.get("confirm_text", ""),
             "caption_color": elem.get("caption_color") or "",
             "hide_when_notice": bool(elem.get("hide_when_notice", False)),
+            "hide_when_switch": bool(elem.get("hide_when_switch", False)),
             "source": "persistent" if elem.get("source") == "persistent" else "timed",
             # the font shrinks when the value is wider than this (0: never)
             "max_width": elem.get("max_width", 0),
@@ -1012,6 +1016,10 @@ class OverlayDesignerBackend(QObject):
             doc.set_element_attr(index, "confirm_text", str(value or ""))
         elif key == "hide_when_notice":
             doc.set_element_attr(index, "hide_when_notice", True if bool(value) else None)
+        elif key == "hide_when_switch":
+            doc.set_element_attr(index, "hide_when_switch", True if bool(value) else None)
+        elif key == "fill_level":
+            doc.set_element_attr(index, "fill_level", True if bool(value) else None)
         elif key == "unit_suffix":
             doc.set_element_attr(index, "unit_suffix", True if bool(value) else None)
         elif key == "unit_position":
@@ -1311,7 +1319,7 @@ class OverlayDesignerBackend(QObject):
         doc = self.document
         if doc is None or not field:
             return
-        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice"):
+        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows"):
             kind = "text"
         if kind == "graph":
             field = "depth_graph"
@@ -1323,6 +1331,8 @@ class OverlayDesignerBackend(QObject):
             field = "n2_tissue_load"
         elif kind == "ascent_chevrons":
             field = "ascent_rate"
+        elif kind == "tank_switch_arrows":
+            field = "tank_switch"
         attrs = {}
         if kind == "ascent_chevrons":
             # The brand's own indicator: hud_rules.json `ascent_chevrons`

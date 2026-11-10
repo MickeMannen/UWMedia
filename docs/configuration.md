@@ -82,10 +82,22 @@ a Perdix shows the safety-stop time under "SAFETY STOP"; an element's own
 `value_align` key overrides it. A label of `""` draws no title (the
 Descent Mk3 style).
 
-`sidemount_switch` (`threshold_bar`, `color`, `text_color`) is the Perdix's
+`sidemount_switch` (`threshold_bar`, `color`, `text_color`) is the
 tank-switch notification: a text element with `"tank_switch_highlight":
 "primary"` or `"secondary"` gets a filled box behind it while that tank is
-the one to breathe from, i.e. holds more than the threshold above the other.
+the one to breathe from, i.e. holds more than the threshold above the other
+(the Perdix's green box round the tank label). With `"tank_switch_style":
+"text"` the element's text takes the colour instead of getting a box - the
+Descent X50i's blue pressure - and a `tank_switch_arrows` element (`width`,
+`height`, `gap`, `count`) draws that many triangles in the colour pointing
+at the tank, the nearest lit first, second by second, as the X50i's march
+towards it; elements with `"hide_when_switch": true` (the X50i's SM label
+and tank icons) step aside while the switch is pointed out.
+
+`display` sets how a brand writes its values: `depth_decimals` per unit
+system, `percent_fields` (the fields that carry a % sign - the X50i's
+SurfGF, GF99 and CNS) and `gf99_on_gassing_text` (what GF99 reads while it
+is at or below 0, the X50i's "On-Gassing").
 
 `ascent_rate` bands colour a lit ascent chevron by m/min (`blink: true`
 flashes the band's colour against the unlit grey - the Perdix's red), and

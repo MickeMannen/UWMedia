@@ -50,12 +50,14 @@ Owner decisions:
 Facts read but not in the rules yet:
 - [ ] Garmin OTU colours, the NO COMMS transceiver display, lock-out after three minutes above the ceiling, a `locked` state.
 - [ ] Shearwater "Better Gas" notice and gas-name colours (need the gas list), Teric / Tern persistent warnings overlay.
-- [ ] Garmin sidemount switch pressure default (30 bar assumed), Garmin reserve / critical defaults (50 / 25 bar assumed), tissue-load bands.
+- [ ] Garmin sidemount switch pressure default (30 bar assumed), Garmin reserve / critical defaults (50 / 25 bar assumed), tissue-load bands. Mk3i tank icon fill colour (the X50i's is blue, screenshots 2026-11-10; the Mk3i keeps green until seen).
+- [ ] Bug (next bugfixing round, noted 2026-11-10): the "Slow your ascent" notice ("Ascending too fast. Slow your ascent.", the fast-ascent alert) is drawn outside its rectangle on the X50i main page; the text should fit inside the alert box like the "Breathe from" notice does.
+- [ ] X50i DIVE END box: the blue box with a countdown in the NDL corner once the diver surfaces (`test_data/dive_computers/screen_shots/3466.bmp`); needs a surface state and what the timer counts.
 - [ ] What-if values (Shearwater `@+5` / `Δ+5`, Garmin `NDL Δ 3M`): only if a page needs them.
 
 Pages and fields:
 - [x] Teric and Mk3i Standard layouts (3b).
-- [x] Garmin X50i dynamic-depth page (3b; checked against the manual's p.21 figure only, not against `x50i_dive_graph.bmp` or an in-water screenshot).
+- [x] Garmin X50i dynamic-depth page (3b; geometry checked against an in-water screenshot 2026-11-10, `test_data/dive_computers/screen_shots/1809.bmp`; its axis labels, current-depth tag and hatched safety-stop block are not drawn).
 - [ ] Garmin three-tank layout (the device's transceiver screen). Needs: a log with three live tanks.
 - [ ] Freediving. (a) A session parser: a FIT apnea activity holds every dive of the session with a summary per lap; split it into dives with dive number, surface interval, last dive time and depth, vertical speed, and match media shot in a surface interval to the session. (b) A `ring` element: a circular track with an arc from 12 o'clock for elapsed time over the dive, depth over max depth, or depth over a target, with a value in the centre; also the arc gauge later computers need. (c) Depth interpolated per frame between samples so the number counts smoothly, and an optional zero-based start and end when the log begins underwater. (d) Templates: a generic Freedive family (big depth with unit, time ring centred), then Teric / Tern Freedive mode and the Mk3i apnea screen from their manuals, whole metres by default. Needs: a real freediving log.
 - [x] CCR: what `gasmix` means for a CCR waypoint (the breathed gas), per-cell PO2 fields - see 3b; a colourable divider line (red on bailout) is open there.
@@ -117,7 +119,7 @@ projects' sample dives. Manual pages: `hud_rules_sources.md`.
 - [ ] Color page "Output filename" combo: scope what is wrong with the owner first.
 - [ ] Light theme: never exercised.
 - [ ] A What's New dialog per release, from the changelog, with a "show me" that opens the page.
-- [ ] An update check.
+- [ ] **Update check** (agreed 2026-10-21). The About page's existing "Check for updates" moves next to the version label ("Version 0.7.18 [Check for updates]") and replaces the separate Updates box; the check runs on a background thread instead of blocking the UI for up to 5 s. At start, at most once a day (on by default, a switch on the Advanced page, skipped for "dev"), the app checks GitHub quietly and offers a newer version in a dialog: Download, Release notes, Skip this version, Later. Download opens this platform's installer (.dmg, .msi or .deb) in the browser, or the release page while the Release Build has not attached it yet; offline stays silent. Settings: `check_updates_on_start`, `last_update_check`, `skipped_version`. No in-app download or self-update.
 
 ## 5. Packaging and distribution
 

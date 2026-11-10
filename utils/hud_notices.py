@@ -197,6 +197,9 @@ def _condition_now(rule: Dict[str, Any], manufacturer, model, wp, prev, waypoint
         tanks = list((getattr(wp, "tanks", None) or {}).items())
         key, tank = tanks[0 if target == "primary" else 1]
         ctx["tank"] = getattr(tank, "name", None) or key
+        # the first tank is worn on the left (a Descent's "Breathe from Left
+        # Tank (Micke01).", real screenshot test_data/dive_computers/screen_shots/5831.bmp)
+        ctx["side"] = "Left" if target == "primary" else "Right"
         return True, ctx
     if when in ("deco_required", "deco_cleared"):
         return resolve_state(manufacturer, model, wp, waypoints) == "deco", ctx

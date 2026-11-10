@@ -454,6 +454,23 @@ ScrollView {
                                 onActivated: (index) => colorBackend.filenameFormat = model[index]
                             }
                         }
+
+                        // Same switch as the Overlay Generator's: a file
+                        // whose output already exists is skipped instead
+                        // of getting a _1 copy, so an interrupted batch
+                        // can be restarted.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: "Skip if target exists" }
+                            Switch {
+                                checked: colorBackend.skipExisting
+                                onToggled: colorBackend.skipExisting = checked
+                                ToolTip.text: "Leave a file alone when its output is already in the output folder, instead of writing a _1 copy. Lets an interrupted batch pick up where it stopped."
+                                ToolTip.visible: hovered
+                                ToolTip.delay: 400
+                            }
+                            Item { Layout.fillWidth: true }
+                        }
                     }
                 }
             }

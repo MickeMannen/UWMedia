@@ -19,8 +19,8 @@
         "scale": 1.4,
         "unit_suffix": true,
         "unit_scale": 0.889,
-        "unit_dx": 13.0,
-        "unit_dy": 10.6
+        "unit_dx": 0.0,
+        "unit_dy": 0.0
       },
       {
         "field": "temp",
@@ -31,8 +31,8 @@
         "scale": 1.4,
         "unit_suffix": true,
         "unit_scale": 0.889,
-        "unit_dx": 18.0,
-        "unit_dy": 1.3
+        "unit_dx": 0.0,
+        "unit_dy": 0.0
       }
     ],
     "width": 230,

@@ -364,10 +364,10 @@ def test_hud_renderer_tank_icon_fill_color_by_pressure():
     assert not np.array_equal(red_frame, frame_skin_only)
     assert (red_frame[:, :, 2] == 255).any() and not (red_frame[:, :, 1] == 255).any()
 
-    # Healthy pressure -> green fill (BGR: green channel, not red)
-    green_frame = frame_for_pressure(180)
-    assert not np.array_equal(green_frame, frame_skin_only)
-    assert (green_frame[:, :, 1] == 255).any() and not (green_frame[:, :, 2] == 255).any()
+    # Healthy pressure -> the X50i's blue fill (0,170,255; real screenshots), no red
+    blue_frame = frame_for_pressure(180)
+    assert not np.array_equal(blue_frame, frame_skin_only)
+    assert np.all(blue_frame == (255, 170, 0), axis=2).any() and not (blue_frame[:, :, 2] == 255).any()
 
 
 def test_hud_renderer_badge_value_font_size_independent_of_label():
@@ -954,8 +954,9 @@ def test_tank_icon_segments_style_lights_by_pressure_and_draws_its_outline():
     assert 2 * 276 < count(half, (255, 255, 255)) < 4 * 276 and count(half, (58, 58, 58)) > 300
     low = render(40.0)
     assert count(low, (0, 0, 255)) > 100 and count(low, (255, 255, 255)) == 0   # red band, one segment
-    garmin = render(200.0, "Garmin", "x50i")
-    assert count(garmin, (0, 255, 0)) > 5 * 200        # Garmin keeps green
+    garmin = render(200.0, "Garmin", "mk3i")
+    assert count(garmin, (0, 255, 0)) > 5 * 200        # Garmin keeps green (the X50i's own rule is blue)
+    assert count(render(200.0, "Garmin", "x50i"), (255, 170, 0)) > 5 * 200
 
 
 def test_tank_icon_segments_bounds_span_all_segments_and_nose():

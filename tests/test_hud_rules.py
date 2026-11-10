@@ -276,12 +276,14 @@ def test_get_tank_fill_color():
     assert get_tank_fill_color("Garmin", "x50i", 40) == "#FF0000"
     # Warning band -> yellow
     assert get_tank_fill_color("Garmin", "x50i", 60) == "#FFFF00"
-    # Healthy pressure -> green (no band matches, falls through to the default)
-    assert get_tank_fill_color("Garmin", "x50i", 150) == "#00FF00"
+    # Healthy pressure -> the X50i's blue (real screenshots: 117 and 146 bar
+    # fill blue); the Mk3i, with no band for it, keeps the green default
+    assert get_tank_fill_color("Garmin", "x50i", 150) == "#00AAFF"
+    assert get_tank_fill_color("Garmin", "mk3i", 150) == "#00FF00"
     # Boundary: exactly at the low-band ceiling counts as the warning band, not red
     assert get_tank_fill_color("Garmin", "x50i", 50) == "#FFFF00"
     # Boundary: exactly at the warning-band ceiling counts as healthy
-    assert get_tank_fill_color("Garmin", "x50i", 70) == "#00FF00"
+    assert get_tank_fill_color("Garmin", "x50i", 70) == "#00AAFF"
 
     # Unknown manufacturer/model still falls back to the global default bands
     assert get_tank_fill_color("UnknownMfg", "UnknownModel", 40) == "#FF0000"

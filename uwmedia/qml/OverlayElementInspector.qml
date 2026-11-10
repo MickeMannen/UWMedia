@@ -23,7 +23,7 @@ ColumnLayout {
     readonly property bool elementSelected: overlayDesignerBackend.selectedIndex >= 0
     readonly property bool skinSelected: overlayDesignerBackend.skinSelected
     readonly property string kind: elementSelected ? String(sel.kind) : ""
-    readonly property bool sizedKind: kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || kind === "notice" || (kind === "badge" && String(sel.style) === "box")
+    readonly property bool sizedKind: kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || kind === "notice" || kind === "tank_switch_arrows" || (kind === "badge" && String(sel.style) === "box")
 
     // Fixed field widths (2026-09-28, per the user): the fill-width fields
     // made the grid, and with it the whole right column, wider than the
@@ -470,6 +470,16 @@ ColumnLayout {
                     ToolTip.visible: hovered
                     ToolTip.delay: 400
                 }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Hide during a tank switch"
+                    visible: inspector.kind === "text"
+                    checked: inspector.sel.hide_when_switch === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("hide_when_switch", checked)
+                    ToolTip.text: "Step aside while the sidemount tanks differ by more than the switch pressure (a Descent's SM label makes room for the arrows)"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+                }
 
             }
             Section {
@@ -570,6 +580,16 @@ ColumnLayout {
                     checked: inspector.sel.hide_when_notice === true
                     onToggled: overlayDesignerBackend.setSelectedAttr("hide_when_notice", checked)
                 }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Hide during a tank switch"
+                    visible: inspector.kind === "tank_icon"
+                    checked: inspector.sel.hide_when_switch === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("hide_when_switch", checked)
+                    ToolTip.text: "Step aside while the sidemount tanks differ by more than the switch pressure (a Descent's icons make room for the arrows)"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+                }
                 // Tank icon style: upright fill (optionally with a drawn outline) or
                 // Shearwater's horizontal segmented gauge (always draws its outline)
                 Label { text: "Style"; visible: inspector.kind === "tank_icon" }
@@ -579,6 +599,20 @@ ColumnLayout {
                     attr: "style"; options: ["fill", "segments"]; labels: ["Fill", "Seg"]
                     current: String(inspector.sel.style)
                 }
+                CheckBox {
+                    Layout.columnSpan: 4
+                    text: "Fill by pressure"
+                    visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments"
+                    checked: inspector.sel.fill_level === true
+                    onToggled: overlayDesignerBackend.setSelectedAttr("fill_level", checked)
+                    ToolTip.text: "The fill empties as the pressure drops - full at Full, empty at Empty - the way a Descent X50i draws its sidemount icons"
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 400
+                }
+                Label { text: "Full"; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.fill_level === true }
+                NumField { attr: "full_bar"; value: inspector.sel.full_bar; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.fill_level === true; ToolTip.text: "Pressure (bar) that fills the icon - the tank's rated pressure"; ToolTip.visible: hovered }
+                Label { text: "Empty"; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.fill_level === true }
+                NumField { attr: "empty_bar"; value: inspector.sel.empty_bar; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.fill_level === true; ToolTip.text: "Pressure (bar) at which the icon is empty - the critical pressure"; ToolTip.visible: hovered }
                 Label { text: "Segments"; visible: inspector.kind === "tank_icon" && inspector.sel.style === "segments" }
                 NumField { attr: "segments"; value: inspector.sel.segments; visible: inspector.kind === "tank_icon" && inspector.sel.style === "segments" }
                 Label { text: "Gap"; visible: inspector.kind === "tank_icon" && inspector.sel.style === "segments" }

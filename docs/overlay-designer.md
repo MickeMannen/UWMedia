@@ -70,10 +70,12 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   **Elements** heading folds the list the same way, showing the selected
   element's name while folded. The right-hand column scrolls.
 - A text element may carry `value_format` in its JSON (`"minutes"` for a
-  time in whole minutes, `"integer"` for a whole number) - the way a
-  Shearwater Tec row shows the dive time and stop depth; for a PO2
+  time in whole minutes, `"m:ss"` for a time without a leading zero, the
+  Descent X50i's "0:00" and "1:16", `"integer"` for a whole number) - the
+  way a Shearwater Tec row shows the dive time and stop depth; for a PO2
   `"decimal2"` ("0.70", a Descent), `"decimal2_no_lead"` (".72", a
-  Shearwater) or `"decimal1"` ("1.3", a Petrel's setpoint).
+  Shearwater) or `"decimal1"` ("1.3", a Petrel's setpoint, the X50i's
+  VSAC).
 - `hide_in_circuits` (a list of `CC`, `SC`, `BO`, `OC`) makes an element step
   aside on those circuits - on a CC page the setpoint gives its place to the
   PPO2 on a bailout.
@@ -97,6 +99,16 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   Shearwater six arrows and no bar - white under 9 m/min, yellow to 18,
   flashing red above, one arrow per 3 m/min as in the Perdix 2 manual. **Up**,
   **Down** and **Divider bar** in the inspector override the brand defaults.
+- A tank icon with `"fill_level": true` in its JSON empties as the pressure
+  drops: full at `full_bar` (the tank's rated pressure; a Descent's 207 bar
+  / 3000 psi default), empty at `empty_bar` (its critical pressure, 21 bar /
+  300 psi), the way the X50i draws its sidemount icons. **Fill by pressure**,
+  **Full** and **Empty** in the inspector set the same.
+- **Tank switch arrows** (a Descent X50i sidemount page) draw two triangles
+  in the brand's tank-switch colour pointing at the tank to breathe from
+  while the two tanks differ by more than the switch pressure, and nothing
+  otherwise; tick **Hide during a tank switch** on the SM label and tank
+  icons they replace. **Width**, **Height**, **Gap** and **Count** size them.
 - **Orientation** (text elements and custom labels): **H** horizontal, **S**
   stacked - upright letters one under the other - or turned on its side,
   **↑** reading bottom-to-top or **↓** top-to-bottom. Align / V-align then

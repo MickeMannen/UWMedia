@@ -131,6 +131,7 @@ def test_form_fields_are_saved_and_restored(color, tmp_path):
     color.logsText = str(tmp_path / "no_logs_here")
     color.colorChecked = False
     color.hwAccel = False
+    color.skipExisting = True
     color.colorProfile = "vivid"
     color.filenameFormat = FILENAME_FORMAT_PRESETS[2][0]
 
@@ -138,6 +139,7 @@ def test_form_fields_are_saved_and_restored(color, tmp_path):
     assert again.outputText == str(tmp_path / "out")
     assert again.logsText == str(tmp_path / "no_logs_here")
     assert again.colorChecked is False and again.hwAccel is False
+    assert again.skipExisting is True
     assert again.colorProfile == "vivid" and "vivid" in again.colorProfileList
     assert again.filenameFormat == FILENAME_FORMAT_PRESETS[2][0]
 
@@ -148,6 +150,7 @@ def test_setting_a_field_to_its_current_value_saves_nothing(color, settings_file
     color.logsText = ""
     color.colorChecked = True
     color.hwAccel = True
+    color.skipExisting = False
     color.colorProfile = color.colorProfile
     color.filenameFormat = color.filenameFormat
     assert not settings_file.exists()
@@ -392,6 +395,17 @@ def test_arguments_carry_logs_overlays_and_switches(color, tmp_path):
     assert len(saved) == 1 and saved[0]["scale"] == 1.0
     assert args[-2:] == ["--keep-filename", "--hw-accel"]
     assert "--media-shift" not in args  # no clock offset set
+
+
+def test_skip_if_target_exists_sends_no_overwrite(color, tmp_path):
+    # "Skip if target exists" - off by default (nothing sent), on sends the
+    # CLI's --no-overwrite. The switch was lost in the QML port (the Overlay
+    # Generator kept its own); this pins it on the Color page.
+    color.sourceText = str(tmp_path / "media")
+    color.outputText = str(tmp_path / "out")
+    assert color.skipExisting is False and "--no-overwrite" not in color._build_args()
+    color.skipExisting = True
+    assert "--no-overwrite" in color._build_args()
 
 
 def test_clock_offset_is_set_on_the_preview_and_reaches_the_run(color, settings_file):

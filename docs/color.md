@@ -23,6 +23,9 @@ with optional telemetry overlays burned in.
    made lower-case, e.g. `DSC06641.JPG` → `DSC06641.jpg`), **Original +
    color** adds `_color` to it (`DSC06641_color.jpg`), or name files by the
    date + time taken (`20260905_143000`) or date + time + `_color`.
+   **Skip if target exists** leaves a file alone when its output is already
+   in the output folder (instead of writing a `_1` copy), so an interrupted
+   batch can be restarted.
 5. **Clock offset**, under the preview - if the overlay runs ahead of or
    behind the footage, the camera's clock is off against the dive
    computer's. Scrub to a frame where the computer is readable, type the

@@ -91,6 +91,18 @@ def test_no_overwrite_still_skips_earlier_output(tmp_path, photo):
     assert skipped
 
 
+def test_no_overwrite_skips_for_an_overlays_only_run(tmp_path, photo):
+    # The Color page with colour correction off sends --overlays-file and
+    # no --color/--layout; "Skip if target exists" must still skip.
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "DSC06641.jpg").write_bytes(b"old")
+    args = _args(photo.parent, keep_filename=True, no_overwrite=True, color=None,
+                 overlay_instances=[{"layout_path": "x.json", "x": 0, "y": 0, "scale": 1.0}])
+    _, skipped = resolve_target_path(out / "DSC06641.jpg", photo, args)
+    assert skipped
+
+
 def test_keep_filename_and_filename_format_are_exclusive():
     import subprocess
     import sys

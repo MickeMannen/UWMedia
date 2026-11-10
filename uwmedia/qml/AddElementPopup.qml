@@ -66,6 +66,7 @@ Popup {
             RadioButton { text: "Tissue load bar"; checked: popup.kind === "tissue_bar"; ButtonGroup.group: kindGroup; onClicked: popup.kind = "tissue_bar" }
             RadioButton { text: "Ascent chevrons"; checked: popup.kind === "ascent_chevrons"; ButtonGroup.group: kindGroup; onClicked: popup.kind = "ascent_chevrons" }
             RadioButton { text: "Notice"; checked: popup.kind === "notice"; ButtonGroup.group: kindGroup; onClicked: popup.kind = "notice" }
+            RadioButton { text: "Tank switch arrows"; checked: popup.kind === "tank_switch_arrows"; ButtonGroup.group: kindGroup; onClicked: popup.kind = "tank_switch_arrows" }
         }
 
         RowLayout {
@@ -103,6 +104,7 @@ Popup {
                 : popup.kind === "tank_icon" ? "Colour fill (red / yellow / green by pressure), optionally with its own drawn outline."
                 : popup.kind === "tissue_bar" ? "Garmin-style vertical nitrogen-loading bar (green / yellow / red) with a marker at the current load."
                 : popup.kind === "ascent_chevrons" ? "Ascent-rate indicator in the template's brand style: Garmin - chevrons over a bar, green / yellow / red, the lower one on descent; Shearwater - six arrows, white / yellow / flashing red, one per 3 m/min (Perdix 2 manual p.12)."
+                : popup.kind === "tank_switch_arrows" ? "Descent-style triangles that point at the sidemount tank to breathe from while the two tanks differ by more than the switch pressure (hud_rules.json sidemount_switch); nothing is drawn otherwise. Tick 'Hide during a tank switch' on the SM label and tank icons they replace."
                 : popup.kind === "notice" ? "The computer's own notification (FAST ASCENT, MISSED DECO STOP, HIGH PPO2, Low NDL Alert…) in its wording and colours from hud_rules.json, shown for a few seconds when the log triggers it. Nothing is drawn otherwise. Tick 'Hide while a notice shows' on the elements it covers."
                 : (popup.kind === "text" && fieldCombo.currentText === "depth_small_decimals") ? "Depth with the decimal part in a small font, top-aligned with the metres (e.g. 12 and a small .3) - the way Garmin and Shearwater computers show it. Saved as a depth element with the Small suffix style set; adjust Suffix size in the inspector."
                 : (popup.kind === "text" && fieldCombo.currentText === "dive_time_small_seconds") ? "Dive time with the seconds in a small font, top-aligned with the minutes (e.g. 32 and a small :15) - the way Garmin and Shearwater computers show it. Saved as a dive_time element with the Small suffix style set; adjust Suffix size in the inspector."

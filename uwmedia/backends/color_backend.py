@@ -165,6 +165,7 @@ class ColorBackend(QObject):
     logsChanged = Signal()
     colorCheckedChanged = Signal()
     hwAccelChanged = Signal()
+    skipExistingChanged = Signal()
     colorProfileChanged = Signal()
     filenameFormatChanged = Signal()
     clockOffsetChanged = Signal()
@@ -218,6 +219,7 @@ class ColorBackend(QObject):
         self._logs_text = ""
         self._color_checked = True
         self._hw_accel = True
+        self._skip_existing = False
         # Clock offset (2026-10-17): the camera's clock against the dive
         # computer's, whole hours + seconds, set on the preview and sent to
         # the run as --media-shift (utils/clock_offset.py).
@@ -258,6 +260,7 @@ class ColorBackend(QObject):
         self._logs_text = fields.get("logs_input", "") or ""
         self._color_checked = fields.get("color_switch", True)
         self._hw_accel = fields.get("hw_accel_switch", True)
+        self._skip_existing = bool(fields.get("no_overwrite_switch", False))
         profile = fields.get("color_profile")
         if profile and profile in self._color_profiles:
             self._color_profile = profile
@@ -372,6 +375,24 @@ class ColorBackend(QObject):
         self._hw_accel = value
         set_field("hw_accel_switch", value)
         self.hwAccelChanged.emit()
+
+    @Property(bool, notify=skipExistingChanged)
+    def skipExisting(self):
+        # "Skip if target exists" - the CLI's --no-overwrite: a file whose
+        # output is already in the output folder is left alone instead of
+        # getting a _1 copy, so an interrupted batch can be restarted. The
+        # Toga app had this switch on its main page; the QML port dropped
+        # it here while the Overlay Generator kept it (2026-11-10). Same
+        # persisted "no_overwrite_switch" key as that page, like hwAccel.
+        return self._skip_existing
+
+    @skipExisting.setter
+    def skipExisting(self, value):
+        if value == self._skip_existing:
+            return
+        self._skip_existing = value
+        set_field("no_overwrite_switch", value)
+        self.skipExistingChanged.emit()
 
     @Property(list, constant=True)
     def colorProfileList(self):
@@ -1328,6 +1349,8 @@ class ColorBackend(QObject):
             # "Original" - without this the CLI names batch output by
             # date taken.
             args.append("--keep-filename")
+        if self._skip_existing:
+            args.append("--no-overwrite")
         # --hw-accel defaults to False in cli_main.py's argparse if never
         # passed - this used to never be appended at all (a long-deferred
         # gap, see hwAccel's own docstring above for history), silently

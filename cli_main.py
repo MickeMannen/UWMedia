@@ -300,6 +300,8 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "n2_tissue_load",
         # the device's own notification (gui/hud_renderer._draw_notice)
         "notice",
+        # the Descent's triangles pointing at the sidemount tank to breathe from
+        "tank_switch",
         # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py properties)
         "circuit",
         "diluent_po2",
@@ -498,20 +500,24 @@ def output_filename(source: Path, output_dir: Path, args, creation_date, forced_
 
 def resolve_target_path(target_path: Path, source: Path, args):
     """Applies --no-overwrite/--overwrite to `target_path`. Returns
-    (path, skipped); an existing file otherwise gets _1, _2 … appended."""
+    (path, skipped); an existing file otherwise gets _1, _2 … appended.
+    --overlays-file counts like --layout: the Color page sends it with
+    colour correction switched off, and its "Skip if target exists" must
+    still skip."""
     # Never write over the source itself (same folder + same name), even
     # with --overwrite - it's still being read. It also isn't an earlier
     # output, so --no-overwrite mustn't skip because of it. samefile, not a
     # path comparison: on case-insensitive file systems (macOS default)
     # "DSC01.jpg" is the source "DSC01.JPG".
     writes_over_source = target_path.exists() and os.path.samefile(target_path, source)
+    names_output = args.color or args.layout or getattr(args, "overlay_instances", None) or args.render_video_log
 
-    if (args.color or args.layout or args.render_video_log) and args.no_overwrite and not writes_over_source:
+    if names_output and args.no_overwrite and not writes_over_source:
         if target_path.exists():
             print(f"Skipping: Target file {target_path} already exists (--no-overwrite is active).")
             return target_path, True
 
-    if (args.color or args.layout or args.render_video_log) and args.overwrite and not writes_over_source:
+    if names_output and args.overwrite and not writes_over_source:
         if target_path.exists():
             print(f"Overwriting existing target file: {target_path}")
     else:

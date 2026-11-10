@@ -160,7 +160,13 @@ def test_garmin_sidemount_pages_say_which_tank_to_breathe_from():
                (40, 20.0, {"tanks": skewed}), (50, 20.0, {"tanks": even}), (60, 20.0, {"tanks": skewed})]
     tl = notice_timeline("Garmin", "mk3i", _dive(samples))
     assert tl[0] is None
-    assert tl[10]["text"] == "Breathe from T2." and tl[15]["text"] == "Breathe from T2."
+    # the side and the transceiver name, as the X50i prints it (real
+    # screenshot test_data/dive_computers/screen_shots/5831.bmp); the first
+    # tank is the left one
+    assert tl[10]["text"] == "Breathe from Right Tank (T2)." and tl[15]["text"] == "Breathe from Right Tank (T2)."
     assert tl[40] is None  # shown for show_seconds, then gone although the difference remains
-    assert tl[60]["text"] == "Breathe from T2."  # re-armed after the tanks were even again
-    assert notice_timeline("Garmin", "x50i", _dive(samples))[10]["text"] == "Breathe from T2."  # the X50i's own notice list has it too
+    assert tl[60]["text"] == "Breathe from Right Tank (T2)."  # re-armed after the tanks were even again
+    assert notice_timeline("Garmin", "x50i", _dive(samples))[10]["text"] == "Breathe from Right Tank (T2)."  # the X50i's own notice list has it too
+    left = [(0, 20.0, {"tanks": even}), (10, 20.0, {"tanks": {"T1": TankData(pressure_bar=176.0, name="T1", enabled=True), "T2": TankData(pressure_bar=140.0, name="T2", enabled=True)}})]
+    assert notice_timeline("Garmin", "x50i", _dive(left))[10]["text"] == "Breathe from Left Tank (T1)."
+    assert notice_timeline("Garmin", "x50i", _dive(left))[10]["color"] == "#00AAFF"  # the X50i's blue border

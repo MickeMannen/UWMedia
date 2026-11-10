@@ -284,7 +284,26 @@ def unit_kind_of(field):
 def format_telemetry_value(field, raw_val, display_rule=None):
     """Unified formatting for telemetry values, in the unit system in force
     (utils/units.py: the data is SI, the display converts). `display_rule`
-    is the brand's `display` rule (depth decimals per system)."""
+    is the brand's `display` rule: depth decimals per system,
+    `percent_fields` (the fields written with a % sign - a Descent X50i's
+    "33%" SurfGF and "2%" CNS) and `gf99_on_gassing_text` (what GF99 reads
+    while the leading tissue is still taking up gas, i.e. at or below 0:
+    the X50i's "On-Gassing")."""
+    if isinstance(display_rule, dict) and raw_val is not None:
+        if field == "gf" and display_rule.get("gf99_on_gassing_text"):
+            try:
+                if float(raw_val) <= 0:
+                    return str(display_rule["gf99_on_gassing_text"])
+            except (TypeError, ValueError):
+                pass
+        text = _format_telemetry_value(field, raw_val, display_rule)
+        if field in (display_rule.get("percent_fields") or ()) and text not in ("--", "wait"):
+            return text + "%"
+        return text
+    return _format_telemetry_value(field, raw_val, display_rule)
+
+
+def _format_telemetry_value(field, raw_val, display_rule=None):
     from utils import units as U
     units = U.current_units()
     if field == "gasmix":
@@ -1552,7 +1571,93 @@ def _draw_tank_fill(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w
         return
     color_rgb = tuple(int(color_hex.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
 
-    draw.rounded_rectangle([abs_x, abs_y, abs_x + w, abs_y + h], radius=radius, fill=color_rgb)
+    top = abs_y
+    if elem.get("fill_level"):
+        # the fill drops with the pressure, from `full_bar` (a Descent X50i:
+        # the tank's rated pressure, 207 bar / 3000 psi by default) down to
+        # `empty_bar` (its critical pressure, 21 bar / 300 psi) - real
+        # screenshots test_data/dive_computers/screen_shots: 117 bar fills
+        # half the icon, 179 bar most of it
+        fraction = tank_fill_fraction(raw_val, elem)
+        if fraction <= 0:
+            return
+        top = abs_y + h - max(1, int(round(h * fraction)))
+    draw.rounded_rectangle([abs_x, top, abs_x + w, abs_y + h], radius=radius, fill=color_rgb)
+
+
+def tank_fill_fraction(value, elem):
+    """0..1 of a `fill_level` tank icon's height that is filled for a
+    pressure in bar: linear from `empty_bar` (default 0) to `full_bar`
+    (default 200)."""
+    try:
+        full = float(elem.get("full_bar", 200))
+        empty = float(elem.get("empty_bar", 0))
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if full <= empty:
+        return 1.0
+    return max(0.0, min(1.0, (v - empty) / (full - empty)))
+
+def tank_switch_arrows_geometry(elem):
+    """(triangle width, height, gap, count) in native px for a
+    tank_switch_arrows element - the Descent X50i's two triangles between
+    the sidemount pressures (real screenshots: 23 x 44 display px, 13 apart)."""
+    w = max(2, int(round(float(elem.get("width", 23)))))
+    h = max(2, int(round(float(elem.get("height", 44)))))
+    gap = max(0, int(round(float(elem.get("gap", 13)))))
+    count = max(1, int(elem.get("count", 2)))
+    return w, h, gap, count
+
+
+# Brightness of the triangle nearest the target tank and of the one behind
+# it, second by second: the X50i's screenshots caught one lit alone, both
+# dim, both lit, and the far one half-lit - a march towards the tank.
+TANK_SWITCH_ARROW_PHASES = ((1.0, 0.0), (0.6, 0.38), (1.0, 1.0), (1.0, 0.6))
+
+
+def tank_switch_arrow_levels(elapsed, count):
+    """Brightness 0..1 of each triangle, nearest the target first."""
+    if elapsed is None:
+        return [1.0] * count  # no clock (a designer preview without a time): all lit
+    try:
+        phase = TANK_SWITCH_ARROW_PHASES[int(elapsed) % len(TANK_SWITCH_ARROW_PHASES)]
+    except (TypeError, ValueError):
+        return [1.0] * count
+    return [phase[min(i, len(phase) - 1)] for i in range(count)]
+
+
+def _draw_tank_switch_arrows(draw, elem, target, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log, elapsed):
+    """Schema element type "tank_switch_arrows": while the two sidemount
+    tanks differ by more than the brand's `sidemount_switch` threshold,
+    `count` triangles in the rule's colour point at the tank to breathe
+    from - right for the secondary tank, left for the primary - the nearest
+    one lit first (Descent X50i real screenshots). Nothing otherwise."""
+    if target not in ("primary", "secondary"):
+        return
+    from utils.hud_rules_engine import get_rule_config
+    rule = get_rule_config(manufacturer, model, "sidemount_switch") or {}
+    base = _rgb(str(elem.get("color") or rule.get("color", "#00AAFF")))
+    scale = user_scale if render_log else user_scale * res_scale
+    w, h, gap, count = tank_switch_arrows_geometry(elem)
+    w_px, h_px, gap_px = max(1, int(round(w * scale))), max(1, int(round(h * scale))), int(round(gap * scale))
+    abs_x = int(skin_x + elem.get("rel_x", 0.0) * w_scaled)
+    abs_y = int(skin_y + elem.get("rel_y", 0.0) * h_scaled)
+    point_right = target == "secondary"
+    levels = tank_switch_arrow_levels(elapsed, count)
+    for i, level in enumerate(levels):  # i = 0 is the triangle nearest the target
+        if level <= 0:
+            continue
+        slot = (count - 1 - i) if point_right else i
+        x0 = abs_x + slot * (w_px + gap_px)
+        colour = tuple(int(round(c * level)) for c in base)
+        mid = abs_y + h_px // 2
+        if point_right:
+            pts = [(x0, abs_y), (x0 + w_px, mid), (x0, abs_y + h_px)]
+        else:
+            pts = [(x0 + w_px, abs_y), (x0, mid), (x0 + w_px, abs_y + h_px)]
+        draw.polygon(pts, fill=colour)
+
 
 def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb, outline_rgb=None):
     """A filled rounded box behind `text` drawn at (abs_x, abs_y) - the way a
@@ -1655,7 +1760,7 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         height_px = max(4, int(float(elem.get("height", 60)) * scale))
         pad = max(2, int(height_px * 0.1))
         draw.rounded_rectangle([abs_x, abs_y, abs_x + width_px, abs_y + height_px], radius=max(2, int(height_px * 0.12)),
-                               fill=(20, 20, 20), outline=colour, width=max(1, int(height_px * 0.04)))
+                               fill=(20, 20, 20), outline=colour, width=max(1, int(height_px * 0.03)))
         # a warning carries the triangle in a left column; an information
         # alert ("Breathe from Left Tank", `icon: none`) has none and its
         # text centred, as the real screenshots show
@@ -1730,6 +1835,9 @@ def apply_value_format(elem, val, raw_val):
         return val
     if value_format == "minutes":
         return str(int(raw_val // 60))
+    if value_format == "m:ss":
+        # a Descent X50i's dive time and TTS: "0:00", "1:16" - no leading zero
+        return f"{int(raw_val // 60)}:{int(raw_val % 60):02d}"
     # a value with a unit is formatted in the unit system in force, not as
     # the SI number the log holds (a stop depth in feet, a temperature in °F)
     from utils import units as U
@@ -1741,6 +1849,8 @@ def apply_value_format(elem, val, raw_val):
         raw_val = U.temperature(raw_val)
     elif kind == "pressure":
         raw_val = U.pressure(raw_val)
+    elif kind == "volume_rate":
+        raw_val = U.volume_rate(raw_val)
     if value_format == "integer":
         return f"{raw_val:.0f}"
     # PPO2 the way each screen writes it: Garmin "0.70" (Descent X50i manual
@@ -1897,6 +2007,13 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
     persistent = None
     if any(elem.get("type") == "notice" and elem.get("source") == "persistent" for elem in linked_elements):
         persistent = persistent_notice_for(layout, waypoint, waypoints)
+    # The sidemount tank to breathe from (a Descent's blue pressure and
+    # marching triangles): the SM label and tank icons (`hide_when_switch`)
+    # step aside while it is pointed out.
+    switch_target = None
+    if any(elem.get("hide_when_switch") or elem.get("type") == "tank_switch_arrows" for elem in linked_elements):
+        from utils.hud_rules_engine import sidemount_switch_target
+        switch_target = sidemount_switch_target(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint)
 
     for elem in linked_elements:
         field = elem.get("field", "")
@@ -1906,6 +2023,12 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             # a CC page's setpoint steps aside on a bailout, its PPO2 on the loop
             continue
         if notice is not None and elem.get("hide_when_notice"):
+            continue
+        if switch_target is not None and elem.get("hide_when_switch"):
+            continue
+        if elem.get("type") == "tank_switch_arrows":
+            elapsed = waypoint.dive_time if waypoint is not None and waypoint.dive_time is not None else getattr(waypoint, "time_since_start", 0)
+            _draw_tank_switch_arrows(draw, elem, switch_target, rules_manufacturer(layout), layout.get("model", "Perdix2"), skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log, elapsed)
             continue
         if elem.get("type") == "notice":
             shown = persistent if elem.get("source") == "persistent" else notice
@@ -2095,8 +2218,13 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             from utils.hud_rules_engine import get_rule_config, sidemount_switch_target
             if sidemount_switch_target(manufacturer, model, waypoint) == highlight:
                 rule = get_rule_config(manufacturer, model, "sidemount_switch") or {}
-                box_rgb = _rgb(str(rule.get("color", "#00C800")))
-                color_rgb = _rgb(str(rule.get("text_color", "#000000")))
+                if elem.get("tank_switch_style") == "text":
+                    # a Descent X50i (real screenshots): the pressure itself
+                    # turns blue, no box
+                    color_rgb = _rgb(str(rule.get("color", "#00C800")))
+                else:
+                    box_rgb = _rgb(str(rule.get("color", "#00C800")))
+                    color_rgb = _rgb(str(rule.get("text_color", "#000000")))
         if box_rgb is not None:
             _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb, box_outline_rgb)
             outline = False

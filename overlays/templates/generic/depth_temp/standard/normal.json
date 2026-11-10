@@ -12,27 +12,27 @@
     "linked_elements": [
       {
         "field": "depth",
-        "rel_x": 0.16542792030506193,
-        "rel_y": 0.16172521943184734,
+        "rel_x": 0.18435,
+        "rel_y": 0.16173,
         "color": "#ffffff",
         "font_size": 45,
         "scale": 1.4,
         "unit_suffix": true,
         "unit_scale": 0.889,
-        "unit_dx": 14.9,
-        "unit_dy": 4.2
+        "unit_dx": 0.0,
+        "unit_dy": 0.0
       },
       {
         "field": "temp",
-        "rel_x": 0.18434531465060114,
-        "rel_y": 0.5368239355581131,
+        "rel_x": 0.18435,
+        "rel_y": 0.53682,
         "color": "#ffffff",
         "font_size": 45,
         "scale": 1.4,
         "unit_suffix": true,
         "unit_scale": 0.889,
-        "unit_dx": 25.0,
-        "unit_dy": 1.3
+        "unit_dx": 0.0,
+        "unit_dy": 0.0
       }
     ],
     "width": 300,

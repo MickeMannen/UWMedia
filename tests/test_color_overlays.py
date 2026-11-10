@@ -437,6 +437,7 @@ def _make_build_args_backend(overlay_instances):
     app._filename_format_by_label = {"": ""}
     app._filename_format = ""
     app._hw_accel = True
+    app._skip_existing = False
     app.color_overlay_instances = overlay_instances
     return app
 

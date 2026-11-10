@@ -967,15 +967,30 @@
       },
       {
         "id": "sidemount_switch",
-        "text": "Breathe from {tank}.",
+        "text": "Breathe from {side} Tank ({tank}).",
         "caption": "",
         "when": "sidemount_switch",
-        "_source": "Mk3 p.36 / X50i p.27 alert table: 'Breathe from %1.' - the pressure difference between the sidemounted tanks exceeded the configured threshold; %1 is the transceiver name; look: real screenshot test_data/dive_computers/garmin_x50i/x50i_sidemount_change_tank.png - blue border, no triangle, text centred",
-        "color": "#1E78FF",
+        "_source": "Mk3 p.36 / X50i p.27 alert table: 'Breathe from %1.' - the pressure difference between the sidemounted tanks exceeded the configured threshold; %1 is the side and transceiver name, 'Breathe from Left Tank (Micke01).' (real screenshots test_data/dive_computers/screen_shots/5831.bmp, garmin_x50i/x50i_sidemount_change_tank.png - blue border, no triangle, text centred); the first tank is the left one",
+        "color": "#00AAFF",
         "icon": "none"
       }
     ],
     "x50i": {
+      "display": {
+        "depth_decimals": {
+          "metric": 1,
+          "imperial": 0
+        },
+        "percent_fields": ["gf", "surf_gf", "cns"],
+        "gf99_on_gassing_text": "On-Gassing",
+        "_source": "Gases page screenshot test_data/dive_computers/screen_shots/1800.bmp: SURF. GF 33%, CNS 2%, GF99 'On-Gassing' while the tissues still take up gas (3466.bmp at the surface: GF99 7%); depth decimals as the Mk3"
+      },
+      "tank_pressure_fill": [
+        {"max": 50, "color": "#FF0000"},
+        {"max": 70, "color": "#FFFF00"},
+        {"min": 70, "color": "#00AAFF"}
+      ],
+      "_tank_pressure_fill": "The tank icon fills blue (0,170,255) at 117 and 146 bar (real screenshots test_data/dive_computers/screen_shots); red / yellow below the reserve assumed as the brand's. Not seen on the Mk3i, which keeps the green",
       "notices": [
         {
           "id": "po2_crit_high",
@@ -1115,11 +1130,11 @@
         },
         {
           "id": "sidemount_switch",
-          "text": "Breathe from {tank}.",
+          "text": "Breathe from {side} Tank ({tank}).",
           "caption": "",
           "when": "sidemount_switch",
           "_source": "X50i EN-US p.27 alert table 'Breathe from %1.'; the real screenshot x50i_sidemount_change_tank.png reads 'Breathe from Left Tank (VASEN).' - blue border, no triangle, centred",
-          "color": "#1E78FF",
+          "color": "#00AAFF",
           "icon": "none"
         }
       ]
@@ -1133,9 +1148,9 @@
     },
     "sidemount_switch": {
       "threshold_bar": 30.0,
-      "color": "#1E78FF",
+      "color": "#00AAFF",
       "text_color": "#FFFFFF",
-      "_source": "Mk3 p.24 / X50i p.13 Enabling Sidemount Setup: 'when the pressure difference is greater than the configured threshold, an alert appears to remind you to breathe from the tank with the higher pressure'; 'The recommended breathing tank is highlighted in blue'. Switch Pressure is a setting; the default is not in the manual - 30 bar assumed (the owner's)"
+      "_source": "Mk3 p.24 / X50i p.13 Enabling Sidemount Setup: 'when the pressure difference is greater than the configured threshold, an alert appears to remind you to breathe from the tank with the higher pressure'; 'The recommended breathing tank is highlighted in blue'. Switch Pressure is a setting; the default is not in the manual - 30 bar assumed (the owner's). Colour: the X50i's own blue (0,170,255), real screenshots test_data/dive_computers/screen_shots/1875-4131.bmp, where the pressure turns blue and two triangles march towards the tank (tank_switch_arrows element)"
     },
     "dil_po2": {
       "min": 0.18,
