@@ -225,7 +225,8 @@ def test_tank_window_opens_with_the_saved_names(backend):
     emitted = _count(backend.tankNamesChanged)
     backend.openTankNamesWindow()
     assert backend.tankWindowVisible is True
-    assert backend.tankRows == [{"serial": "111", "name": "Back gas"}, {"serial": "222", "name": "Stage"}]
+    # in the saved order (the tank order), not sorted by serial
+    assert backend.tankRows == [{"serial": "222", "name": "Stage"}, {"serial": "111", "name": "Back gas"}]
     assert backend.tankStatusText == ""
     backend.closeTankNamesWindow()
     assert backend.tankWindowVisible is False
@@ -270,6 +271,24 @@ def test_rename_and_remove_rows_then_save(backend, dialogs):
     ConfigManager._instance = None
     assert get_config().get_tank_mapping() == expected
     assert AdvancedBackend().tankRows == [{"serial": s, "name": n} for s, n in sorted(expected.items())]
+
+
+def test_move_rows_sets_the_tank_order(backend, dialogs):
+    _write_tanks({"111": "Right", "222": "Left", "333": "Stage"})
+    backend.openTankNamesWindow()
+    emitted = _count(backend.tankNamesChanged)
+    backend.moveTankRow("222", -1)
+    backend.moveTankRow("222", -1)     # already first: stays
+    backend.moveTankRow("111", 1)
+    backend.moveTankRow("111", 1)      # already last: stays
+    backend.moveTankRow("missing", 1)  # no error
+    assert len(emitted) == 2
+    assert [row["serial"] for row in backend.tankRows] == ["222", "333", "111"]
+
+    backend.saveTankNames()
+    ConfigManager._instance = None
+    assert list(get_config().get_tank_mapping().items()) == [("222", "Left"), ("333", "Stage"), ("111", "Right")]
+    assert get_config().order_tanks(["Right", "Left"]) == ["Left", "Right"]
 
 
 def test_scan_logs_folder_adds_new_serials(backend, dialogs, monkeypatch, tmp_path):

@@ -226,9 +226,15 @@ Item {
         id: tankWindow
         visible: advancedBackend.tankWindowVisible
         title: "Tank Sensor Names"
-        width: 560
+        width: 640
         height: 500
         onClosing: advancedBackend.closeTankNamesWindow()
+        // A window of its own doesn't take the main window's theme: without
+        // these the fields draw dark text on the dark background
+        Material.theme: Material.Dark
+        Material.accent: "#00A6ED"
+        Material.primary: "#00A6ED"
+        Material.background: "#1F1F1F"
 
         Rectangle {
             anchors.fill: parent
@@ -241,7 +247,7 @@ Item {
 
                 Label {
                     Layout.fillWidth: true
-                    text: "Map Garmin tank sensor serial numbers to friendly names (e.g. \"Left\", \"Micke01\")."
+                    text: "Map Garmin tank sensor serial numbers to friendly names (e.g. \"Left\", \"Micke01\"). The order is the tank order: an overlay's primary tank is the first one listed here that the dive has, its secondary tank the next."
                     color: "white"
                     wrapMode: Text.WordWrap
                 }
@@ -252,8 +258,10 @@ Item {
                     clip: true
                     model: advancedBackend.tankRows
                     delegate: RowLayout {
+                        id: tankRow
                         width: ListView.view.width
                         required property var modelData
+                        required property int index
                         Label {
                             Layout.preferredWidth: 140
                             text: modelData.serial
@@ -265,6 +273,16 @@ Item {
                             font.pixelSize: 15
                             text: modelData.name
                             onTextEdited: advancedBackend.setTankName(modelData.serial, text)
+                        }
+                        Button {
+                            text: "Up"
+                            enabled: tankRow.index > 0
+                            onClicked: advancedBackend.moveTankRow(modelData.serial, -1)
+                        }
+                        Button {
+                            text: "Down"
+                            enabled: tankRow.index < tankRow.ListView.view.count - 1
+                            onClicked: advancedBackend.moveTankRow(modelData.serial, 1)
                         }
                         Button {
                             text: "Remove"

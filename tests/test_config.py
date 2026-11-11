@@ -44,8 +44,17 @@ def test_save_adds_new_serials_and_keeps_names(fresh):
     config.get_config().save_config(["300", 200, "100"])
     data = _read(fresh)
     assert data["tanks"] == {"100": "Tank 100", "200": "Left", "300": "Tank 300"}
-    assert list(data["tanks"]) == ["100", "200", "300"]
+    assert list(data["tanks"]) == ["200", "100", "300"]  # the tank order is kept, new serials go last
     assert data["other"] == "kept"
+
+
+def test_tank_order_is_the_mapping_order(fresh):
+    cfg = config.get_config()
+    cfg.set_tank_mapping({"222": "Left", 111: "Right", "333": "Left"})
+    assert list(_read(fresh)["tanks"].items()) == [("222", "Left"), ("111", "Right"), ("333", "Left")]
+    # by name (what the parsers key a tank by); unlisted tanks last, as they came
+    assert cfg.order_tanks(["9", "Right", "5", "Left"]) == ["Left", "Right", "9", "5"]
+    assert cfg.order_tanks([]) == []
 
 
 def test_rename_and_remove_write_through(fresh):

@@ -123,6 +123,9 @@ tanks:
   "3578142604": "Right"
 ```
 
+The order is the tank order: an overlay's primary tank is the first one
+listed that the dive has, its secondary tank the next.
+
 Edit it on [Advanced → Sensor names](advanced.md#sensor-names), or create it
 from a log folder with the CLI's `--create-config`.
 

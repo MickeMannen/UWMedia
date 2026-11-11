@@ -352,8 +352,10 @@ class GarminParser(BaseParser):
                 if t_key not in unique_tank_keys:
                     initial_tanks[t_key] = tank_messages_dict[ts_key][t_key]
                     unique_tank_keys.add(t_key)
-        
-        
+        # Primary, secondary, ...: the order of config.yaml's tanks, not which
+        # pod happened to be heard from first on this dive
+        initial_tanks = {t_key: initial_tanks[t_key] for t_key in get_config().order_tanks(initial_tanks)}
+
         current_active_tanks = initial_tanks.copy()
         tank_ptr = 0
         alert_ptr = 0

@@ -1,6 +1,6 @@
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Iterable, Optional, List
 
 from utils.resource_paths import find_resource, user_config_dir
 
@@ -62,11 +62,12 @@ class ConfigManager:
 
     def save_config(self, tank_serials: List[str]):
         """Adds any newly discovered tank serials to the mapping (leaving already-named
-        tanks untouched) and writes the result to the user's writable config.yaml."""
+        tanks untouched, in their order - see order_tanks) and writes the result to the
+        user's writable config.yaml."""
         tanks = dict(self.get_tank_mapping())
-        for serial in tank_serials:
-            tanks.setdefault(str(serial), f"Tank {serial}")
-        self._config["tanks"] = dict(sorted(tanks.items()))
+        for serial in sorted(str(s) for s in tank_serials):
+            tanks.setdefault(serial, f"Tank {serial}")
+        self._config["tanks"] = tanks
 
         try:
             self._write()
@@ -79,6 +80,11 @@ class ConfigManager:
         tanks = dict(self.get_tank_mapping())
         tanks[str(serial)] = name
         self._config["tanks"] = tanks
+        self._write()
+
+    def set_tank_mapping(self, tanks: Dict[str, str]):
+        """Replaces the whole mapping, in the order given (see order_tanks), and saves immediately."""
+        self._config["tanks"] = {str(serial): str(name) for serial, name in tanks.items()}
         self._write()
 
     def remove_tank(self, serial: str):
@@ -97,6 +103,15 @@ class ConfigManager:
         """Maps a serial number to a friendly name, or returns the serial if not found."""
         mapping = self.get_tank_mapping()
         return mapping.get(str(serial), str(serial))
+
+    def order_tanks(self, keys: Iterable[str]) -> List[str]:
+        """Tank keys (as map_tank_name names them) in the mapping's order: the first
+        listed tank is an overlay's primary tank, the second its secondary. Tanks
+        the mapping doesn't list come after, in the order given."""
+        rank: Dict[str, int] = {}
+        for name in self.get_tank_mapping().values():
+            rank.setdefault(name, len(rank))
+        return sorted(keys, key=lambda key: rank.get(key, len(rank)))
 
 
 def get_config() -> ConfigManager:

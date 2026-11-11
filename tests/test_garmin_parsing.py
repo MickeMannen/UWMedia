@@ -208,6 +208,37 @@ def test_tank_updates_merge_onto_records(monkeypatch, tmp_path):
     assert (unknown.name, unknown.o2_percent, unknown.enabled) == (None, 21.0, True)
 
 
+def test_tank_order_follows_the_sensor_names_order(monkeypatch, tmp_path):
+    """Primary/secondary is the order of config.yaml's tanks, not which pod
+    the computer heard from first."""
+    class Names:
+        mapping = {"222": "Left", "111": "Right"}
+
+        def map_tank_name(self, serial):
+            return self.mapping.get(serial, serial)
+
+        def order_tanks(self, keys):
+            order = list(self.mapping.values())
+            return sorted(keys, key=lambda k: order.index(k) if k in order else len(order))
+
+    monkeypatch.setattr(garmin, "get_config", Names)
+    t = lambda s: START_UTC + timedelta(seconds=s)  # noqa: E731
+    dive, = _parse(monkeypatch, tmp_path, {
+        "activity_mesgs": _activity(),
+        "record_mesgs": _records(3),
+        "tank_update_mesgs": [
+            {"timestamp": t(0), "sensor": 333, "pressure": 100.0},
+            {"timestamp": t(0), "sensor": 111, "pressure": 210.0},
+            {"timestamp": t(60), "sensor": 222, "pressure": 190.0},
+            {"timestamp": t(60), "sensor": 111, "pressure": 200.0},
+        ],
+    })
+    for wp in dive.waypoints:
+        assert list(wp.tanks) == ["Left", "Right", "333"]
+    last = dive.waypoints[-1]
+    assert (last.primary_tank_pressure, last.secondary_tank_pressure) == (190.0, 200.0)
+
+
 def test_dive_alerts_land_on_the_next_record(monkeypatch, tmp_path):
     t = lambda s: START_UTC + timedelta(seconds=s)  # noqa: E731
     dive, = _parse(monkeypatch, tmp_path, {

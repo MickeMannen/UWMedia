@@ -303,7 +303,8 @@ class AdvancedBackend(QObject):
 
     @Property("QVariant", notify=tankNamesChanged)
     def tankRows(self):
-        return [{"serial": s, "name": self._tank_row_state[s]} for s in sorted(self._tank_row_state.keys())]
+        # In the saved order: it is the tank order (first = an overlay's primary tank)
+        return [{"serial": s, "name": name} for s, name in self._tank_row_state.items()]
 
     @Property(str, notify=tankNamesChanged)
     def tankStatusText(self):
@@ -326,6 +327,20 @@ class AdvancedBackend(QObject):
     @Slot(str)
     def removeTankRow(self, serial):
         self._tank_row_state.pop(serial, None)
+        self.tankNamesChanged.emit()
+
+    @Slot(str, int)
+    def moveTankRow(self, serial, step):
+        """Moves a row up (step -1) or down (+1) in the tank order."""
+        serials = list(self._tank_row_state)
+        if serial not in serials:
+            return
+        at = serials.index(serial)
+        to = at + step
+        if not 0 <= to < len(serials) or to == at:
+            return
+        serials.insert(to, serials.pop(at))
+        self._tank_row_state = {s: self._tank_row_state[s] for s in serials}
         self.tankNamesChanged.emit()
 
     @Slot()
@@ -355,7 +370,7 @@ class AdvancedBackend(QObject):
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to scan folder: {e}")
             return
-        new_serials = [s for s in found if s not in self._tank_row_state]
+        new_serials = sorted(s for s in found if s not in self._tank_row_state)
         for serial in new_serials:
             self._tank_row_state[serial] = f"Tank {serial}"
         self._tank_status_text = (
@@ -368,12 +383,8 @@ class AdvancedBackend(QObject):
     def saveTankNames(self):
         from PySide6.QtWidgets import QMessageBox
 
-        config = get_config()
-        for serial in list(config.get_tank_mapping().keys()):
-            if serial not in self._tank_row_state:
-                config.remove_tank(serial)
-        for serial, name in self._tank_row_state.items():
-            config.set_tank_name(serial, name.strip() or f"Tank {serial}")
+        get_config().set_tank_mapping(
+            {serial: name.strip() or f"Tank {serial}" for serial, name in self._tank_row_state.items()})
         self._tank_window_visible = False
         self.tankNamesChanged.emit()
         self.locationsChanged.emit()

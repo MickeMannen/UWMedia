@@ -5,7 +5,20 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- Advanced: the Tank Sensor Names window has **Up / Down** buttons to set the
+  tank order, and keeps the sensors in that order instead of sorting them
+  by serial number.
+
+### Changed
+- Overlays: on a Garmin log the primary and secondary tank follow the order
+  of the sensors under Advanced → Sensor names, so a sidemount overlay shows
+  left and right the same way on every dive. Before, the primary tank was
+  whichever transmitter the computer heard from first.
+
 ### Fixed
+- Advanced: the name fields in the Tank Sensor Names window were dark text
+  on a dark background; they now use the app's dark theme.
 - Overlays: the Descent X50i alert box no longer lets a line in capitals
   ("SLOW YOUR ASCENT") run past its border; every line of the alert is
   fitted inside the box.

@@ -46,6 +46,11 @@ a friendly name (e.g. "Left", "Right", "Stage") so overlays and the
 - **Edit Tank Sensor Names…** opens the list.
 - **Scan Logs Folder…** finds every serial in a folder of logs.
 - **Add serial manually** adds one by hand.
+- **Up / Down** move a sensor up or down. The order is the tank order: an
+  overlay's *primary tank* is the first sensor in the list that the dive
+  has, its *secondary tank* the next. For sidemount, put the left tank above
+  the right one. Sensors that are not in the list come after, in the order
+  the log first hears from them.
 
 The mapping is stored in `config.yaml` (shown under *Config file*). The CLI's
 `--create-config` builds the same file from a log folder.
