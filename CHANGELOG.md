@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.7.20] - 2026-11-12
 
 ### Added
 - Advanced: the Tank Sensor Names window has **Up / Down** buttons to set the
@@ -23,8 +23,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   chevrons are thick and close together; the gas reads "Air", not "AIR";
   and the "+" after 99 is larger and level with the digits.
 - Overlays: the X50i stop box has STOP at the left and the arrow and stop
-  depth at the right, as on the device, and "Breathe from Left Tank
-  (Micke01)." is white on two lines that fill the alert box.
+  depth at the right, as on the device, and the tank-switch alert
+  ("Breathe from Left Tank") is white on two lines that fill the alert box.
+- Overlays: the X50i deco-ceiling alert is on three lines ("DESCEND TO
+  6 m" / "You are above" / "your deco ceiling."), so its text is larger
+  and easier to read.
 - Overlay Designer: **Roboto Condensed** is in the font list.
 
 ### Fixed
