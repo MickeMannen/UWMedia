@@ -139,6 +139,19 @@ def test_tank_icon_fill_level_follows_the_pressure():
     assert _count(_render(_layout([dict(icon, fill_level=False)]), _wp(114.0, 114.0)), BLUE) == full
 
 
+def test_long_alert_wraps_onto_two_lines():
+    """5831.bmp: 'Breathe from Left Tank' / '(Micke01).' - as many words as
+    fit on the first line, the rest on the second."""
+    from PIL import Image, ImageDraw
+
+    from gui.hud_renderer import get_font, wrap_two_lines
+    draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    font = get_font(45, "Roboto Condensed", "bold")
+    assert wrap_two_lines(draw, "Breathe from Left Tank (Micke01).", font, 419) == ["Breathe from Left Tank", "(Micke01)."]
+    assert wrap_two_lines(draw, "Low battery.", font, 419) == ["Low battery."]
+    assert wrap_two_lines(draw, "Supercalifragilistic", font, 50) == ["Supercalifragilistic"]
+
+
 def test_alert_box_fits_the_widest_line_not_the_longest():
     """The X50i alert box fits its font to every line in pixels: "SLOW YOUR
     ASCENT" has fewer characters than "Ascending too fast." but is wider, and
@@ -154,3 +167,118 @@ def test_alert_box_fits_the_widest_line_not_the_longest():
     font, size = fit_font_lines(draw, lines, 46, width, None, "bold")
     assert all(draw.textlength(line, font=font) <= width for line in lines)
     assert size < 46
+
+
+def _bars_wp(load=60.0, rate=0.0):
+    return Waypoint(timestamp=START, depth=12.0, time_since_start=600, dive_time=600, n2_tissue_load=load, ascent_rate=rate)
+
+
+def test_tissue_bar_has_black_between_its_colours_and_a_pointer_marker():
+    """Real screenshots: black space between the red, yellow and green
+    segments, and a white tab pointing into the bar, ringed in black."""
+    bar = {"id": "t", "field": "n2_tissue_load", "type": "tissue_bar", "rel_x": 0.25, "rel_y": 0.1, "width": 24, "height": 120,
+           "marker_size": 7, "segment_gap": 4, "marker_style": "pointer"}
+    frame = _render(_layout([bar]), _bars_wp(load=60.0))
+    column = frame[21:141, 120].astype(int)  # down the bar's right side, clear of the marker
+    kinds = []
+    for b, g, r in column:
+        kind = "black" if r + g + b < 60 else "red" if g < 80 else "yellow" if r > 200 else "green"
+        if not kinds or kinds[-1] != kind:
+            kinds.append(kind)
+    assert kinds == ["red", "black", "yellow", "black", "green"]
+    assert int((column.sum(axis=1) < 60).sum()) == 8  # two gaps of 4 px
+    # the marker at half height (60 of 120 %): white from left of the bar to
+    # its point, then the black ring, then the bar's green again
+    row = frame[80, 90:124].astype(int)
+    assert tuple(row[100 - 90 - 3]) == (255, 255, 255) and tuple(row[100 - 90 + 6]) == (255, 255, 255)
+    assert tuple(row[100 - 90 + 11]) == (0, 0, 0)
+    assert tuple(row[100 - 90 + 20]) == (0, 255, 0)
+    # the old look stays the default: a dot, no pointer
+    dot = _render(_layout([{k: v for k, v in bar.items() if k not in ("segment_gap", "marker_style")}]), _bars_wp(load=60.0))
+    assert tuple(dot[80, 100 + 6]) == (255, 255, 255) and tuple(dot[80, 100 + 9]) != (0, 0, 0)
+
+
+def test_solid_chevrons_nest_and_the_ones_at_the_bar_are_flat():
+    """Real screenshots: thick grey chevrons with a thin black line between
+    them, the lowest one and the descent one flat against the white bar."""
+    from gui.hud_renderer import CHEVRON_SOLID_UNLIT, solid_chevron_layout
+    shapes, total = solid_chevron_layout(4, 1, True)
+    assert [(d, k) for d, k, _, _ in shapes] == [("up", "chevron")] * 3 + [("up", "flat"), ("bar", "bar"), ("down", "flat")]
+    assert total == 95.5
+    assert [(d, k) for d, k, _, _ in solid_chevron_layout(6, 0, False)[0]] == [("up", "chevron")] * 6
+
+    chevrons = {"id": "a", "field": "ascent_rate", "type": "ascent_chevrons", "style": "solid", "rel_x": 0.25, "rel_y": 0.1,
+                "width": 24, "height": 96, "up_count": 4, "down_count": 1}
+    level = _render(_layout([chevrons]), _bars_wp(rate=0.0))
+    grey = _count(level, CHEVRON_SOLID_UNLIT)
+    box = 24 * 96
+    assert grey > 0.6 * box  # mostly filled: thick chevrons, thin gaps
+    thin = _count(_render(_layout([dict(chevrons, style=None)]), _bars_wp(rate=0.0)), (138, 138, 138))
+    assert thin < 0.75 * grey
+    # flat against the bar: the grey just above and below it spans the full width
+    bar_rows = np.where(np.all(level[20:117, 100:124] == 255, axis=(1, 2)))[0] + 20
+    assert len(bar_rows) >= 4
+    for y in (bar_rows[0] - 5, bar_rows[-1] + 5):
+        assert np.all(level[y, 101:124] == CHEVRON_SOLID_UNLIT[0])
+    # ascending: the chevron next to the bar lights, in the rate's colour
+    rising = _render(_layout([chevrons]), _bars_wp(rate=3.0))
+    assert tuple(rising[bar_rows[0] - 5, 112]) == (0, 255, 0)
+    assert _count(rising, CHEVRON_SOLID_UNLIT) < grey
+    # descending: the one under the bar turns white
+    sinking = _render(_layout([chevrons]), _bars_wp(rate=-5.0))
+    assert tuple(sinking[bar_rows[-1] + 5, 112]) == (255, 255, 255)
+
+
+def test_x50i_writes_air_in_lower_case_and_other_brands_keep_capitals():
+    rule = get_rule_config("Garmin", "x50i", "display")
+    assert format_telemetry_value("gasmix", "AIR", rule) == "Air"
+    assert format_telemetry_value("gasmix", "Nx32", rule) == "Nx32"
+    assert format_telemetry_value("gasmix", "AIR", get_rule_config("Shearwater", "Perdix 2", "display")) == "AIR"
+    assert format_telemetry_value("gasmix", "AIR") == "AIR"
+
+
+def test_ndl_plus_sign_takes_the_elements_scale_and_offset():
+    """Real screenshots: the "+" after 99 is about half the digits' size,
+    level with their top and a little clear of them."""
+    from gui.hud_renderer import SMALL_SUFFIX_DEFAULT_SCALE, text_parts
+    assert text_parts("ndl", "99+", {}) == ("99", "+", SMALL_SUFFIX_DEFAULT_SCALE)
+    assert text_parts("ndl", "99+", {"small_suffix_scale": 0.47}) == ("99", "+", 0.47)
+    ndl = {"id": "n", "field": "ndl", "rel_x": 0.1, "rel_y": 0.2, "font_size": 80, "font_weight": "bold", "outline": False}
+    wp = Waypoint(timestamp=START, depth=12.0, time_since_start=600, dive_time=600, ndl=7000)
+
+    def plus_box(elem):
+        frame = _render(_layout([elem]), wp)
+        digits = np.where(np.all(_render(_layout([dict(elem, field="custom:99")]), wp) > 200, axis=2))
+        ys, xs = np.where(np.all(frame[:, digits[1].max() + 2:] > 200, axis=2))
+        return xs.min(), ys.min(), xs.max() - xs.min() + 1, digits[0].min()
+
+    _, small_top, small_w, digits_top = plus_box(ndl)
+    x, top, width, digits_top = plus_box(dict(ndl, small_suffix_scale=0.5))
+    assert width > 1.25 * small_w
+    assert abs(int(top) - int(digits_top)) <= 2  # level with the top of the digits
+    moved_x, *_ = plus_box(dict(ndl, small_suffix_scale=0.5, small_suffix_dx=6))
+    assert moved_x == x + 6
+
+
+def test_stop_box_draws_its_arrow_and_right_aligns_the_depth():
+    """4570.bmp: STOP at the left, a bar over an arrow and the stop depth at
+    the right - the arrow drawn, so a face without the glyph shows no box."""
+    from gui.hud_renderer import stop_arrow_shapes
+    bar, head, stem = stop_arrow_shapes(100.0, 10.0, 30.0)
+    assert max(x for x, _ in bar) == 100.0 and min(y for _, y in bar) == 10.0
+    assert max(y for _, y in stem) == 40.0  # as tall as the digits
+    assert min(x for x, _ in head) == min(x for x, _ in bar)
+
+    badge = {"id": "b", "field": "state_badge", "type": "badge", "style": "box", "rel_x": 0.1, "rel_y": 0.1, "width": 212, "height": 86,
+             "font_size": 34, "font_family": "Roboto Condensed", "value_font_size": 50, "depth_font_size": 46, "font_weight": "bold",
+             "depth_unit": "m", "fill_colors": {"safety_stop": "#00FA00"}, "text_color": "#000000", "padding": 5}
+    stop = Waypoint(timestamp=START, depth=5.0, time_since_start=1200, dive_time=1200, max_depth=20.0)
+    frame = _render(_layout([badge]), stop)
+    box = frame[20:106, 40:252]
+    assert (box[:, :, 1] > 200).mean() > 0.5  # the green box
+    dark = np.where(box.sum(axis=2) < 120)
+    assert dark[1].max() > 212 - 12  # the depth reaches the right edge...
+    assert dark[1].min() < 20        # ...and the label the left
+    top_row = box[:40].sum(axis=2) < 120
+    gap = np.where(~top_row.any(axis=0)[20:192])[0]
+    assert len(gap) > 30  # with clear green between them

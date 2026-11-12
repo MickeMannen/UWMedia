@@ -19,6 +19,7 @@
         "rel_y": 0.23754,
         "color": "#000000",
         "font_size": 29,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -30,6 +31,7 @@
         "rel_y": 0.2907,
         "color": "#000000",
         "font_size": 44,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold",
@@ -39,6 +41,7 @@
         "id": "ascent_rate",
         "field": "ascent_rate",
         "type": "ascent_chevrons",
+        "style": "solid",
         "rel_x": 0.18801,
         "rel_y": 0.3841,
         "width": 32,
@@ -54,6 +57,7 @@
         "rel_y": 0.39948,
         "color": "#FFFFFF",
         "font_size": 78,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "unit_suffix": true,
         "unit_scale": 0.45,
@@ -69,6 +73,7 @@
         "rel_y": 0.55648,
         "color": "#FFFFFF",
         "font_size": 72,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "font_weight": "bold"
       },
@@ -79,6 +84,7 @@
         "rel_y": 0.75581,
         "color": "#FFFFFF",
         "font_size": 32,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "valign": "middle",
@@ -91,6 +97,7 @@
         "rel_y": 0.69601,
         "color": "#999999",
         "font_size": 25,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "font_weight": "bold"
       },
@@ -101,6 +108,7 @@
         "rel_y": 0.74086,
         "color": "#FFFFFF",
         "font_size": 38,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "unit_suffix": true,
         "unit_scale": 0.5,
@@ -116,6 +124,7 @@
         "rel_y": 0.43854,
         "color": "#999999",
         "font_size": 30,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -127,6 +136,7 @@
         "rel_y": 0.49834,
         "color": "#FFFFFF",
         "font_size": 64,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "unit_suffix": true,
@@ -143,6 +153,7 @@
         "rel_y": 0.43854,
         "color": "#999999",
         "font_size": 30,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -154,6 +165,7 @@
         "rel_y": 0.49834,
         "color": "#FFFFFF",
         "font_size": 64,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "unit_suffix": true,
@@ -171,6 +183,7 @@
         "rel_y": 0.64618,
         "color": "#999999",
         "font_size": 30,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -182,6 +195,7 @@
         "rel_y": 0.70598,
         "color": "#FFFFFF",
         "font_size": 56,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -193,6 +207,7 @@
         "rel_y": 0.64618,
         "color": "#999999",
         "font_size": 30,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "center",
         "font_weight": "bold"
@@ -204,6 +219,7 @@
         "rel_y": 0.69767,
         "color": "#FFFFFF",
         "font_size": 66,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "align": "right",
         "value_format": "integer",
@@ -216,6 +232,7 @@
         "rel_y": 0.69767,
         "color": "#FFFFFF",
         "font_size": 66,
+        "font_family": "Roboto Condensed",
         "scale": 1.0,
         "font_weight": "bold"
       }

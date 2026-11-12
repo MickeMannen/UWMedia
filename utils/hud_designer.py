@@ -333,8 +333,9 @@ def element_native_bounds(
     suffix_x = None
     if suffix:
         suffix_font = get_font(max(1, round(size * suffix_scale)), family, weight)
-        suffix_x = font.getlength(main)
-        right = right + suffix_font.getlength(suffix)
+        suffix_dx = float(elem.get("small_suffix_dx") or 0.0)
+        suffix_x = font.getlength(main) + suffix_dx
+        right = right + suffix_dx + suffix_font.getlength(suffix)
         if align == "center":
             dx = -(left + right) / 2.0
         elif align == "right":

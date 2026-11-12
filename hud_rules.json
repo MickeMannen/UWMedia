@@ -983,7 +983,8 @@
         },
         "percent_fields": ["gf", "surf_gf", "cns"],
         "gf99_on_gassing_text": "On-Gassing",
-        "_source": "Gases page screenshot test_data/dive_computers/screen_shots/1800.bmp: SURF. GF 33%, CNS 2%, GF99 'On-Gassing' while the tissues still take up gas (3466.bmp at the surface: GF99 7%); depth decimals as the Mk3"
+        "air_text": "Air",
+        "_source": "Gases page screenshot test_data/dive_computers/screen_shots/1800.bmp: SURF. GF 33%, CNS 2%, GF99 'On-Gassing' while the tissues still take up gas (3466.bmp at the surface: GF99 7%); the gas box reads 'Air' on every screenshot; depth decimals as the Mk3"
       },
       "tank_pressure_fill": [
         {"max": 50, "color": "#FF0000"},
@@ -1133,8 +1134,9 @@
           "text": "Breathe from {side} Tank ({tank}).",
           "caption": "",
           "when": "sidemount_switch",
-          "_source": "X50i EN-US p.27 alert table 'Breathe from %1.'; the real screenshot x50i_sidemount_change_tank.png reads 'Breathe from Left Tank (VASEN).' - blue border, no triangle, centred",
+          "_source": "X50i EN-US p.27 alert table 'Breathe from %1.'; the real screenshot x50i_sidemount_change_tank.png reads 'Breathe from Left Tank (VASEN).' - blue border, no triangle, centred; white text (test_data/dive_computers/screen_shots/5831.bmp)",
           "color": "#00AAFF",
+          "text_color": "#FFFFFF",
           "icon": "none"
         }
       ]

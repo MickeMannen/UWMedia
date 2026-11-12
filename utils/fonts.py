@@ -9,8 +9,8 @@ Families available to a template's `font_family` element attribute:
   Linux DejaVu/Liberation system fonts the renderer used to look for.
 - The bundled set under resources/fonts/ (a top-level Briefcase `sources`
   entry, so it lands beside `overlays`/`licenses` in a packaged app):
-  DejaVu Sans, Liberation Sans, Roboto, Roboto Mono, DSEG7 Classic - each
-  as Regular + Bold, OFL/Apache/Bitstream-licensed (license texts under
+  DejaVu Sans, Liberation Sans, Roboto, Roboto Condensed, Roboto Mono,
+  DSEG7 Classic - each as Regular + Bold, OFL/Apache/Bitstream-licensed (license texts under
   resources/licenses/*_FONT_LICENSE.txt). Family names are read from the
   font files themselves, so a new .ttf dropped into that folder registers
   itself.

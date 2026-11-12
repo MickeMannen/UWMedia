@@ -7,7 +7,7 @@ import utils.fonts as fonts
 from utils.fonts import DEFAULT_FAMILY, bundled_fonts_dir, fallback_font_path, font_path, list_families, registry
 from gui.hud_renderer import get_font
 
-BUNDLED_FAMILIES = ["DSEG7 Classic", "DejaVu Sans", "Liberation Sans", "Roboto", "Roboto Mono"]
+BUNDLED_FAMILIES = ["DSEG7 Classic", "DejaVu Sans", "Liberation Sans", "Roboto", "Roboto Condensed", "Roboto Mono"]
 
 
 def test_bundled_fonts_dir_found_in_checkout():

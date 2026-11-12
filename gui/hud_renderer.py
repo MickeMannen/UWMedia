@@ -145,13 +145,25 @@ def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px
     return max(1, lo)
 
 
+def plus_sign_scale(elem):
+    """The size of the NDL's "+" against its digits when the element sets
+    `small_suffix_scale` (a Descent X50i's larger plus, level with the top
+    of the digits), else None: the small raised plus. `small_suffix_dx`
+    (skin px) moves any small suffix away from the digits."""
+    try:
+        scale = float(elem.get("small_suffix_scale") or 0)
+    except (TypeError, ValueError):
+        return None
+    return max(0.1, min(1.0, scale)) if scale > 0 else None
+
+
 def text_parts(field, val_str, elem):
     """(main, suffix, suffix_scale) the renderer draws for a text element:
     the NDL "99+" convention (small, top-aligned plus sign) and the
     `small_suffix` element attribute both resolve here so the renderer and
     the Overlay Designer's bounds agree."""
     if field in ("ndl", "ndl_before_clear") and val_str.endswith("+"):
-        return val_str[:-1], "+", SMALL_SUFFIX_DEFAULT_SCALE
+        return val_str[:-1], "+", plus_sign_scale(elem) or SMALL_SUFFIX_DEFAULT_SCALE
     style = elem.get("small_suffix")
     if style:
         main, suffix = split_small_suffix(val_str, style)
@@ -286,9 +298,10 @@ def format_telemetry_value(field, raw_val, display_rule=None):
     (utils/units.py: the data is SI, the display converts). `display_rule`
     is the brand's `display` rule: depth decimals per system,
     `percent_fields` (the fields written with a % sign - a Descent X50i's
-    "33%" SurfGF and "2%" CNS) and `gf99_on_gassing_text` (what GF99 reads
+    "33%" SurfGF and "2%" CNS), `gf99_on_gassing_text` (what GF99 reads
     while the leading tissue is still taking up gas, i.e. at or below 0:
-    the X50i's "On-Gassing")."""
+    the X50i's "On-Gassing") and `air_text` (how the brand writes air:
+    the X50i's "Air")."""
     if isinstance(display_rule, dict) and raw_val is not None:
         if field == "gf" and display_rule.get("gf99_on_gassing_text"):
             try:
@@ -297,6 +310,8 @@ def format_telemetry_value(field, raw_val, display_rule=None):
             except (TypeError, ValueError):
                 pass
         text = _format_telemetry_value(field, raw_val, display_rule)
+        if field == "gasmix" and text == "AIR" and display_rule.get("air_text"):
+            return str(display_rule["air_text"])
         if field in (display_rule.get("percent_fields") or ()) and text not in ("--", "wait"):
             return text + "%"
         return text
@@ -1041,6 +1056,20 @@ def badge_box_size(elem, user_scale, res_scale, render_log):
     return max(1, int(elem.get("width", 80) * scale)), max(1, int(elem.get("height", 44) * scale))
 
 
+def stop_arrow_shapes(right, top, cap):
+    """The Descent's "ascend to" mark as polygons: a bar with an arrow
+    under it, `cap` px tall (the height of the digits after it), its right
+    edge at `right`. Proportions from the screen (4570.bmp)."""
+    width, bar, gap, head, stem = 0.77 * cap, 0.13 * cap, 0.1 * cap, 0.4 * cap, 0.27 * cap
+    left, mid = right - width, right - width / 2.0
+    head_top = top + bar + gap
+    return [
+        [(left, top), (right, top), (right, top + bar), (left, top + bar)],
+        [(mid, head_top), (right, head_top + head), (left, head_top + head)],
+        [(mid - stem / 2.0, head_top + head), (mid + stem / 2.0, head_top + head), (mid + stem / 2.0, top + cap), (mid - stem / 2.0, top + cap)],
+    ]
+
+
 def _draw_badge_box(draw, elem, lines, state, abs_x, abs_y, label_size, value_size, box_w, box_h, scale):
     """Garmin Descent-style stop box (X50i manual p.10): a filled rounded
     box in the state's colour replacing the NDL field - the label and
@@ -1059,8 +1088,36 @@ def _draw_badge_box(draw, elem, lines, state, abs_x, abs_y, label_size, value_si
     top_row = [text for text, _, is_value in lines if not is_value or text.startswith("↑")]
     timer = next((text for text, _, is_value in lines if is_value and not text.startswith("↑")), None)
 
-    top_text = "  ".join(top_row)
-    draw.text((abs_x + pad, abs_y + pad), top_text, font=label_font, fill=text_rgb)
+    depth_size = elem.get("depth_font_size")
+    if depth_size:
+        # A Descent X50i's top row (real screenshot 4570.bmp): the label at
+        # the left, and at the right an arrow under a bar - drawn, the face
+        # has no such glyph - before the stop depth in its own larger size.
+        # Placed by their ink, so the row sits `padding` inside the box.
+        label = next((text for text in top_row if not text.startswith("↑")), "")
+        depth = next((text[1:] for text in top_row if text.startswith("↑")), "")
+        if label:
+            left, top, _, _ = label_font.getbbox(label)
+            draw.text((abs_x + pad + float(elem.get("label_dx", 0.0)) * scale - left, abs_y + pad - top), label, font=label_font, fill=text_rgb)
+        if depth:
+            depth_px = max(1, int(label_size * float(depth_size) / max(1.0, float(elem.get("font_size", 16)))))
+            depth_font = get_font(depth_px, family, weight)
+            unit_font = get_font(max(1, int(depth_px * 0.85)), family, weight)  # the unit a little smaller
+            digits = depth.rstrip("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            unit = depth[len(digits):]
+            left, top, right, bottom = depth_font.getbbox(digits or depth)
+            cap = bottom - top
+            unit_w = unit_font.getbbox(unit)[2] if unit else 0
+            text_x = abs_x + box_w - pad - unit_w - depth_font.getlength(digits)
+            text_y = abs_y + pad - top
+            draw.text((text_x, text_y), digits, font=depth_font, fill=text_rgb)
+            if unit:  # baselines together
+                draw.text((text_x + depth_font.getlength(digits), text_y + bottom - unit_font.getbbox(unit)[3]), unit, font=unit_font, fill=text_rgb)
+            for shape in stop_arrow_shapes(text_x + left - 0.17 * cap, abs_y + pad, cap):
+                draw.polygon(shape, fill=text_rgb)
+    else:
+        top_text = "  ".join(top_row)
+        draw.text((abs_x + pad, abs_y + pad), top_text, font=label_font, fill=text_rgb)
     if timer:
         left, top, right, bottom = value_font.getbbox(timer)
         x = abs_x + (box_w - (right - left)) / 2 - left
@@ -1198,6 +1255,15 @@ def tissue_bar_geometry(elem):
     return w, h, r
 
 
+def tissue_pointer_shapes(size):
+    """The "pointer" marker's two shapes, back to front, as (half height,
+    left edge, tip, colour) in px from the bar's left edge at the marker's
+    height, for a marker_size of `size` px: the black ring that cuts into
+    the bar, then the white tab. Proportions from a Descent X50i's screen."""
+    return [(1.3 * size, -0.62 * size, 1.9 * size, (0, 0, 0)),
+            (0.62 * size, -0.62 * size, 1.3 * size, (255, 255, 255))]
+
+
 def tissue_bar_marker_fraction(value):
     """0.0 (bottom) .. 1.0 (top) position of the marker for a tissue load in
     percent - linear up to TISSUE_BAR_MAX_PERCENT, clamped. None -> 0."""
@@ -1216,7 +1282,11 @@ def _draw_tissue_bar(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, 
     hud_rules.json's `tissue_load` bands (green 0-80 %, yellow 80-100 %, red
     100-120 % of the bar height, small gaps between), plus a white marker dot
     at the bar's left edge at the current load. Drawn even without a value
-    (marker at the bottom), like the real device."""
+    (marker at the bottom), like the real device.
+
+    `segment_gap` (skin px) is the black space between the segments and
+    `marker_style: "pointer"` swaps the dot for a Descent X50i's marker
+    (real screenshots): a white tab pointing into the bar, ringed in black."""
     from utils.hud_rules_engine import get_rule_config
 
     rel_x = elem.get("rel_x", 0.0)
@@ -1272,15 +1342,27 @@ def _draw_tissue_bar(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, 
     # Segment heights follow the percent ranges 0-80 / 80-100 / 100-120.
     fractions = (80.0 / TISSUE_BAR_MAX_PERCENT, 20.0 / TISSUE_BAR_MAX_PERCENT, 20.0 / TISSUE_BAR_MAX_PERCENT)
     cursor = bottom
+    segment_gap = elem.get("segment_gap")
     for frac, color in zip(fractions, colors):
         seg_h = max(1, int(round(h_px * frac)))
         top = cursor - seg_h
-        draw.rectangle([abs_x, top + (gap_px if cursor != bottom else 0), abs_x + w_px, cursor], fill=color)
+        if segment_gap is None:
+            draw.rectangle([abs_x, top + (gap_px if cursor != bottom else 0), abs_x + w_px, cursor], fill=color)
+        else:
+            # the gap comes off the foot of every segment but the lowest
+            foot = cursor if cursor == bottom else cursor - max(1, int(round(float(segment_gap) * scale)))
+            draw.rectangle([abs_x, top + 1, abs_x + w_px, max(top + 1, foot)], fill=color)
         cursor = top
 
     marker_y = bottom - int(round(fraction * h_px))
     marker_y = max(abs_y + r_px, min(bottom, marker_y))
     cx = abs_x
+    if elem.get("marker_style") == "pointer":
+        for half, left, tip, color in tissue_pointer_shapes(r * scale):
+            body = tip - half  # a 45-degree point
+            draw.polygon([(cx + left, marker_y - half), (cx + body, marker_y - half), (cx + tip, marker_y),
+                          (cx + body, marker_y + half), (cx + left, marker_y + half)], fill=color)
+        return
     draw.ellipse([cx - r_px, marker_y - r_px, cx + r_px, marker_y + r_px], fill=(255, 255, 255), outline=(0, 0, 0))
 
 
@@ -1292,6 +1374,41 @@ ASCENT_DEFAULT_BANDS = [
     {"min": 10.1, "color": "#FF0000"},
 ]
 CHEVRON_UNLIT = (138, 138, 138)
+CHEVRON_SOLID_UNLIT = (164, 164, 164)
+# The "solid" style's shapes, in px on a 24 px wide indicator (a Descent
+# X50i's screen): the apex's rise, a chevron's thickness, the step from one
+# chevron to the next, the body of the flat-sided one next to the bar, the
+# space either side of the bar and the bar itself.
+SOLID_CHEVRON_ARROW, SOLID_CHEVRON_THICK, SOLID_CHEVRON_PITCH = 8.0, 12.0, 17.0
+SOLID_CHEVRON_BODY, SOLID_CHEVRON_BAR_GAP, SOLID_CHEVRON_BAR = 8.0, 3.5, 5.5
+
+
+def solid_chevron_layout(up, down, show_bar):
+    """The "solid" style's shapes, top to bottom, in SOLID_CHEVRON units:
+    (kind, top, bottom) with kind "chevron" / "flat" (the flat-sided one
+    next to the bar) for both directions - ("up", ...) / ("down", ...) -
+    and ("bar", top, bottom); and the total height."""
+    arrow, thick, pitch = SOLID_CHEVRON_ARROW, SOLID_CHEVRON_THICK, SOLID_CHEVRON_PITCH
+    flat_h, chevron_h = arrow + SOLID_CHEVRON_BODY, arrow + thick
+    shapes = []
+    y = 0.0
+    for i in range(up):
+        last = i == up - 1
+        flat = last and show_bar
+        shapes.append(("up", "flat" if flat else "chevron", y, y + (flat_h if flat else chevron_h)))
+        y += (flat_h if flat else chevron_h) if last else pitch
+    if show_bar:
+        y += SOLID_CHEVRON_BAR_GAP if up else 0.0
+        shapes.append(("bar", "bar", y, y + SOLID_CHEVRON_BAR))
+        y += SOLID_CHEVRON_BAR + (SOLID_CHEVRON_BAR_GAP if down else 0.0)
+    for i in range(down):
+        flat = i == 0 and show_bar
+        # mirrored: the first one's flat (or notched) side is at its top
+        top = y if i == 0 else y + (flat_h if show_bar else chevron_h) + i * pitch - chevron_h
+        shapes.append(("down", "flat" if flat else "chevron", top, top + (flat_h if flat else chevron_h)))
+    if down:
+        y += (flat_h if show_bar else chevron_h) + (down - 1) * pitch
+    return shapes, y
 
 
 def ascent_rate_for(waypoint, waypoints=None):
@@ -1358,7 +1475,11 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
     and `ascent_rate` bands white / yellow / flashing red (a band's
     `blink: true` alternates its colour with the unlit grey every second
     of dive time). Element keys `bar` (false hides the divider) and the
-    counts override the rule."""
+    counts override the rule.
+
+    `style: "solid"` draws a Descent X50i's indicator (real screenshots):
+    thick chevrons that nest into each other, the ones next to the bar
+    flat on the bar's side, in a lighter grey."""
     from utils.hud_rules_engine import get_rule_config, resolve_blink_color
 
     rel_x = elem.get("rel_x", 0.0)
@@ -1403,6 +1524,35 @@ def _draw_ascent_chevrons(draw, elem, waypoint, waypoints, manufacturer, model, 
             hex_color = hex_color.lstrip('#')
             lit_color = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
             break
+
+    if elem.get("style") == "solid":
+        shapes, total = solid_chevron_layout(up, down, show_bar)
+        k = h_px / total if total else 1.0
+        x0, x1, xm = abs_x, abs_x + w_px, abs_x + w_px / 2.0
+        rise, thick = SOLID_CHEVRON_ARROW * k, SOLID_CHEVRON_THICK * k
+        ups = [shape for shape in shapes if shape[0] == "up"]
+        downs = [shape for shape in shapes if shape[0] == "down"]
+        for direction, kind, top, bottom in shapes:
+            if direction == "bar":
+                draw.rectangle([x0, abs_y + top * k, x1, abs_y + bottom * k], fill=(255, 255, 255))
+        # the lit ones are the closest to the bar, like the device
+        for n, (direction, kind, top, bottom) in enumerate(ups):
+            color = lit_color if len(ups) - 1 - n < lit_up else CHEVRON_SOLID_UNLIT
+            top, bottom = abs_y + top * k, abs_y + bottom * k
+            if kind == "flat":
+                pts = [(x0, top + rise), (xm, top), (x1, top + rise), (x1, bottom), (x0, bottom)]
+            else:
+                pts = [(x0, top + rise), (xm, top), (x1, top + rise), (x1, bottom), (xm, top + thick), (x0, bottom)]
+            draw.polygon(pts, fill=color)
+        for n, (direction, kind, top, bottom) in enumerate(downs):
+            color = (255, 255, 255) if n < lit_down else CHEVRON_SOLID_UNLIT
+            top, bottom = abs_y + top * k, abs_y + bottom * k
+            if kind == "flat":
+                pts = [(x0, top), (x1, top), (x1, bottom - rise), (xm, bottom), (x0, bottom - rise)]
+            else:
+                pts = [(x0, top), (xm, bottom - thick), (x1, top), (x1, bottom - rise), (xm, bottom), (x0, bottom - rise)]
+            draw.polygon(pts, fill=color)
+        return
 
     def chevron(top, pointing_up, color):
         x0, x1, xm = abs_x, abs_x + w_px, abs_x + w_px / 2.0
@@ -1698,6 +1848,19 @@ def notice_lines(elem, notice, manufacturer, model):
     return notice.get("caption", ""), confirm or "", notice.get("text", ""), style
 
 
+def wrap_two_lines(draw, text, font, width_px):
+    """`text` as one line when it fits `width_px` in `font` (the size two
+    lines would have), else two: as many words as fit on the first, the
+    rest on the second ("Breathe from Left Tank" / "(Micke01).")."""
+    words = text.split()
+    if len(words) < 2 or draw.textlength(text, font=font) <= width_px:
+        return [text]
+    first = 1
+    while first < len(words) - 1 and draw.textlength(" ".join(words[:first + 1]), font=font) <= width_px:
+        first += 1
+    return [" ".join(words[:first]), " ".join(words[first:])]
+
+
 def _fit_font(draw, text, size, width_px, family, weight, floor=8):
     """The largest font at or under `size` whose `text` fits `width_px`."""
     size = max(floor, int(size))
@@ -1788,11 +1951,23 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         # two lines at a sentence boundary when the text has one, else word-wrapped
         text = message if "\n" in message else message.replace(". ", ".\n")
         parts = [p.strip() for p in text.split("\n") if p.strip()][:2]
+        fill = float(elem.get("line_fill", 0.8))  # the text's share of a line's height
+        if len(parts) == 1:
+            parts = wrap_two_lines(draw, parts[0], get_font(max(1, min(msg_size, int((height_px - 2 * pad) // 2 * fill))), family, weight), inner_w)
         line_h = (height_px - 2 * pad) // max(1, len(parts))
-        font, size = fit_font_lines(draw, parts, min(msg_size, int(line_h * 0.8)), inner_w, family, weight)
+        font, size = fit_font_lines(draw, parts, min(msg_size, int(line_h * fill)), inner_w, family, weight)
+        if elem.get("line_fill"):
+            # the lines 1.2 em apart, their ink centred in the box (5831.bmp)
+            pitch = int(round(size * 1.2))
+            ink_top = min(font.getbbox(part)[1] for part in parts[:1])
+            ink_bottom = (len(parts) - 1) * pitch + font.getbbox(parts[-1])[3]
+            first_y = abs_y + (height_px - (ink_bottom - ink_top)) // 2 - ink_top
+        else:
+            pitch = line_h
+            first_y = abs_y + pad + (line_h - size) // 2
         for i, part in enumerate(parts):
             x = inner_x if icon else inner_x + (inner_w - draw.textlength(part, font=font)) // 2
-            draw.text((x, abs_y + pad + i * line_h + (line_h - size) // 2), part, font=font, fill=text_colour)
+            draw.text((x, first_y + i * pitch), part, font=font, fill=text_colour)
         return
 
     if style["style"] == "banner":
@@ -2203,9 +2378,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                     draw.text((abs_x + dx, abs_y + dy), main_str, font=font, fill=(0, 0, 0))
             draw.text((abs_x, abs_y), main_str, font=font, fill=color_rgb)
 
-            suffix_x = abs_x + draw.textlength(main_str, font=font)
+            suffix_x = abs_x + draw.textlength(main_str, font=font) + float(elem.get("small_suffix_dx") or 0.0) * px_scale
             suffix_y = abs_y
-            if elem.get("small_suffix"):
+            if elem.get("small_suffix") or (suffix_str == "+" and plus_sign_scale(elem)):
                 # Align the suffix's ink top with the main digits' ink top
                 # (PIL's text origin is the line top, so a smaller font's
                 # glyphs would otherwise sit higher than the big ones). The

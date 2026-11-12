@@ -15,6 +15,17 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   of the sensors under Advanced → Sensor names, so a sidemount overlay shows
   left and right the same way on every dive. Before, the primary tank was
   whichever transmitter the computer heard from first.
+- Overlays: the Descent X50i pages follow the in-water screenshots more
+  closely. They are set in the device's condensed bold face (Roboto
+  Condensed, now bundled), so digits and labels have the screen's width
+  and sit where the screen has them; the tissue bar has black space between
+  red, yellow and green and a white pointer in place of the dot; the ascent
+  chevrons are thick and close together; the gas reads "Air", not "AIR";
+  and the "+" after 99 is larger and level with the digits.
+- Overlays: the X50i stop box has STOP at the left and the arrow and stop
+  depth at the right, as on the device, and "Breathe from Left Tank
+  (Micke01)." is white on two lines that fill the alert box.
+- Overlay Designer: **Roboto Condensed** is in the font list.
 
 ### Fixed
 - Advanced: the name fields in the Tank Sensor Names window were dark text

@@ -25,7 +25,7 @@ sources = [
     "color.yaml",
     "hud_rules.json",
     "resources/licenses",
-    # Bundled overlay fonts (DejaVu Sans, Liberation Sans, Roboto, Roboto
+    # Bundled overlay fonts (DejaVu Sans, Liberation Sans, Roboto, Roboto Condensed, Roboto
     # Mono, DSEG7 Classic - Regular + Bold) - see utils/fonts.py and the
     # *_FONT_LICENSE.txt files under resources/licenses.
     "resources/fonts",

@@ -9,6 +9,7 @@
       "rel_y": 0.21092,
       "color": "#FFFFFF",
       "font_size": 30,
+      "font_family": "Roboto Condensed",
       "scale": 1.0,
       "font_weight": "bold",
       "hide_when_notice": true
@@ -37,7 +38,8 @@
       "rel_x": 0.65904,
       "rel_y": 0.25372,
       "color": "#FFFFFF",
-      "font_size": 84,
+      "font_size": 86,
+      "font_family": "Roboto Condensed",
       "scale": 1.0,
       "font_weight": "bold",
       "hide_when_notice": true

@@ -31,6 +31,7 @@
   ],
   "notes": {
     "verified": [
+      "The face: Roboto Condensed Bold, which lies on top of the screenshots' digits and letters",
       "Main page (real in-water screenshots, test_data/dive_computers/screen_shots, 2026-11-10): the bold face, the tissue bar and ascent chevrons, 99+ NDL, the depth with its raised decimal and the m under it, the dive time, the gas box, the dividers; the right panel's rows VSAC | ATR over MAX. DEPTH | TTS (the owner's field arrangement)",
       "Sidemount: tank names over the pressures with SM and two blue tank icons between, their fill dropping with the pressure (half full at 117 bar, nearly full at 179; empty at the 300 psi critical pressure, full at the 3000 psi rated one); when the tanks differ by more than the switch pressure the pressure to breathe from turns blue (0,170,255), two triangles march towards it, SM and the icons step aside, and 'Breathe from Left Tank (Micke01).' fills the top-right cell in a blue-bordered box (1787, 1875, 1879, 3920, 4131, 5831)",
       "Safety stop: STOP, the stop depth and the timer in a bright green box in the NDL corner (4570)",
@@ -43,7 +44,6 @@
       "Gauge page: no deco colours (layout rules switch ceiling_broken off - a gauge-mode computer computes no deco)"
     ],
     "assumed": [
-      "The face: Arial / Liberation Sans Bold stands in for the device's condensed bold, so digits run a little wider than on the screen",
       "The triangles' march: four phases a second apart, from the brightness levels the screenshots caught",
       "Single-tank main page and the CCR pages: the measured grid with the earlier screenshot's / the manual's fields; the CC DIL and SP values inside the gas box",
       "Tank icon fill: Garmin's 300 psi / 3000 psi critical and rated defaults as the empty and full points (the fit of six screenshots; the settings are not in a log)",
