@@ -169,6 +169,28 @@ def test_alert_box_fits_the_widest_line_not_the_longest():
     assert size < 46
 
 
+def test_long_alert_line_goes_on_two_when_three_lines_are_larger():
+    """"You are above your deco ceiling." on one line shrank the deco-ceiling
+    alert to small print; with that line split, all three lines are larger
+    and still inside the box. A short alert stays on two lines."""
+    from PIL import Image, ImageDraw
+
+    from gui.hud_renderer import fit_font_lines, three_line_fit
+    draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    height, width = 99, 346  # the alert box of the main page, inside its padding and triangle
+    lines = ["DESCEND TO 6 m", "You are above your deco ceiling."]
+    _, two = fit_font_lines(draw, lines, 45, width, "Roboto Condensed", "bold")
+    parts, font, size = three_line_fit(draw, lines, 45, height, width, "Roboto Condensed", "bold")
+    assert parts == ["DESCEND TO 6 m", "You are above", "your deco ceiling."]
+    assert size > two
+    assert all(draw.textlength(part, font=font) <= width for part in parts)
+    assert 2 * round(size * 1.2) + font.getbbox(parts[-1])[3] - font.getbbox(parts[0])[1] <= height  # the ink, top to bottom
+    short = ["SLOW YOUR ASCENT", "Ascending too fast."]
+    _, two = fit_font_lines(draw, short, 45, width, "Roboto Condensed", "bold")
+    assert three_line_fit(draw, short, 45, height, width, "Roboto Condensed", "bold")[2] < two
+    assert three_line_fit(draw, ["Low battery."], 45, height, width, "Roboto Condensed", "bold") is None
+
+
 def _bars_wp(load=60.0, rate=0.0):
     return Waypoint(timestamp=START, depth=12.0, time_since_start=600, dive_time=600, n2_tissue_load=load, ascent_rate=rate)
 

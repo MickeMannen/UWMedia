@@ -1882,6 +1882,26 @@ def fit_font_lines(draw, lines, size, width_px, family, weight, floor=8):
     return font, size
 
 
+def three_line_fit(draw, parts, size, height_px, width_px, family, weight):
+    """A two-line alert with its widest line split in two, when three lines
+    are larger than two: (lines, font, size), else None. "You are above your
+    deco ceiling." fitted on one line shrank the whole alert to small print;
+    as "You are above" / "your deco ceiling." all three lines are larger. The
+    split is the one with the narrowest wider half; the lines sit 1.2 em
+    apart, so three of them take 3.4 em of the box's height."""
+    cap = min(size, int(height_px / 3.4))
+    font = get_font(max(1, cap), family, weight)
+    widest = max(range(len(parts)), key=lambda i: draw.textlength(parts[i], font=font))
+    words = parts[widest].split()
+    if len(parts) != 2 or len(words) < 2:
+        return None
+    cut = min(range(1, len(words)), key=lambda i: max(draw.textlength(" ".join(words[:i]), font=font),
+                                                      draw.textlength(" ".join(words[i:]), font=font)))
+    lines = parts[:widest] + [" ".join(words[:cut]), " ".join(words[cut:])] + parts[widest + 1:]
+    font, fitted = fit_font_lines(draw, lines, cap, width_px, family, weight)
+    return lines, font, fitted
+
+
 def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
     """A device notification (schema element type "notice"): the active
     notice's message in the brand's style. "text" (Perdix 2 manual p.22): the
@@ -1957,6 +1977,10 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
         line_h = (height_px - 2 * pad) // max(1, len(parts))
         font, size = fit_font_lines(draw, parts, min(msg_size, int(line_h * fill)), inner_w, family, weight)
         if elem.get("line_fill"):
+            # a line too long for the box at a readable size goes on two
+            three = three_line_fit(draw, parts, msg_size, height_px - 2 * pad, inner_w, family, weight)
+            if three and three[2] > size:
+                parts, font, size = three
             # the lines 1.2 em apart, their ink centred in the box (5831.bmp)
             pitch = int(round(size * 1.2))
             ink_top = min(font.getbbox(part)[1] for part in parts[:1])
