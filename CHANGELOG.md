@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.8.1] - 2026-11-14
 
 ### Added
 - Overlays: a **Main: AI** page for the Shearwater **Peregrine TX** (gas,
