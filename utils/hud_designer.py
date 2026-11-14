@@ -12,6 +12,9 @@ saved here load in the CLI/renderer unchanged, and vice versa.
 from typing import Any, Dict, List, Optional, Tuple
 
 from gui.hud_renderer import (
+    ARC_DEFAULTS,
+    SEGMENT_BAR_DEFAULTS,
+    arc_geometry,
     ascent_chevron_geometry,
     badge_line_sizes,
     VERTICAL_ORIENTATIONS,
@@ -19,6 +22,7 @@ from gui.hud_renderer import (
     get_font,
     tank_outline_metrics,
     tank_segments_geometry,
+    segment_bar_geometry,
     fitted_font_size,
     text_anchor_shift,
     text_parts,
@@ -91,7 +95,7 @@ def skin_pixel_size(skin: Dict[str, Any]) -> Tuple[float, float]:
 
 
 
-ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows")
+ELEMENT_KINDS = ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows", "arc", "segment_bar")
 
 
 def element_kind(element: Dict[str, Any]) -> str:
@@ -100,7 +104,7 @@ def element_kind(element: Dict[str, Any]) -> str:
     kind = element.get("type")
     if kind == "graph" or element.get("field") == "depth_graph":
         return "graph"
-    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows"):
+    if kind in ("badge", "tank_icon", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows", "arc", "segment_bar"):
         return kind
     return "text"
 
@@ -120,6 +124,14 @@ def element_defaults(kind: str, field: str) -> Dict[str, Any]:
         base.update({"type": "tissue_bar", "field": "n2_tissue_load", "width": 12, "height": 33, "marker_size": 4})
     elif kind == "ascent_chevrons":
         base.update({"type": "ascent_chevrons", "field": "ascent_rate", "width": 16, "height": 47, "up_count": 4, "down_count": 1})
+    elif kind == "arc":
+        # an arc gauge (gui.hud_renderer._draw_arc): NDL over 0-100 minutes
+        base.update({"type": "arc", "width": 120, "height": 120, "thickness": 12,
+                     "start_angle": 135, "sweep": 270, "range_min": 0, "range_max": 6000, "color": "#7ED321"})
+    elif kind == "segment_bar":
+        # a segment bar (gui.hud_renderer._draw_segment_bar): the ascent rate, 2 m/min a segment
+        base.update({"type": "segment_bar", "width": 12, "height": 60, "segments": 5,
+                     "segment_gap": 2, "range_min": 0, "range_max": 10, "color": "#7ED321"})
     elif kind == "notice":
         # The device's own notification (gui.hud_renderer._draw_notice): the
         # message fitted into `width`, a caption line above it.
@@ -167,6 +179,14 @@ def parse_layout_elements(hud_skin: Dict[str, Any]) -> List[Dict[str, Any]]:
         elif kind == "ascent_chevrons":
             entry["field"] = field or "ascent_rate"
             for key, default in (("width", 16), ("height", 47), ("up_count", 4), ("down_count", 1)):
+                entry.setdefault(key, default)
+        elif kind == "arc":
+            entry["field"] = field or "ndl"
+            for key, default in ARC_DEFAULTS.items():
+                entry.setdefault(key, default)
+        elif kind == "segment_bar":
+            entry["field"] = field or "ascent_rate"
+            for key, default in SEGMENT_BAR_DEFAULTS.items():
                 entry.setdefault(key, default)
         elif kind == "notice":
             entry["field"] = field or "notice"
@@ -268,6 +288,12 @@ def element_native_bounds(
         return x - r, y, x + w, y + h + r
     if kind == "ascent_chevrons":
         w, h, _, _ = ascent_chevron_geometry(elem)
+        return x, y, x + w, y + h
+    if kind == "arc":
+        w, h, _ = arc_geometry(elem)
+        return x, y, x + w, y + h
+    if kind == "segment_bar":
+        w, h, _, _ = segment_bar_geometry(elem)
         return x, y, x + w, y + h
     if kind == "tank_switch_arrows":
         w, h, gap, count = tank_switch_arrows_geometry(elem)

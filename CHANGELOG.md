@@ -12,6 +12,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   to surface, ceiling, tank pressures (both tanks in sidemount), gas time
   and alarms are shown as logged; other JSON files in a log folder are
   ignored.
+- Overlay Designer: two new elements. An **arc gauge** fills a circular
+  track by a value (NDL, time to surface, tank pressure), with optional
+  divisions; a **segment bar** lights a stack of segments from the bottom
+  (an ascent-rate bar, 2 m/min a segment). Both take the brand's colours
+  or their own colour bands.
+- Overlay Designer: a text element can sit on a filled **Box** of its own
+  colour, and times can be written the Suunto way, "24′", ">99′" or "2′50".
 
 ## [0.7.20] - 2026-11-12
 

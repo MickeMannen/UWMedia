@@ -65,8 +65,8 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   the inspector: font, size, bold, colour, outline, alignment, anchor, offsets,
   opacity - and element-specific settings such as tank segments, chevron counts
   or the depth graph's marker. The inspector is grouped into folding sections
-  (Element, Position and size, Text, Tank icon, Tissue bar, Graph colours and
-  shading, Graph options); click a heading to fold or open it. The
+  (Element, Position and size, Text, Tank icon, Arc gauge / Segment bar,
+  Tissue bar, Graph colours and shading, Graph options); click a heading to fold or open it. The
   **Elements** heading folds the list the same way, showing the selected
   element's name while folded. The right-hand column scrolls.
 - A text element may carry `value_format` in its JSON (`"minutes"` for a
@@ -75,7 +75,10 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   way a Shearwater Tec row shows the dive time and stop depth; for a PO2
   `"decimal2"` ("0.70", a Descent), `"decimal2_no_lead"` (".72", a
   Shearwater) or `"decimal1"` ("1.3", a Petrel's setpoint, the X50i's
-  VSAC).
+  VSAC); for a Suunto `"minutes_prime"` ("24′", and an NDL past 99 minutes
+  as ">99′") or `"m'ss"` ("2′50", a stop counter).
+- **Box** (text elements): a filled box in that colour behind the value, the
+  Nautic's stop-timer pill. Empty the field for none.
 - `hide_in_circuits` (a list of `CC`, `SC`, `BO`, `OC`) makes an element step
   aside on those circuits - on a CC page the setpoint gives its place to the
   PPO2 on a bailout.
@@ -99,6 +102,23 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   Shearwater six arrows and no bar - white under 9 m/min, yellow to 18,
   flashing red above, one arrow per 3 m/min as in the Perdix 2 manual. **Up**,
   **Down** and **Divider bar** in the inspector override the brand defaults.
+- **Arc gauge** (Add element → Arc gauge): a circular track filled from its
+  start by a field, the Suunto EON's NDL, ascent-time and tank arcs.
+  **Range** is the value at the empty and full ends in the field's raw
+  units (seconds for NDL and TTS, so 0 to 6000 is 100 minutes; bar for a
+  tank), **Start** the angle it begins at (0 at 3 o'clock, clockwise; 135 is
+  bottom left), **Sweep** how far it runs, **Segments** and **Gap** (degrees)
+  split it into parts. The fill takes **Color**, or the brand's colour for
+  that field where the rules have one; **Track** colours the empty part. Its
+  label and value are ordinary text elements placed inside it; give two arcs
+  `hide_in_states` to swap an NDL arc for an ascent-time arc in deco.
+- **Segment bar** (Add element → Segment bar): a vertical stack of segments
+  lit from the bottom by a field over **Range** - a Suunto ascent bar is 5
+  segments over 0-10 m/min, one per 2 m/min. **Colour by** *Value* lights
+  every segment in the value's colour, *Place* gives each segment the colour
+  of its own place on the scale. A `bands` list in the JSON
+  (`[{"max": 8, "color": "#00C000"}, ...]`, the hud_rules.json shape) sets
+  the colours for one element.
 - A tank icon with `"fill_level": true` in its JSON empties as the pressure
   drops: full at `full_bar` (the tank's rated pressure; a Descent's 207 bar
   / 3000 psi default), empty at `empty_bar` (its critical pressure, 21 bar /

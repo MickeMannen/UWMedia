@@ -1446,3 +1446,89 @@ def test_garmin_clear_badge_keeps_the_cleared_stops_depth_and_flashes_it():
     assert [text for text, _, _ in lines] == ["↑6m", "0:00"]
     colours = {badge_lines("Garmin", "mk3i", elem, Waypoint(**{**cleared.model_dump(), "dive_time": dt}), history)[0][1] for dt in (10, 11)}
     assert (255, 0, 0) in colours  # the depth line flashes red
+
+
+def _gauge_frame(elements, waypoint, waypoints=None):
+    layout = {"design_width": 400, "design_height": 200, "manufacturer": "Suunto", "model": "EON Core",
+              "hud_skin": {"type": "shape", "width": 400, "height": 200, "anchor": "TOP_LEFT", "opacity": 0.0,
+                           "linked_elements": elements}}
+    frame = np.zeros((200, 400, 3), dtype=np.uint8)
+    draw_hud(frame, layout, waypoint, waypoints=waypoints, render_log=True)
+    return frame
+
+
+def test_arc_fills_from_its_start_in_proportion_to_the_value():
+    from gui.hud_renderer import ARC_DEFAULTS, arc_geometry, gauge_fraction
+    assert arc_geometry({"type": "arc"}) == (120, 120, 12)
+    assert gauge_fraction({"range_max": 250}, 125, ARC_DEFAULTS) == pytest.approx(0.5)
+    assert gauge_fraction({"range_max": 250}, 400, ARC_DEFAULTS) == 1.0
+    assert gauge_fraction({}, None, ARC_DEFAULTS) == 0.0
+
+    # a half-circle from 9 o'clock over the top to 3 o'clock, 0-250 bar, blue on a grey track
+    elem = {"type": "arc", "field": "primary_tank_pressure", "rel_x": 0.0, "rel_y": 0.0, "width": 100, "height": 100,
+            "thickness": 10, "start_angle": 180, "sweep": 180, "range_max": 250, "color": "#0000FF", "track_color": "#404040",
+            "bands": [{"color": "#0000FF"}]}
+
+    def frame_at(bar):
+        tanks = {"T1": TankData(pressure_bar=bar)} if bar is not None else {}
+        return _gauge_frame([elem], Waypoint(timestamp=datetime(2026, 1, 1), depth=10.0, time_since_start=0, tanks=tanks))
+
+    half = frame_at(125.0)
+    left, top, right = half[50, 4], half[4, 50], half[50, 96]  # BGR: 9, 12 and 3 o'clock on the ring
+    assert tuple(left) == (255, 0, 0) and tuple(right) == (64, 64, 64)
+    assert top[0] > 200 or tuple(top) == (64, 64, 64)  # the boundary sits at 12 o'clock
+    assert tuple(frame_at(250.0)[50, 96]) == (255, 0, 0)
+    empty = frame_at(None)
+    assert tuple(empty[50, 4]) == (64, 64, 64)  # the track is drawn without a value
+
+
+def test_segment_bar_lights_whole_segments_from_the_bottom():
+    from gui.hud_renderer import segment_bar_geometry
+    assert segment_bar_geometry({"type": "segment_bar"}) == (12, 60, 5, 2)
+    bands = [{"max": 8, "color": "#00FF00"}, {"min": 8, "max": 10, "color": "#FFFF00"}, {"min": 10, "color": "#FF0000"}]
+    elem = {"type": "segment_bar", "field": "ascent_rate", "rel_x": 0.0, "rel_y": 0.0, "width": 10, "height": 98,
+            "segments": 5, "segment_gap": 2, "range_max": 10, "track_color": "#404040", "bands": bands}
+    t0 = datetime(2026, 1, 1)
+
+    def frame_at(rate, **extra):
+        # the rate is derived from the depth 10 s before, as for a log without one
+        wps = [Waypoint(timestamp=t0, depth=20.0, time_since_start=0),
+               Waypoint(timestamp=t0 + timedelta(seconds=10), depth=20.0 - rate / 6.0, time_since_start=10)]
+        return _gauge_frame([dict(elem, **extra)], wps[1], wps)
+
+    centres = [88, 68, 48, 28, 8]  # segment middles, bottom to top (18.8 px segments, 2 px gaps)
+    lit = lambda frame: [tuple(frame[y, 5]) != (64, 64, 64) for y in centres]
+    assert lit(frame_at(5.0)) == [True, True, False, False, False]  # 2 m/min a segment, whole ones
+    assert lit(frame_at(0.0)) == [False] * 5
+    assert tuple(frame_at(5.0)[88, 5]) == (0, 255, 0)
+    fast = frame_at(12.0)
+    assert lit(fast) == [True] * 5 and tuple(fast[88, 5]) == (0, 0, 255)  # every lit segment in the value's red
+    placed = frame_at(12.0, color_mode="position")
+    assert tuple(placed[88, 5]) == (0, 255, 0) and tuple(placed[8, 5]) == (0, 255, 255)  # each by its place: 8-10 m/min is yellow
+
+
+def test_suunto_minute_formats_and_text_box():
+    from gui.hud_renderer import apply_value_format
+    assert apply_value_format({"field": "ndl", "value_format": "minutes_prime"}, "x", 45 * 60) == "45′"
+    assert apply_value_format({"field": "ndl", "value_format": "minutes_prime"}, "x", 6000) == ">99′"
+    assert apply_value_format({"field": "tts", "value_format": "minutes_prime"}, "x", 6000) == "100′"
+    assert apply_value_format({"field": "dive_time", "value_format": "m'ss"}, "x", 170) == "2′50"
+
+    elem = {"field": "dive_time", "rel_x": 0.1, "rel_y": 0.1, "font_size": 30, "color": "#FFFFFF", "box_color": "#FF8000"}
+    frame = _gauge_frame([elem], Waypoint(timestamp=datetime(2026, 1, 1), depth=10.0, time_since_start=0, dive_time=170))
+    orange = np.all(frame == (0, 128, 255), axis=2)
+    assert orange.sum() > 200  # the box behind the value
+
+
+def test_gauge_bounds_and_defaults():
+    from utils.hud_designer import element_defaults, element_kind, element_native_bounds, parse_layout_elements
+    arc = element_defaults("arc", "ndl")
+    assert element_kind(arc) == "arc" and arc["field"] == "ndl" and arc["range_max"] == 6000
+    assert element_native_bounds(dict(arc, rel_x=0.5, rel_y=0.5), 200, 200) == (100.0, 100.0, 220.0, 220.0)
+    bar = element_defaults("segment_bar", "ascent_rate")
+    assert element_kind(bar) == "segment_bar" and bar["field"] == "ascent_rate" and bar["segments"] == 5
+    assert element_native_bounds(dict(bar, rel_x=0.0, rel_y=0.0), 200, 200) == (0.0, 0.0, 12.0, 60.0)
+    parsed = parse_layout_elements({"linked_elements": [{"type": "arc", "rel_x": 0.1, "rel_y": 0.1},
+                                                        {"type": "segment_bar", "rel_x": 0.2, "rel_y": 0.2}]})
+    assert parsed[0]["field"] == "ndl" and parsed[0]["sweep"] == 270
+    assert parsed[1]["field"] == "ascent_rate" and parsed[1]["range_max"] == 10

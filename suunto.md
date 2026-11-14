@@ -439,6 +439,10 @@ are on hand.
 
 Progress: step 2 done 2026-11-14 (`parsers/suunto.py`, `tests/test_suunto.py`;
 built on the D5 / Ocean sample exports, EON and Nautic files still to check).
+Step 3 done 2026-11-14: `arc` and `segment_bar` elements, a text element's
+`box_color`, the `minutes_prime` / `m'ss` formats (`gui/hud_renderer.py`,
+Overlay Designer add / inspector support). Not done: a pill-shaped box
+behind a value with a small suffix (the box only goes behind plain text).
 
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in

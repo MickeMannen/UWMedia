@@ -179,8 +179,8 @@ ADD_ELEMENT_PRESETS = {
     DIVE_TIME_SMALL_SECONDS: ("dive_time", "seconds"),
 }
 
-_NUMERIC_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "scale", "max_width", "unit_scale", "unit_dx", "unit_dy", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
-_INT_ELEMENT_ATTRS = {"font_size", "value_font_size", "caption_font_size", "max_width", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar"}
+_NUMERIC_ELEMENT_ATTRS = {"thickness", "start_angle", "sweep", "range_min", "range_max", "font_size", "value_font_size", "caption_font_size", "scale", "max_width", "unit_scale", "unit_dx", "unit_dy", "width", "height", "corner_radius", "marker_size", "small_suffix_scale", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar", "fill_opacity", "stops_opacity", "ceiling_opacity", "background_opacity"}
+_INT_ELEMENT_ATTRS = {"thickness", "start_angle", "sweep", "font_size", "value_font_size", "caption_font_size", "max_width", "width", "height", "corner_radius", "marker_size", "outline_width", "outline_gap", "up_count", "down_count", "segments", "segment_gap", "full_bar", "empty_bar"}
 _STYLE_DEFAULTS = {"tissue_bar": "segments", "tank_icon": "fill", "notice": "text"}
 # A graph's deco-stop shading colour when the inspector switches it on.
 DEFAULT_STOPS_COLOR = "#FFA500"
@@ -875,6 +875,8 @@ class OverlayDesignerBackend(QObject):
                 "caption_font_size": 18, "confirm_text": "", "caption_color": "", "hide_when_notice": False, "hide_when_switch": False, "source": "timed",
                 "unit_suffix": False, "unit_position": "right", "unit_scale": 0.35, "unit_dx": 0.0, "unit_dy": 0.0, "unit_color": "", "unit_orientation": "horizontal",
                 "max_width": 0, "shared": False,
+                "thickness": 12, "start_angle": 135, "sweep": 270, "range_min": 0, "range_max": 100,
+                "track_color": "#303030", "color_mode": "value", "box_color": "",
             }
         x_px, y_px = doc.element_position_px(self._selected_index)
         field = elem.get("field", "")
@@ -951,6 +953,16 @@ class OverlayDesignerBackend(QObject):
             "unit_dy": elem.get("unit_dy", 0.0),
             "unit_color": elem.get("unit_color") or "",
             "unit_orientation": elem.get("unit_orientation") or "horizontal",
+            # arc / segment bar (gui.hud_renderer._draw_arc / _draw_segment_bar)
+            "thickness": elem.get("thickness", 12),
+            "start_angle": elem.get("start_angle", 135),
+            "sweep": elem.get("sweep", 270),
+            "range_min": elem.get("range_min", 0),
+            "range_max": elem.get("range_max", 100),
+            "track_color": elem.get("track_color") or "#303030",
+            "color_mode": "position" if elem.get("color_mode") == "position" else "value",
+            # a text element's own box behind it ("" = none)
+            "box_color": elem.get("box_color") or "",
         }
 
     @Slot(str, "QVariant")
@@ -1026,8 +1038,10 @@ class OverlayDesignerBackend(QObject):
             doc.set_element_attr(index, "unit_position", "below" if value == "below" else None)
         elif key == "unit_orientation":
             doc.set_element_attr(index, "unit_orientation", "stacked" if value == "stacked" else None)
-        elif key == "unit_color":
-            doc.set_element_attr(index, "unit_color", str(value) if value else None)
+        elif key in ("unit_color", "box_color", "track_color"):
+            doc.set_element_attr(index, key, str(value) if value else None)
+        elif key == "color_mode":
+            doc.set_element_attr(index, "color_mode", "position" if value == "position" else None)
         elif key == "source":
             doc.set_element_attr(index, "source", "persistent" if value == "persistent" else None)
         elif key in ("field", "color", "ceiling_color", "marker_style", "outline_color", "fill_color", "background_color", "caption_color"):
@@ -1319,7 +1333,7 @@ class OverlayDesignerBackend(QObject):
         doc = self.document
         if doc is None or not field:
             return
-        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows"):
+        if kind not in ("text", "badge", "tank_icon", "graph", "tissue_bar", "ascent_chevrons", "notice", "tank_switch_arrows", "arc", "segment_bar"):
             kind = "text"
         if kind == "graph":
             field = "depth_graph"
@@ -1506,8 +1520,9 @@ class OverlayDesignerBackend(QObject):
         for index in selection:
             elem = doc.elements[index]
             kind = element_kind(elem)
-            if kind in ("tank_icon", "graph", "tissue_bar", "ascent_chevrons"):
-                defaults = {"tank_icon": (20, 30), "graph": (300, 150), "tissue_bar": (12, 33), "ascent_chevrons": (16, 47)}[kind]
+            if kind in ("tank_icon", "graph", "tissue_bar", "ascent_chevrons", "arc", "segment_bar"):
+                defaults = {"tank_icon": (20, 30), "graph": (300, 150), "tissue_bar": (12, 33), "ascent_chevrons": (16, 47),
+                            "arc": (120, 120), "segment_bar": (12, 60)}[kind]
                 for key, default in (("width", defaults[0]), ("height", defaults[1])):
                     current = float(elem.get(key, default))
                     grown = current * factor

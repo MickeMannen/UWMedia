@@ -1366,6 +1366,142 @@ def _draw_tissue_bar(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, 
     draw.ellipse([cx - r_px, marker_y - r_px, cx + r_px, marker_y + r_px], fill=(255, 255, 255), outline=(0, 0, 0))
 
 
+ARC_DEFAULTS = {"width": 120, "height": 120, "thickness": 12, "start_angle": 135, "sweep": 270,
+                "range_min": 0, "range_max": 100, "segments": 1, "segment_gap": 0, "track_color": "#303030"}
+SEGMENT_BAR_DEFAULTS = {"width": 12, "height": 60, "segments": 5, "segment_gap": 2,
+                        "range_min": 0, "range_max": 10, "track_color": "#303030"}
+
+
+def gauge_value(layout, elem, waypoint, waypoints=None):
+    """The number an arc or segment bar shows: the field's raw value, or the
+    ascent rate (positive going up) derived the way the chevrons derive it."""
+    if waypoint is None:
+        return None
+    field = elem.get("field", "")
+    if field == "ascent_rate":
+        value = ascent_rate_for(waypoint, waypoints)
+    else:
+        _, value = resolve_element_text(layout, field, waypoint, waypoints)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def gauge_fraction(elem, value, defaults):
+    """`value` as 0-1 of the element's range_min..range_max (raw units:
+    seconds for an NDL, bar for a tank, m/min for an ascent rate)."""
+    if value is None:
+        return 0.0
+    low = float(elem.get("range_min", defaults["range_min"]))
+    high = float(elem.get("range_max", defaults["range_max"]))
+    if high <= low:
+        return 0.0
+    return max(0.0, min(1.0, (value - low) / (high - low)))
+
+
+def _band_color(elem, field, value, manufacturer, model, default):
+    """A gauge's colour at `value`: the element's own `bands` ([{"min",
+    "max", "color"}], the hud_rules.json shape) where it has them, else
+    the field's colour rule, else `default`."""
+    bands = elem.get("bands")
+    if isinstance(bands, list):
+        for band in bands:
+            if "min" in band and value < float(band["min"]):
+                continue
+            if "max" in band and value >= float(band["max"]):
+                continue
+            return str(band.get("color", default))
+        return default
+    from utils.hud_rules_engine import get_dynamic_color
+    return get_dynamic_color(manufacturer, model, field, value, default)
+
+
+def arc_geometry(elem):
+    """(width, height, thickness) of an arc element in skin px."""
+    return (float(elem.get("width", ARC_DEFAULTS["width"])), float(elem.get("height", ARC_DEFAULTS["height"])),
+            float(elem.get("thickness", ARC_DEFAULTS["thickness"])))
+
+
+def _draw_arc(draw, elem, value, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
+    """An arc gauge (a Suunto EON's NDL / ascent-time / tank / stop arc):
+    a track from `start_angle` through `sweep` degrees (0 = 3 o'clock,
+    clockwise, as PIL counts them), filled from its start in proportion to
+    the value over range_min..range_max. `segments` > 1 splits the track
+    with `segment_gap` degrees between the parts. The fill takes `color`,
+    or the band / rule colour at the value. Drawn even without a value
+    (an empty track), like the device's."""
+    scale = user_scale if render_log else user_scale * res_scale
+    w, h, thick = arc_geometry(elem)
+    x0 = int(skin_x + elem.get("rel_x", 0.0) * w_scaled)
+    y0 = int(skin_y + elem.get("rel_y", 0.0) * h_scaled)
+    box = [x0, y0, x0 + max(2, int(round(w * scale))), y0 + max(2, int(round(h * scale)))]
+    width_px = max(1, int(round(thick * scale)))
+    start = float(elem.get("start_angle", ARC_DEFAULTS["start_angle"]))
+    sweep = float(elem.get("sweep", ARC_DEFAULTS["sweep"]))
+    count = max(1, int(elem.get("segments", ARC_DEFAULTS["segments"])))
+    gap = float(elem.get("segment_gap", ARC_DEFAULTS["segment_gap"])) if count > 1 else 0.0
+    track = _rgb(str(elem.get("track_color", ARC_DEFAULTS["track_color"])))
+    field = elem.get("field", "")
+    fill = _rgb(_band_color(elem, field, value, manufacturer, model, elem.get("color", "#FFFFFF"))) if value is not None else None
+    fill_end = start + sweep * gauge_fraction(elem, value, ARC_DEFAULTS)
+    part = (sweep - gap * (count - 1)) / count
+    for i in range(count):
+        a0 = start + i * (part + gap)
+        a1 = a0 + part
+        draw.arc(box, a0, a1, fill=track, width=width_px)
+        if fill is not None and fill_end > a0:
+            draw.arc(box, a0, min(a1, fill_end), fill=fill, width=width_px)
+
+
+def segment_bar_geometry(elem):
+    """(width, height, segments, gap) of a segment bar in skin px."""
+    return (float(elem.get("width", SEGMENT_BAR_DEFAULTS["width"])), float(elem.get("height", SEGMENT_BAR_DEFAULTS["height"])),
+            max(1, int(elem.get("segments", SEGMENT_BAR_DEFAULTS["segments"]))),
+            float(elem.get("segment_gap", SEGMENT_BAR_DEFAULTS["segment_gap"])))
+
+
+def _draw_segment_bar(draw, elem, value, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log):
+    """A vertical stack of segments lit from the bottom by a value over
+    range_min..range_max (a Suunto's ascent-rate bar, 2 m/min a segment;
+    an EON's NDL / tank scale). Whole segments light (`step`, the default)
+    or the fill runs continuously (`step: false`). `color_mode` "value"
+    lights every segment in the value's colour; "position" gives each
+    segment the colour of its own place on the scale (green at the foot,
+    red at the top), as the EON's ascent bar does. Unlit segments take
+    `track_color`."""
+    scale = user_scale if render_log else user_scale * res_scale
+    w, h, count, gap = segment_bar_geometry(elem)
+    x0 = int(skin_x + elem.get("rel_x", 0.0) * w_scaled)
+    y0 = int(skin_y + elem.get("rel_y", 0.0) * h_scaled)
+    w_px, h_px = max(1, int(round(w * scale))), max(count, int(round(h * scale)))
+    gap_px = gap * scale
+    seg_h = (h_px - gap_px * (count - 1)) / count
+    track = _rgb(str(elem.get("track_color", SEGMENT_BAR_DEFAULTS["track_color"])))
+    field = elem.get("field", "")
+    default = elem.get("color", "#FFFFFF")
+    fraction = gauge_fraction(elem, value, SEGMENT_BAR_DEFAULTS)
+    if elem.get("step", True) is not False:
+        fraction = int(fraction * count + 1e-9) / count
+    lit_px = fraction * h_px
+    low = float(elem.get("range_min", SEGMENT_BAR_DEFAULTS["range_min"]))
+    high = float(elem.get("range_max", SEGMENT_BAR_DEFAULTS["range_max"]))
+    value_color = _rgb(_band_color(elem, field, value, manufacturer, model, default)) if value is not None else track
+    bottom = y0 + h_px
+    for i in range(count):
+        seg_bottom = bottom - i * (seg_h + gap_px)
+        seg_top = seg_bottom - seg_h
+        draw.rectangle([x0, int(round(seg_top)), x0 + w_px, int(round(seg_bottom))], fill=track)
+        lit_top = max(seg_top, bottom - lit_px)
+        if lit_top >= seg_bottom:
+            continue
+        if elem.get("color_mode") == "position":
+            at = low + (high - low) * (i + 0.5) / count
+            color = _rgb(_band_color(elem, field, at, manufacturer, model, default))
+        else:
+            color = value_color
+        draw.rectangle([x0, int(round(lit_top)), x0 + w_px, int(round(seg_bottom))], fill=color)
+
+
 ASCENT_FULL_SCALE_M_PER_MIN = 12.0
 ASCENT_DEADBAND_M_PER_MIN = 0.5
 ASCENT_DEFAULT_BANDS = [
@@ -2048,6 +2184,14 @@ def apply_value_format(elem, val, raw_val):
     if value_format == "m:ss":
         # a Descent X50i's dive time and TTS: "0:00", "1:16" - no leading zero
         return f"{int(raw_val // 60)}:{int(raw_val % 60):02d}"
+    if value_format == "minutes_prime":
+        # a Suunto's minutes with a prime: "24′"; an NDL at the 100-minute
+        # cap ">99′" (EON Core manual p.25, Nautic p.21)
+        minutes = int(raw_val // 60)
+        return ">99′" if elem.get("field") == "ndl" and minutes > 99 else f"{minutes}′"
+    if value_format == "m'ss":
+        # a Suunto's stop counter and the Nautic's dive time: "2′50", "24′05"
+        return f"{int(raw_val // 60)}′{int(raw_val % 60):02d}"
     # a value with a unit is formatted in the unit system in force, not as
     # the SI number the log holds (a stop depth in feet, a temperature in °F)
     from utils import units as U
@@ -2267,6 +2411,12 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             _draw_tissue_bar(draw, elem, waypoint, manufacturer, model, skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
             continue
 
+        if elem.get("type") in ("arc", "segment_bar"):
+            draw_gauge = _draw_arc if elem["type"] == "arc" else _draw_segment_bar
+            draw_gauge(draw, elem, gauge_value(layout, elem, waypoint, waypoints), rules_manufacturer(layout), layout.get("model", "Perdix2"),
+                       skin_x, skin_y, w_scaled, h_scaled, res_scale, user_scale, render_log)
+            continue
+
         if elem.get("type") == "ascent_chevrons":
             manufacturer = rules_manufacturer(layout)
             model = layout.get("model", "Perdix2")
@@ -2323,7 +2473,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                     color_hex = gf_rule.get("above_100", "#FF0000")
                 elif float(raw_val) > float(gf_high):
                     color_hex = gf_rule.get("above_gf_high", "#FFFF00")
-        box_rgb = None
+        # a box the element always sits on (a Nautic's stop timer pill); the
+        # rules' own boxes below (CCR, tank reserve) take its place
+        box_rgb = _rgb(elem["box_color"]) if elem.get("box_color") else None
         from utils.hud_rules_engine import ccr_style
         ccr = ccr_style(manufacturer, model, field, waypoint, raw_val, color_hex, elapsed)
         box_outline_rgb = None

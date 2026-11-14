@@ -23,7 +23,8 @@ ColumnLayout {
     readonly property bool elementSelected: overlayDesignerBackend.selectedIndex >= 0
     readonly property bool skinSelected: overlayDesignerBackend.skinSelected
     readonly property string kind: elementSelected ? String(sel.kind) : ""
-    readonly property bool sizedKind: kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || kind === "notice" || kind === "tank_switch_arrows" || (kind === "badge" && String(sel.style) === "box")
+    readonly property bool gaugeKind: kind === "arc" || kind === "segment_bar"
+    readonly property bool sizedKind: gaugeKind || kind === "tank_icon" || kind === "graph" || kind === "tissue_bar" || kind === "ascent_chevrons" || kind === "notice" || kind === "tank_switch_arrows" || (kind === "badge" && String(sel.style) === "box")
 
     // Fixed field widths (2026-09-28, per the user): the fill-width fields
     // made the grid, and with it the whole right column, wider than the
@@ -221,7 +222,7 @@ ColumnLayout {
                 spacing: 2
                 Label {
                     Layout.fillWidth: true
-                    text: "Element · " + (inspector.kind === "tissue_bar" ? "tissue bar" : inspector.kind === "ascent_chevrons" ? "ascent chevrons" : inspector.kind)
+                    text: "Element · " + (inspector.kind === "tissue_bar" ? "tissue bar" : inspector.kind === "ascent_chevrons" ? "ascent chevrons" : inspector.kind === "segment_bar" ? "segment bar" : inspector.kind)
                     // a notice has no field of its own: the active notification is what it shows
                     font.bold: true
                     font.pixelSize: 14
@@ -285,7 +286,7 @@ ColumnLayout {
                     Layout.preferredHeight: 32
                     font.pixelSize: 13
                     popup.width: 240  // long field names stay readable in the list
-                    visible: inspector.sel.is_custom !== true && (inspector.kind === "text" || inspector.kind === "tank_icon" || inspector.kind === "tissue_bar")
+                    visible: inspector.sel.is_custom !== true && (inspector.kind === "text" || inspector.kind === "tank_icon" || inspector.kind === "tissue_bar" || inspector.gaugeKind)
                     model: overlayDesignerBackend.availableFields
                     Binding {
                         target: fieldCombo; property: "currentIndex"
@@ -354,10 +355,10 @@ ColumnLayout {
                     ToolTip.visible: hovered
                     ToolTip.delay: 400
                 }
-                Label { text: "Quick size"; visible: inspector.kind === "tank_icon" || inspector.kind === "graph" || inspector.kind === "tissue_bar" || inspector.kind === "ascent_chevrons" }
+                Label { text: "Quick size"; visible: inspector.kind === "tank_icon" || inspector.kind === "graph" || inspector.kind === "tissue_bar" || inspector.kind === "ascent_chevrons" || inspector.gaugeKind }
                 RowLayout {
                     Layout.columnSpan: 3
-                    visible: inspector.kind === "tank_icon" || inspector.kind === "graph" || inspector.kind === "tissue_bar" || inspector.kind === "ascent_chevrons"
+                    visible: inspector.kind === "tank_icon" || inspector.kind === "graph" || inspector.kind === "tissue_bar" || inspector.kind === "ascent_chevrons" || inspector.gaugeKind
                     spacing: 4
                     Button { Layout.preferredWidth: 40; Layout.preferredHeight: 30; flat: true; text: "−"; onClicked: overlayDesignerBackend.resizeSelected(-1); ToolTip.text: "Shrink width and height 5 % (or the − key)"; ToolTip.visible: hovered }
                     Button { Layout.preferredWidth: 40; Layout.preferredHeight: 30; flat: true; text: "+"; onClicked: overlayDesignerBackend.resizeSelected(1); ToolTip.text: "Grow width and height 5 % (or the + key)"; ToolTip.visible: hovered }
@@ -388,6 +389,12 @@ ColumnLayout {
                 }
                 Label { text: "Color"; visible: inspector.kind === "text" }
                 ColorField { Layout.columnSpan: 3; attr: "color"; value: inspector.sel.color; visible: inspector.kind === "text" }
+                Label {
+                    text: "Box"; visible: inspector.kind === "text"
+                    MouseArea { id: boxTip; anchors.fill: parent; hoverEnabled: true }
+                    ToolTip.text: "A filled box behind the value (a Nautic's stop timer). Empty the field for none."; ToolTip.visible: boxTip.containsMouse
+                }
+                ColorField { Layout.columnSpan: 3; attr: "box_color"; value: inspector.sel.box_color; visible: inspector.kind === "text" }
 
                 // Small suffix: Garmin-style large "00" + small top-aligned ":00" / "12" + ".3"
                 Label { text: "Small suffix"; visible: inspector.kind === "text" }
@@ -646,6 +653,36 @@ ColumnLayout {
                 Label { text: "Gap"; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.draw_outline === true }
                 NumField { attr: "outline_gap"; value: inspector.sel.outline_gap; visible: inspector.kind === "tank_icon" && inspector.sel.style !== "segments" && inspector.sel.draw_outline === true }
 
+            }
+            Section {
+                // arc gauge / segment bar (gui.hud_renderer._draw_arc / _draw_segment_bar)
+                title: inspector.kind === "arc" ? "Arc gauge" : "Segment bar"
+                visible: inspector.gaugeKind
+                Label { text: "Range"; visible: inspector.gaugeKind }
+                NumField { attr: "range_min"; value: inspector.sel.range_min; visible: inspector.gaugeKind; ToolTip.text: "The value at the empty end, in the field's raw units (seconds for NDL / TTS, bar, m/min)"; ToolTip.visible: hovered }
+                Label { text: "to"; visible: inspector.gaugeKind }
+                NumField { attr: "range_max"; value: inspector.sel.range_max; visible: inspector.gaugeKind; ToolTip.text: "The value at the full end (NDL 6000 s = 100 min)"; ToolTip.visible: hovered }
+                Label { text: "Thickness"; visible: inspector.kind === "arc" }
+                NumField { Layout.columnSpan: 3; attr: "thickness"; value: inspector.sel.thickness; visible: inspector.kind === "arc" }
+                Label { text: "Start"; visible: inspector.kind === "arc" }
+                NumField { attr: "start_angle"; value: inspector.sel.start_angle; visible: inspector.kind === "arc"; ToolTip.text: "Degrees, 0 at 3 o'clock, clockwise (135: bottom left)"; ToolTip.visible: hovered }
+                Label { text: "Sweep"; visible: inspector.kind === "arc" }
+                NumField { attr: "sweep"; value: inspector.sel.sweep; visible: inspector.kind === "arc"; ToolTip.text: "Degrees the track runs clockwise from Start"; ToolTip.visible: hovered }
+                Label { text: "Segments"; visible: inspector.gaugeKind }
+                NumField { attr: "segments"; value: inspector.sel.segments; visible: inspector.gaugeKind }
+                Label { text: "Gap"; visible: inspector.gaugeKind }
+                NumField { attr: "segment_gap"; value: inspector.sel.segment_gap; visible: inspector.gaugeKind; ToolTip.text: inspector.kind === "arc" ? "Degrees between segments" : "Skin px between segments"; ToolTip.visible: hovered }
+                Label { text: "Color"; visible: inspector.gaugeKind }
+                ColorField { Layout.columnSpan: 3; attr: "color"; value: inspector.sel.color; visible: inspector.gaugeKind }
+                Label { text: "Track"; visible: inspector.gaugeKind }
+                ColorField { Layout.columnSpan: 3; attr: "track_color"; value: inspector.sel.track_color; visible: inspector.gaugeKind }
+                Label { text: "Colour by"; visible: inspector.kind === "segment_bar" }
+                ChoiceRow {
+                    Layout.columnSpan: 3
+                    visible: inspector.kind === "segment_bar"
+                    attr: "color_mode"; options: ["value", "position"]; labels: ["Value", "Place"]
+                    current: String(inspector.sel.color_mode)
+                }
             }
             Section {
                 title: "Tissue bar"

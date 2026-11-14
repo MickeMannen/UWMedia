@@ -1376,3 +1376,33 @@ def test_play_runs_the_time_slider_at_ten_x_and_stops_at_the_end():
     app.togglePlay()
     assert app.playing is True and app.timeValue == app.timeMin  # from the start again
     app._stop_playing()
+
+
+def test_designer_adds_and_edits_gauges():
+    app = OverlayDesignerBackend()
+    app.onBrandSelected("Garmin")
+    app.onComputerSelected(next(n for n, c in app._computer_choices.items() if c == "x50i"))
+    app.addElement("primary_tank_pressure", "arc")
+    sel = app.selectedElement
+    assert sel["kind"] == "arc" and sel["field"] == "primary_tank_pressure" and sel["sweep"] == 270
+    app.setSelectedAttr("range_max", "250")
+    app.setSelectedAttr("sweep", "180.4")
+    app.setSelectedAttr("track_color", "#202020")
+    elem = app.document.elements[sel["index"]]
+    assert (elem["range_max"], elem["sweep"], elem["track_color"]) == (250.0, 180, "#202020")
+    w = app.selectedElement["width"]
+    app.resizeSelected(1)
+    assert app.selectedElement["width"] > w
+
+    app.addElement("ascent_rate", "segment_bar")
+    assert app.selectedElement["kind"] == "segment_bar" and app.selectedElement["color_mode"] == "value"
+    app.setSelectedAttr("color_mode", "position")
+    assert app.selectedElement["color_mode"] == "position"
+    app.setSelectedAttr("color_mode", "value")
+    assert "color_mode" not in app.document.elements[app.selectedElement["index"]]
+
+    app.addElement("dive_time", "text")
+    app.setSelectedAttr("box_color", "#FF8000")
+    assert app.selectedElement["box_color"] == "#FF8000"
+    app.setSelectedAttr("box_color", "")
+    assert "box_color" not in app.document.elements[app.selectedElement["index"]]
