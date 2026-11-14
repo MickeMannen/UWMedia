@@ -33,6 +33,9 @@ rule below was checked against the manuals listed.
 | Shearwater Tern | `Tern_Manual_Rev_B-1.pdf` | Rev B (2023-11-24) |
 | Garmin Descent Mk3 series | `Descent_Mk3_Series_OM_EN-US.pdf` | owner's manual, EN-US (replaced the EN-MY edition on 2026-10-16; Garmin pages cited before that date are the older edition's, e.g. its p.12-14 alert table is now p.35-36) |
 | Garmin Descent X50i | `Descent_X50i_OM_EN-US.pdf` | owner's manual, EN-US (replaced the EN-SG edition on 2026-10-16; older page numbers as above, its p.12-13 alert table is now p.26-27) |
+| Suunto EON Core | `suunto/Suunto_EONCore_UserGuide_EN.pdf` | User Guide 4.0 (2024-12-19); printed pages are PDF pages |
+| Suunto EON Steel Black | `suunto/Suunto_EONSteelBlack_UserGuide_EN.pdf` | User Guide 3.0 (2023-03-02); repeats the EON Core's rules |
+| Suunto Nautic | `suunto/Suunto_Nautic_UserGuide_EN.pdf` | 2025-12-01 |
 
 To re-read a passage: `pdftotext -layout <file> out.txt`, then `grep`; a
 figure: `pdftoppm -f N -l N -r 100 -png <file> page` and open the PNG.
@@ -95,6 +98,39 @@ figure: `pdftoppm -f N -l N -r 100 -png <file> page` and open the PNG.
 |---|---|---|---|---|
 | mk3i | `badge_states` | empty labels, white | real Mk3i screenshots (`test_data/dive_computers/garmin_mk3i/`) | deduced |
 
+## Suunto (brand level: EON Core, EON Steel Black), added 2026-11-14
+
+Colours are sampled from Suunto's product photos in
+`test_data/dive_computers/suunto/` (the manual figures are 110-208 px wide):
+EON green `#B1CB45`, orange `#ED7C2A`; Nautic cyan `#3FEBDF`, green
+`#46F083`, blue `#48C2F5`, yellow `#FEF01D`, red `#FF2322`.
+
+| Rule key | Value | Source | Status |
+|---|---|---|---|
+| `ndl` | green at every value | product photos; EON Core p.30, Steel Black p.31 figures; no NDL warning in the alarm tables (EON Core p.13-14) | deduced |
+| `po2` | red over 1.6 | EON Core p.13 alarm table; "Alarms are always red" | verified |
+| `safety_stop` | shown from a 10 m dive, counted between 2.4 and 6 m, 180 s, yellow | EON Core p.25, p.40; "Safety stop is ahead at 3.0 meters" (p.11) | verified |
+| `safety_stop` | a mandatory stop (after an ascent-rate violation) is red and longer | EON Core p.40 | verified, not modelled |
+| `badge_states` | stop yellow, m:ss; DECO orange | EON Core p.40-41 figures; DECO top right p.27 figure, orange sampled from the Steel Black photo | deduced |
+| `deco_stop` | window from the ceiling to 3 m below it, 0.6 m safe margin above it, violation beyond; the stop is the logged ceiling | EON Core p.26 | verified |
+| `ceiling_broken` | margin 0.6 m, red | EON Core p.13, p.26 | verified |
+| `lockout` | 3 min above the safe margin locks Fused RGBM 2; Bühlmann shows a Ceiling broken bar instead | EON Core p.17, p.26-27 (not modelled) | verified |
+| `ascent_rate` | 2 m/min a step; green under 8 m/min, yellow 8-10, red over 10 | EON Core p.15 | verified |
+| `tank_reserve` | red below 50 bar (built in), yellow below the diver's own alarm (70 bar) | EON Core p.14; the diver's limit has no default | 50 verified, 70 assumed |
+| `display.depth_decimals` | 0.1 m / 1 ft | EON Core p.57 | verified |
+
+## Suunto, per model
+
+| Model | Rule key | Value | Source | Status |
+|---|---|---|---|---|
+| Nautic | `ndl` | white, yellow at 5 min or less | p.22, p.37; white in the product photo, yellow from the p.51 figure | deduced |
+| Nautic | `po2` | red over 1.6, yellow over the gas's limit (1.4) | p.36-37; the gas limit has no default | 1.6 verified, 1.4 assumed |
+| Nautic | `ascent_rate` | grey under 2 m/min, green to 8, yellow 8-10, red over 10 | p.23 (2-4 m/min is not stated) | verified, 2-4 assumed |
+| Nautic | `safety_stop` | 10 m dive, 2.4-6 m, paused deeper than 6 m; amber | p.47; amber from the p.22 figure | verified, colour deduced |
+| Nautic | `badge_states` | stop label cyan, DECO orange | p.22; p.52 figure; product photo | deduced |
+| Nautic | `tank_pressure_fill` | blue, yellow below 70 bar, red below 50 | product photo; 50 bar p.37; 70 assumed | deduced |
+| Nautic | `gf_colors` | GF99 yellow above GF High, red from 100 %; GF High 85 | p.26; Medium 40/85 p.42 | verified |
+
 ## default (no brand)
 
 Generic values with no source; they only apply to Custom templates that
@@ -109,6 +145,10 @@ carries its own `_source`; the table is the summary.
 | Brand / model | Item | Value | Source | Status |
 |---|---|---|---|---|
 | Shearwater | `notice_style` | message in yellow under a "Warning" (or "Alert", "Error") caption with "Confirm" at the right, across the bottom row | Perdix 2 p.22 and p.24-26 figures; Peregrine TX p.21; Petrel 3 Rec p.24 | verified |
+| Suunto (EON) | `notice_style` | a dark rounded box with a yellow border: alarms red, warnings red or yellow, notifications yellow, until a button is pressed | EON Core p.13 and figures | verified |
+| Suunto (EON) | `notices` | Ascent speed, Ceiling broken, pO2 high / low, Safety stop broken, CNS 100%, OTU 300, Tank pressure (red); CNS 80%, OTU 250, Change gas, Setpoint switched (yellow) | EON Core p.13-14 tables, p.17, p.39; the alarm names are icons in the table, so "Ascent speed" and "pO2 low" are assumed; Change gas from a D5 export's "Gas Available" event (deduced); OTU and Safety stop broken only from the log's own events | verified / assumed per entry |
+| Suunto Nautic | `notice_style` | a red panel filling the switch window, until resolved | p.36; p.37, p.49 figures | verified |
+| Suunto Nautic | `notices` | ASCENT SPEED, CEILING BROKEN, PO2 HIGH, TANK PRESSURE, CNS, NO DECO (red); SWITCH GAS, SIDEMOUNT (cyan) | p.22, p.29-30, p.36-39; the alarms are icons, so their wording is assumed | verified triggers, assumed wording |
 | Shearwater | `show_seconds` 10 | none: the device keeps a notification until a button is pressed, which a log does not record | assumed |
 | Shearwater | `LOW PPO2` below the OC Min limit (0.18) | Perdix 2 p.25, p.62 | verified |
 | Shearwater | `HIGH PPO2` above the limit for more than 30 s (1.61 used) | Perdix 2 p.22, p.25 | verified (limit choice: see `po2`) |

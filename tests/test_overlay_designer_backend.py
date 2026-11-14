@@ -712,7 +712,7 @@ def test_create_custom_template_from_image_under_new_custom_computer(isolated_te
     image = tmp_path / "hud graphic.jpg"
     _PILImage.new("RGB", (800, 600), (30, 30, 30)).save(image)
     app = OverlayDesignerBackend()
-    assert app.rulesProfiles == ["Default", "Shearwater", "Garmin"]
+    assert app.rulesProfiles == ["Default", "Shearwater", "Garmin", "Suunto"]
     new_index = len(app.saveAsTargets) - 1
     changed = _signal_counter(app.templatesChanged)
 

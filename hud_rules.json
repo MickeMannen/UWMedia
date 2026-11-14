@@ -1169,6 +1169,413 @@
       "_source": "Descent Mk3 p.21, X50i p.16-17: the label says whether CC or OC diving is active - a bailout reads OC"
     }
   },
+  "Suunto": {
+    "_manual": "Suunto EON Core User Guide 4.0 (EON Core) for the brand level, which the EON Steel Black User Guide 3.0 repeats; Suunto Nautic user guide (2025-12-01) for the Nautic block. Pages are PDF pages; colours sampled from Suunto's product photos (test_data/dive_computers/suunto). Full list: hud_rules_sources.md",
+    "ndl": [
+      {
+        "max": 30,
+        "color": "#B1CB45"
+      },
+      {
+        "min": 30,
+        "color": "#B1CB45"
+      }
+    ],
+    "_ndl": "deduced: an EON shows 'no deco' green at every value (product photos; EON Core p.30, Steel Black p.31 figures); the alarm tables (EON Core p.13-14) have no NDL warning",
+    "po2": [
+      {
+        "min": 1.6,
+        "color": "#FF0000"
+      }
+    ],
+    "_po2": "EON Core p.13: pO2 over 1.6 is an alarm, and alarms are red",
+    "safety_stop": {
+      "text": "SAFETY STOP",
+      "color": "#FFFF00",
+      "trigger_max_depth": 10.0,
+      "duration_sec": 180,
+      "start_below": 6.0,
+      "count_range": [
+        2.4,
+        6.0
+      ],
+      "min_depth": 2.4,
+      "max_depth": 6.0,
+      "_source": "EON Core p.25, p.40: a 3 minute stop (3, 4 or 5 settable) on every dive over 10 m, counted while between 2.4 and 6 m; 'Safety stop is ahead at 3.0 meters' before it counts (p.11). Voluntary yellow; a mandatory stop after an ascent-rate violation is red and longer (p.40) - not modelled"
+    },
+    "badge_states": {
+      "safety_stop": {
+        "label": "SAFETY STOP",
+        "color": "#FFFF00",
+        "value_color": "#FFFF00",
+        "timer_format": "m:ss"
+      },
+      "deco": {
+        "label": "DECO",
+        "color": "#ED7C2A"
+      },
+      "_source": "EON Core p.40-41 figures: the stop depth and m:ss counter yellow (voluntary); DECO orange top right in deco (p.27 figure; orange sampled from the Steel Black photo's asc. time)"
+    },
+    "deco_stop": {
+      "approach_m": 3.0,
+      "at_stop_m": 3.0,
+      "violation_above_m": 0.6,
+      "_source": "EON Core p.26: the deco window runs from the ceiling to 3 m below it (white up / down arrows), a 0.6 m safe margin above the ceiling (yellow), above that a red arrow, an alarm and the calculation paused. The stop is the logged ceiling (parsers/suunto.py)"
+    },
+    "ceiling_broken": {
+      "margin": 0.6,
+      "color": "#FF0000",
+      "_source": "EON Core p.13, p.26"
+    },
+    "lockout": {
+      "minutes_above_ceiling": 3,
+      "_source": "EON Core p.26-27: three minutes above the safe margin locks Fused RGBM 2 ('Locked', p.17); Bühlmann 16 GF does not lock but shows a red Ceiling broken bar (p.17). Not modelled yet"
+    },
+    "ascent_rate": [
+      {
+        "max": 8.0,
+        "color": "#B1CB45"
+      },
+      {
+        "min": 8.0,
+        "max": 10.0,
+        "color": "#FFFF00"
+      },
+      {
+        "min": 10.0,
+        "color": "#FF0000"
+      }
+    ],
+    "_ascent_rate": "EON Core p.15: one bar step is 2 m/min; green under 8 m/min, yellow 8-10, red over 10; an alarm after five seconds over 10",
+    "tank_reserve": {
+      "default_bar": 70,
+      "critical_default_bar": 50,
+      "reserve_color": "#FFFF00",
+      "critical_color": "#FF0000",
+      "style": "text",
+      "_source": "EON Core p.14: the value turns yellow below the diver's own tank pressure alarm and red below the built-in 50 bar one; the diver's limit has no default in the manual: 70 bar assumed"
+    },
+    "notice_style": {
+      "style": "box",
+      "color": "#FFFF00",
+      "caption_color": "#FFFF00",
+      "confirm_text": "",
+      "show_seconds": 10,
+      "_source": "EON Core p.13: alarms, warnings and notifications as a pop-up until a button is pressed; alarms red, warnings red or yellow, notifications yellow; the figures show a dark rounded box with a coloured border. A log has no button press: show_seconds assumed"
+    },
+    "notices": [
+      {
+        "id": "ascent_speed",
+        "text": "Ascent speed",
+        "caption": "",
+        "when": "ascent_faster_than",
+        "m_per_min": 10,
+        "seconds": 5,
+        "color": "#FF0000",
+        "_source": "EON Core p.13 alarm: over 10 m/min for five seconds; the pop-up's wording is not in the text (assumed)"
+      },
+      {
+        "id": "ceiling_broken",
+        "text": "Ceiling broken",
+        "caption": "",
+        "when": "stop_violation",
+        "seconds": 0,
+        "color": "#FF0000",
+        "_source": "EON Core p.13 alarm: ceiling broken by more than 0.6 m; 'Ceiling broken' p.17"
+      },
+      {
+        "id": "po2_high",
+        "text": "pO2 high",
+        "caption": "",
+        "when": "po2_above",
+        "bar": 1.6,
+        "seconds": 0,
+        "color": "#FF0000",
+        "_source": "EON Core p.13 alarm: pO2 over 1.6; 'pO2 high' pop-up in the p.13 figure (the screen writes pO₂, the bundled font has no subscript)"
+      },
+      {
+        "id": "po2_low",
+        "text": "pO2 low",
+        "caption": "",
+        "when": "po2_below",
+        "bar": 0.18,
+        "color": "#FF0000",
+        "_source": "EON Core p.13 alarm: pO2 under 0.18 (wording assumed after 'pO2 high')"
+      },
+      {
+        "id": "safety_stop_broken",
+        "text": "Safety stop broken",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "safety_stop_broken",
+        "color": "#FF0000",
+        "_source": "EON Core p.14 warning: safety stop ceiling broken by more than 0.6 m; from the log's own event (parsers/suunto.py)"
+      },
+      {
+        "id": "cns_100",
+        "text": "CNS 100%",
+        "caption": "",
+        "when": "cns_at_least",
+        "percent": 100,
+        "color": "#FF0000",
+        "_source": "EON Core p.13 warning"
+      },
+      {
+        "id": "otu_300",
+        "text": "OTU 300",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "otu_critical",
+        "color": "#FF0000",
+        "_source": "EON Core p.13 warning; from the log's own event (no OTU is computed)"
+      },
+      {
+        "id": "tank_pressure",
+        "text": "Tank pressure",
+        "caption": "",
+        "when": "tank_critical",
+        "color": "#FF0000",
+        "_source": "EON Core p.14 warning: the built-in 50 bar alarm (red); the user's own limit (yellow) is a setting no log holds"
+      },
+      {
+        "id": "cns_80",
+        "text": "CNS 80%",
+        "caption": "",
+        "when": "cns_at_least",
+        "percent": 80,
+        "color": "#FFFF00",
+        "_source": "EON Core p.14 notification"
+      },
+      {
+        "id": "otu_250",
+        "text": "OTU 250",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "otu_warning",
+        "color": "#FFFF00",
+        "_source": "EON Core p.14 notification; from the log's own event"
+      },
+      {
+        "id": "change_gas",
+        "text": "Change gas",
+        "caption": "",
+        "when": "fit_alert",
+        "alert": "suunto:Gas Available",
+        "color": "#FFFF00",
+        "_source": "EON Core p.14 notification on a multi-gas ascent; deduced: a D5 export logs 'Gas Available' just before the diver switches (sample export, 2026-11-14)"
+      },
+      {
+        "id": "setpoint_up",
+        "text": "Setpoint switched {setpoint}",
+        "caption": "",
+        "when": "setpoint_up",
+        "circuits": [
+          "CC",
+          "SC"
+        ],
+        "color": "#FFFF00",
+        "_source": "EON Core p.14 notification, p.39 'Setpoint switched' pop-up figure"
+      },
+      {
+        "id": "setpoint_down",
+        "text": "Setpoint switched {setpoint}",
+        "caption": "",
+        "when": "setpoint_down",
+        "circuits": [
+          "CC",
+          "SC"
+        ],
+        "color": "#FFFF00",
+        "_source": "EON Core p.14 notification"
+      }
+    ],
+    "display": {
+      "depth_decimals": {
+        "metric": 1,
+        "imperial": 0
+      },
+      "_source": "EON Core p.57: depth resolution 0.1 m / 1 ft"
+    },
+    "Nautic": {
+      "ndl": [
+        {
+          "max": 5,
+          "color": "#FEF01D"
+        },
+        {
+          "min": 5,
+          "color": "#FFFFFF"
+        }
+      ],
+      "_ndl": "Nautic p.22: '>99' above 99 minutes; at 5 minutes or less a mandatory alarm and the area highlighted; white otherwise (product photo); the highlight colour yellow from the p.51 figure (deduced)",
+      "po2": [
+        {
+          "min": 1.6,
+          "color": "#FF2322"
+        },
+        {
+          "min": 1.4,
+          "color": "#FEF01D"
+        }
+      ],
+      "_po2": "Nautic p.36-37: red over 1.6, yellow over the gas's own set limit (no default in the manual: 1.4 assumed)",
+      "ascent_rate": [
+        {
+          "max": 2.0,
+          "color": "#808080"
+        },
+        {
+          "min": 2.0,
+          "max": 8.0,
+          "color": "#46F083"
+        },
+        {
+          "min": 8.0,
+          "max": 10.0,
+          "color": "#FEF01D"
+        },
+        {
+          "min": 10.0,
+          "color": "#FF2322"
+        }
+      ],
+      "_ascent_rate": "Nautic p.23: one step 2 m/min; grey under 2, green 4-8 (2-4 not stated: green assumed), yellow over 8, red at 10, highlighted red over 10 for 5 s (not modelled)",
+      "safety_stop": {
+        "text": "SAFETY STOP",
+        "color": "#FFB000",
+        "trigger_max_depth": 10.0,
+        "duration_sec": 180,
+        "start_below": 6.0,
+        "count_range": [
+          2.4,
+          6.0
+        ],
+        "min_depth": 2.4,
+        "max_depth": 6.0,
+        "_source": "Nautic p.47: a 3 minute stop on dives over 10 m, timed between 2.4 and 6 m; the timer stops deeper than 6 m and resumes inside the window; amber timer pill from the p.22 figure (colour deduced)"
+      },
+      "badge_states": {
+        "safety_stop": {
+          "label": "SAFETY STOP",
+          "color": "#3FEBDF",
+          "value_color": "#FFFFFF",
+          "timer_format": "m:ss"
+        },
+        "deco": {
+          "label": "DECO",
+          "color": "#ED7C2A"
+        },
+        "_source": "Nautic p.22: a Deco badge in deco (orange in the p.52 figure); stop labels cyan like every Nautic label (product photo)"
+      },
+      "tank_pressure_fill": [
+        {
+          "max": 50,
+          "color": "#FF2322"
+        },
+        {
+          "max": 70,
+          "color": "#FEF01D"
+        },
+        {
+          "min": 70,
+          "color": "#48C2F5"
+        }
+      ],
+      "_tank_pressure_fill": "Nautic product photo: the tank gauge blue over yellow over red; red below 50 bar (p.37), yellow below the user's alarm (70 bar assumed)",
+      "gf_colors": {
+        "above_gf_high": "#FEF01D",
+        "above_100": "#FF2322",
+        "gf_high_default": 85,
+        "_source": "Nautic p.26: GF99 yellow above GF High, red at 100 % and above; GF High default 85 (Medium 40/85, p.42)"
+      },
+      "notice_style": {
+        "style": "banner",
+        "color": "#FF2322",
+        "text_color": "#FFFFFF",
+        "caption_color": "#FFFFFF",
+        "confirm_text": "",
+        "show_seconds": 10,
+        "_source": "Nautic p.36: mandatory warnings are red and stay until resolved; they fill the switch window (p.37, p.49 figures). show_seconds assumed"
+      },
+      "notices": [
+        {
+          "id": "ascent_speed",
+          "text": "ASCENT SPEED",
+          "caption": "",
+          "when": "ascent_faster_than",
+          "m_per_min": 10,
+          "seconds": 5,
+          "color": "#FF2322",
+          "_source": "Nautic p.36 mandatory alarm: over 10 m/min for five seconds (the alarm shows an icon; wording assumed)"
+        },
+        {
+          "id": "ceiling_broken",
+          "text": "CEILING BROKEN",
+          "caption": "",
+          "when": "stop_violation",
+          "seconds": 0,
+          "color": "#FF2322",
+          "_source": "Nautic p.36 mandatory alarm (wording assumed)"
+        },
+        {
+          "id": "po2_high",
+          "text": "PO2 HIGH",
+          "caption": "",
+          "when": "po2_above",
+          "bar": 1.6,
+          "seconds": 0,
+          "color": "#FF2322",
+          "_source": "Nautic p.36 mandatory alarm: pO2 over 1.6 (wording assumed)"
+        },
+        {
+          "id": "tank_pressure",
+          "text": "TANK PRESSURE",
+          "caption": "",
+          "when": "tank_critical",
+          "color": "#FF2322",
+          "_source": "Nautic p.37 mandatory alarm: tank below 50 bar (wording assumed)"
+        },
+        {
+          "id": "cns_80",
+          "text": "CNS {cns}%",
+          "caption": "",
+          "when": "cns_at_least",
+          "percent": 80,
+          "color": "#FF2322",
+          "_source": "Nautic p.37 mandatory alarm at 80 % and 100 %"
+        },
+        {
+          "id": "ndl_low",
+          "text": "NO DECO",
+          "caption": "",
+          "when": "ndl_at_most",
+          "minutes": 5,
+          "rearm_minutes": 6,
+          "color": "#FF2322",
+          "_source": "Nautic p.22, p.37: a mandatory alarm when the NDL is 5 minutes or less"
+        },
+        {
+          "id": "switch_gas",
+          "text": "SWITCH GAS",
+          "caption": "",
+          "when": "fit_alert",
+          "alert": "suunto:Gas Switch",
+          "text_color": "#000000",
+          "color": "#3FEBDF",
+          "_source": "Nautic p.29-30: the switch window turns cyan with the gas to switch to; from the log's own 'Gas Switch' notification (an Ocean export logs it, sample 2026-11-14)"
+        },
+        {
+          "id": "sidemount_switch",
+          "text": "SIDEMOUNT",
+          "caption": "",
+          "when": "sidemount_switch",
+          "text_color": "#000000",
+          "color": "#3FEBDF",
+          "_source": "Nautic p.38-39: the user's sidemount tank-switch alarm, a cyan panel"
+        }
+      ]
+    }
+  },
   "default": {
     "ndl": [
       {

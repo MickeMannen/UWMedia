@@ -113,6 +113,7 @@ def test_eon_units_and_values(tmp_path):
     assert deco.ndl == 0
     assert deco.ceiling == 6.0
     assert deco.deco_stop_depth == 6.0
+    assert deco.next_stop_depth == 6.0  # the logged ceiling is the stop, not rounded up to the next 3 m
     assert deco.temp == pytest.approx(20.0)  # carried forward
     assert deco.tanks["T1"].pressure_bar == pytest.approx(180.0)
 

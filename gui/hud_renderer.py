@@ -1399,11 +1399,19 @@ def gauge_fraction(elem, value, defaults):
     return max(0.0, min(1.0, (value - low) / (high - low)))
 
 
+# Fields whose colour bands are a hud_rules.json list of their own.
+GAUGE_BAND_RULES = {"ascent_rate": "ascent_rate", "n2_tissue_load": "tissue_load"}
+
+
 def _band_color(elem, field, value, manufacturer, model, default):
     """A gauge's colour at `value`: the element's own `bands` ([{"min",
     "max", "color"}], the hud_rules.json shape) where it has them, else
-    the field's colour rule, else `default`."""
+    the brand's bands for the field (ascent rate, tissue load) or its
+    colour rule, else `default`."""
     bands = elem.get("bands")
+    if not isinstance(bands, list) and field in GAUGE_BAND_RULES:
+        from utils.hud_rules_engine import get_rule_config
+        bands = get_rule_config(manufacturer, model, GAUGE_BAND_RULES[field])
     if isinstance(bands, list):
         for band in bands:
             if "min" in band and value < float(band["min"]):

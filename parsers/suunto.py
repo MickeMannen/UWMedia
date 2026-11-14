@@ -239,7 +239,10 @@ class SuuntoJSONParser(BaseParser):
         )
         for wp, ceiling in zip(waypoints, logged_ceilings):
             if ceiling is not None:
+                # the computer's own ceiling is also the stop it shows (EON
+                # Core manual p.26), not the next 3 m step below it
                 wp.ceiling = ceiling
+                wp.next_stop_depth = ceiling
 
         end_time = waypoints[-1].timestamp
         return [Dive(

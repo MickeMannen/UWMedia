@@ -19,6 +19,13 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   or their own colour bands.
 - Overlay Designer: a text element can sit on a filled **Box** of its own
   colour, and times can be written the Suunto way, "24′", ">99′" or "2′50".
+- Overlays: Suunto colours and alerts for the EON Core, EON Steel Black and
+  Nautic, from their manuals: the NDL, PO2, tank pressure and ascent-rate
+  colours, the safety stop counted between 2.4 and 6 m on dives over 10 m,
+  the deco window and its 0.6 m safe margin, and the device's own pop-ups
+  (Ascent speed, Ceiling broken, pO2 high, Tank pressure, CNS 80%, Change
+  gas…). They take effect with the Suunto templates, and a custom template
+  can borrow them by picking Suunto as its rules.
 
 ## [0.7.20] - 2026-11-12
 

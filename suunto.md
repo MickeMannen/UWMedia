@@ -443,6 +443,13 @@ Step 3 done 2026-11-14: `arc` and `segment_bar` elements, a text element's
 `box_color`, the `minutes_prime` / `m'ss` formats (`gui/hud_renderer.py`,
 Overlay Designer add / inspector support). Not done: a pill-shaped box
 behind a value with a small suffix (the box only goes behind plain text).
+Step 4 done 2026-11-14: the `Suunto` block in `hud_rules.json` (EON rules
+at brand level, `Nautic` model block), cited in `hud_rules_sources.md`;
+gauges take the brand's ascent-rate bands; the logged ceiling is the stop.
+Not modelled: the mandatory (red, longer) safety stop, deepstops, the EON
+lock / Ceiling broken bar and the Nautic's Algorithm deviation panel, the
+highlighted-red ascent bar after 5 s. Template model names must be
+"EON Core", "EON Steel Black" and "Nautic" to pick up these rules.
 
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in
