@@ -36,6 +36,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   (no-deco arc, and tank arc), **Graphical** and Gauge **timer** pages, from
   the manuals' figures; the arc turns orange with the ascent time in deco
   and yellow with the stop counter at the safety stop.
+- Overlays: the Suunto Nautic Main Screen follows the manual's dive-screen
+  figures (the amber stop pill at the left of the stop row, the orange DECO
+  tag, "6 m STOP" in deco, warnings over both right-hand cells), has a
+  **sidemount** variant with both tanks' pressures and bars, and a new
+  **NDL / TTS, ppO2 / MOD** page.
 
 ### Fixed
 - Overlay Generator: a template with a unit label that follows the unit

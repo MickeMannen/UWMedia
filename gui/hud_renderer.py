@@ -1479,38 +1479,49 @@ def _draw_segment_bar(draw, elem, value, manufacturer, model, skin_x, skin_y, w_
     lights every segment in the value's colour; "position" gives each
     segment the colour of its own place on the scale (green at the foot,
     red at the top), as the EON's ascent bar does. Unlit segments take
-    `track_color`."""
+    `track_color`. `orientation: "horizontal"` lays the segments left to
+    right and fills from the left (a Nautic's sidemount tank bars)."""
     scale = user_scale if render_log else user_scale * res_scale
     w, h, count, gap = segment_bar_geometry(elem)
     x0 = int(skin_x + elem.get("rel_x", 0.0) * w_scaled)
     y0 = int(skin_y + elem.get("rel_y", 0.0) * h_scaled)
-    w_px, h_px = max(1, int(round(w * scale))), max(count, int(round(h * scale)))
+    horizontal = elem.get("orientation") == "horizontal"
+    w_px = max(count if horizontal else 1, int(round(w * scale)))
+    h_px = max(1 if horizontal else count, int(round(h * scale)))
     gap_px = gap * scale
-    seg_h = (h_px - gap_px * (count - 1)) / count
     track = _rgb(str(elem.get("track_color", SEGMENT_BAR_DEFAULTS["track_color"])))
     field = elem.get("field", "")
     default = elem.get("color", "#FFFFFF")
     fraction = gauge_fraction(elem, value, SEGMENT_BAR_DEFAULTS)
     if elem.get("step", True) is not False:
         fraction = int(fraction * count + 1e-9) / count
-    lit_px = fraction * h_px
+    length = w_px if horizontal else h_px
+    seg_len = (length - gap_px * (count - 1)) / count
+    lit_px = fraction * length
     low = float(elem.get("range_min", SEGMENT_BAR_DEFAULTS["range_min"]))
     high = float(elem.get("range_max", SEGMENT_BAR_DEFAULTS["range_max"]))
     value_color = _rgb(_band_color(elem, field, value, manufacturer, model, default)) if value is not None else track
-    bottom = y0 + h_px
+
+    def rect(a, b, color):
+        """the span a..b along the bar, measured from its start (bottom or left)"""
+        if horizontal:
+            draw.rectangle([x0 + int(round(a)), y0, x0 + int(round(b)), y0 + h_px], fill=color)
+        else:
+            draw.rectangle([x0, y0 + h_px - int(round(b)), x0 + w_px, y0 + h_px - int(round(a))], fill=color)
+
     for i in range(count):
-        seg_bottom = bottom - i * (seg_h + gap_px)
-        seg_top = seg_bottom - seg_h
-        draw.rectangle([x0, int(round(seg_top)), x0 + w_px, int(round(seg_bottom))], fill=track)
-        lit_top = max(seg_top, bottom - lit_px)
-        if lit_top >= seg_bottom:
+        seg_start = i * (seg_len + gap_px)
+        seg_end = seg_start + seg_len
+        rect(seg_start, seg_end, track)
+        lit_end = min(seg_end, lit_px)
+        if lit_end <= seg_start:
             continue
         if elem.get("color_mode") == "position":
             at = low + (high - low) * (i + 0.5) / count
             color = _rgb(_band_color(elem, field, at, manufacturer, model, default))
         else:
             color = value_color
-        draw.rectangle([x0, int(round(lit_top)), x0 + w_px, int(round(seg_bottom))], fill=color)
+        rect(seg_start, lit_end, color)
 
 
 ASCENT_FULL_SCALE_M_PER_MIN = 12.0
@@ -2456,6 +2467,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
             if get_rule_config(rules_manufacturer(layout), layout.get("model", "Perdix2"), "ndl_zero") and \
                     resolve_state(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint, waypoints) == "deco":
                 val, raw_val = "0", 0
+                val = apply_value_format(elem, val, raw_val)  # a Nautic's "0′"
 
         if val is None or str(val) == "":
             continue

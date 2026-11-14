@@ -127,6 +127,7 @@ EON green `#B1CB45`, orange `#ED7C2A`; Nautic cyan `#3FEBDF`, green
 | Model | Rule key | Value | Source | Status |
 |---|---|---|---|---|
 | Nautic | `ndl` | white, yellow at 5 min or less | p.22, p.37; white in the product photo, yellow from the p.51 figure | deduced |
+| Nautic | `ndl_zero` | "NDL 0′" in white in deco | p.52 figures | deduced |
 | Nautic | `po2` | red over 1.6, yellow over the gas's limit (1.4) | p.36-37; the gas limit has no default | 1.6 verified, 1.4 assumed |
 | Nautic | `ascent_rate` | grey under 2 m/min, green to 8, yellow 8-10, red over 10 | p.23 (2-4 m/min is not stated) | verified, 2-4 assumed |
 | Nautic | `safety_stop` | 10 m dive, 2.4-6 m, paused deeper than 6 m; amber | p.47; amber from the p.22 figure | verified, colour deduced |

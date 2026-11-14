@@ -118,7 +118,8 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   lit from the bottom by a field over **Range** - a Suunto ascent bar is 5
   segments over 0-10 m/min, one per 2 m/min. **Colour by** *Value* lights
   every segment in the value's colour, *Place* gives each segment the colour
-  of its own place on the scale. A `bands` list in the JSON
+  of its own place on the scale. `"orientation": "horizontal"` in the JSON
+  lays it left to right (a Nautic's sidemount tank bars). A `bands` list in the JSON
   (`[{"max": 8, "color": "#00C000"}, ...]`, the hud_rules.json shape) sets
   the colours for one element.
 - A tank icon with `"fill_level": true` in its JSON empties as the pressure

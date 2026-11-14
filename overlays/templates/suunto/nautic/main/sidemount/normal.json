@@ -1,0 +1,154 @@
+{
+  "base": "../normal.json",
+  "linked_elements": [
+    {
+      "id": "label_tank",
+      "field": "custom:TANK PRESSURE",
+      "rel_x": 0.68736,
+      "rel_y": 0.1654,
+      "color": "#3FEBDF",
+      "font_size": 22,
+      "font_family": "Roboto Condensed",
+      "font_weight": "bold",
+      "scale": 1.0,
+      "align": "center",
+      "hide_when_notice": true
+    },
+    {
+      "id": "tank1",
+      "field": "primary_tank_pressure",
+      "rel_x": 0.56318,
+      "rel_y": 0.35171,
+      "color": "#FFFFFF",
+      "font_size": 66,
+      "font_family": "Roboto Condensed",
+      "font_weight": "bold",
+      "scale": 1.0,
+      "valign": "bottom",
+      "value_format": "integer",
+      "unit_suffix": true,
+      "unit_kind": "pressure_lower",
+      "unit_scale": 0.33,
+      "unit_color": "#C8C8C8",
+      "max_width": 150,
+      "hide_when_notice": true
+    },
+    {
+      "id": "tank1_number",
+      "field": "custom:1",
+      "rel_x": 0.81481,
+      "rel_y": 0.35171,
+      "color": "#C8C8C8",
+      "font_size": 30,
+      "font_family": "Roboto Condensed",
+      "font_weight": "bold",
+      "scale": 1.0,
+      "align": "right",
+      "valign": "bottom",
+      "hide_when_notice": true
+    },
+    {
+      "id": "tank1_bar",
+      "field": "primary_tank_pressure",
+      "type": "segment_bar",
+      "orientation": "horizontal",
+      "rel_x": 0.55773,
+      "rel_y": 0.37452,
+      "width": 240,
+      "height": 14,
+      "segments": 23,
+      "segment_gap": 0,
+      "range_min": 0,
+      "range_max": 230,
+      "step": false,
+      "color": "#48C2F5",
+      "color_mode": "position",
+      "bands": [
+        {
+          "max": 50,
+          "color": "#FF2322"
+        },
+        {
+          "min": 50,
+          "max": 70,
+          "color": "#FEF01D"
+        },
+        {
+          "min": 70,
+          "color": "#48C2F5"
+        }
+      ],
+      "track_color": "#3A3A3A",
+      "hide_when_notice": true,
+      "label": "Tank 1 bar, red / yellow / blue along its length (full scale 230 bar assumed)"
+    },
+    {
+      "id": "tank2",
+      "field": "secondary_tank_pressure",
+      "rel_x": 0.56318,
+      "rel_y": 0.60837,
+      "color": "#FFFFFF",
+      "font_size": 66,
+      "font_family": "Roboto Condensed",
+      "font_weight": "bold",
+      "scale": 1.0,
+      "valign": "bottom",
+      "value_format": "integer",
+      "unit_suffix": true,
+      "unit_kind": "pressure_lower",
+      "unit_scale": 0.33,
+      "unit_color": "#C8C8C8",
+      "max_width": 150,
+      "hide_when_notice": true
+    },
+    {
+      "id": "tank2_number",
+      "field": "custom:2",
+      "rel_x": 0.81481,
+      "rel_y": 0.60837,
+      "color": "#C8C8C8",
+      "font_size": 30,
+      "font_family": "Roboto Condensed",
+      "font_weight": "bold",
+      "scale": 1.0,
+      "align": "right",
+      "valign": "bottom",
+      "hide_when_notice": true
+    },
+    {
+      "id": "tank2_bar",
+      "field": "secondary_tank_pressure",
+      "type": "segment_bar",
+      "orientation": "horizontal",
+      "rel_x": 0.55773,
+      "rel_y": 0.63118,
+      "width": 240,
+      "height": 14,
+      "segments": 23,
+      "segment_gap": 0,
+      "range_min": 0,
+      "range_max": 230,
+      "step": false,
+      "color": "#48C2F5",
+      "color_mode": "position",
+      "bands": [
+        {
+          "max": 50,
+          "color": "#FF2322"
+        },
+        {
+          "min": 50,
+          "max": 70,
+          "color": "#FEF01D"
+        },
+        {
+          "min": 70,
+          "color": "#48C2F5"
+        }
+      ],
+      "track_color": "#3A3A3A",
+      "hide_when_notice": true,
+      "label": "Tank 2 bar, red / yellow / blue along its length (full scale 230 bar assumed)"
+    }
+  ]
+}

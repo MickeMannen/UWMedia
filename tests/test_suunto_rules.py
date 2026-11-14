@@ -137,3 +137,23 @@ def test_uppercase_baseline_suffix_and_prime_timer():
         return rows.min(), rows.max()
     top_aligned, baseline = suffix_rows(elem), suffix_rows(dict(elem, small_suffix_align="baseline"))
     assert baseline[0] > top_aligned[0] + 10 and baseline[1] > top_aligned[1] + 10
+
+
+def test_horizontal_segment_bar_and_ndl_zero_in_the_page_format():
+    from gui.hud_renderer import resolve_element_text
+    elem = {"type": "segment_bar", "orientation": "horizontal", "field": "primary_tank_pressure", "rel_x": 0.0, "rel_y": 0.0,
+            "width": 100, "height": 10, "segments": 1, "segment_gap": 0, "range_min": 0, "range_max": 200, "step": False,
+            "bands": [{"color": "#0000FF"}], "track_color": "#404040"}
+    layout = {"design_width": 400, "design_height": 200, "manufacturer": "Suunto", "model": "Nautic",
+              "hud_skin": {"type": "shape", "width": 400, "height": 200, "anchor": "TOP_LEFT", "opacity": 0.0, "linked_elements": [elem]}}
+    frame = np.zeros((200, 400, 3), dtype=np.uint8)
+    draw_hud(frame, layout, _wp(0, 20.0, tanks={"T1": TankData(pressure_bar=100)}), render_log=True)
+    assert tuple(frame[5, 25]) == (255, 0, 0) and tuple(frame[5, 75]) == (64, 64, 64)  # filled from the left to half
+    # in deco the Nautic's NDL reads 0 in the page's own format ("0′")
+    ndl = {"field": "ndl", "value_format": "minutes_prime", "rel_x": 0.1, "rel_y": 0.1, "font_size": 30, "color": "#FFFFFF"}
+    deco = _wp(0, 20.0, ndl=None, next_stop_depth=6.0, deco_stop_depth=6.0)
+    layout["hud_skin"]["linked_elements"] = [ndl]
+    frame = np.zeros((200, 400, 3), dtype=np.uint8)
+    draw_hud(frame, layout, deco, render_log=True)
+    assert frame.max() > 0
+    assert get_rule_config("Suunto", "Nautic", "ndl_zero") == "#FFFFFF"

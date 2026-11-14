@@ -1414,6 +1414,8 @@
         }
       ],
       "_ndl": "Nautic p.22: '>99' above 99 minutes; at 5 minutes or less a mandatory alarm and the area highlighted; white otherwise (product photo); the highlight colour yellow from the p.51 figure (deduced)",
+        "ndl_zero": "#FFFFFF",
+        "_ndl_zero": "Nautic p.52 figures: in deco the NDL / TTS field reads NDL 0' in white",
       "po2": [
         {
           "min": 1.6,

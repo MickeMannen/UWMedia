@@ -463,8 +463,15 @@ sidemount, compass pages once a log carries a heading.
 Step 5, second round done 2026-11-14: EON Prominent (no deco, tank),
 Graphical and Gauge timer pages from the manual figures (EON Core p.30-31,
 Steel Black p.54); the layout sweep checks text against an arc's band, and
-an arc's bounds are its drawn band. Still to do: the Nautic's other
-switch-window views and sidemount, compass pages.
+an arc's bounds are its drawn band.
+Step 5, third round done 2026-11-14: the Nautic Main Screen corrected from
+the manual's dive-screen figures (p.22, p.35, p.51-53) and split into
+single-tank and sidemount variants; a NDL / TTS, ppO2 / MOD page; horizontal
+segment bars; NDL zero shown in a page's own format ("0′"). Still to do:
+compass pages (a heading in a log), the Nautic's large switch-window views
+(tissues, stopwatch), GF99 / Δ+5 fields, STOP DONE and the Algorithm
+deviation panel. Step 5 is otherwise done; steps 6-7 (SML / DM5 XML, the
+paired FIT) wait on real files.
 
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in

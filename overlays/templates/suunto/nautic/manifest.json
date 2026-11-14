@@ -5,6 +5,33 @@
     {
       "id": "main",
       "name": "Main Screen"
+    },
+    {
+      "id": "ndl_tts",
+      "name": "NDL / TTS, ppO2 / MOD"
     }
-  ]
+  ],
+  "notes": {
+    "verified": [
+      "Cells (Nautic product photo): depth top left with its small decimal and unit, dive time below, the deco cell with its bar, the switch window on the right, the stop row along the bottom, status bottom right; cyan uppercase labels, white values",
+      "Dive screen from the manual's figures (p.22, p.24, p.35, p.51-53): the safety stop counter in an amber pill at the left of the stop row; in deco a filled orange DECO tag over the time to surface and '6m ... STOP' along the bottom; SWITCH GAS and warnings filling both right-hand cells",
+      "Dive time m'ss, NDL with a prime and >99' (p.22); ascent bar in the centre column, 2 m/min a step, grey / green / yellow / red (p.23)",
+      "Tank gauge blue over yellow over red (product photo); sidemount (p.35): TANK PRESSURE over each tank's pressure with its number and a red / yellow / blue bar under it",
+      "NDL / TTS page (p.22 note, p.52): NDL over TTS in the deco cell, 'NDL 0'' in deco; ppO2 and MOD side by side",
+      "Safety stop on dives over 10 m, timed between 2.4 and 6 m (p.47); warnings in a red panel (p.36-37)"
+    ],
+    "assumed": [
+      "Positions measured on the product photo (the surface screen) and the manual's small figures",
+      "The deco cell's bar as the NDL over 0-100 min (time to surface in deco); the tank gauge's full scale 230 bar",
+      "The pill shows the planned time before the stop counts (the device shows the stop depth, '3.0m', then)",
+      "The deco stop row shows the stop depth only: a log holds no stop time",
+      "Warning wording (the manual's alarm table shows icons)"
+    ],
+    "not_shown": [
+      "Battery, GPS, heart-rate and Tank POD icons in the status cell",
+      "Large switch-window views (tissues, compass, stopwatch), GF99 / Δ+5 fields, the Algorithm deviation panel, STOP DONE",
+      "The hourglass and chevrons in the ascent column, the highlighted red ascent bar after 5 s"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
 }
