@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.8.0] - 2026-11-14
 
 ### Added
 - Dive logs: Suunto app dive exports (`.json`, from the EON Steel / EON
@@ -12,35 +12,31 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   to surface, ceiling, tank pressures (both tanks in sidemount), gas time
   and alarms are shown as logged; other JSON files in a log folder are
   ignored.
+- Overlays: templates for the Suunto **EON Steel Black** and **EON Core**,
+  laid out from Suunto's product photos and the manuals' figures: the
+  **Classic** grid (depth, dive time, no deco or ascent time, gas and tank)
+  with its ascent bar and no-deco scale, **Classic (CCR)**, **Prominent**
+  with its no-deco arc, **Prominent: tank**, **Graphical** and the Gauge
+  **timer**. The arc turns orange with the ascent time in deco and yellow
+  with the stop counter at the safety stop.
+- Overlays: templates for the Suunto **Nautic**: the Main Screen with its
+  cells, the amber safety-stop pill, the orange DECO tag and the red
+  warning panel, in single-tank and **sidemount** variants (both tanks'
+  pressures with their bars), and an **NDL / TTS, ppO2 / MOD** page. The
+  Dive Profile Builder can pose as the EON Steel Black, EON Core and Nautic.
+- Overlays: Suunto colours and alerts from the manuals: the NDL, PO2, tank
+  pressure and ascent-rate colours, the safety stop counted between 2.4 and
+  6 m on dives over 10 m, the deco window and its 0.6 m safe margin, and the
+  device's own pop-ups (Ascent speed, Ceiling broken, pO2 high, Tank
+  pressure, CNS 80%, Change gas…). A custom template can borrow them by
+  picking Suunto as its rules.
 - Overlay Designer: two new elements. An **arc gauge** fills a circular
   track by a value (NDL, time to surface, tank pressure), with optional
-  divisions; a **segment bar** lights a stack of segments from the bottom
-  (an ascent-rate bar, 2 m/min a segment). Both take the brand's colours
-  or their own colour bands.
+  divisions; a **segment bar** lights a stack of segments by a value (an
+  ascent-rate bar, 2 m/min a segment), upright or across. Both take the
+  brand's colours or their own colour bands.
 - Overlay Designer: a text element can sit on a filled **Box** of its own
   colour, and times can be written the Suunto way, "24′", ">99′" or "2′50".
-- Overlays: Suunto colours and alerts for the EON Core, EON Steel Black and
-  Nautic, from their manuals: the NDL, PO2, tank pressure and ascent-rate
-  colours, the safety stop counted between 2.4 and 6 m on dives over 10 m,
-  the deco window and its 0.6 m safe margin, and the device's own pop-ups
-  (Ascent speed, Ceiling broken, pO2 high, Tank pressure, CNS 80%, Change
-  gas…). They take effect with the Suunto templates, and a custom template
-  can borrow them by picking Suunto as its rules.
-- Overlays: templates for the Suunto **EON Steel Black** and **EON Core**
-  (Classic and Classic (CCR) pages) and the **Nautic** (Main Screen), laid
-  out from Suunto's product photos and the manuals: the EON's grid of depth,
-  dive time, no deco or ascent time, gas and tank, its ascent bar and
-  no-deco scale; the Nautic's cells with the amber safety-stop pill and the
-  red warning panel. The Dive Profile Builder can pose as all three.
-- Overlays: the EON Steel Black and EON Core also have their **Prominent**
-  (no-deco arc, and tank arc), **Graphical** and Gauge **timer** pages, from
-  the manuals' figures; the arc turns orange with the ascent time in deco
-  and yellow with the stop counter at the safety stop.
-- Overlays: the Suunto Nautic Main Screen follows the manual's dive-screen
-  figures (the amber stop pill at the left of the stop row, the orange DECO
-  tag, "6 m STOP" in deco, warnings over both right-hand cells), has a
-  **sidemount** variant with both tanks' pressures and bars, and a new
-  **NDL / TTS, ppO2 / MOD** page.
 
 ### Fixed
 - Overlay Generator: a template with a unit label that follows the unit
