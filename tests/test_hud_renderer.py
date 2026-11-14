@@ -1286,6 +1286,56 @@ def test_shearwater_safety_stop_time_is_centred_under_the_title():
     assert checked[1] - checked[0] > plain[1] - plain[0]
 
 
+def test_badge_line_spacing_max_width_and_mid_line_check_mark():
+    # A Peregrine badge: `max_width` shrinks only a line too wide for it (a
+    # deco stop's "6m✓ 2min", not the "3:00" timer), the span helper counts
+    # a check mark inside the line, and `line_spacing` sets the pitch.
+    from gui.hud_renderer import badge_title_ink_span, fitted_badge_line_size, get_font
+    elem = {"font_family": "Roboto Condensed", "max_width": 200}
+    assert fitted_badge_line_size(elem, "3:00", 100) == 100
+    assert fitted_badge_line_size(elem, "6m✓ 2min", 100) < 100
+    assert fitted_badge_line_size({}, "6m✓ 2min", 100) == 100
+    font = get_font(40)
+    plain = badge_title_ink_span(font, "6m 2min", 40)
+    checked = badge_title_ink_span(font, "6m✓ 2min", 40)
+    assert checked[1] - checked[0] > plain[1] - plain[0] + 30
+
+    def value_top(spacing):
+        layout = _shape_layout([{"type": "badge", "field": "state_badge", "font_size": 28, "value_font_size": 60,
+                                 "rel_x": 0.1, "rel_y": 0.1, "outline": False, "line_spacing": spacing}],
+                               "Shearwater", "Perdix 2")
+        wp = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                      dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=150)
+        frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        draw_hud(frame, layout, wp, render_log=False)
+        white = (frame[:, :, 0] > 200) & (frame[:, :, 1] > 200) & (frame[:, :, 2] > 200)
+        return np.where(white.any(axis=1))[0].min()
+
+    assert value_top(0.6) < value_top(1.2)
+
+
+def test_badge_arrow_falls_back_to_a_font_that_has_it():
+    # Roboto Condensed has no ↑ / ↓: a deco stop's marker is drawn in Roboto
+    from gui.hud_renderer import _badge_font_runs, get_font
+    condensed = get_font(40, "Roboto Condensed")
+    runs = _badge_font_runs("6m↓ 3min", condensed, 40, None)
+    assert [text for text, _ in runs] == ["6m", "↓", " 3min"]
+    assert runs[1][1] is not condensed and runs[0][1] is condensed
+    roboto = get_font(40, "Roboto")
+    assert _badge_font_runs("6m↓ 3min", roboto, 40, None) == [("6m↓ 3min", roboto)]
+
+
+def test_align_unit_puts_a_trailing_unit_inside_the_right_aligned_run():
+    from gui.hud_renderer import get_font, unit_align_shift
+    font = get_font(80, "Roboto Condensed")
+    elem = {"align_unit": True, "unit_suffix": True, "unit_scale": 0.33}
+    assert unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) < -20
+    assert unit_align_shift(elem, font, "45", "", None, 80, "ft", "center", 1.0) == \
+        unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) / 2
+    assert unit_align_shift({}, font, "45", "", None, 80, "ft", "right", 1.0) == 0.0
+    assert unit_align_shift(elem, font, "45", "", None, 80, "", "right", 1.0) == 0.0
+
+
 def _ink_box(frame):
     ink = frame.max(axis=2) > 40
     rows = np.where(ink.any(axis=1))[0]

@@ -6,5 +6,41 @@
   },
   "suunto/eon_core/ccr": {
     "stop_timer overlaps label_setpoint": "checked by eye 2026-11-14: only the badge's empty line space under the digits reaches the row-3 label on the small EON Core skin; the ink is clear"
+  },
+  "shearwater/peregrine/main/single_tank": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/main/sidemount": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/mini": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_ai/single_tank": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_ai/sidemount": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_mod": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_temp": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_gf": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_battery": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_pressure": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/info_date": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
+  },
+  "shearwater/peregrine/main_ai": {
+    "notice leaves the screen": "checked by eye 2026-11-14: the box counts a full line under the message (caption x 1.25 + message x 1.2); the Peregrine's message is near the manual's p.21 size and its ink, a descender included, ends at the screen's bottom edge"
   }
 }

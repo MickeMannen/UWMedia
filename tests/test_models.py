@@ -39,6 +39,18 @@ def test_primary_secondary_tank_properties():
     assert wp_sidemount.secondary_tank_name == "Right Tank"
     assert wp_sidemount.secondary_tank_pressure == 190
 
+def test_gas_percent_names_the_breathed_gas_the_perdix_3_way():
+    # Perdix 3 manual Rev B p.27: the O2 percentage ("32%"), O2/He for a trimix ("18/50")
+    def wp(**kw):
+        return Waypoint(timestamp=datetime.now(), time_since_start=0, **kw)
+    assert wp().gas_percent == "--"
+    assert wp(tanks={"T1": TankData(pressure_bar=200, o2_percent=32.0)}).gas_percent == "32%"
+    assert wp(tanks={"T1": TankData(pressure_bar=200, o2_percent=21.0)}).gas_percent == "21%"
+    assert wp(gas_o2_percent=18.0, gas_he_percent=50.0).gas_percent == "18/50"
+    assert wp(gas_o2_percent=18.0, gas_he_percent=50.0).gasmix == "18/50"
+    assert wp(tanks={"T1": TankData(pressure_bar=200, o2_percent=21.0)}).gasmix == "AIR"
+
+
 def test_ccr_and_gas_switch_fields_default_to_none():
     # New Shearwater CCR/gas-switch fields - inert until a parser populates
     # them (no source data yet to verify real UDDF field names against)

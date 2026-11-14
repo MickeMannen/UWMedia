@@ -80,7 +80,9 @@ and `title_box` draws the title in a filled box of its colour with black
 text. `value_align: "center"` centres the timer under the title, the way
 a Perdix shows the safety-stop time under "SAFETY STOP"; an element's own
 `value_align` key overrides it. A label of `""` draws no title (the
-Descent Mk3 style).
+Descent Mk3 style). The badge element's `line_spacing` (default 1.2) is
+the line pitch as a share of each line's font size; a Peregrine's tall
+stop time uses less to sit close under its title.
 
 `sidemount_switch` (`threshold_bar`, `color`, `text_color`) is the
 tank-switch notification: a text element with `"tank_switch_highlight":
@@ -110,7 +112,9 @@ depth, which the `safety_stop_depth` field shows in the units in force
 Text elements also take `"uppercase": true` (the value in capitals, a
 Nautic's "NX32") and, with a small suffix, `"small_suffix_align":
 "baseline"` (the small decimal on the digits' baseline, as a Suunto writes
-"36.6", instead of level with their tops).
+"36.6", instead of level with their tops). A right or centre aligned value
+with `"align_unit": true` counts the unit drawn after it in the aligned
+run, so a Peregrine's "45ft" ends where "15.7m" does.
 
 `ascent_rate` bands colour a lit ascent chevron by m/min (`blink: true`
 flashes the band's colour against the unlit grey - the Perdix's red), and

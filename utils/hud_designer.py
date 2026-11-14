@@ -17,6 +17,7 @@ from gui.hud_renderer import (
     arc_geometry,
     ascent_chevron_geometry,
     badge_line_sizes,
+    fitted_badge_line_size,
     VERTICAL_ORIENTATIONS,
     oriented_text_geometry,
     get_font,
@@ -26,6 +27,7 @@ from gui.hud_renderer import (
     fitted_font_size,
     text_anchor_shift,
     text_parts,
+    unit_align_shift,
     tank_switch_arrows_geometry,
     tissue_bar_geometry,
     unit_suffix_geometry,
@@ -210,7 +212,7 @@ def available_telemetry_fields(dive=None) -> List[str]:
     standard_fields += [
         "primary_tank_pressure", "primary_tank_name",
         "secondary_tank_pressure", "secondary_tank_name",
-        "gasmix", "safety_stop", "safety_stop_depth", "time_of_day",
+        "gasmix", "gas_percent", "safety_stop", "safety_stop_depth", "time_of_day",
         "circuit", "diluent_po2",  # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py)
         "avg_depth", "min_temp", "gf_setting", "eod", "date", "ambient_mbar", "surface_mbar",  # info screens and gauge pages (gui/hud_renderer.resolve_element_text)
         "mod",  # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
@@ -340,14 +342,14 @@ def element_native_bounds(
     if kind == "badge":
         label_size, value_size = badge_line_sizes(elem, 1.0, 1.0, True)
         lines = badge_lines or [(element_display_name("state_badge"), None, False)]
-        block_h = sum(int((value_size if is_value else label_size) * 1.2) for _, _, is_value in lines)
+        block_h = sum(int((value_size if is_value else label_size) * float(elem.get("line_spacing", 1.2))) for _, _, is_value in lines)
         y0 = y - (block_h if valign == "bottom" else block_h // 2 if valign == "middle" else 0)
         x0, x1 = float("inf"), float("-inf")
         # A badge state's value_align "center" (Shearwater safety stop) is
         # not mirrored here: the title is the widest line there, so the box
         # is the same; only a timer wider than its title would poke out.
         for line_text, _, is_value in lines:
-            size = value_size if is_value else label_size
+            size = fitted_badge_line_size(elem, line_text, value_size if is_value else label_size)
             font = get_font(size, family, weight)
             dx, _, (left, _, right, _) = text_anchor_shift(font, line_text, align, "top")
             x0 = min(x0, x + dx + left)
@@ -377,12 +379,15 @@ def element_native_bounds(
             dx = -(left + right) / 2.0
         elif align == "right":
             dx = -float(right)
+    dx += unit_align_shift(elem, font, main, suffix, suffix_font if suffix else None, size, unit, align, 1.0)
     if unit:
         # the unit drawn after the value (gui.hud_renderer._draw_unit_suffix), skin px (scale 1)
-        ux, uy, unit_font, _ = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0)
+        ux, uy, unit_font, unit_size = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0)
         ul, ut, ur, ub = unit_font.getbbox(unit)
         if elem.get("unit_orientation") in VERTICAL_ORIENTATIONS:
-            ur, ub = ul + (ub - ut), ut + (ur - ul) * len(unit)
+            # the box draw_oriented_text() paints from (ux, uy)
+            _, _, w, h = oriented_text_geometry(unit_font, unit, elem["unit_orientation"], unit_size)
+            ul, ut, ur, ub = 0, 0, w, h
         right = max(right, ux + ur)
         bottom = max(bottom, uy + ub)
     return x + dx + left, y + dy + top, x + dx + right, y + dy + bottom

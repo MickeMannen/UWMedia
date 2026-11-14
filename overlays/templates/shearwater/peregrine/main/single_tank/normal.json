@@ -4,20 +4,23 @@
     {
       "id": "label_max",
       "field": "custom:MAX",
-      "rel_x": 0.4,
-      "rel_y": 0.609,
+      "rel_x": 0.42,
+      "rel_y": 0.6649,
       "color": "#00ADED",
-      "font_size": 30,
+      "font_size": 54,
       "scale": 1.0,
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "font_family": "Roboto Condensed",
+      "align": "center",
+      "valign": "bottom"
     },
     {
       "id": "max_depth",
       "field": "max_depth",
-      "rel_x": 0.4,
-      "rel_y": 0.75026,
+      "rel_x": 0.4188,
+      "rel_y": 0.7834,
       "color": "#FFFFFF",
-      "font_size": 61,
+      "font_size": 115,
       "scale": 1.0,
       "valign": "bottom",
       "hide_when_notice": true,
@@ -25,33 +28,41 @@
       "unit_scale": 0.35,
       "unit_color": "#00ADED",
       "small_suffix": "decimals",
-      "small_suffix_scale": 0.5
+      "small_suffix_scale": 0.43,
+      "font_family": "Roboto Condensed",
+      "unit_position": "below",
+      "unit_dx": 2.0,
+      "unit_dy": -47.0
     },
     {
       "id": "temp",
       "field": "temp",
-      "rel_x": 0.69,
-      "rel_y": 0.688,
+      "rel_x": 0.7388,
+      "rel_y": 0.7049,
       "color": "#FFFFFF",
-      "font_size": 40,
+      "font_size": 56,
       "scale": 1.0,
       "valign": "bottom",
       "hide_when_notice": true,
       "unit_suffix": true,
-      "unit_scale": 0.5,
+      "unit_scale": 1.0,
       "unit_color": "#00ADED",
-      "value_format": "integer"
+      "value_format": "integer",
+      "font_family": "Roboto Condensed",
+      "align": "right"
     },
     {
       "id": "time_of_day",
       "field": "time_of_day",
-      "rel_x": 0.69,
-      "rel_y": 0.765,
+      "rel_x": 0.7825,
+      "rel_y": 0.7834,
       "color": "#FFFFFF",
-      "font_size": 40,
+      "font_size": 56,
       "scale": 1.0,
       "valign": "bottom",
-      "hide_when_notice": true
+      "hide_when_notice": true,
+      "font_family": "Roboto Condensed",
+      "align": "right"
     }
   ]
 }

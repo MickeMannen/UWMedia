@@ -1,4 +1,5 @@
 import copy
+from functools import lru_cache
 import cv2
 import numpy as np
 import math
@@ -213,6 +214,23 @@ def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_sc
         x = run_right + int(size * 0.08) + dx
         y = main_bottom - unit_bbox[3] + dy  # baselines together
     return x, y, unit_font, unit_size
+
+
+def unit_align_shift(elem, font, main_text, suffix_text, suffix_font, size, unit_text, align, px_scale):
+    """Extra x shift for a right / centre aligned value whose `align_unit`
+    puts the unit drawn after it inside the aligned run (a Peregrine's
+    "45ft" ends where "15.7m" does); 0 otherwise, and for a unit under the
+    decimals, which sits inside the run already."""
+    if not (elem.get("align_unit") and unit_text and align in ("right", "center")):
+        return 0.0
+    run_right = font.getlength(main_text)
+    suffix_x = None
+    if suffix_font is not None:
+        suffix_x = run_right + float(elem.get("small_suffix_dx") or 0.0) * px_scale
+        run_right = suffix_x + suffix_font.getlength(suffix_text)
+    x, _, unit_font, _ = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale)
+    extra = max(0.0, x + unit_font.getlength(unit_text) - run_right)
+    return -extra if align == "right" else -extra / 2.0
 
 
 def _draw_unit_suffix(pil_img, draw, elem, unit_text, abs_x, abs_y, run_right, suffix_x, font, main_text, size, color_rgb, outline, px_scale):
@@ -919,14 +937,79 @@ def badge_title_ink_span(font, text, size):
     """(left, right) of a badge line's ink relative to its draw x - with the
     check mark _draw_check_mark() strokes in front of a CHECK_MARK line
     included, so a value line can be centred under the whole title (and a
-    "✓ 2:59" timer under its title)."""
-    if text.startswith(CHECK_MARK):
-        w = int(size * 0.9)
-        stroke = max(2, int(size / 8))  # the stroke's half width reaches left of its first point
-        _, _, right, _ = font.getbbox(text[len(CHECK_MARK):])
-        return int(w * 0.05) - stroke // 2, w + int(size * 0.35) + right
-    left, _, right, _ = font.getbbox(text)
-    return left, right
+    "✓ 2:59" timer under its title). A check mark inside the line ("6m✓
+    2min") is stepped over the way _draw_state_badge() draws it."""
+    w = int(size * 0.9)
+    left, right, x = None, 0, 0
+    for i, piece in enumerate(text.split(CHECK_MARK.strip())):
+        if i:
+            if left is None:
+                left = int(w * 0.05) - max(2, int(size / 8)) // 2  # the stroke's half width reaches left of its first point
+            right = max(right, x + w)
+            x += w + int(size * 0.35)
+            piece = piece.lstrip(" ")
+        if not piece:
+            continue
+        piece_left, _, piece_right, _ = font.getbbox(piece)
+        if left is None:
+            left = x + piece_left
+        right = x + piece_right
+        x += font.getlength(piece)
+    return (left or 0), right
+
+
+BADGE_ARROWS = "↑↓"
+BADGE_ARROW_FAMILY = "Roboto"  # has the arrows Roboto Condensed lacks
+
+
+@lru_cache(maxsize=None)
+def _font_lacks_glyph(path, char):
+    font = ImageFont.truetype(path, 40)
+    return font.getmask(char).getbbox() == font.getmask("\uffff").getbbox()
+
+
+def _badge_font_runs(text, font, size, weight):
+    """(text, font) runs of a badge line: a deco stop's ↑ / ↓ marker in
+    Roboto where the badge's own font has no arrow (Roboto Condensed)."""
+    path = getattr(font, "path", None)
+    if not path or not any(c in text for c in BADGE_ARROWS):
+        return [(text, font)]
+    runs = []
+    for char in text:
+        f = get_font(size, BADGE_ARROW_FAMILY, weight) if char in BADGE_ARROWS and _font_lacks_glyph(path, char) else font
+        if runs and runs[-1][1] is f:
+            runs[-1] = (runs[-1][0] + char, f)
+        else:
+            runs.append((char, f))
+    return runs
+
+
+def fitted_badge_line_size(elem, text, size, px_scale=1.0):
+    """The font size (px) a badge line draws at: `size`, or smaller when the
+    element has a `max_width` (skin px, before the skin scale) and the line
+    - check mark included - is wider (a deco stop's "6m✓ 2min" in the
+    panel a "3:00" fills). Shared by the renderer and the designer."""
+    try:
+        max_w = float(elem.get("max_width") or 0) * px_scale
+    except (TypeError, ValueError):
+        return size
+    if max_w <= 0 or size <= 1:
+        return size
+
+    def width(px):
+        left, right = badge_title_ink_span(get_font(px, elem.get("font_family"), elem.get("font_weight")), text, px)
+        return right - left
+
+    if width(size) <= max_w:
+        return size
+    lo, hi = 1, size
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if width(mid) <= max_w:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
 
 
 def _rgb(hex_color):
@@ -1176,13 +1259,24 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
     value_align = elem.get("value_align") or badge_cfg.get("value_align")
     title_center = None
 
+    # `line_spacing`: the line pitch as a share of each line's font size (a
+    # Peregrine's tall stop time sits close under its title)
+    spacing = float(elem.get("line_spacing", 1.2))
     y = abs_y
     if valign != "top":
-        block_h = sum(int((value_size if is_value else label_size) * 1.2) for _, _, is_value in lines)
+        block_h = sum(int((value_size if is_value else label_size) * spacing) for _, _, is_value in lines)
         y -= block_h if valign == "bottom" else block_h // 2
+    px_scale = user_scale if render_log else user_scale * res_scale
     for index, (text, color_rgb, is_value) in enumerate(lines):
         font = value_font if is_value else label_font
-        final_size = value_size if is_value else label_size
+        pitch_size = final_size = value_size if is_value else label_size
+        line_y = y
+        fitted = fitted_badge_line_size(elem, text, final_size, px_scale)
+        if fitted != final_size:
+            # a line too wide for `max_width` shrinks, on the full-size line's baseline
+            fitted_font = get_font(fitted, family, weight)
+            y += font.getbbox("0")[3] - fitted_font.getbbox("0")[3]
+            font, final_size = fitted_font, fitted
         x = abs_x
         if align != "left":
             dx, _, _ = text_anchor_shift(font, text, align, "top")
@@ -1200,7 +1294,7 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             draw.rounded_rectangle([x + left - pad, y + top - pad, x + right + pad, y + bottom + pad],
                                    radius=max(1, int(final_size * 0.1)), fill=color_rgb)
             draw.text((x, y), text, font=font, fill=(0, 0, 0))
-            y += int(final_size * 1.2) + pad
+            y = line_y + int(pitch_size * spacing) + pad
             continue
         o_dist = max(1, int(final_size / 20))
         # The bundled fonts have no ✓ glyph - draw the Perdix's check mark as a
@@ -1213,12 +1307,13 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             piece = piece.lstrip(" ") if i else piece
             if not piece:
                 continue
-            if outline:
-                for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
-                    draw.text((x + dx, y + dy), piece, font=font, fill=(0, 0, 0))
-            draw.text((x, y), piece, font=font, fill=color_rgb)
-            x += draw.textlength(piece, font=font)
-        y += int(final_size * 1.2)
+            for run, run_font in _badge_font_runs(piece, font, final_size, weight):
+                if outline:
+                    for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
+                        draw.text((x + dx, y + dy), run, font=run_font, fill=(0, 0, 0))
+                draw.text((x, y), run, font=run_font, fill=color_rgb)
+                x += draw.textlength(run, font=run_font)
+        y = line_y + int(pitch_size * spacing)
 
 TANK_OUTLINE_DEFAULT_WIDTH = 2
 TANK_OUTLINE_DEFAULT_GAP = 4
@@ -2576,6 +2671,7 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                     dx = -(left + total_right) / 2.0
                 elif align == "right":
                     dx = -float(total_right)
+            dx += unit_align_shift(elem, font, main_str, suffix_str, suffix_font, final_size, unit_text, align, px_scale)
             abs_x = int(round(abs_x + dx))
             abs_y = int(round(abs_y + dy))
         if suffix_font is not None:

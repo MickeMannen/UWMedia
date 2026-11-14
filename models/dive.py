@@ -140,19 +140,34 @@ class Waypoint(BaseModel):
             return None
         return round((1.0 + (self.depth or 0.0) / 10.0) * self.diluent_o2_percent / 100.0, 2)
 
+    def _breathed_mix(self) -> Optional[tuple]:
+        """(O2 %, He %) of the gas breathed: gas_o2/he_percent where the log
+        names it (a rebreather's diluent, a bailout gas), else the first
+        tank's mix; None when the log has neither."""
+        if self.gas_o2_percent is not None:
+            return round(self.gas_o2_percent), round(self.gas_he_percent or 0.0)
+        if not self.tanks:
+            return None
+        first_tank = next(iter(self.tanks.values()))
+        return round(first_tank.o2_percent), round(first_tank.he_percent)
+
+    @property
+    def gas_percent(self) -> str:
+        """The gas breathed as a Perdix 3 writes it over its mode badge: the
+        O2 percentage ("32%"), or O2/He for a trimix ("18/50")."""
+        mix = self._breathed_mix()
+        if mix is None:
+            return "--"
+        o2, he = mix
+        return f"{o2:02d}/{he:02d}" if he != 0 else f"{o2}%"
+
     @property
     def gasmix(self) -> str:
-        """The gas breathed: gas_o2/he_percent where the log names it (a
-        rebreather's diluent, a bailout gas), else the first tank's mix."""
-        if self.gas_o2_percent is not None:
-            o2 = round(self.gas_o2_percent)
-            he = round(self.gas_he_percent or 0.0)
-        elif not self.tanks:
+        """The gas breathed (see _breathed_mix) by its name: AIR, Nx32, 18/45."""
+        mix = self._breathed_mix()
+        if mix is None:
             return "N/A"
-        else:
-            first_tank = next(iter(self.tanks.values()))
-            o2 = round(first_tank.o2_percent)
-            he = round(first_tank.he_percent)
+        o2, he = mix
 
         if he != 0:
             return f"{o2:02d}/{he:02d}"  # O2 first, as both brands show a trimix (Petrel 3 Tech p.10 "18/45")

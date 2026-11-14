@@ -11,6 +11,17 @@
       "scale": 1.0
     },
     {
+      "id": "gas_percent",
+      "field": "gas_percent",
+      "rel_x": 0.2304,
+      "rel_y": 0.6653,
+      "color": "#FFFFFF",
+      "font_size": 50,
+      "font_family": "Roboto Condensed",
+      "scale": 1.0,
+      "valign": "bottom"
+    },
+    {
       "id": "gasmix",
       "field": "gasmix",
       "rel_x": 0.2239,

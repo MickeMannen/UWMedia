@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Overlays: a **Main: AI** page for the Shearwater **Peregrine TX** (gas,
+  T1 pressure with its bar, GTR) and the **Perdix 3** (T1 in the top slot,
+  gas, GTR and SAC), so a dive with a tank transmitter can show its tank
+  and gas time on the main screen instead of an info page.
+
+### Fixed
+- Overlays: the Shearwater **Peregrine TX** pages draw their text at the
+  manual's sizes in a tall condensed font: depth, dive time, NDL, the stop
+  badge, the info rows, mini displays, notifications and the gauge page
+  were about half as tall as on the real screen. Feet fit before the
+  ascent arrows, and a deco stop's ↑ / ↓ marker shows.
+- Overlays: the Shearwater **Perdix 3** Main Screen and Standard pages show
+  the breathing gas's O2 percentage from the log (32% for Nx32, 18/50 for a
+  trimix) above the gas badge; it read 21% whatever the gas.
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

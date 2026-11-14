@@ -7,6 +7,10 @@
       "name": "Main Screen"
     },
     {
+      "id": "main_ai",
+      "name": "Main: AI (gas / GTR / SAC)"
+    },
+    {
       "id": "standard",
       "name": "Standard"
     },
@@ -61,9 +65,11 @@
     "verified": [
       "SAFETY boxed title, PAUSED, SAFETY / CLEAR; DECO blue label over depth and minutes (manual Rev B p.58-60)",
       "Tank rules (p.154)",
+      "Active gas on the Main Screen, Standard and Main: AI bottom row: the breathing gas's O2 percentage (32%), O2/He for a trimix (18/50), from the log (PDF p.27)",
       "CC page: the Tec layout with SP in the centre slot, green high / magenta low, PPO2 there on a bailout; CC green / BO yellow badges (Rev B PDF p.42, p.85, p.87); loop PPO2 limits 0.40 / 1.60 (PDF p.41)",
       "Info pages: one page per info screen, in the manual order, each replacing the bottom row of the main page (Rev B PDF p.37 figure)",
       "Info: AI - T1 pressure, GTR, SAC, grey T1 tags (PDF p.37, p.38 T1 & GTR/SAC)",
+      "Main: AI page: the Main Screen with T1 in the configurable slot and the Info: AI row's GTR and SAC (with their grey T1 tags) in the bottom row's centre and right positions, the gas kept on the left (bottom row options, PDF p.27; GTR / SAC p.38); on a sidemount dive the Main Screen's sidemount variant already shows the AI row",
       "Info: MAX / AVG (PDF p.37, p.40)",
       "Info: CNS / MOD / PPO2, PPO2 as .21 (PDF p.37, p.41-42); CC page Info: CNS / MOD / DilPO2 (PDF p.37, p.41)",
       "Info: GF / GF99 / TTS - GF setting 50/85, GF99 with %, TTS in minutes (PDF p.37, p.43-44)",

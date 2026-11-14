@@ -7,6 +7,10 @@
       "name": "Main Screen"
     },
     {
+      "id": "main_ai",
+      "name": "Main: AI (gas / T1 / GTR)"
+    },
+    {
       "id": "mini",
       "name": "Main: Mini displays (MAX / PO2 / MOD, TEMP / CLOCK)"
     },
@@ -51,6 +55,7 @@
       "Main screen top half: ascent-rate arrows beside the depth and the N2 loading bar beside the NDL, on every page but the gauge (Peregrine TX manual Rev C p.10-11)",
       "Main screen bottom row as shipped: the gas, MAX in the centre, Mini Display 1 (TEMP over CLOCK) on the right (p.10, p.14)",
       "Mini page: Mini Display 2 (MAX / PO2 / MOD) in the centre and Mini Display 1 on the right (p.14 figure)",
+      "Main: AI page: the bottom row's centre and right slots set to Cylinder Pressure (T1 with its bar) and Gas Time Remaining (GTR T1), two of the slot options in the p.14 table; on a sidemount dive the Main Screen's sidemount variant already shows T1 and T2",
       "Sidemount: T1 and T2 on the main screen with the green switch box on the tank to breathe from (p.41, 21 bar default), and the AI row T1 | GTR / SM / SAC | T2 (p.41 combination table)"
     ],
     "assumed": [
@@ -60,7 +65,8 @@
       "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)",
       "Gauge page: the photo's TIME / NDL titles and dividers painted out, one divider under the top row",
       "Mini page: the centre and right slots are set to the manual's example; on the device both are the diver's choice",
-      "Clock in 24 h (the manual's figures show am/pm)"
+      "Clock in 24 h (the manual's figures show am/pm)",
+      "Text in Roboto Condensed, the narrowest bundled font, standing in for the device's own; sizes measured from the manual's figures as a share of the screen height (depth 0.26, values 0.18, labels 0.085; p.10, p.14-16, p.33), so a wide value (Nx32, 1013 mBar) is shrunk to its cell where the real narrower font fits at full size"
     ],
     "not_shown": [
       "Persistent notifications, surface screen",

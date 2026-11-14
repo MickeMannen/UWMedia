@@ -306,6 +306,7 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py properties)
         "circuit",
         "diluent_po2",
+        "gas_percent",  # the breathed gas as a Perdix 3 writes it: "32%", "18/50"
         # info screens and gauge pages (gui/hud_renderer.resolve_element_text)
         "avg_depth",
         "min_temp",
