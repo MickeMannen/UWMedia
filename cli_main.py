@@ -313,6 +313,7 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "eod",
         "gf_setting",
         "mod",  # the breathed gas's MOD (utils/hud_gas.py)
+        "ascent_rate_value",  # the ascent rate as a number (gui/hud_renderer.resolve_element_text)
         "date",
         "ambient_mbar",
         "surface_mbar",

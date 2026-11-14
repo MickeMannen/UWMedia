@@ -6,6 +6,7 @@ import math
 from datetime import timedelta
 from PIL import Image, ImageDraw, ImageFont
 import os
+import re
 from pathlib import Path
 import platform
 
@@ -302,6 +303,7 @@ UNIT_KIND_OF_FIELD = {
     "depth": "depth", "max_depth": "depth", "safety_stop_depth": "depth", "deco_stop_depth": "depth", "next_stop_depth": "depth", "ceiling": "depth", "mod": "depth",
     "primary_tank_pressure": "pressure", "secondary_tank_pressure": "pressure",
     "temp": "temp", "pressure_sac": "sac", "volume_sac": "volume_rate", "avg_depth": "depth", "min_temp": "temp",
+    "ascent_rate_value": "depth_rate",
 }
 
 
@@ -933,12 +935,13 @@ def _draw_check_mark(draw, x, y, size, color_rgb, outline=True):
     return x + w + int(size * 0.35)
 
 
-def badge_title_ink_span(font, text, size):
+def badge_title_ink_span(font, text, size, unit_scale=None):
     """(left, right) of a badge line's ink relative to its draw x - with the
     check mark _draw_check_mark() strokes in front of a CHECK_MARK line
     included, so a value line can be centred under the whole title (and a
     "✓ 2:59" timer under its title). A check mark inside the line ("6m✓
-    2min") is stepped over the way _draw_state_badge() draws it."""
+    2min") is stepped over the way _draw_state_badge() draws it, and with
+    `unit_scale` the small units are measured at their own size."""
     w = int(size * 0.9)
     left, right, x = None, 0, 0
     for i, piece in enumerate(text.split(CHECK_MARK.strip())):
@@ -950,11 +953,12 @@ def badge_title_ink_span(font, text, size):
             piece = piece.lstrip(" ")
         if not piece:
             continue
-        piece_left, _, piece_right, _ = font.getbbox(piece)
-        if left is None:
-            left = x + piece_left
-        right = x + piece_right
-        x += font.getlength(piece)
+        for run, run_font, _ in _badge_font_runs(piece, font, size, None, unit_scale):
+            run_left, _, run_right, _ = run_font.getbbox(run)
+            if left is None:
+                left = x + run_left
+            right = x + run_right
+            x += run_font.getlength(run)
     return (left or 0), right
 
 
@@ -968,23 +972,63 @@ def _font_lacks_glyph(path, char):
     return font.getmask(char).getbbox() == font.getmask("\uffff").getbbox()
 
 
-def _badge_font_runs(text, font, size, weight):
-    """(text, font) runs of a badge line: a deco stop's ↑ / ↓ marker in
-    Roboto where the badge's own font has no arrow (Roboto Condensed)."""
+# a unit right after a number on a badge value line: "6m", "20ft", "2min"
+BADGE_UNIT_RE = re.compile(r"(?<=\d)(min|ft|m)(?![A-Za-z])")
+
+
+@lru_cache(maxsize=None)
+def _font_file_at(path, size):
+    return ImageFont.truetype(path, size)
+
+
+def _badge_font_runs(text, font, size, weight, unit_scale=None):
+    """(text, font, is_unit) runs of a badge line: a deco stop's ↑ / ↓
+    marker in Roboto where the badge's own font has no arrow (Roboto
+    Condensed), and with `unit_scale` the units after its numbers ("6m
+    2min") in the same font at that share of the size (Peregrine and Teric
+    manuals: small cyan m / min)."""
     path = getattr(font, "path", None)
-    if not path or not any(c in text for c in BADGE_ARROWS):
-        return [(text, font)]
+    segments = [(text, False)]
+    if unit_scale and path:
+        segments, pos = [], 0
+        for m in BADGE_UNIT_RE.finditer(text):
+            if m.start() > pos:
+                segments.append((text[pos:m.start()], False))
+            segments.append((m.group(0), True))
+            pos = m.end()
+        if pos < len(text):
+            segments.append((text[pos:], False))
     runs = []
-    for char in text:
-        f = get_font(size, BADGE_ARROW_FAMILY, weight) if char in BADGE_ARROWS and _font_lacks_glyph(path, char) else font
-        if runs and runs[-1][1] is f:
-            runs[-1] = (runs[-1][0] + char, f)
-        else:
-            runs.append((char, f))
+    for segment, is_unit in segments:
+        if is_unit:
+            runs.append((segment, _font_file_at(path, max(1, int(round(size * float(unit_scale))))), True))
+            continue
+        if not path or not any(c in segment for c in BADGE_ARROWS):
+            runs.append((segment, font, False))
+            continue
+        for char in segment:
+            f = get_font(size, BADGE_ARROW_FAMILY, weight) if char in BADGE_ARROWS and _font_lacks_glyph(path, char) else font
+            if runs and runs[-1][1] is f and not runs[-1][2]:
+                runs[-1] = (runs[-1][0] + char, f, False)
+            else:
+                runs.append((char, f, False))
     return runs
 
 
-def fitted_badge_line_size(elem, text, size, px_scale=1.0):
+def badge_line_anchor(font, text, size, align, unit_scale=None):
+    """(dx, left, right) of one badge line: the shift that puts its ink on
+    the element's anchor for `align`, and its ink span from the draw x.
+    A line with small units (`unit_scale`) is measured as drawn; other
+    lines keep the plain text box. Shared by the renderer and the designer."""
+    if unit_scale:
+        left, right = badge_title_ink_span(font, text, size, unit_scale)
+        dx = -(left + right) / 2.0 if align == "center" else -float(right) if align == "right" else 0.0
+        return dx, left, right
+    dx, _, (left, _, right, _) = text_anchor_shift(font, text, align, "top")
+    return dx, left, right
+
+
+def fitted_badge_line_size(elem, text, size, px_scale=1.0, unit_scale=None):
     """The font size (px) a badge line draws at: `size`, or smaller when the
     element has a `max_width` (skin px, before the skin scale) and the line
     - check mark included - is wider (a deco stop's "6m✓ 2min" in the
@@ -997,7 +1041,7 @@ def fitted_badge_line_size(elem, text, size, px_scale=1.0):
         return size
 
     def width(px):
-        left, right = badge_title_ink_span(get_font(px, elem.get("font_family"), elem.get("font_weight")), text, px)
+        left, right = badge_title_ink_span(get_font(px, elem.get("font_family"), elem.get("font_weight")), text, px, unit_scale)
         return right - left
 
     if width(size) <= max_w:
@@ -1267,11 +1311,16 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
         block_h = sum(int((value_size if is_value else label_size) * spacing) for _, _, is_value in lines)
         y -= block_h if valign == "bottom" else block_h // 2
     px_scale = user_scale if render_log else user_scale * res_scale
+    # `unit_scale` / `unit_color`: the units after a value line's numbers
+    # ("6m 2min") small and in their own colour, as a Peregrine or Teric draws them
+    badge_unit_scale = elem.get("unit_scale")
+    unit_rgb = _rgb(elem["unit_color"]) if elem.get("unit_color") else None
     for index, (text, color_rgb, is_value) in enumerate(lines):
         font = value_font if is_value else label_font
         pitch_size = final_size = value_size if is_value else label_size
+        line_units = badge_unit_scale if is_value else None
         line_y = y
-        fitted = fitted_badge_line_size(elem, text, final_size, px_scale)
+        fitted = fitted_badge_line_size(elem, text, final_size, px_scale, line_units)
         if fitted != final_size:
             # a line too wide for `max_width` shrinks, on the full-size line's baseline
             fitted_font = get_font(fitted, family, weight)
@@ -1279,10 +1328,10 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             font, final_size = fitted_font, fitted
         x = abs_x
         if align != "left":
-            dx, _, _ = text_anchor_shift(font, text, align, "top")
+            dx, _, _ = badge_line_anchor(font, text, final_size, align, line_units)
             x = int(round(abs_x + dx))
         if is_value and value_align == "center" and title_center is not None:
-            left, right = badge_title_ink_span(font, text, final_size)  # the drawn check mark included
+            left, right = badge_title_ink_span(font, text, final_size, line_units)  # the drawn check mark included
             x = int(round(title_center - (left + right) / 2.0))
         elif not is_value and title_center is None:
             left, right = badge_title_ink_span(font, text, final_size)
@@ -1307,11 +1356,14 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             piece = piece.lstrip(" ") if i else piece
             if not piece:
                 continue
-            for run, run_font in _badge_font_runs(piece, font, final_size, weight):
+            for run, run_font, is_unit in _badge_font_runs(piece, font, final_size, weight, line_units):
+                # a small unit sits on the digits' baseline
+                run_y = y + (font.getmetrics()[0] - run_font.getmetrics()[0]) if is_unit else y
+                run_rgb = unit_rgb if is_unit and unit_rgb else color_rgb
                 if outline:
                     for dx, dy in [(-o_dist, -o_dist), (o_dist, -o_dist), (-o_dist, o_dist), (o_dist, o_dist)]:
-                        draw.text((x + dx, y + dy), run, font=run_font, fill=(0, 0, 0))
-                draw.text((x, y), run, font=run_font, fill=color_rgb)
+                        draw.text((x + dx, run_y + dy), run, font=run_font, fill=(0, 0, 0))
+                draw.text((x, run_y), run, font=run_font, fill=run_rgb)
                 x += draw.textlength(run, font=run_font)
         y = line_y + int(pitch_size * spacing)
 
@@ -2378,6 +2430,14 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
         from utils.hud_rules_engine import average_depth_at
         raw_val = average_depth_at(waypoint, waypoints)
         return format_telemetry_value("max_depth", raw_val, display), raw_val
+    if field == "ascent_rate_value":
+        # the ascent rate as a number beside the arrows, in m/min or ft/min
+        # (Teric manual p.12 "graphically and numerically"); 0 when level or descending
+        from utils import units as U
+        raw_val = ascent_rate_for(waypoint, waypoints)
+        if raw_val is None:
+            return "--", None
+        return str(int(round(U.depth(max(0.0, raw_val))))), raw_val
     if field == "min_temp":
         # the coldest water so far (a Descent X50i gauge page's MIN. TEMP, manual p.17)
         temps = [wp.temp for wp in (waypoints or [waypoint]) if wp is not None and wp.temp is not None

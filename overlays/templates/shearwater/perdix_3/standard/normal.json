@@ -11,82 +11,87 @@
       {
         "id": "depth",
         "field": "depth",
-        "rel_x": 0.2314,
-        "rel_y": 0.2222,
+        "rel_x": 0.17,
+        "rel_y": 0.3816,
         "color": "#FFFFFF",
-        "font_size": 72,
+        "font_size": 214,
         "scale": 1.0,
         "unit_suffix": true,
-        "unit_scale": 0.325,
-        "unit_dx": 5.4,
-        "unit_dy": -27.7,
+        "unit_scale": 0.33,
+        "unit_dx": 20.0,
+        "unit_dy": -82.0,
         "unit_color": "#00ADED",
         "small_suffix": "decimals",
-        "small_suffix_scale": 0.35,
-        "unit_position": "below"
+        "small_suffix_scale": 0.5,
+        "unit_position": "below",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 245
       },
       {
         "id": "dive_time",
         "field": "dive_time",
-        "rel_x": 0.2206,
-        "rel_y": 0.4788,
+        "rel_x": 0.1768,
+        "rel_y": 0.5744,
         "color": "#FFFFFF",
-        "font_size": 75,
-        "scale": 1.0
+        "font_size": 160,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "small_suffix": "seconds",
+        "small_suffix_scale": 0.53,
+        "max_width": 260
       },
       {
         "id": "label_ndl",
         "field": "custom:NDL",
-        "rel_x": 0.595,
-        "rel_y": 0.224,
+        "rel_x": 0.6224,
+        "rel_y": 0.2324,
         "color": "#00ADED",
-        "font_size": 38,
+        "font_size": 67,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
           "deco",
           "clear"
-        ]
-      },
-      {
-        "id": "label_min",
-        "field": "custom:min",
-        "rel_x": 0.649,
-        "rel_y": 0.342,
-        "color": "#00ADED",
-        "font_size": 34,
-        "scale": 1.0,
-        "hide_in_states": [
-          "safety_stop",
-          "deco",
-          "clear"
-        ]
+        ],
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "align": "center"
       },
       {
         "id": "state_badge",
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.556,
-        "rel_y": 0.23,
-        "font_size": 28,
-        "value_font_size": 38,
+        "rel_x": 0.6224,
+        "rel_y": 0.1697,
+        "font_size": 58,
+        "value_font_size": 105,
         "scale": 1.0,
         "depth_unit": "m",
-        "label": "Stop / deco (replaces NDL)"
+        "label": "Stop / deco (replaces NDL)",
+        "font_family": "Roboto Condensed",
+        "align": "center",
+        "value_align": "center",
+        "line_spacing": 0.72,
+        "max_width": 225
       },
       {
         "id": "ndl",
         "field": "ndl",
-        "rel_x": 0.5543,
-        "rel_y": 0.2937,
+        "rel_x": 0.6224,
+        "rel_y": 0.3475,
         "color": "#FFFFFF",
-        "font_size": 55,
+        "font_size": 105,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
           "deco",
           "clear"
-        ]
+        ],
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "align": "center"
       }
     ],
     "path": "normal.png",

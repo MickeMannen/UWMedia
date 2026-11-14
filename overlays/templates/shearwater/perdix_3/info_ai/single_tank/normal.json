@@ -4,85 +4,106 @@
     {
       "id": "label_t1",
       "field": "custom:T1",
-      "rel_x": 0.155,
-      "rel_y": 0.6005,
+      "rel_x": 0.1529,
+      "rel_y": 0.6812,
       "color": "#00ADED",
-      "font_size": 40,
-      "scale": 1.0
+      "font_size": 58,
+      "scale": 1.0,
+      "font_family": "Roboto Condensed",
+      "valign": "bottom"
     },
     {
       "id": "primary_tank_pressure",
       "field": "primary_tank_pressure",
-      "rel_x": 0.155,
-      "rel_y": 0.6653,
+      "rel_x": 0.1529,
+      "rel_y": 0.8135,
       "color": "#FFFFFF",
-      "font_size": 70,
+      "font_size": 105,
       "scale": 1.0,
       "unit_suffix": true,
-      "unit_scale": 0.26,
-      "unit_dx": 0.6,
-      "unit_dy": -34,
+      "unit_scale": 0.24,
+      "unit_dy": -50.0,
       "unit_color": "#00ADED",
-      "unit_orientation": "stacked"
+      "unit_orientation": "stacked",
+      "font_family": "Roboto Condensed",
+      "valign": "bottom",
+      "max_width": 160,
+      "unit_dx": 8.0
     },
     {
       "id": "label_gtr",
       "field": "custom:GTR",
-      "rel_x": 0.385,
-      "rel_y": 0.6005,
+      "rel_x": 0.4575,
+      "rel_y": 0.6812,
       "color": "#00ADED",
-      "font_size": 40,
-      "scale": 1.0
+      "font_size": 58,
+      "scale": 1.0,
+      "font_family": "Roboto Condensed",
+      "valign": "bottom",
+      "align": "right"
     },
     {
       "id": "label_gtr_tank",
       "field": "custom:T1",
-      "rel_x": 0.482,
-      "rel_y": 0.6005,
+      "rel_x": 0.465,
+      "rel_y": 0.6812,
       "color": "#808080",
-      "font_size": 40,
-      "scale": 1.0
+      "font_size": 58,
+      "scale": 1.0,
+      "font_family": "Roboto Condensed",
+      "valign": "bottom"
     },
     {
       "id": "gtr",
       "field": "air_remaining",
-      "rel_x": 0.5,
-      "rel_y": 0.6653,
+      "rel_x": 0.4521,
+      "rel_y": 0.8135,
       "color": "#FFFFFF",
-      "font_size": 70,
+      "font_size": 105,
       "scale": 1.0,
-      "align": "right"
+      "align": "center",
+      "font_family": "Roboto Condensed",
+      "valign": "bottom"
     },
     {
       "id": "label_sac",
       "field": "custom:SAC",
-      "rel_x": 0.572,
-      "rel_y": 0.6005,
+      "rel_x": 0.6889,
+      "rel_y": 0.6812,
       "color": "#00ADED",
-      "font_size": 40,
-      "scale": 1.0
+      "font_size": 58,
+      "scale": 1.0,
+      "font_family": "Roboto Condensed",
+      "valign": "bottom",
+      "align": "right"
     },
     {
       "id": "label_sac_tank",
       "field": "custom:T1",
-      "rel_x": 0.672,
-      "rel_y": 0.6005,
+      "rel_x": 0.6964,
+      "rel_y": 0.6812,
       "color": "#808080",
-      "font_size": 40,
-      "scale": 1.0
+      "font_size": 58,
+      "scale": 1.0,
+      "font_family": "Roboto Condensed",
+      "valign": "bottom"
     },
     {
       "id": "sac",
       "field": "pressure_sac",
-      "rel_x": 0.705,
-      "rel_y": 0.6653,
+      "rel_x": 0.8019,
+      "rel_y": 0.8135,
       "color": "#FFFFFF",
-      "font_size": 70,
+      "font_size": 105,
       "scale": 1.0,
       "align": "right",
       "unit_suffix": true,
-      "unit_scale": 0.28,
-      "unit_color": "#00ADED"
+      "unit_scale": 0.3,
+      "unit_color": "#00ADED",
+      "font_family": "Roboto Condensed",
+      "valign": "bottom",
+      "align_unit": true,
+      "max_width": 220
     }
   ]
 }

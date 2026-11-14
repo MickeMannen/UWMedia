@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Overlays: the Shearwater **Teric** and **Tern** pages show the ascent-rate
+  arrows beside the depth with the rate as a number (m/min or ft/min), as
+  the watches do.
+- Overlays: on the Shearwater **Peregrine TX**, **Perdix 2**, **Petrel**,
+  **Teric** and **Tern** a deco stop reads "6m 2min" with the units small
+  and in blue, as on the real screens.
+
+### Fixed
+- Overlays: the Shearwater **Perdix 2**, **Petrel**, **Perdix 3**, **Teric**
+  and **Tern** pages draw their text at the manuals' sizes in a tall
+  condensed font, as the Peregrine TX now does; depth, dive time, NDL, stop
+  badges, info rows, Tec / CC rows and gauge pages were a half to two thirds
+  as tall as on the real screens. Dive time shows its seconds small.
+- Overlays: Tec and CC pages on the Perdix 2, Petrel and Perdix 3 show time
+  to surface in whole minutes, and the Perdix 2 and Petrel Tec / CC screens
+  are black instead of a grey panel with fixed ascent arrows.
+- Overlays: the **Teric** and **Tern** Main pages show the gas as its O2
+  percentage with the cylinder, the Tern's right slot shows MAX by default,
+  and a deco stop reads "6m 3min" on the Standard pages.
+
 ## [0.8.1] - 2026-11-14
 
 ### Added

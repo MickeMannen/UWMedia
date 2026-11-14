@@ -16,6 +16,7 @@ from gui.hud_renderer import (
     SEGMENT_BAR_DEFAULTS,
     arc_geometry,
     ascent_chevron_geometry,
+    badge_line_anchor,
     badge_line_sizes,
     fitted_badge_line_size,
     VERTICAL_ORIENTATIONS,
@@ -215,6 +216,7 @@ def available_telemetry_fields(dive=None) -> List[str]:
         "gasmix", "gas_percent", "safety_stop", "safety_stop_depth", "time_of_day",
         "circuit", "diluent_po2",  # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py)
         "avg_depth", "min_temp", "gf_setting", "eod", "date", "ambient_mbar", "surface_mbar",  # info screens and gauge pages (gui/hud_renderer.resolve_element_text)
+        "ascent_rate_value",  # the ascent rate in m/min or ft/min, beside a Teric's arrows
         "mod",  # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)
         # unit labels that follow the unit system (utils/units.py)
         "unit:depth", "unit:pressure", "unit:pressure_lower", "unit:temp", "unit:sac", "unit:volume_rate", "unit:depth_rate",
@@ -349,9 +351,10 @@ def element_native_bounds(
         # not mirrored here: the title is the widest line there, so the box
         # is the same; only a timer wider than its title would poke out.
         for line_text, _, is_value in lines:
-            size = fitted_badge_line_size(elem, line_text, value_size if is_value else label_size)
+            line_units = elem.get("unit_scale") if is_value else None
+            size = fitted_badge_line_size(elem, line_text, value_size if is_value else label_size, unit_scale=line_units)
             font = get_font(size, family, weight)
-            dx, _, (left, _, right, _) = text_anchor_shift(font, line_text, align, "top")
+            dx, left, right = badge_line_anchor(font, line_text, size, align, line_units)
             x0 = min(x0, x + dx + left)
             x1 = max(x1, x + dx + right)
         if x0 == float("inf"):

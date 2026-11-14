@@ -56,7 +56,8 @@
       "Main screen bottom row as shipped: the gas, MAX in the centre, Mini Display 1 (TEMP over CLOCK) on the right (p.10, p.14)",
       "Mini page: Mini Display 2 (MAX / PO2 / MOD) in the centre and Mini Display 1 on the right (p.14 figure)",
       "Main: AI page: the bottom row's centre and right slots set to Cylinder Pressure (T1 with its bar) and Gas Time Remaining (GTR T1), two of the slot options in the p.14 table; on a sidemount dive the Main Screen's sidemount variant already shows T1 and T2",
-      "Sidemount: T1 and T2 on the main screen with the green switch box on the tank to breathe from (p.41, 21 bar default), and the AI row T1 | GTR / SM / SAC | T2 (p.41 combination table)"
+      "Sidemount: T1 and T2 on the main screen with the green switch box on the tank to breathe from (p.41, 21 bar default), and the AI row T1 | GTR / SM / SAC | T2 (p.41 combination table)",
+      "Deco stop in the badge as \"6m 2min\" with small cyan m / min (manual Rev C p.12)"
     ],
     "assumed": [
       "Element placement from a pre-dive photo only; no live screen or log seen",

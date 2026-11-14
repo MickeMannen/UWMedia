@@ -71,7 +71,9 @@
         "align": "center",
         "line_spacing": 0.6,
         "value_align": "center",
-        "max_width": 300
+        "max_width": 300,
+        "unit_scale": 0.55,
+        "unit_color": "#00ADED"
       },
       {
         "field": "ndl",

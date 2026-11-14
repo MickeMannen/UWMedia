@@ -1319,10 +1319,25 @@ def test_badge_arrow_falls_back_to_a_font_that_has_it():
     from gui.hud_renderer import _badge_font_runs, get_font
     condensed = get_font(40, "Roboto Condensed")
     runs = _badge_font_runs("6m↓ 3min", condensed, 40, None)
-    assert [text for text, _ in runs] == ["6m", "↓", " 3min"]
+    assert [text for text, _, _ in runs] == ["6m", "↓", " 3min"]
     assert runs[1][1] is not condensed and runs[0][1] is condensed
     roboto = get_font(40, "Roboto")
-    assert _badge_font_runs("6m↓ 3min", roboto, 40, None) == [("6m↓ 3min", roboto)]
+    assert _badge_font_runs("6m↓ 3min", roboto, 40, None) == [("6m↓ 3min", roboto, False)]
+
+
+def test_badge_units_draw_small_after_numbers_only():
+    # `unit_scale` on a badge: "6m 2min" with small m / min (Peregrine p.12,
+    # Teric p.11); a word like CLEAR or a timer "3:00" is left alone
+    from gui.hud_renderer import _badge_font_runs, badge_title_ink_span, get_font
+    font = get_font(60, "Roboto Condensed")
+    runs = _badge_font_runs("6m✓ 2min", font, 60, None, 0.5)
+    assert [(text, unit) for text, _, unit in runs] == [("6", False), ("m", True), ("✓ 2", False), ("min", True)]
+    assert runs[1][1].size == 30
+    assert [text for text, _, _ in _badge_font_runs("20ft↓ 3min", font, 60, None, 0.5)] == ["20", "ft", "↓", " 3", "min"]
+    assert all(not unit for _, _, unit in _badge_font_runs("CLEAR 3:00", font, 60, None, 0.5))
+    full = badge_title_ink_span(font, "6m 2min", 60)
+    small = badge_title_ink_span(font, "6m 2min", 60, 0.5)
+    assert small[1] - small[0] < full[1] - full[0]
 
 
 def test_align_unit_puts_a_trailing_unit_inside_the_right_aligned_run():
@@ -1334,6 +1349,23 @@ def test_align_unit_puts_a_trailing_unit_inside_the_right_aligned_run():
         unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) / 2
     assert unit_align_shift({}, font, "45", "", None, 80, "ft", "right", 1.0) == 0.0
     assert unit_align_shift(elem, font, "45", "", None, 80, "", "right", 1.0) == 0.0
+
+
+def test_ascent_rate_value_is_the_rate_in_the_units_in_force():
+    # a Teric writes its ascent rate beside the arrows (manual p.12): m/min or ft/min, 0 when not ascending
+    from gui.hud_renderer import resolve_element_text
+    from utils import units as U
+    from utils.dummy_telemetry import build_dummy_dive, forced_dive, waypoint_at
+    layout = {"manufacturer": "Shearwater", "model": "Teric"}
+    dive = build_dummy_dive("single_tank")
+    wp, history = forced_dive(waypoint_at(dive, 12 * 60), "fast_ascent")
+    text, rate = resolve_element_text(layout, "ascent_rate_value", wp, history)
+    assert rate > 9 and text == str(int(round(rate)))
+    with U.units_override(U.IMPERIAL):
+        assert resolve_element_text(layout, "ascent_rate_value", wp, history)[0] == str(int(round(rate / 0.3048)))
+    level, history = forced_dive(waypoint_at(dive, 12 * 60), "normal")
+    assert resolve_element_text(layout, "ascent_rate_value", level, history)[0] == "0"
+    assert resolve_element_text(layout, "ascent_rate_value", None)[0] == "--"
 
 
 def _ink_box(frame):

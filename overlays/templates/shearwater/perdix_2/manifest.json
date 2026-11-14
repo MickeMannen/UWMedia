@@ -56,7 +56,8 @@
       "Tank pressure on a yellow / red box below the reserve / critical pressure (p.40, p.57)",
       "Tec page row rules: whole minutes, CLEAR counter (Petrel 3 Technical manual Rev B p.24-25)",
       "Info pages: the main screen with its bottom row replaced by one info screen - AI (T1 & GTR/SAC, and T1, T2 & GTR/SAC on a sidemount dive), MOD / MAX / PPO2, TEMP / CONSERV / CNS, GF99 / SurGF / CEIL, BATTERY, PRESSURE mBar SURF / NOW, DATE / CLOCK (Perdix 2 Rec manual Rev C p.16 (row figure), p.17-21)",
-      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Perdix 2 Rec manual Rev C p.34)"
+      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Perdix 2 Rec manual Rev C p.34)",
+      "Deco stop in the badge as \"6m 2min\" with small cyan m / min (the main-screen figures, manual p.12)"
     ],
     "assumed": [
       "Deco Clear counter look on the main page (green CLEAR, m:ss): no figure in the recreational manual",
@@ -64,12 +65,13 @@
       "CC page: the Perdix 2's CC/BO mode is in its Technical Modes manual, which is not on hand - drawn as the Petrel 3's internal-setpoint screen (Technical manual Rev B p.10: the setpoint in the centre position, no title; CC / BO label, BO yellow, p.14), PPO2 there on a bailout as the Perdix 3 shows it",
       "Info and gauge positions measured from the manual's figures and set on the main page's skin",
       "Gauge STOPWATCH shows the dive time: a log records no stopwatch start or reset",
-      "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)"
+      "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)",
+      "Text in Roboto Condensed, the narrowest bundled font, standing in for the device's own; sizes measured from the manual's figures as a share of the screen height (depth 0.26, values 0.18, labels 0.085; p.11, p.22, p.34; Tec and CC rows from the Petrel 3 Technical manual p.10), so a wide value is shrunk to its cell on this screen, which is narrower than the figures' 4:3. Tec and CC skins: the painted grey panel, static ascent arrows and patch replaced by the plain black screen (the Tec figure has no arrows)"
     ],
     "not_shown": [
       "Persistent notifications left of the NDL (MOD, Near MOD, Better Gas, High CNS; p.23)",
       "Surface interval and battery icon (p.12)",
-      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / Δ+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
+      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / \u0394+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
       "CONSERV level name (Low / Med / High) above the GF pair, and the battery type / nominal voltage beside BATTERY: not in the logs",
       "Gauge page: no notification row and no resettable average (deco is not tracked in gauge mode)"
     ],

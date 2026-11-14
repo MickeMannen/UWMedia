@@ -46,18 +46,27 @@
       "Info pages: the Standard page with its info row replaced by one info screen each, cyan titles over white values, no column divider (manual Rev B-1 p.15)",
       "Info: MAX / AVG (p.16); CNS / MOD / PPO2 (p.15-16); GF / GF99 / TTS (p.17); TEMP / BATTERY (p.17); mBar NOW / SURF (p.17); TIME (p.18)",
       "Gauge page: GA badge, depth, MAX | STOPWATCH, large dive time, rows divided (Big layout figure, p.31)",
-      "Info: TIME / EOD - EOD is the time now plus TTS (Tern p.18)"
+      "Info: TIME / EOD - EOD is the time now plus TTS (Tern p.18)",
+      "Text sizes, baselines and grid lines measured from the manual's Big, Standard and Gauge figures (p.10, p.31) as a share of the round screen's height: depth 0.23 bold on Big (0.16 on Standard), dive time 0.23 / 0.16 with small seconds, labels 0.057, values 0.10; the grid lines redrawn where the figures have them",
+      "Ascent-rate arrows beside the depth, six per column, one per 3 m/min (Teric p.12 / Tern p.11)",
+      "Big layout gas: the cylinder icon and the breathing gas's O2 % (21%), O2/He for a trimix",
+      "Main (Big): MAX in the right slot of the deco row, the manual's default (p.10); PPO2 is on Info: CNS / MOD / PPO2",
+      "Ascent rate shown graphically and numerically, the rate beside the arrows (as the Teric, Rev B-1 p.10-11); deco stop as \"6m 2min\" with small cyan m / min (p.10)"
     ],
     "assumed": [
       "Field set never checked against a real Tern export",
       "Standard page: row positions and font sizes measured from the manual's figure, not a device photo",
-      "Info pages: three-column positions and the % / unit marks placed by eye from the p.15-18 strips; TEMP with one decimal",
+      "Info pages: three-column positions and the % / unit marks placed by eye from the p.15-18 strips; TEMP in whole degrees as the p.17 figure",
       "Info: BATTERY shows the log's battery value as a percent; Shearwater exports record battery voltage, not percent",
-      "Gauge page: STOPWATCH is the dive time (a log records no stopwatch reset); the bottom row shows the dive time where the surface figure shows SURFACE; positions measured from the p.31 figure"
+      "Gauge page: STOPWATCH is the dive time (a log records no stopwatch reset); the bottom row shows the dive time where the surface figure shows SURFACE; positions measured from the p.31 figure",
+      "Text in Roboto Condensed (Bold for the Big and Tern gauge depth), standing in for the device's own font; a wide value is shrunk to its cell or to the circle",
+      "Warning / info banners kept at their size, placed across the row they cover; what is under them hides while they show"
     ],
     "not_shown": [
       "Info screens LAST DIVE (surface only) and TISSUES (p.15-19)",
-      "Gauge page: the battery icon and the surface interval (p.31)"
+      "Gauge page: the battery icon and the surface interval (p.31)",
+      "The ascent rate as a number beside the arrows (needs a computed, unit-converted ascent-rate text field)",
+      "The deco stop's small cyan m / min units: the stop reads 6m 3min in one size"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

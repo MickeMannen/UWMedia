@@ -15,210 +15,262 @@
     "linked_elements": [
       {
         "field": "custom:DEPTH",
-        "rel_x": 0.1479,
-        "rel_y": 0.1776,
+        "rel_x": 0.136,
+        "rel_y": 0.2215,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "depth",
-        "rel_x": 0.1479,
-        "rel_y": 0.2323,
+        "rel_x": 0.136,
+        "rel_y": 0.3482,
         "color": "#FFFFFF",
-        "font_size": 79,
-        "scale": 1.0
+        "font_size": 118,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 230
       },
       {
         "field": "custom:TIME",
-        "rel_x": 0.3959,
-        "rel_y": 0.1776,
+        "rel_x": 0.3469,
+        "rel_y": 0.2215,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "dive_time",
-        "rel_x": 0.3959,
-        "rel_y": 0.2323,
+        "rel_x": 0.4013,
+        "rel_y": 0.3482,
         "color": "#FFFFFF",
-        "font_size": 72,
+        "font_size": 118,
         "scale": 1.0,
-        "value_format": "minutes"
+        "value_format": "minutes",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "state_badge",
         "type": "badge",
-        "rel_x": 0.59,
-        "rel_y": 0.2733,
-        "font_size": 34,
-        "value_font_size": 42,
+        "rel_x": 0.6734,
+        "rel_y": 0.167,
+        "font_size": 58,
+        "value_font_size": 118,
         "scale": 1.0,
         "depth_unit": "m",
         "title_box": false,
-        "label": "Deco (replaces NDL)"
+        "label": "Deco (replaces NDL)",
+        "font_family": "Roboto Condensed",
+        "align": "center",
+        "value_align": "center",
+        "line_spacing": 0.55,
+        "max_width": 250
       },
       {
         "field": "custom:NDL",
-        "rel_x": 0.6,
-        "rel_y": 0.2733,
+        "rel_x": 0.5986,
+        "rel_y": 0.2215,
         "color": "#00ADED",
-        "font_size": 30,
+        "font_size": 58,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
           "deco",
           "clear"
-        ]
+        ],
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "ndl",
-        "rel_x": 0.6,
-        "rel_y": 0.3189,
+        "rel_x": 0.5986,
+        "rel_y": 0.3482,
         "color": "#FFFFFF",
-        "font_size": 50,
+        "font_size": 118,
         "scale": 1.0,
         "hide_in_states": [
           "safety_stop",
           "deco",
           "clear"
-        ]
+        ],
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "custom:MAX",
-        "rel_x": 0.1489,
-        "rel_y": 0.4055,
+        "rel_x": 0.1836,
+        "rel_y": 0.4626,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "max_depth",
-        "rel_x": 0.1489,
-        "rel_y": 0.4602,
+        "rel_x": 0.136,
+        "rel_y": 0.5927,
         "color": "#FFFFFF",
-        "font_size": 72,
+        "font_size": 118,
         "scale": 1.0,
         "unit_suffix": true,
-        "unit_scale": 0.35,
-        "unit_color": "#00ADED"
+        "unit_scale": 0.5,
+        "unit_color": "#00ADED",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 240
       },
       {
         "field": "custom:SP",
-        "rel_x": 0.3991,
-        "rel_y": 0.4055,
+        "rel_x": 0.4013,
+        "rel_y": 0.4626,
         "color": "#00ADED",
-        "font_size": 30,
+        "font_size": 58,
         "scale": 1.0,
         "hide_in_circuits": [
           "BO",
           "OC"
         ],
-        "label": "SP title (Perdix 3 Rev B PDF p.85: the Tec centre slot is SP in CC)"
+        "label": "SP title (Perdix 3 Rev B PDF p.85: the Tec centre slot is SP in CC)",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "custom:PPO2",
-        "rel_x": 0.3991,
-        "rel_y": 0.4055,
+        "rel_x": 0.4013,
+        "rel_y": 0.4626,
         "color": "#00ADED",
-        "font_size": 30,
+        "font_size": 58,
         "scale": 1.0,
         "hide_in_circuits": [
           "CC",
           "SC"
         ],
-        "label": "On a bailout the SP slot shows PPO2 (PDF p.87: \"the set point has disappeared\")"
+        "label": "On a bailout the SP slot shows PPO2 (PDF p.87: \"the set point has disappeared\")",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "setpoint",
-        "rel_x": 0.3991,
-        "rel_y": 0.4602,
+        "rel_x": 0.4013,
+        "rel_y": 0.5927,
         "color": "#FFFFFF",
-        "font_size": 61,
+        "font_size": 118,
         "scale": 1.0,
         "value_format": "decimal1",
         "hide_in_circuits": [
           "BO",
           "OC"
         ],
-        "label": "Setpoint in force: green when high, magenta when low (PDF p.42)"
+        "label": "Setpoint in force: green when high, magenta when low (PDF p.42)",
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 160
       },
       {
         "field": "po2",
-        "rel_x": 0.3991,
-        "rel_y": 0.4602,
+        "rel_x": 0.4013,
+        "rel_y": 0.5927,
         "color": "#FFFFFF",
-        "font_size": 61,
+        "font_size": 118,
         "scale": 1.0,
         "value_format": "decimal2_no_lead",
         "hide_in_circuits": [
           "CC",
           "SC"
-        ]
+        ],
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 160
       },
       {
         "field": "custom:SurfGF",
-        "rel_x": 0.5852,
-        "rel_y": 0.4055,
+        "rel_x": 0.5986,
+        "rel_y": 0.4626,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "gf",
-        "rel_x": 0.5913,
-        "rel_y": 0.4602,
+        "rel_x": 0.7244,
+        "rel_y": 0.5927,
         "color": "#FFFFFF",
-        "font_size": 72,
-        "scale": 1.0
+        "font_size": 118,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "align": "right"
       },
       {
         "field": "custom:%",
-        "rel_x": 0.756,
-        "rel_y": 0.4739,
+        "rel_x": 0.7312,
+        "rel_y": 0.5927,
         "color": "#00ADED",
-        "font_size": 22,
-        "scale": 1.0
+        "font_size": 60,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "custom:O2/HE",
-        "rel_x": 0.1479,
-        "rel_y": 0.6335,
+        "rel_x": 0.3809,
+        "rel_y": 0.6922,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "gasmix",
-        "rel_x": 0.255,
-        "rel_y": 0.6882,
+        "rel_x": 0.3537,
+        "rel_y": 0.8135,
         "color": "#FFFFFF",
-        "font_size": 72,
-        "scale": 1.0
+        "font_size": 118,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "max_width": 225
       },
       {
         "field": "circuit",
-        "rel_x": 0.1479,
-        "rel_y": 0.688,
+        "rel_x": 0.1632,
+        "rel_y": 0.7692,
         "color": "#FFFFFF",
-        "font_size": 56,
-        "scale": 1.0
+        "font_size": 70,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "custom:TTS",
-        "rel_x": 0.6,
-        "rel_y": 0.6335,
+        "rel_x": 0.653,
+        "rel_y": 0.6922,
         "color": "#00ADED",
-        "font_size": 35,
-        "scale": 1.0
+        "font_size": 58,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom"
       },
       {
         "field": "tts",
-        "rel_x": 0.6,
-        "rel_y": 0.6882,
+        "rel_x": 0.6462,
+        "rel_y": 0.8135,
         "color": "#FFFFFF",
-        "font_size": 72,
-        "scale": 1.0
+        "font_size": 118,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "valign": "bottom",
+        "value_format": "minutes"
       }
     ],
     "path": "normal.png",

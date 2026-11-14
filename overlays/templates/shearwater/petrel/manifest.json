@@ -56,9 +56,10 @@
   "notes": {
     "verified": [
       "Same rules as the Perdix 2 (Petrel 3 Recreational manual Rev C p.26-27, p.56); Tec page row rules (Technical manual Rev B p.24-25)",
-      "CC pages: centre row with the internal setpoint between the two transmitters, or the three cell PPO2s (Technical manual Rev B p.10, p.13); CC / BO mode label, BO on a yellow box (p.14, p.37); cells yellow when out of the ±20 % vote, red below 0.4 / above 1.6 (p.57, p.67); loop PPO2 limits 0.40 / 1.60 and DilPO2 0.19 / 1.65 (p.18, p.81)",
+      "CC pages: centre row with the internal setpoint between the two transmitters, or the three cell PPO2s (Technical manual Rev B p.10, p.13); CC / BO mode label, BO on a yellow box (p.14, p.37); cells yellow when out of the \u00b120 % vote, red below 0.4 / above 1.6 (p.57, p.67); loop PPO2 limits 0.40 / 1.60 and DilPO2 0.19 / 1.65 (p.18, p.81)",
       "Info pages: the main screen with its bottom row replaced by one info screen - AI (T1 & GTR/SAC, and T1, T2 & GTR/SAC on a sidemount dive), MOD / MAX / PPO2, TEMP / CONSERV / CNS, GF99 / SurGF / CEIL, BATTERY, PRESSURE mBar SURF / NOW, DATE / CLOCK (Petrel 3 Rec manual Rev C p.15 (row figure), p.16-20)",
-      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Petrel 3 Rec manual Rev C p.33)"
+      "Gauge page: large depth and dive time, MAX / STOPWATCH, AVG, temperature, clock (Petrel 3 Rec manual Rev C p.33)",
+      "Deco stop in the badge as \"6m 2min\" with small cyan m / min (Rec manual p.12)"
     ],
     "assumed": [
       "Skin geometry from the Petrel 3 figures",
@@ -67,14 +68,16 @@
       "Info and gauge positions measured from the manual's figures and set on the main page's skin",
       "Gauge STOPWATCH shows the dive time: a log records no stopwatch start or reset",
       "Info screens are shown in full, without the 10 s timeout; the date and clock are the log's own time (24 h)",
-      "Info pages draw the photo's info-row divider full width, as the info-screen figure shows it"
+      "Info pages and the Main Screen draw the photo's info-row divider full width, as the info-screen figure shows it",
+      "Text in Roboto Condensed, the narrowest bundled font, standing in for the device's own; sizes measured from the manuals' figures as a share of the screen height (depth 0.26, values 0.18, labels 0.085, cell PPO2s 0.21; Rec Rev C p.10, p.15-16, p.33; Technical Rev B p.10), so a wide value (Nx32, 1755 psi, 1013 mBar) is shrunk to its cell where the real narrower font fits at full size",
+      "Tec / CC pages: the ascent arrows drawn live between depth and time (Technical manual Rev B p.16) and the TTS in whole minutes (p.10)"
     ],
     "not_shown": [
       "Persistent notifications",
       "VOTING FAILED alternating with the readings (p.67)",
       "Millivolts and stack-timer info screens (p.17, p.21)",
       "SC/BO FiO2 cells (p.39)",
-      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / Δ+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
+      "Info screens LAST DIVE (surface only), Compass (no heading in a log), TISSUES, DET / \u0394+5 / @+5 / TTS (what-if values not computed), SERIAL NO / VERSION",
       "CONSERV level name (Low / Med / High) above the GF pair, and the battery type / nominal voltage beside BATTERY: not in the logs",
       "Gauge page: no notification row and no resettable average (deco is not tracked in gauge mode)"
     ],

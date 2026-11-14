@@ -78,12 +78,13 @@
       "Sidemount (Tec page and Info: AI): the Tec centre row T1 | SurfGF | T2 with the green switch box on the label of the tank to breathe from (Rev B PDF p.113, SM Switch 21 bar), and the AI row T1 | GTR / SM / SAC | T2 (PDF p.112 combination table); on the Main Screen and Standard pages the AI row is the info row (PDF p.22, p.112)"
     ],
     "assumed": [
-      "Margins, padding and font sizes of all three pages were approximated from the figures, not measured on a device photo",
-      "Info pages: title and value sizes match the main page bottom row, column positions approximated from the PDF p.37 figure",
+      "Text sizes measured from the manual's figures as a share of the screen height and drawn in Roboto Condensed, the narrowest bundled font, standing in for the device's own: Main / Standard / Main: AI from the Standard layout figure (PDF p.69 Descent: depth 0.295, dive time 0.221 with small seconds, NDL label 0.092 / value 0.145, slot and row labels 0.08-0.096, values 0.145, gas % 0.087, gas badge 0.145 tall), Tec / CC from PDF p.23 (labels 0.08, values 0.163, TIME and TTS in whole minutes), Gauge from PDF p.89; wide values (18/50, 4-digit psi, 1013 mBar) are shrunk to their cells",
+      "Main and Standard are both the Standard layout (the owner's choice; the Big layout with bold depth and NDL and the vertical N/D/L label is not drawn); the TIME, T1, BAR and MAX labels painted into the skins are replaced by drawn labels, the TIME label dropped as on the manual's figures, NDL without the 'min' tag",
+      "Info pages: title and value sizes match the Standard bottom row, column positions approximated from the PDF p.37 figure",
       "Info: TEMP shows one decimal in metric (the figure shows whole degrees), battery as a percent from the log",
       "Info: PRESSURE - surface 1013 mbar and now from depth (salt water), not the logged barometer",
       "Gauge: STOPWATCH shows the dive time - a log records no stopwatch start or reset; the stopwatch title is always green (running)",
-      "Gauge: the TIME label is kept from the main page skin; the figure shows no temperature, so none is drawn",
+      "Gauge: no TIME label, as on the figure; the figure shows no temperature, so none is drawn",
       "Sidemount: the tank icons' size and the GTR / SM / SAC spacing approximated from the PDF p.112 figure",
       "Sidemount Main Screen and Standard: MAX in the configurable slot (the manual shows no sidemount figure of these layouts; MAX is one of the slot's options, PDF p.147), no gas or compass on the info row while it shows the AI row"
     ],
