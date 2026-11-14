@@ -409,6 +409,37 @@ def _shearwater_parts(path: Path) -> LoggedPlanParts:
     return parts
 
 
+def _suunto_parts(path: Path, dive: Optional[Dive]) -> LoggedPlanParts:
+    """Gases (mix, tank size, start pressure) from the export's header and
+    the switches from its GasSwitch events, by the gas numbers the samples
+    use; an export with no gas list (an Ocean, a Nautic) gets the builder's
+    own gases. The first gas in the list is the one in use until the first
+    switch."""
+    from parsers.suunto import parse_time, read_device_log, read_gases, sample_records
+
+    log = read_device_log(path)
+    parts = LoggedPlanParts()
+    gases = read_gases(log)
+    names = {number: mix_name(gas.o2_percent, gas.he_percent) for number, gas in gases.items()}
+    for i, (number, gas) in enumerate(sorted(gases.items())):
+        parts.gases.append(LoggedGas(
+            name=names[number], o2_percent=gas.o2_percent, he_percent=gas.he_percent, tank_ref=f"T{i + 1}",
+            tank_size_l=gas.tank_size_l, start_pressure_bar=gas.start_pressure_bar,
+        ))
+    start = parse_time((log.get("Header") or {}).get("DateTime"))
+    if gases and start is not None:
+        current = names[min(gases)]
+        parts.switches.append((0, current))
+        for record in sample_records(log, start):
+            name = names.get(record.gas_switch) if record.gas_switch is not None else None
+            if name and name != current:
+                parts.switches.append((int(record.seconds), name))
+                current = name
+    if dive is not None:
+        parts.water_temp_c = next((wp.temp for wp in dive.waypoints if wp.temp is not None), None)
+    return parts
+
+
 def _subsurface_csv_parts(dive: Dive) -> LoggedPlanParts:
     """A Subsurface CSV profile has no gas, cylinder or GF information - the
     builder's own settings stand for those, the water temperature comes
@@ -519,7 +550,7 @@ def profile_waypoints(dive: Dive, switches: Sequence[Tuple[int, str]], first_gas
 # ---------------------------------------------------------------------------
 
 def logged_plan_parts(path, dive: Optional[Dive] = None) -> LoggedPlanParts:
-    from parsers.registry import SHEARWATER_CSV, SHEARWATER_XML, SUBSURFACE_CSV, detect_log_format
+    from parsers.registry import SHEARWATER_CSV, SHEARWATER_XML, SUBSURFACE_CSV, SUUNTO_JSON, detect_log_format
 
     path = Path(path)
     log_format = detect_log_format(path)
@@ -527,6 +558,8 @@ def logged_plan_parts(path, dive: Optional[Dive] = None) -> LoggedPlanParts:
         return _shearwater_parts(path)
     if log_format == SUBSURFACE_CSV:
         return _subsurface_csv_parts(dive) if dive is not None else LoggedPlanParts()
+    if log_format == SUUNTO_JSON:
+        return _suunto_parts(path, dive)
     suffix = path.suffix.lower()
     if suffix == ".uddf":
         return _uddf_parts(path)
@@ -534,7 +567,7 @@ def logged_plan_parts(path, dive: Optional[Dive] = None) -> LoggedPlanParts:
         return _subsurface_parts(path)
     if suffix == ".fit":
         return _fit_parts(path)
-    raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf or a Shearwater/Subsurface .xml/.csv export")
+    raise ValueError(f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf, a Shearwater/Subsurface .xml/.csv or a Suunto app .json export")
 
 
 def plan_from_log(path, dive: Dive, base: Optional[DiveProfilePlan] = None) -> DiveProfilePlan:

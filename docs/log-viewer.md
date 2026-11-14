@@ -4,8 +4,10 @@ Browse your dive logs the way UWMedia reads them - to check what an overlay
 will show before rendering.
 
 Supported logs: **Garmin** `.fit`, **Shearwater** `.uddf`, **Subsurface**
-`.xml`/`.ssrf`/`.csv`, **Shearwater Cloud** `.xml`/`.csv` exports (and logs
-from the [Dive Profile Builder](dive-profile-builder.md)).
+`.xml`/`.ssrf`/`.csv`, **Shearwater Cloud** `.xml`/`.csv` exports, **Suunto
+app** `.json` exports (EON Steel / EON Core, Nautic, D5, Ocean; one dive per
+file, exported from the dive in the Suunto app) and logs from the
+[Dive Profile Builder](dive-profile-builder.md).
 
 ## Using it
 

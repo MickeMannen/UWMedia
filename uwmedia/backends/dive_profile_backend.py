@@ -350,7 +350,7 @@ class DiveProfileBackend(QObject):
         log_format = detect_log_format(path)
         if log_format is None:
             raise ValueError(
-                f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf or a Shearwater/Subsurface .xml/.csv export"
+                f"Unknown log format '{path.suffix}' - use .uddf, .fit, .ssrf, a Shearwater/Subsurface .xml/.csv or a Suunto app .json export"
             )
         origin = read_log_origin(path)
         if origin.plan is not None:

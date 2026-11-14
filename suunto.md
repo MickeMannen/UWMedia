@@ -437,6 +437,9 @@ are on hand.
 
 ## 4. Order of work
 
+Progress: step 2 done 2026-11-14 (`parsers/suunto.py`, `tests/test_suunto.py`;
+built on the D5 / Ocean sample exports, EON and Nautic files still to check).
+
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in
    `test_data/` (local only, never in git; see § 5).

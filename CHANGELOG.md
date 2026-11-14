@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Dive logs: Suunto app dive exports (`.json`, from the EON Steel / EON
+  Core, Nautic, D5 and Ocean) open in the Log Viewer, Overlay Designer,
+  Overlay Generator and Dive Profile Builder. The computer's own NDL, time
+  to surface, ceiling, tank pressures (both tanks in sidemount), gas time
+  and alarms are shown as logged; other JSON files in a log folder are
+  ignored.
+
 ## [0.7.20] - 2026-11-12
 
 ### Added

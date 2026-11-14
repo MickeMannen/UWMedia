@@ -64,6 +64,7 @@ FORMAT_NAMES = {
     "subsurface_csv": "Subsurface CSV",
     "shearwater_xml": "Shearwater Cloud",
     "shearwater_csv": "Shearwater Cloud CSV",
+    "suunto_json": "Suunto app",
 }
 
 # (Waypoint attribute, label) of the channels listed under the profile as

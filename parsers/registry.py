@@ -9,6 +9,8 @@ by more than one program's export, so those are told apart by content:
 - .csv: Shearwater Cloud's "Dive Number,GF Minimum,..." header vs
   Subsurface's "sample time"/"sample depth" profile columns; any other
   CSV is not a dive log.
+- .json: only the Suunto app's export ({"DeviceLog": ...}); any other JSON
+  (settings, plans, overlay documents) is not a dive log.
 """
 from pathlib import Path
 from typing import List, Optional
@@ -18,6 +20,7 @@ from parsers.garmin import GarminParser
 from parsers.shearwater import ShearwaterParser
 from parsers.subsurface import SubsurfaceParser
 from parsers.subsurface_csv import SubsurfaceCSVParser, is_subsurface_profile_header
+from parsers.suunto import SuuntoJSONParser, is_suunto_json
 from parsers.uddf import UDDFParser
 
 UDDF = "uddf"
@@ -26,6 +29,7 @@ SUBSURFACE_XML = "subsurface_xml"
 SUBSURFACE_CSV = "subsurface_csv"
 SHEARWATER_XML = "shearwater_xml"
 SHEARWATER_CSV = "shearwater_csv"
+SUUNTO_JSON = "suunto_json"
 
 PARSERS = {
     UDDF: UDDFParser,
@@ -34,12 +38,13 @@ PARSERS = {
     SUBSURFACE_CSV: SubsurfaceCSVParser,
     SHEARWATER_XML: ShearwaterParser,
     SHEARWATER_CSV: ShearwaterParser,
+    SUUNTO_JSON: SuuntoJSONParser,
 }
 
-LOG_EXTENSIONS = {".uddf", ".fit", ".ssrf", ".xml", ".csv"}
+LOG_EXTENSIONS = {".uddf", ".fit", ".ssrf", ".xml", ".csv", ".json"}
 LOG_FILE_FILTER = (
-    "Dive logs (*.uddf *.fit *.ssrf *.xml *.csv);;UDDF (*.uddf);;Garmin FIT (*.fit);;"
-    "Subsurface (*.ssrf *.xml *.csv);;Shearwater Cloud (*.xml *.csv);;All files (*)"
+    "Dive logs (*.uddf *.fit *.ssrf *.xml *.csv *.json);;UDDF (*.uddf);;Garmin FIT (*.fit);;"
+    "Subsurface (*.ssrf *.xml *.csv);;Shearwater Cloud (*.xml *.csv);;Suunto app (*.json);;All files (*)"
 )
 
 
@@ -61,12 +66,14 @@ def detect_log_format(path) -> Optional[str]:
         return FIT
     if suffix == ".ssrf":
         return SUBSURFACE_XML
-    if suffix not in (".xml", ".csv"):
+    if suffix not in (".xml", ".csv", ".json"):
         return None
     try:
         head = _head(path)
     except OSError:
         return None
+    if suffix == ".json":
+        return SUUNTO_JSON if is_suunto_json(head) else None
     if suffix == ".xml":
         return SHEARWATER_XML if "<diveLog>" in head else SUBSURFACE_XML
     first_line = head.splitlines()[0] if head else ""
