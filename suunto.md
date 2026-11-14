@@ -460,6 +460,11 @@ and sweep entries. Renderer additions: `safety_stop_depth`, `uppercase`,
 overrides. Still to do: the EON Prominent and Graphical styles (arc pages),
 the gauge / timer pages, the Nautic's other switch-window views and
 sidemount, compass pages once a log carries a heading.
+Step 5, second round done 2026-11-14: EON Prominent (no deco, tank),
+Graphical and Gauge timer pages from the manual figures (EON Core p.30-31,
+Steel Black p.54); the layout sweep checks text against an arc's band, and
+an arc's bounds are its drawn band. Still to do: the Nautic's other
+switch-window views and sidemount, compass pages.
 
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in

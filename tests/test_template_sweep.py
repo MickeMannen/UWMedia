@@ -90,6 +90,7 @@ def sweep_page(layout, size, situation, wp, waypoints):
     state = resolve_state(manufacturer, model, wp, waypoints)
     notice = notice_for(layout, wp, waypoints)
     boxes = []  # (name, kind, bounds)
+    rings = []  # (name, element) - an arc gauge: text may sit inside it, not on its band
     for elem in elements:
         kind = element_kind(elem)
         if state in (elem.get("hide_in_states") or ()):
@@ -114,6 +115,8 @@ def sweep_page(layout, size, situation, wp, waypoints):
                 continue
         elif kind == "graph":
             continue
+        elif kind == "arc":
+            rings.append((name, elem))
         boxes.append((name, kind, element_native_bounds(elem, size[0], size[1], text=text, badge_lines=lines)))
     issues = []  # (key, detail): the key names the pair / element, the detail the numbers
     w, h = size
@@ -133,13 +136,44 @@ def sweep_page(layout, size, situation, wp, waypoints):
             # must be on the glass too, not only inside its bounding rectangle
             issues.append((f"{name} leaves the round screen", f"{situation}: ({x0:.0f},{y0:.0f})-({x1:.0f},{y1:.0f}) of the ellipse in ({sx0:.0f},{sy0:.0f})-({sx1:.0f},{sy1:.0f})"))
     textual = [(n, k, b) for n, k, b in boxes if k in ("text", "badge", "notice")]
-    graphics = [(n, k, b) for n, k, b in boxes if k not in ("text", "badge", "notice")]
+    graphics = [(n, k, b) for n, k, b in boxes if k not in ("text", "badge", "notice", "arc")]
     for i, (na, ka, ba) in enumerate(textual):
         for nb, kb, bb in textual[i + 1:] + graphics:  # text against text, and text against an icon / bar / chevrons
             over = _overlap(ba, bb)
             if over:
                 issues.append((f"{na} overlaps {nb}", f"{situation}: by {over[0]:.0f}x{over[1]:.0f} px"))
+        for nb, ring in rings:
+            if ka != "notice" and _on_ring(ba, ring, size):  # a pop-up covers whatever is under it, as on the device
+                issues.append((f"{na} overlaps {nb}", f"{situation}: on its band"))
     return issues
+
+
+def _on_ring(box, elem, size):
+    """Whether `box` touches an arc gauge's band (between its inner and outer
+    radius, within its sweep), sampled on a grid over the box; SLACK px of
+    tolerance on the radii."""
+    import math
+    w, h = size
+    x = float(elem.get("rel_x", 0.0)) * w
+    y = float(elem.get("rel_y", 0.0)) * h
+    rx, ry = float(elem.get("width", 120)) / 2.0, float(elem.get("height", 120)) / 2.0
+    cx, cy, thick = x + rx, y + ry, float(elem.get("thickness", 12))
+    start, sweep = float(elem.get("start_angle", 135)), float(elem.get("sweep", 270))
+    x0, y0, x1, y1 = box
+    for i in range(9):
+        for j in range(9):
+            px, py = x0 + (x1 - x0) * i / 8.0, y0 + (y1 - y0) * j / 8.0
+            # radius along this direction, as a fraction of the ellipse's
+            dx, dy = (px - cx) / rx, (py - cy) / ry
+            dist = math.hypot(dx, dy)
+            r_px = dist * min(rx, ry)
+            inner = min(rx, ry) - thick
+            if not (inner + SLACK < r_px < min(rx, ry) - SLACK):
+                continue
+            angle = (math.degrees(math.atan2(dy, dx)) - start) % 360.0
+            if angle <= sweep:
+                return True
+    return False
 
 
 def _inside_ellipse(box, screen):

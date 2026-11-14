@@ -7,9 +7,25 @@
       "name": "Classic"
     },
     {
+      "id": "prominent",
+      "name": "Prominent"
+    },
+    {
+      "id": "prominent_tank",
+      "name": "Prominent: tank"
+    },
+    {
+      "id": "graphical",
+      "name": "Graphical"
+    },
+    {
       "id": "ccr",
       "name": "Classic (CCR)",
       "dive": "ccr"
+    },
+    {
+      "id": "timer",
+      "name": "Gauge: timer"
     }
   ],
   "notes": {
@@ -19,18 +35,25 @@
       "Ascent bar on the left, one segment per 2 m/min, green / yellow / red (EON Core manual p.15)",
       "Safety stop counted between 2.4 and 6 m on dives over 10 m, the counter in m'ss, yellow (p.25, p.40)",
       "Deco: ceiling, m and asc. time in orange (p.25-27); CC, SP and pO2 after a bailout, OC (p.39-40)",
-      "Pop-ups: a dark box with a coloured border (p.13-14)"
+      "Pop-ups: a dark box with a coloured border (p.13-14)",
+      "Prominent style (EON Core p.30-31 figures): depth and dive time down the left, the arc on the right with its label and value inside (no deco green, tank cyan), max, m below it; 0 / 50 / 100 on the no-deco scale",
+      "Graphical style (EON Steel Black p.54 figure): stop and depth across the top, the segmented arc low in the middle with no deco inside, the gas and dive time on the right",
+      "Timer view (EON Core p.31 figure, Gauge mode): a full ring with the timer inside",
+      "The top strip on the arc pages: '3.0 SAFETY STOP', the ceiling in deco and DECO at the right (Steel Black p.54, EON Core p.27 figures)"
     ],
     "assumed": [
       "Positions on this skin: measured on the Steel Black photo and mapped onto the Steel Black photo itself's display area",
       "Font: Roboto Condensed for the device's condensed face (narrower on the device)",
       "Row 2 left in normal diving: max, m (the manual shows max / avg in the switch window, p.31)",
-      "Right-edge scale: the no-deco time over 0-100 min, orange time to surface in deco (the manual does not describe it)"
+      "Right-edge scale: the no-deco time over 0-100 min, orange time to surface in deco (the manual does not describe it)",
+      "Arc pages: positions measured on the manuals' 208 x 158 px figures",
+      "The arcs in deco and at the safety stop: an orange ascent-time arc (0-100 min) and a yellow arc drawn full; the figures show only the no-deco and tank arcs",
+      "Tank arc full scale 250 bar; the timer is the dive time (a log records no timer start)"
     ],
     "not_shown": [
       "Battery icon and remaining dive hours (no log holds them)",
       "Deepstops, the red mandatory safety stop, Locked / Ceiling broken after 3 minutes above the ceiling",
-      "Prominent and Graphical styles, the compass, timer and tank views (to come)"
+      "The compass view (no log carries a heading) and the timer's second marker"
     ],
     "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
   }

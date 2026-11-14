@@ -111,7 +111,9 @@ and **Snap** (to the grid and to other elements' edges) help alignment.
   split it into parts. The fill takes **Color**, or the brand's colour for
   that field where the rules have one; **Track** colours the empty part. Its
   label and value are ordinary text elements placed inside it; give two arcs
-  `hide_in_states` to swap an NDL arc for an ascent-time arc in deco.
+  `hide_in_states` to swap an NDL arc for an ascent-time arc in deco (the
+  Suunto EON Prominent and Graphical pages do). Its hit box is the drawn
+  band, so an arc open at the bottom does not reach below it.
 - **Segment bar** (Add element → Segment bar): a vertical stack of segments
   lit from the bottom by a field over **Range** - a Suunto ascent bar is 5
   segments over 0-10 m/min, one per 2 m/min. **Colour by** *Value* lights

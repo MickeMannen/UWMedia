@@ -1,0 +1,522 @@
+{
+  "manufacturer": "Suunto",
+  "model": "EON Steel Black",
+  "design_width": 1920,
+  "design_height": 1080,
+  "rules": {
+    "badge_states": {
+      "safety_stop": {
+        "label": "",
+        "color": "#FFFF00",
+        "value_color": "#FFFF00",
+        "show_depth": false,
+        "timer_format": "m'ss"
+      },
+      "_source": "EON Core p.40-41 figures: the stop counter in yellow inside the arc, under its label"
+    }
+  },
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.1798,
+      "y0": 0.1908,
+      "x1": 0.656,
+      "y1": 0.8092,
+      "shape": "rect"
+    },
+    "linked_elements": [
+      {
+        "id": "time_of_day",
+        "field": "time_of_day",
+        "rel_x": 0.18155,
+        "rel_y": 0.29418,
+        "color": "#A5BB45",
+        "font_size": 17,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "valign": "bottom"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "segment_bar",
+        "rel_x": 0.18039,
+        "rel_y": 0.31124,
+        "width": 27.0,
+        "height": 191.0,
+        "segments": 5,
+        "segment_gap": 2.0,
+        "range_min": 2,
+        "range_max": 12,
+        "color_mode": "position",
+        "track_color": "#1C1C1C",
+        "label": "Ascent rate (2 m/min a segment)"
+      },
+      {
+        "id": "temp",
+        "field": "temp",
+        "rel_x": 0.18155,
+        "rel_y": 0.80321,
+        "color": "#FFFFFF",
+        "font_size": 23,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "value_format": "integer"
+      },
+      {
+        "id": "temp_deg",
+        "field": "custom:°",
+        "rel_x": 0.20882,
+        "rel_y": 0.80321,
+        "color": "#FFFFFF",
+        "font_size": 23,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "label": "° after the temperature"
+      },
+      {
+        "id": "top_stop_depth",
+        "field": "safety_stop_depth",
+        "rel_x": 0.25537,
+        "rel_y": 0.23382,
+        "color": "#C8C8C8",
+        "font_size": 20,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "top_safety",
+        "field": "custom:SAFETY STOP",
+        "rel_x": 0.29429,
+        "rel_y": 0.18855,
+        "color": "#8A848C",
+        "font_size": 20,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "top_ceiling",
+        "field": "ceiling",
+        "rel_x": 0.25537,
+        "rel_y": 0.23382,
+        "color": "#FFFFFF",
+        "font_size": 20,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "value_format": "decimal1",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "top_ceiling_label",
+        "field": "custom:CEILING",
+        "rel_x": 0.32176,
+        "rel_y": 0.18855,
+        "color": "#8A848C",
+        "font_size": 20,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "top_deco",
+        "field": "custom:DECO",
+        "rel_x": 0.64916,
+        "rel_y": 0.23382,
+        "color": "#ED7C2A",
+        "font_size": 20,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "align": "right",
+        "valign": "bottom",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "label_depth",
+        "field": "custom:depth,",
+        "rel_x": 0.25308,
+        "rel_y": 0.26684,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "label_depth_unit",
+        "field": "unit:depth",
+        "rel_x": 0.3272,
+        "rel_y": 0.26684,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.25537,
+        "rel_y": 0.48826,
+        "color": "#FFFFFF",
+        "font_size": 93,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.5,
+        "small_suffix_align": "baseline"
+      },
+      {
+        "id": "label_dive_time",
+        "field": "custom:dive time",
+        "rel_x": 0.25308,
+        "rel_y": 0.56433,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.25766,
+        "rel_y": 0.78184,
+        "color": "#B1CB45",
+        "font_size": 91,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "value_format": "minutes_prime"
+      },
+      {
+        "id": "label_max",
+        "field": "custom:max,",
+        "rel_x": 0.49577,
+        "rel_y": 0.63258,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_max_unit",
+        "field": "unit:depth",
+        "rel_x": 0.55413,
+        "rel_y": 0.63258,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.49806,
+        "rel_y": 0.78575,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.5,
+        "small_suffix_align": "baseline",
+        "hide_when_notice": true
+      },
+      {
+        "id": "ndl_arc",
+        "field": "ndl",
+        "type": "arc",
+        "rel_x": 0.41984,
+        "rel_y": 0.24648,
+        "width": 192.1,
+        "height": 192.1,
+        "thickness": 11.8,
+        "start_angle": 125,
+        "sweep": 290,
+        "range_min": 0,
+        "range_max": 6000,
+        "color": "#7ABC42",
+        "bands": [
+          {
+            "color": "#7ABC42"
+          }
+        ],
+        "track_color": "#39592A",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ],
+        "label": "No-deco arc, 0-100 min"
+      },
+      {
+        "id": "tts_arc",
+        "field": "tts",
+        "type": "arc",
+        "rel_x": 0.41984,
+        "rel_y": 0.24648,
+        "width": 192.1,
+        "height": 192.1,
+        "thickness": 11.8,
+        "start_angle": 125,
+        "sweep": 290,
+        "range_min": 0,
+        "range_max": 6000,
+        "color": "#ED7C2A",
+        "bands": [
+          {
+            "color": "#ED7C2A"
+          }
+        ],
+        "track_color": "#4A2A10",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ],
+        "label": "Ascent-time arc in deco, 0-100 min (assumed scale)"
+      },
+      {
+        "id": "stop_arc",
+        "field": "safety_stop_depth",
+        "type": "arc",
+        "rel_x": 0.41984,
+        "rel_y": 0.24648,
+        "width": 192.1,
+        "height": 192.1,
+        "thickness": 11.8,
+        "start_angle": 125,
+        "sweep": 290,
+        "range_min": 0,
+        "range_max": 1,
+        "color": "#FFFF00",
+        "bands": [
+          {
+            "color": "#FFFF00"
+          }
+        ],
+        "track_color": "#4A4A10",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ],
+        "label": "Safety-stop arc (drawn full: what it measures is not in the manual)"
+      },
+      {
+        "id": "scale_0",
+        "field": "custom:0",
+        "rel_x": 0.4889,
+        "rel_y": 0.56654,
+        "color": "#5A6A4A",
+        "font_size": 14,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "scale_50",
+        "field": "custom:50",
+        "rel_x": 0.53125,
+        "rel_y": 0.31602,
+        "color": "#5A6A4A",
+        "font_size": 14,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "scale_100",
+        "field": "custom:100",
+        "rel_x": 0.57361,
+        "rel_y": 0.56654,
+        "color": "#5A6A4A",
+        "font_size": 14,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:no deco",
+        "rel_x": 0.53125,
+        "rel_y": 0.35687,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.53354,
+        "rel_y": 0.5,
+        "color": "#B1CB45",
+        "font_size": 45,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "minutes_prime",
+        "hide_in_states": [
+          "safety_stop",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_tts",
+        "field": "custom:asc. time",
+        "rel_x": 0.53125,
+        "rel_y": 0.35687,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "tts",
+        "field": "tts",
+        "rel_x": 0.53354,
+        "rel_y": 0.5,
+        "color": "#ED7C2A",
+        "font_size": 45,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "minutes_prime",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_stop_timer",
+        "field": "custom:stop",
+        "rel_x": 0.53125,
+        "rel_y": 0.35285,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "stop_timer",
+        "field": "state_badge",
+        "rel_x": 0.53354,
+        "rel_y": 0.41739,
+        "color": "#FFFF00",
+        "font_size": 45,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "align": "center",
+        "type": "badge",
+        "value_font_size": 45,
+        "timer_format": "m'ss",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ],
+        "hide_when_notice": true
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.40877,
+        "rel_y": 0.43173,
+        "width": 200,
+        "height": 60,
+        "font_size": 22,
+        "caption_font_size": 10,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "label": "The device's pop-up (yellow-bordered box)"
+      }
+    ]
+  }
+}

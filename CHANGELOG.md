@@ -32,6 +32,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   dive time, no deco or ascent time, gas and tank, its ascent bar and
   no-deco scale; the Nautic's cells with the amber safety-stop pill and the
   red warning panel. The Dive Profile Builder can pose as all three.
+- Overlays: the EON Steel Black and EON Core also have their **Prominent**
+  (no-deco arc, and tank arc), **Graphical** and Gauge **timer** pages, from
+  the manuals' figures; the arc turns orange with the ascent time in deco
+  and yellow with the stop counter at the safety stop.
 
 ### Fixed
 - Overlay Generator: a template with a unit label that follows the unit

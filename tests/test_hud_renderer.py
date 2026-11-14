@@ -1524,7 +1524,11 @@ def test_gauge_bounds_and_defaults():
     from utils.hud_designer import element_defaults, element_kind, element_native_bounds, parse_layout_elements
     arc = element_defaults("arc", "ndl")
     assert element_kind(arc) == "arc" and arc["field"] == "ndl" and arc["range_max"] == 6000
-    assert element_native_bounds(dict(arc, rel_x=0.5, rel_y=0.5), 200, 200) == (100.0, 100.0, 220.0, 220.0)
+    # the drawn band only: a 270-degree arc open at the bottom ends ~42 px short of the full circle's foot
+    x0, y0, x1, y1 = element_native_bounds(dict(arc, rel_x=0.5, rel_y=0.5), 200, 200)
+    assert (round(x0), round(y0), round(x1)) == (100, 100, 220) and 200 < y1 < 205
+    full = element_native_bounds(dict(arc, rel_x=0.5, rel_y=0.5, start_angle=0, sweep=360), 200, 200)
+    assert tuple(round(v) for v in full) == (100, 100, 220, 220)
     bar = element_defaults("segment_bar", "ascent_rate")
     assert element_kind(bar) == "segment_bar" and bar["field"] == "ascent_rate" and bar["segments"] == 5
     assert element_native_bounds(dict(bar, rel_x=0.0, rel_y=0.0), 200, 200) == (0.0, 0.0, 12.0, 60.0)

@@ -1,0 +1,241 @@
+{
+  "manufacturer": "Suunto",
+  "model": "EON Steel Black",
+  "design_width": 1920,
+  "design_height": 1080,
+  "rules": {
+    "ceiling_broken": null,
+    "_gauge": "Gauge mode computes no deco (EON Core p.31-32): no ceiling, no deco colours"
+  },
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.1798,
+      "y0": 0.1908,
+      "x1": 0.656,
+      "y1": 0.8092,
+      "shape": "rect"
+    },
+    "linked_elements": [
+      {
+        "id": "time_of_day",
+        "field": "time_of_day",
+        "rel_x": 0.18155,
+        "rel_y": 0.29418,
+        "color": "#A5BB45",
+        "font_size": 17,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "valign": "bottom"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "segment_bar",
+        "rel_x": 0.18039,
+        "rel_y": 0.31124,
+        "width": 27.0,
+        "height": 191.0,
+        "segments": 5,
+        "segment_gap": 2.0,
+        "range_min": 2,
+        "range_max": 12,
+        "color_mode": "position",
+        "track_color": "#1C1C1C",
+        "label": "Ascent rate (2 m/min a segment)"
+      },
+      {
+        "id": "temp",
+        "field": "temp",
+        "rel_x": 0.18155,
+        "rel_y": 0.80321,
+        "color": "#FFFFFF",
+        "font_size": 23,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "value_format": "integer"
+      },
+      {
+        "id": "temp_deg",
+        "field": "custom:°",
+        "rel_x": 0.20882,
+        "rel_y": 0.80321,
+        "color": "#FFFFFF",
+        "font_size": 23,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "label": "° after the temperature"
+      },
+      {
+        "id": "label_depth",
+        "field": "custom:depth,",
+        "rel_x": 0.25308,
+        "rel_y": 0.26684,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "label_depth_unit",
+        "field": "unit:depth",
+        "rel_x": 0.3272,
+        "rel_y": 0.26684,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.25537,
+        "rel_y": 0.48826,
+        "color": "#FFFFFF",
+        "font_size": 93,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.5,
+        "small_suffix_align": "baseline"
+      },
+      {
+        "id": "label_dive_time",
+        "field": "custom:dive time",
+        "rel_x": 0.25308,
+        "rel_y": 0.56433,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.25766,
+        "rel_y": 0.78184,
+        "color": "#B1CB45",
+        "font_size": 91,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "value_format": "minutes_prime"
+      },
+      {
+        "id": "label_max",
+        "field": "custom:max,",
+        "rel_x": 0.49577,
+        "rel_y": 0.63258,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_max_unit",
+        "field": "unit:depth",
+        "rel_x": 0.55413,
+        "rel_y": 0.63258,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "hide_when_notice": true
+      },
+      {
+        "id": "max_depth",
+        "field": "max_depth",
+        "rel_x": 0.49806,
+        "rel_y": 0.78575,
+        "color": "#FFFFFF",
+        "font_size": 42,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.5,
+        "small_suffix_align": "baseline",
+        "hide_when_notice": true
+      },
+      {
+        "id": "timer_ring",
+        "field": "dive_time",
+        "type": "arc",
+        "rel_x": 0.41984,
+        "rel_y": 0.24648,
+        "width": 192.1,
+        "height": 192.1,
+        "thickness": 11.8,
+        "start_angle": -90,
+        "sweep": 360,
+        "range_min": 0,
+        "range_max": 1,
+        "color": "#385629",
+        "bands": [
+          {
+            "color": "#385629"
+          }
+        ],
+        "track_color": "#385629",
+        "label": "Timer ring (one colour: the timer's own second marker is not drawn)"
+      },
+      {
+        "id": "label_timer",
+        "field": "custom:timer",
+        "rel_x": 0.53125,
+        "rel_y": 0.35687,
+        "color": "#8A848C",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "id": "timer",
+        "field": "dive_time",
+        "rel_x": 0.53354,
+        "rel_y": 0.5,
+        "color": "#83B239",
+        "font_size": 45,
+        "font_family": "Roboto Condensed",
+        "scale": 1.0,
+        "font_weight": "bold",
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "m'ss",
+        "label": "Timer (the dive time: a log records no timer start)",
+        "hide_when_notice": true
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.40877,
+        "rel_y": 0.43173,
+        "width": 200,
+        "height": 60,
+        "font_size": 22,
+        "caption_font_size": 10,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "label": "The device's pop-up (yellow-bordered box)"
+      }
+    ]
+  }
+}

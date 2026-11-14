@@ -290,8 +290,19 @@ def element_native_bounds(
         w, h, _, _ = ascent_chevron_geometry(elem)
         return x, y, x + w, y + h
     if kind == "arc":
-        w, h, _ = arc_geometry(elem)
-        return x, y, x + w, y + h
+        # the drawn band only: an open-bottomed arc's empty part is no part of it
+        import math
+        w, h, thick = arc_geometry(elem)
+        start = float(elem.get("start_angle", ARC_DEFAULTS["start_angle"]))
+        sweep = float(elem.get("sweep", ARC_DEFAULTS["sweep"]))
+        cx, cy = x + w / 2.0, y + h / 2.0
+        points = []
+        for i in range(73):
+            a = math.radians(start + sweep * i / 72.0)
+            for rx, ry in ((w / 2.0, h / 2.0), (max(0.0, w / 2.0 - thick), max(0.0, h / 2.0 - thick))):
+                points.append((cx + rx * math.cos(a), cy + ry * math.sin(a)))
+        xs, ys = [p[0] for p in points], [p[1] for p in points]
+        return min(xs), min(ys), max(xs), max(ys)
     if kind == "segment_bar":
         w, h, _, _ = segment_bar_geometry(elem)
         return x, y, x + w, y + h
