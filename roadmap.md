@@ -2,7 +2,7 @@
 
 The one list of what is still to do. Finished work is in `CHANGELOG.md`;
 the reasoning behind a bigger item lives in its design note where one
-exists (`redesign.md`, `local_ci.md`, `hud_rules_sources.md`). Items are
+exists (`redesign.md`, `local_ci.md`, `hud_rules_sources.md`, `suunto.md`). Items are
 grouped by area and ordered by value within each group; "needs" names the
 thing that blocks an item.
 
@@ -34,7 +34,7 @@ Then, in order (redesign.md §7):
 
 - [x] **Sync by eye** (2026-10-17): a clock offset on the Color page, set on the preview by typing the dive time the computer shows or by nudging; the Overlay Generator leaves the alignment to the editor. A camera-profile version that saved the offset per camera from the Overlay Designer was tried and dropped the same day as unusable.
 - [x] **Transparent overlay export** (2026-10-17): ProRes 4444 by default, PNG sequence, or the video on black. Left for later: a VP9 with alpha for editors without ProRes, and exporting only a chosen range of a log-only render.
-- [ ] **Suunto FIT logs.** The FIT parser maps Garmin products; a Suunto FIT file (Nautic, Ocean, D5) may carry the same record messages with other ids and no tank pods. Needs: one real Suunto FIT file.
+- [ ] **Suunto FIT logs** (section 3c). The FIT parser maps Garmin products; a Suunto FIT file (Nautic, Ocean, D5) may carry the same record messages with other ids and no tank pods. Needs: one real Suunto FIT file.
 - [ ] Vertical video: a 9:16 frame scales overlays by width today, so they come out small on phone footage. Needs a portrait design size and anchors against the short side.
 - [ ] Brand-free overlay families (lower third, side rail, corner stack, minimal, vertical stack) as bundled generic templates; also the natural templates for freediving and for computers without a skin.
 - [ ] A soft text shadow as an alternative to the outline.
@@ -58,10 +58,11 @@ Pages and fields:
 - [x] Teric and Mk3i Standard layouts (3b).
 - [x] Garmin X50i dynamic-depth page (3b; geometry checked against an in-water screenshot 2026-11-10, `test_data/dive_computers/screen_shots/1809.bmp`; its axis labels, current-depth tag and hatched safety-stop block are not drawn).
 - [ ] Garmin three-tank layout (the device's transceiver screen). Needs: a log with three live tanks.
-- [ ] Freediving. (a) A session parser: a FIT apnea activity holds every dive of the session with a summary per lap; split it into dives with dive number, surface interval, last dive time and depth, vertical speed, and match media shot in a surface interval to the session. (b) A `ring` element: a circular track with an arc from 12 o'clock for elapsed time over the dive, depth over max depth, or depth over a target, with a value in the centre; also the arc gauge later computers need. (c) Depth interpolated per frame between samples so the number counts smoothly, and an optional zero-based start and end when the log begins underwater. (d) Templates: a generic Freedive family (big depth with unit, time ring centred), then Teric / Tern Freedive mode and the Mk3i apnea screen from their manuals, whole metres by default. Needs: a real freediving log.
+- [ ] Freediving. (a) A session parser: a FIT apnea activity holds every dive of the session with a summary per lap; split it into dives with dive number, surface interval, last dive time and depth, vertical speed, and match media shot in a surface interval to the session. (b) A ring for elapsed time over the dive, depth over max depth, or depth over a target, with a value in the centre: the `arc` element (0.8.0) with `start_angle` -90 and `sweep` 360 draws it; a ring field for "depth over a target" is still to add. (c) Depth interpolated per frame between samples so the number counts smoothly, and an optional zero-based start and end when the log begins underwater. (d) Templates: a generic Freedive family (big depth with unit, time ring centred), then Teric / Tern Freedive mode and the Mk3i apnea screen from their manuals, whole metres by default. Needs: a real freediving log.
 - [x] CCR: what `gasmix` means for a CCR waypoint (the breathed gas), per-cell PO2 fields - see 3b; a colourable divider line (red on bailout) is open there.
-- [ ] Compass heading as a field (no source format carries one yet).
-- [ ] New computers (Suunto D5 / EON Core, Mares Quad family, Scubapro G2 / G3, Cressi Goa / Donatello, Aqualung i330R / i770R), deferred 2026-10-16. Each needs a real log, the manual and a clean screen reference; segment-display and arc elements come with the first of them.
+- [ ] Compass heading as a field (no source format carries one yet; a Suunto DM5 XML or a Suunto app export of a compass dive may, section 3c).
+- [x] Suunto EON Steel Black, EON Core and Nautic (0.8.0, 2026-11-14; section 3c), with the arc gauge and segment bar elements.
+- [ ] New computers (Suunto D5, Mares Quad family, Scubapro G2 / G3, Cressi Goa / Donatello, Aqualung i330R / i770R), deferred 2026-10-16. Each needs a real log, the manual and a clean screen reference; a segment-display element comes with the first that needs it.
 
 Verification gaps (built, not checked against real data):
 - [ ] Teric, Tern and Peregrine: a real export each (field set, PO2 / NDL population, no tank pressure on the Teric).
@@ -110,6 +111,33 @@ projects' sample dives. Manual pages: `hud_rules_sources.md`.
 - [x] Perdix 3 sidemount on the Main Screen and Standard pages (2026-10-21): a variant can carry its own skin (`"skin"` in the overlay); theirs has no T1 slot, MAX moves there and the AI row takes the info row.
 - [ ] Peregrine TX extras: three or four transmitters on one row (T1-T4, p.41), RTR, Gas Density, the No Comms / Low Bat transmitter warnings (the readers drop the transmitter status), the am / pm clock. Needs: more than two tanks in the overlay; a real Peregrine TX export.
 - [x] Fix `hud_rules_sources.md`: the Perdix 3 pages cited are printed pages (PDF page = printed + 2) - noted in the manuals table.
+
+## 3c. Suunto (`suunto.md`, started 2026-11-14)
+
+Done in 0.8.0: the Suunto app JSON export read everywhere a log is; the
+Suunto rules (colours, safety stop, deco window, pop-ups); EON Steel Black /
+EON Core Classic, Classic (CCR), Prominent, Prominent: tank, Graphical and
+Gauge timer pages; Nautic Main Screen (single tank, sidemount) and NDL / TTS,
+ppO2 / MOD. Positions come from product photos and the manuals' small
+figures, so most are marked assumed in the manifests.
+
+Logs:
+- [ ] Check the JSON parser against a real EON Core, EON Steel and Nautic export: device names, gas numbering, the swapped header temperatures, whether a compass dive logs a heading. Built on D5 / Ocean sample exports only. Needs: one real export per family.
+- [ ] The FIT file the Suunto app writes beside each JSON: the gas mixes and gradient factors the Nautic's and Ocean's JSON lack (see "Suunto FIT logs", section 2). Needs: a real pair.
+- [ ] SML (DM5 export) and DM4 / DM5 XML: one shared reader with the JSON; the XML carries a heading. Owner decision first: worth it for logs from before 2020 (DM5 is discontinued and the Nautic never had it)? Needs: a real file of each.
+- [ ] GF99 from the Nautic's own `RtGradientFactors`: its values (up to 12 575 on a deco ascent) are not a GF99 in percent; the recompute stands in until they are understood.
+
+Rules not modelled yet:
+- [ ] The mandatory safety stop after an ascent-rate violation (red, longer; EON Core manual p.40) and deepstops (half the max depth on dives over 20 m, p.41).
+- [ ] Three minutes above the ceiling: the EON's "Locked" (Fused RGBM 2) or red Ceiling broken bar (Bühlmann), the Nautic's Algorithm deviation panel. Shares the `locked` state with the Garmin lock-out (section 3).
+- [ ] The Nautic's highlighted red ascent bar after five seconds over 10 m/min.
+
+Pages:
+- [ ] In-water screenshots or sharp photos of each computer to replace the assumed positions (the EON Core skin is a 447 px photo; the arc pages come from 208 px manual figures).
+- [ ] Compass views (EON Prominent compass, Nautic large compass). Needs: a heading in a log.
+- [ ] Nautic: the large switch-window views (tissues bar graph, stopwatch), GF99 / SurfGF and Δ+5 / @5 fields, STOP DONE, the stop depth ("3.0m") before the stop counts in place of the pill, the hourglass in the ascent column.
+- [ ] EON: the timer ring's second marker, battery hours (no log holds them).
+- [ ] Nautic S: not in the manual; treat as a Nautic once one is seen.
 
 ## 4. App and UI
 
