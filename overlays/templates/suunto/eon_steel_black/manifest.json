@@ -1,0 +1,37 @@
+{
+  "manufacturer": "Suunto",
+  "model": "EON Steel Black",
+  "pages": [
+    {
+      "id": "classic",
+      "name": "Classic"
+    },
+    {
+      "id": "ccr",
+      "name": "Classic (CCR)",
+      "dive": "ccr"
+    }
+  ],
+  "notes": {
+    "verified": [
+      "Classic grid (EON Steel Black product photo, test_data/dive_computers/suunto): depth | dive time, the stop / ceiling depth | no deco or asc. time, the gas or CC | tank or setpoint, the grey dividers, grey lowercase labels with units, minutes with a prime",
+      "Colours sampled from the photos: dive time and no deco green, asc. time orange, gas / tank / CC / setpoint cyan, the clock yellow-green",
+      "Ascent bar on the left, one segment per 2 m/min, green / yellow / red (EON Core manual p.15)",
+      "Safety stop counted between 2.4 and 6 m on dives over 10 m, the counter in m'ss, yellow (p.25, p.40)",
+      "Deco: ceiling, m and asc. time in orange (p.25-27); CC, SP and pO2 after a bailout, OC (p.39-40)",
+      "Pop-ups: a dark box with a coloured border (p.13-14)"
+    ],
+    "assumed": [
+      "Positions on this skin: measured on the Steel Black photo and mapped onto the Steel Black photo itself's display area",
+      "Font: Roboto Condensed for the device's condensed face (narrower on the device)",
+      "Row 2 left in normal diving: max, m (the manual shows max / avg in the switch window, p.31)",
+      "Right-edge scale: the no-deco time over 0-100 min, orange time to surface in deco (the manual does not describe it)"
+    ],
+    "not_shown": [
+      "Battery icon and remaining dive hours (no log holds them)",
+      "Deepstops, the red mandatory safety stop, Locked / Ceiling broken after 3 minutes above the ceiling",
+      "Prominent and Graphical styles, the compass, timer and tank views (to come)"
+    ],
+    "_about": "What this template reproduces of the real screen and what it does not; manual pages in hud_rules_sources.md"
+  }
+}

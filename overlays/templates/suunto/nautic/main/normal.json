@@ -1,0 +1,419 @@
+{
+  "manufacturer": "Suunto",
+  "model": "Nautic",
+  "design_width": 1920,
+  "design_height": 1080,
+  "rules": {
+    "badge_states": {
+      "safety_stop": {
+        "label": "",
+        "color": "#FFB000",
+        "value_color": "#000000",
+        "show_depth": false,
+        "timer_format": "m'ss"
+      },
+      "_source": "Nautic p.22, p.47 figures: the safety stop counter in a filled amber pill beside the stop depth"
+    }
+  },
+  "hud_skin": {
+    "type": "image",
+    "anchor": "BOTTOM_LEFT",
+    "ref_offset_x": 16.0,
+    "ref_offset_y": -16.0,
+    "opacity": 1.0,
+    "path": "normal.png",
+    "scale": 0.5,
+    "screen": {
+      "x0": 0.0817,
+      "y0": 0.1141,
+      "x1": 0.8551,
+      "y1": 0.8783,
+      "shape": "rect"
+    },
+    "linked_elements": [
+      {
+        "id": "depth",
+        "field": "depth",
+        "rel_x": 0.15795,
+        "rel_y": 0.41635,
+        "color": "#FFFFFF",
+        "font_size": 103,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.55,
+        "small_suffix_align": "baseline",
+        "unit_suffix": true,
+        "unit_scale": 0.3,
+        "unit_color": "#C8C8C8"
+      },
+      {
+        "id": "ascent_rate",
+        "field": "ascent_rate",
+        "type": "segment_bar",
+        "rel_x": 0.48802,
+        "rel_y": 0.20532,
+        "width": 30,
+        "height": 102,
+        "segments": 5,
+        "segment_gap": 10,
+        "range_min": 0,
+        "range_max": 10,
+        "track_color": "#3A3A3A",
+        "label": "Ascent rate (2 m/min a step)"
+      },
+      {
+        "id": "dive_time",
+        "field": "dive_time",
+        "rel_x": 0.22985,
+        "rel_y": 0.65779,
+        "color": "#FFFFFF",
+        "font_size": 68,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "m'ss"
+      },
+      {
+        "id": "label_ndl",
+        "field": "custom:NO DECO",
+        "rel_x": 0.43682,
+        "rel_y": 0.47338,
+        "color": "#62EB98",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "ndl",
+        "field": "ndl",
+        "rel_x": 0.43682,
+        "rel_y": 0.6616,
+        "color": "#FFFFFF",
+        "font_size": 80,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "minutes_prime",
+        "hide_in_states": [
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "label_deco",
+        "field": "custom:DECO",
+        "rel_x": 0.43682,
+        "rel_y": 0.47338,
+        "color": "#ED7C2A",
+        "font_size": 24,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "tts",
+        "field": "tts",
+        "rel_x": 0.43682,
+        "rel_y": 0.6616,
+        "color": "#FFFFFF",
+        "font_size": 80,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "value_format": "minutes_prime",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "ndl_bar",
+        "field": "ndl",
+        "type": "segment_bar",
+        "rel_x": 0.50327,
+        "rel_y": 0.45627,
+        "width": 24,
+        "height": 112,
+        "segments": 1,
+        "segment_gap": 0,
+        "range_min": 0,
+        "range_max": 6000,
+        "step": false,
+        "color": "#46F083",
+        "bands": [
+          {
+            "color": "#46F083"
+          }
+        ],
+        "track_color": "#3A3A3A",
+        "hide_in_states": [
+          "deco",
+          "clear"
+        ],
+        "label": "No-deco bar (its meaning is not in the manual: NDL over 0-100 min assumed)"
+      },
+      {
+        "id": "deco_bar",
+        "field": "tts",
+        "type": "segment_bar",
+        "rel_x": 0.50327,
+        "rel_y": 0.45627,
+        "width": 24,
+        "height": 112,
+        "segments": 1,
+        "segment_gap": 0,
+        "range_min": 0,
+        "range_max": 6000,
+        "step": false,
+        "color": "#ED7C2A",
+        "bands": [
+          {
+            "color": "#ED7C2A"
+          }
+        ],
+        "track_color": "#3A3A3A",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ],
+        "label": "Deco bar (time to surface, assumed)"
+      },
+      {
+        "id": "label_gas",
+        "field": "custom:ACTIVE GAS",
+        "rel_x": 0.68736,
+        "rel_y": 0.19202,
+        "color": "#3FEBDF",
+        "font_size": 26,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "hide_when_notice": true
+      },
+      {
+        "id": "gasmix",
+        "field": "gasmix",
+        "rel_x": 0.68736,
+        "rel_y": 0.36692,
+        "color": "#FFFFFF",
+        "font_size": 50,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "center",
+        "valign": "bottom",
+        "uppercase": true,
+        "hide_when_notice": true
+      },
+      {
+        "id": "label_tank",
+        "field": "custom:TANK PRESSURE",
+        "rel_x": 0.56645,
+        "rel_y": 0.46958,
+        "color": "#3FEBDF",
+        "font_size": 22,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0
+      },
+      {
+        "id": "tank",
+        "field": "primary_tank_pressure",
+        "rel_x": 0.56318,
+        "rel_y": 0.6711,
+        "color": "#FFFFFF",
+        "font_size": 87,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "valign": "bottom",
+        "value_format": "integer",
+        "unit_suffix": true,
+        "unit_kind": "pressure_lower",
+        "unit_scale": 0.3,
+        "unit_color": "#C8C8C8",
+        "max_width": 170
+      },
+      {
+        "id": "tank_gauge",
+        "field": "primary_tank_pressure",
+        "type": "segment_bar",
+        "rel_x": 0.79303,
+        "rel_y": 0.45627,
+        "width": 28,
+        "height": 113,
+        "segments": 1,
+        "segment_gap": 0,
+        "range_min": 0,
+        "range_max": 230,
+        "step": false,
+        "color": "#48C2F5",
+        "track_color": "#3A3A3A",
+        "label": "Tank gauge (full scale 230 bar assumed)"
+      },
+      {
+        "id": "stop_depth",
+        "field": "safety_stop_depth",
+        "rel_x": 0.14161,
+        "rel_y": 0.8289,
+        "color": "#FFFFFF",
+        "font_size": 70,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "valign": "bottom",
+        "small_suffix": "decimals",
+        "small_suffix_scale": 0.55,
+        "small_suffix_align": "baseline",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "stop_unit",
+        "field": "unit:depth",
+        "rel_x": 0.22331,
+        "rel_y": 0.8289,
+        "color": "#C8C8C8",
+        "font_size": 22,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "valign": "bottom",
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "stop_timer",
+        "field": "state_badge",
+        "type": "badge",
+        "style": "box",
+        "rel_x": 0.26144,
+        "rel_y": 0.72624,
+        "width": 110,
+        "height": 52,
+        "font_size": 20,
+        "value_font_size": 40,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "timer_format": "m'ss",
+        "fill_colors": {
+          "safety_stop": "#FFB000"
+        },
+        "text_color": "#000000",
+        "corner_radius": 14,
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "label_safety",
+        "field": "custom:SAFETY STOP",
+        "rel_x": 0.39434,
+        "rel_y": 0.74905,
+        "color": "#3FEBDF",
+        "font_size": 22,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "hide_in_states": [
+          "normal",
+          "deco",
+          "clear"
+        ]
+      },
+      {
+        "id": "ceiling",
+        "field": "ceiling",
+        "rel_x": 0.14161,
+        "rel_y": 0.8289,
+        "color": "#FFFFFF",
+        "font_size": 70,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "valign": "bottom",
+        "value_format": "decimal1",
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "label_ceiling",
+        "field": "custom:CEILING",
+        "rel_x": 0.28867,
+        "rel_y": 0.74335,
+        "color": "#3FEBDF",
+        "font_size": 26,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "hide_in_states": [
+          "normal",
+          "safety_stop"
+        ]
+      },
+      {
+        "id": "temp",
+        "field": "temp",
+        "rel_x": 0.78322,
+        "rel_y": 0.827,
+        "color": "#FFFFFF",
+        "font_size": 34,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "scale": 1.0,
+        "align": "right",
+        "valign": "bottom",
+        "value_format": "integer",
+        "unit_suffix": true,
+        "unit_scale": 0.6
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "rel_x": 0.54248,
+        "rel_y": 0.13308,
+        "width": 265,
+        "height": 165,
+        "font_size": 34,
+        "caption_font_size": 18,
+        "scale": 1.0,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "label": "The device's warning panel"
+      }
+    ]
+  }
+}

@@ -118,6 +118,9 @@ EON green `#B1CB45`, orange `#ED7C2A`; Nautic cyan `#3FEBDF`, green
 | `ascent_rate` | 2 m/min a step; green under 8 m/min, yellow 8-10, red over 10 | EON Core p.15 | verified |
 | `tank_reserve` | red below 50 bar (built in), yellow below the diver's own alarm (70 bar) | EON Core p.14; the diver's limit has no default | 50 verified, 70 assumed |
 | `display.depth_decimals` | 0.1 m / 1 ft | EON Core p.57 | verified |
+| `display.air_text` | "Air" | EON Steel Black p.31 figures, product photos | verified |
+| `circuit_labels` | a bailout reads OC | EON Core p.39-40 figures (CC on the loop, OC after a bailout) | deduced |
+| `safety_stop.stop_depth` | 3.0 m (the `safety_stop_depth` field) | EON Core p.11 "Safety stop is ahead at 3.0 meters"; Nautic p.47 "the minimum ceiling value (3 m)" | verified |
 
 ## Suunto, per model
 

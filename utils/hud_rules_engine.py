@@ -776,7 +776,10 @@ def get_badge_config(manufacturer: Optional[str], model: Optional[str], state: s
     # Brand-level entry first, then the model's own entry layered on top (a
     # key set to null removes it) - so a Teric only says what differs from
     # the Perdix family: "SAFETY" for "SAFETY STOP", no check mark.
-    for block in (rules.get("default", {}), brand.get("default", {}), brand, brand.get(model, {}) if model else {}):
+    # a page's own `rules` (rule_overrides) layer last: an EON page shows the
+    # stop counter alone, its label and depth in cells of their own
+    overrides = _rule_overrides.get() or {}
+    for block in (rules.get("default", {}), brand.get("default", {}), brand, brand.get(model, {}) if model else {}, overrides):
         states = block.get("badge_states") if isinstance(block, dict) else None
         cfg = states.get(state) if isinstance(states, dict) else None
         if isinstance(cfg, dict):

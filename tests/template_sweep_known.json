@@ -1,3 +1,10 @@
 {
-  "_about": "Layout issues tests/test_template_sweep.py reports that were checked by eye and accepted, per page: {issue key: note}. Remove a key once the template is fixed; a key the sweep no longer reports is harmless."
+  "_about": "Layout issues tests/test_template_sweep.py reports that were checked by eye and accepted, per page: {issue key: note}. Remove a key once the template is fixed; a key the sweep no longer reports is harmless.",
+  "suunto/eon_core/classic": {
+    "stop_timer overlaps label_tank": "checked by eye 2026-11-14: only the badge's empty line space under the digits reaches the row-3 label on the small EON Core skin; the ink is clear",
+    "stop_timer overlaps label_tank_unit": "checked by eye 2026-11-14: only the badge's empty line space under the digits reaches the row-3 label on the small EON Core skin; the ink is clear"
+  },
+  "suunto/eon_core/ccr": {
+    "stop_timer overlaps label_setpoint": "checked by eye 2026-11-14: only the badge's empty line space under the digits reaches the row-3 label on the small EON Core skin; the ink is clear"
+  }
 }

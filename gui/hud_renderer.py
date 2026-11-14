@@ -281,7 +281,7 @@ def text_anchor_shift(font, text, align="left", valign="top"):
 
 # Fields that carry a unit, and which one (for unit suffixes and `unit:*` labels).
 UNIT_KIND_OF_FIELD = {
-    "depth": "depth", "max_depth": "depth", "deco_stop_depth": "depth", "next_stop_depth": "depth", "ceiling": "depth", "mod": "depth",
+    "depth": "depth", "max_depth": "depth", "safety_stop_depth": "depth", "deco_stop_depth": "depth", "next_stop_depth": "depth", "ceiling": "depth", "mod": "depth",
     "primary_tank_pressure": "pressure", "secondary_tank_pressure": "pressure",
     "temp": "temp", "pressure_sac": "sac", "volume_sac": "volume_rate", "avg_depth": "depth", "min_temp": "temp",
 }
@@ -934,12 +934,15 @@ def _rgb(hex_color):
 
 
 def _format_stop_timer(seconds, fmt):
-    """'2:33' (m:ss), '02:33' (mm:ss) or '2min' (min - whole minutes, rounded
-    up, as a Perdix shows a deco stop's time)."""
+    """'2:33' (m:ss), '02:33' (mm:ss), '2′33' (m'ss, a Suunto's stop
+    counter) or '2min' (min - whole minutes, rounded up, as a Perdix shows a
+    deco stop's time)."""
     seconds = max(0, int(seconds))
     if fmt == "min":
         return f"{max(1, -(-seconds // 60)) if seconds else 0}min"
     mins, secs = divmod(seconds, 60)
+    if fmt == "m'ss":
+        return f"{mins}′{secs:02d}"
     return f"{mins}:{secs:02d}" if fmt == "m:ss" else f"{mins:02d}:{secs:02d}"
 
 
@@ -2180,6 +2183,13 @@ def rules_manufacturer(layout):
     return layout.get("rules_profile") or layout.get("manufacturer", "Shearwater")
 
 def apply_value_format(elem, val, raw_val):
+    """_format_value, then in capitals where the element says `uppercase`
+    (a Suunto Nautic writes "NX32", "AIR")."""
+    val = _format_value(elem, val, raw_val)
+    return val.upper() if elem.get("uppercase") and isinstance(val, str) else val
+
+
+def _format_value(elem, val, raw_val):
     """An element's `value_format` on a resolved value: "minutes" (a time in
     whole minutes) or "integer" - the Shearwater Tec row's dive time, stop
     time and stop depth (Petrel 3 Technical manual p.24-25). Used by the
@@ -2240,6 +2250,11 @@ def resolve_element_text(layout, field, waypoint, waypoints=None):
     if field == "safety_stop":
         from utils.hud_rules_engine import get_safety_stop_text
         return get_safety_stop_text(manufacturer, model, waypoint), None
+    if field == "safety_stop_depth":
+        # the brand's fixed safety stop depth (a Suunto's 3.0 m, 10 ft), in the units in force
+        rule = get_rule_config(manufacturer, model, "safety_stop")
+        raw_val = rule.get("stop_depth") if isinstance(rule, dict) else None
+        return format_telemetry_value("depth", raw_val, display), raw_val
     if field == "time_of_day":
         val = waypoint.timestamp.strftime("%H:%M") if waypoint is not None and waypoint.timestamp else None
         return val, None
@@ -2570,6 +2585,9 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                 # glyphs would otherwise sit higher than the big ones). The
                 # NDL "+" keeps its legacy raised look.
                 suffix_y = abs_y + (font.getbbox(main_str)[1] - suffix_font.getbbox(suffix_str)[1])
+                if elem.get("small_suffix_align") == "baseline":
+                    # a Suunto's small decimal sits on the digits' baseline ("36.6")
+                    suffix_y = abs_y + (font.getbbox(main_str)[3] - suffix_font.getbbox(suffix_str)[3])
             suffix_o = max(1, int(suffix_font.size / 20))
             if outline:
                 for dx, dy in [(-suffix_o, -suffix_o), (suffix_o, -suffix_o), (-suffix_o, suffix_o), (suffix_o, suffix_o)]:

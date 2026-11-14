@@ -34,6 +34,9 @@ DIVE_COMPUTERS: Dict[str, DiveComputer] = {
         DiveComputer("Shearwater Peregrine TX", "Shearwater", "Peregrine TX"),
         DiveComputer("Shearwater Teric", "Shearwater", "Teric"),
         DiveComputer("Shearwater Tern", "Shearwater", "Tern"),
+        DiveComputer("Suunto EON Core", "Suunto", "EON Core"),
+        DiveComputer("Suunto EON Steel Black", "Suunto", "EON Steel Black"),
+        DiveComputer("Suunto Nautic", "Suunto", "Nautic"),
     )
 }
 DEFAULT_DIVE_COMPUTER = "Shearwater Perdix 2"

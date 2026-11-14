@@ -450,6 +450,16 @@ Not modelled: the mandatory (red, longer) safety stop, deepstops, the EON
 lock / Ceiling broken bar and the Nautic's Algorithm deviation panel, the
 highlighted-red ascent bar after 5 s. Template model names must be
 "EON Core", "EON Steel Black" and "Nautic" to pick up these rules.
+Step 5, first round done 2026-11-14: `overlays/templates/suunto/`
+`eon_steel_black` and `eon_core` (Classic, Classic (CCR)) and `nautic`
+(Main Screen), skins from the cleaned product photos, positions measured on
+the Steel Black and Nautic photos (the EON Core's mapped from the Steel
+Black's); the three computers in `utils/dive_computers.py`; golden images
+and sweep entries. Renderer additions: `safety_stop_depth`, `uppercase`,
+`small_suffix_align: baseline`, the m'ss stop timer, page `badge_states`
+overrides. Still to do: the EON Prominent and Graphical styles (arc pages),
+the gauge / timer pages, the Nautic's other switch-window views and
+sidemount, compass pages once a log carries a heading.
 
 1. **Inputs** (owner): real logs and screen photos (§ 6). Without at least one
    real JSON per family, step 2 is built on the sample exports in

@@ -26,6 +26,17 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   (Ascent speed, Ceiling broken, pO2 high, Tank pressure, CNS 80%, Change
   gas…). They take effect with the Suunto templates, and a custom template
   can borrow them by picking Suunto as its rules.
+- Overlays: templates for the Suunto **EON Steel Black** and **EON Core**
+  (Classic and Classic (CCR) pages) and the **Nautic** (Main Screen), laid
+  out from Suunto's product photos and the manuals: the EON's grid of depth,
+  dive time, no deco or ascent time, gas and tank, its ascent bar and
+  no-deco scale; the Nautic's cells with the amber safety-stop pill and the
+  red warning panel. The Dive Profile Builder can pose as all three.
+
+### Fixed
+- Overlay Generator: a template with a unit label that follows the unit
+  system (depth "m" / "ft", "bar" / "psi") is no longer refused as having
+  an unknown field.
 
 ## [0.7.20] - 2026-11-12
 

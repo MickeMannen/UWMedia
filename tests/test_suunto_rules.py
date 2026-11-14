@@ -98,3 +98,42 @@ def test_segment_bar_takes_the_brand_ascent_bands():
     frame = np.zeros((200, 400, 3), dtype=np.uint8)
     draw_hud(frame, layout, wps[1], waypoints=wps, render_log=True)
     assert tuple(frame[88, 5]) == (0, 255, 255)  # BGR yellow: 8-10 m/min (EON Core manual p.15)
+
+
+def test_safety_stop_depth_field_follows_the_units():
+    from gui.hud_renderer import resolve_element_text
+    from utils import units as U
+    layout = {"manufacturer": "Suunto", "model": "EON Core"}
+    wp = _wp(0, 5.0)
+    assert resolve_element_text(layout, "safety_stop_depth", wp) == ("3.0", 3.0)
+    with U.units_override(U.IMPERIAL):
+        assert resolve_element_text(layout, "safety_stop_depth", wp)[0] == "10"
+
+
+def test_page_badge_override_layers_over_the_brand():
+    from utils.hud_rules_engine import get_badge_config, rule_overrides
+    assert get_badge_config("Suunto", "EON Core", "safety_stop")["label"] == "SAFETY STOP"
+    with rule_overrides({"badge_states": {"safety_stop": {"label": "", "timer_format": "m'ss"}}}):
+        cfg = get_badge_config("Suunto", "EON Core", "safety_stop")
+    assert cfg["label"] == "" and cfg["timer_format"] == "m'ss" and cfg["color"] == "#FFFF00"
+
+
+def test_uppercase_baseline_suffix_and_prime_timer():
+    from gui.hud_renderer import _format_stop_timer, apply_value_format
+    assert apply_value_format({"uppercase": True}, "Nx32", None) == "NX32"
+    assert _format_stop_timer(170, "m'ss") == "2′50"
+    # the small decimal's ink bottom on the digits' baseline, not level with their tops
+    elem = {"field": "depth", "rel_x": 0.1, "rel_y": 0.1, "font_size": 80, "color": "#FFFFFF", "outline": False,
+            "small_suffix": "decimals", "small_suffix_scale": 0.5}
+    layout = lambda e: {"design_width": 400, "design_height": 200, "manufacturer": "Suunto", "model": "EON Core",
+                        "hud_skin": {"type": "shape", "width": 400, "height": 200, "anchor": "TOP_LEFT", "opacity": 0.0, "linked_elements": [e]}}
+
+    def suffix_rows(e):
+        frame = np.zeros((200, 400, 3), dtype=np.uint8)
+        draw_hud(frame, layout(e), _wp(0, 36.6), render_log=True)
+        cols = np.where(frame.max(axis=(0, 2)) > 0)[0]
+        right = frame[:, cols.max() - 15:cols.max() + 1].max(axis=2)  # the small "6"
+        rows = np.where(right.max(axis=1) > 0)[0]
+        return rows.min(), rows.max()
+    top_aligned, baseline = suffix_rows(elem), suffix_rows(dict(elem, small_suffix_align="baseline"))
+    assert baseline[0] > top_aligned[0] + 10 and baseline[1] > top_aligned[1] + 10

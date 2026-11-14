@@ -96,8 +96,21 @@ and tank icons) step aside while the switch is pointed out.
 
 `display` sets how a brand writes its values: `depth_decimals` per unit
 system, `percent_fields` (the fields that carry a % sign - the X50i's
-SurfGF, GF99 and CNS) and `gf99_on_gassing_text` (what GF99 reads while it
-is at or below 0, the X50i's "On-Gassing").
+SurfGF, GF99 and CNS), `gf99_on_gassing_text` (what GF99 reads while it
+is at or below 0, the X50i's "On-Gassing") and `air_text` (how the gas
+reads for air, "Air" on a Descent or an EON).
+
+A page's own `rules` block replaces a brand rule for that page only; for
+`badge_states` it is layered over the brand's entry, so a Suunto EON page
+can show the safety-stop counter alone (`"label": ""`) where the brand's
+badge has a title. `safety_stop.stop_depth` is the brand's fixed stop
+depth, which the `safety_stop_depth` field shows in the units in force
+(3.0 m / 10 ft on a Suunto).
+
+Text elements also take `"uppercase": true` (the value in capitals, a
+Nautic's "NX32") and, with a small suffix, `"small_suffix_align":
+"baseline"` (the small decimal on the digits' baseline, as a Suunto writes
+"36.6", instead of level with their tops).
 
 `ascent_rate` bands colour a lit ascent chevron by m/min (`blink: true`
 flashes the band's colour against the unlit grey - the Perdix's red), and

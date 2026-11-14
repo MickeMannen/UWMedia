@@ -210,7 +210,7 @@ def available_telemetry_fields(dive=None) -> List[str]:
     standard_fields += [
         "primary_tank_pressure", "primary_tank_name",
         "secondary_tank_pressure", "secondary_tank_name",
-        "gasmix", "safety_stop", "time_of_day",
+        "gasmix", "safety_stop", "safety_stop_depth", "time_of_day",
         "circuit", "diluent_po2",  # a rebreather's CC / BO / OC label and its diluent's PO2 (models/dive.py)
         "avg_depth", "min_temp", "gf_setting", "eod", "date", "ambient_mbar", "surface_mbar",  # info screens and gauge pages (gui/hud_renderer.resolve_element_text)
         "mod",  # the breathed gas's MOD at the brand's ppO2 limit (utils.hud_gas)

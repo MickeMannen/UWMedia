@@ -1,0 +1,10 @@
+{
+  "manufacturer": "Suunto",
+  "model": "Nautic",
+  "pages": [
+    {
+      "id": "main",
+      "name": "Main Screen"
+    }
+  ]
+}

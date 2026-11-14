@@ -178,7 +178,9 @@ Teric), `po2_1` .. `po2_3` (the cells, yellow when one fails the ±20 % vote),
 the diluent on the loop, the bailout gas after a bailout - not the first
 tank. Bundled CC pages: Petrel *CC (setpoint)* and *CC (3 cells)*, Perdix 3
 and Perdix 2 *CC (setpoint)*, Teric *CC (Standard)*, Descent X50i *CCR* and
-*Dynamic depth (CCR)*, Descent Mk3i *CCR (Big Numbers)* and *CCR (standard)*.
+*Dynamic depth (CCR)*, Descent Mk3i *CCR (Big Numbers)* and *CCR (standard)*,
+Suunto EON Core and EON Steel Black *Classic (CCR)* (CC and the setpoint, OC
+and the pO2 after a bailout).
 
 ### Info screens and gauge pages
 

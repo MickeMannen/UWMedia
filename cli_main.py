@@ -288,6 +288,7 @@ def validate_layout(layout_path: Path, manager: DiveManager):
         "primary_tank_name",
         "secondary_tank_name",
         "safety_stop",
+        "safety_stop_depth",  # the brand's fixed safety stop depth (a Suunto's 3.0 m)
         "time_of_day",
         "depth_graph",
         # renderer-synthesised fields (gui/hud_renderer.py): the stop/deco
@@ -322,7 +323,7 @@ def validate_layout(layout_path: Path, manager: DiveManager):
     invalid_fields = []
     
     for field in layout_fields:
-        if field.startswith("custom:"):
+        if field.startswith(("custom:", "unit:")):  # fixed text, and a unit word that follows the unit system
             continue
         if field.startswith("tank_pressure:") or field.startswith("tank_name:"):
             serial = field.split(":", 1)[1]
