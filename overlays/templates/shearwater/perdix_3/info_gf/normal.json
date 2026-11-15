@@ -90,6 +90,7 @@
       },
       {
         "field": "primary_tank_pressure",
+        "box_pad": 0.04,
         "rel_x": 0.6734,
         "rel_y": 0.5767,
         "color": "#FFFFFF",
@@ -100,9 +101,8 @@
         "align": "right",
         "unit_suffix": true,
         "unit_orientation": "stacked",
-        "unit_scale": 0.24,
+        "unit_span": "digits",
         "unit_color": "#00ADED",
-        "unit_dy": -50.0,
         "max_width": 200,
         "unit_dx": 8.0
       },

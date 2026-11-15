@@ -1344,7 +1344,10 @@ def test_align_unit_puts_a_trailing_unit_inside_the_right_aligned_run():
     from gui.hud_renderer import get_font, unit_align_shift
     font = get_font(80, "Roboto Condensed")
     elem = {"align_unit": True, "unit_suffix": True, "unit_scale": 0.33}
-    assert unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) < -20
+    # the run moves left by the gap plus the unit's width, measured in the
+    # font this machine resolves (CI may fall back to another face)
+    unit_w = get_font(int(80 * 0.33), None, None).getlength("ft")  # the element names no font
+    assert unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) == pytest.approx(-(int(80 * 0.08) + unit_w))
     assert unit_align_shift(elem, font, "45", "", None, 80, "ft", "center", 1.0) == \
         unit_align_shift(elem, font, "45", "", None, 80, "ft", "right", 1.0) / 2
     assert unit_align_shift({}, font, "45", "", None, 80, "ft", "right", 1.0) == 0.0
@@ -1618,3 +1621,65 @@ def test_gauge_bounds_and_defaults():
                                                         {"type": "segment_bar", "rel_x": 0.2, "rel_y": 0.2}]})
     assert parsed[0]["field"] == "ndl" and parsed[0]["sweep"] == 270
     assert parsed[1]["field"] == "ascent_rate" and parsed[1]["range_max"] == 10
+
+
+def test_stacked_unit_spanning_the_digits_runs_from_their_top_to_the_baseline():
+    # a Shearwater's B/A/R beside the tank pressure (Perdix 2 manual p.40)
+    from gui.hud_renderer import STACKED_LINE_ADVANCE, get_font, unit_suffix_geometry
+    font = get_font(128, "Roboto Condensed")
+    elem = {"unit_orientation": "stacked", "unit_span": "digits", "font_family": "Roboto Condensed"}
+    x, y, unit_font, unit_size = unit_suffix_geometry(elem, font, "157", 128, 200.0, None, 1.0, "BAR")
+    _, digit_top, _, digit_bottom = font.getbbox("0")
+    assert y == digit_top and x > 200
+    letters_bottom = y + 2 * int(unit_size * STACKED_LINE_ADVANCE) + unit_font.getbbox("R")[3] - unit_font.getbbox("R")[1]
+    assert abs(letters_bottom - digit_bottom) <= 3
+    # without the key the unit keeps its unit_scale size
+    _, _, _, plain = unit_suffix_geometry({"unit_orientation": "stacked"}, font, "157", 128, 200.0, None, 1.0, "BAR")
+    assert plain == int(128 * 0.35)
+
+
+def test_box_pad_sets_the_highlight_box_margin():
+    from PIL import Image, ImageDraw
+    from gui.hud_renderer import _draw_text_box, get_font
+    font = get_font(100, "Roboto Condensed")
+
+    def box_height(pad_share):
+        img = Image.new("RGB", (300, 200))
+        _draw_text_box(ImageDraw.Draw(img), 50, 20, font, "47", 100, (255, 255, 0), None, pad_share)
+        rows = np.where(np.asarray(img)[:, :, 0].max(axis=1) > 0)[0]
+        return rows.max() - rows.min()
+
+    assert box_height(0.15) - box_height(0.04) >= 20
+
+
+def test_perdix_3_safety_timer_clears_its_title_box():
+    # the timer's ink starts below the green SAFETY box, with black between
+    layout = _load_perdix3_layout("main")
+    counting = Waypoint(timestamp=datetime.now(), depth=5.0, max_depth=20.0, time_since_start=0, dive_time=0,
+                        dive_alerts=["safety_stop_started"], next_stop_depth=5.0, next_stop_time=120)
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    draw_hud(frame, layout, counting, render_log=False)
+    green = (frame[:, :, 1] > 150) & (frame[:, :, 0] < 80) & (frame[:, :, 2] < 80)
+    per_row = green.sum(axis=1)
+    rows = np.where(per_row > 0)[0]
+    widest = per_row.max()
+    box_rows = np.where(per_row > widest * 0.8)[0]
+    after_box = rows[rows > box_rows.max()]
+    assert len(after_box) and after_box.min() > box_rows.max() + 1
+
+
+def test_notice_with_hide_others_takes_the_screen_and_draws_last():
+    layout = _shape_layout([
+        {"type": "notice", "field": "notice", "style": "box", "rel_x": 0.0, "rel_y": 0.0, "width": 200, "height": 50,
+         "hide_others": True},
+        {"field": "depth", "rel_x": 0.0, "rel_y": 0.6, "font_size": 30, "color": "#FF0000", "outline": False},
+    ])
+    quiet = Waypoint(timestamp=datetime.now(), depth=20.0, time_since_start=600)
+    alert = Waypoint(timestamp=datetime.now(), depth=20.0, time_since_start=600, dive_alerts=["ndl_reached"])
+
+    def red(wp):
+        frame = np.zeros((800, 1000, 3), dtype=np.uint8)
+        draw_hud(frame, layout, wp, render_log=False)
+        return ((frame[:, :, 2] > 200) & (frame[:, :, 1] < 60)).sum()
+
+    assert red(quiet) > 50 and red(alert) == 0

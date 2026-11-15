@@ -41,11 +41,11 @@
       "scale": 1.0,
       "valign": "bottom",
       "unit_suffix": true,
-      "unit_scale": 0.3,
       "unit_orientation": "stacked",
+      "unit_span": "digits",
       "unit_color": "#00ADED",
       "unit_dx": 0.0,
-      "unit_dy": -73.0,
+      "box_pad": 0.04,
       "max_width": 165,
       "hide_when_notice": true,
       "font_family": "Roboto Condensed"

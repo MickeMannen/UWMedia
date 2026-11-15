@@ -91,8 +91,11 @@ def sweep_page(layout, size, situation, wp, waypoints):
     notice = notice_for(layout, wp, waypoints)
     boxes = []  # (name, kind, bounds)
     rings = []  # (name, element) - an arc gauge: text may sit inside it, not on its band
+    hide_all = notice is not None and any(e.get("type") == "notice" and e.get("hide_others") for e in elements)
     for elem in elements:
         kind = element_kind(elem)
+        if hide_all and kind != "notice":
+            continue
         if state in (elem.get("hide_in_states") or ()):
             continue
         if (getattr(wp, "circuit", None) or "OC") in (elem.get("hide_in_circuits") or ()):

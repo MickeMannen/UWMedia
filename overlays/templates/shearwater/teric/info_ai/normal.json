@@ -143,6 +143,7 @@
       },
       {
         "field": "primary_tank_pressure",
+        "box_pad": 0.04,
         "rel_x": 0.3086,
         "rel_y": 0.6152,
         "color": "#FFFFFF",
@@ -151,14 +152,13 @@
         "align": "center",
         "hide_when_notice": true,
         "unit_suffix": true,
-        "unit_scale": 0.3,
         "unit_color": "#00ADED",
         "max_width": 97,
         "font_family": "Roboto Condensed",
         "valign": "bottom",
         "unit_orientation": "stacked",
-        "align_unit": true,
-        "unit_dy": -28.1
+        "unit_span": "digits",
+        "align_unit": true
       },
       {
         "field": "custom:SAC",

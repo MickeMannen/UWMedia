@@ -116,6 +116,24 @@
         "font_size": 60,
         "scale": 1.0,
         "align": "center"
+      },
+      {
+        "id": "notice",
+        "field": "notice",
+        "type": "notice",
+        "style": "box",
+        "rel_x": 0.1893,
+        "rel_y": 0.3937,
+        "width": 440,
+        "height": 170,
+        "font_size": 48,
+        "font_family": "Roboto Condensed",
+        "font_weight": "bold",
+        "caption_font_size": 22,
+        "scale": 1.0,
+        "line_fill": 0.94,
+        "label": "Alert pop-up: the message alone on the screen (manual p.34-36 alert texts; the look is assumed, the manual has no figure)",
+        "hide_others": true
       }
     ],
     "screen": {

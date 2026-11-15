@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.8.2] - 2026-11-15
 
 ### Added
 - Overlays: the Shearwater **Teric** and **Tern** pages show the ascent-rate
@@ -12,8 +12,20 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Overlays: on the Shearwater **Peregrine TX**, **Perdix 2**, **Petrel**,
   **Teric** and **Tern** a deco stop reads "6m 2min" with the units small
   and in blue, as on the real screens.
+- Overlays: the Garmin **Descent Mk3i** pages show the watch's alerts
+  ("Approaching NDL", "PO2 is high", ...) from the dive log, the message
+  alone on the screen; before, the Mk3i showed no alerts at all.
+- Overlay Designer: the dummy sidemount dive lets the two cylinders drift
+  over 35 bar apart before the first change, so the tank-switch cue
+  (Perdix box, X50i blue pressure and arrows, "Breathe from ..." alert)
+  can be checked without a log.
 
 ### Fixed
+- Overlays: the Garmin **Descent X50i** pages fit the watch's real
+  display, measured on Garmin's product photo and the in-water photos;
+  the layout had filled the whole glass, so the bottom row ran past the
+  display's lower edge and the right column over the dark glass by the
+  light sensor.
 - Overlays: the Shearwater **Perdix 2**, **Petrel**, **Perdix 3**, **Teric**
   and **Tern** pages draw their text at the manuals' sizes in a tall
   condensed font, as the Peregrine TX now does; depth, dive time, NDL, stop
@@ -25,6 +37,19 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Overlays: the **Teric** and **Tern** Main pages show the gas as its O2
   percentage with the cylinder, the Tern's right slot shows MAX by default,
   and a deco stop reads "6m 3min" on the Standard pages.
+- Overlays: Shearwater **Perdix 2**, **Peregrine TX** and **Petrel**
+  warnings sit under the blue line and inside the screen, instead of
+  touching the line and running onto the bezel at the bottom left.
+- Overlays: a Shearwater tank pressure below the reserve gets a yellow /
+  red box that hugs the digits, as in the manuals, instead of covering the
+  tank label, the pressure bar or the blue line.
+- Overlays: the vertical BAR / PSI beside a Shearwater tank pressure runs
+  the digits' full height, level with them, instead of sitting small and
+  raised against the pressure bar (sidemount pages included).
+- Overlays: the **Perdix 3** safety-stop time sits below the SAFETY box
+  instead of overlapping it.
+- Overlays: the warning triangle on Garmin **Descent X50i** alerts shows
+  its exclamation mark.
 
 ## [0.8.1] - 2026-11-14
 

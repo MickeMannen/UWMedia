@@ -49,10 +49,10 @@
       "Gases page: the same fields as the X50i's (CURRENT GAS, GAS PO2, SURF. GF, GF99, CNS), laid out for the round screen - a configured page, not pictured in the manual",
       "Standard and transceiver pages: positions measured from the manual's figures, not a device photo",
       "Gauge page: the stopwatch shows the dive time (a log records no stopwatch start or reset)",
-      "Gauge page: positions measured from the manual's figure, not a device photo; the temperature with its unit (the figure shows only °)"
+      "Gauge page: positions measured from the manual's figure, not a device photo; the temperature with its unit (the figure shows only °)",
+      "Alert messages: the message alone on the screen in a dark outlined box with a warning triangle, as the X50i draws it (the manual's p.34-36 table gives the texts but no figure)"
     ],
     "not_shown": [
-      "Alert messages (full-screen on the watch; no notice element on this page)",
       "Gauges (arcs)",
       "Red dividing lines on a bailout (p.28): the Big Numbers screen has none",
       "Tissue-load and ascent-rate arcs on the standard and transceiver pages (no arc element yet)",

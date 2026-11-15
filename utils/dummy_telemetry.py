@@ -11,7 +11,9 @@ PPO2), a deco obligation with a 6 m stop, the ascent towards it (a 25 s fast
 ascent on the way), the approach, the stop, a 40 s violation (MISSED DECO
 STOP), the stop clearing, the safety stop counting at 5 m, a pause at 1.8 m,
 the stop completing, and the surface. One Nx32 cylinder (or two for the
-sidemount variant) drains into the reserve during the safety stop. Garmin-
+sidemount variant) drains into the reserve during the safety stop; the
+sidemount pair is over 35 bar apart before the first change of cylinder at
+7:00, so the tank-switch notification shows. Garmin-
 style dive alerts are set where the watch would raise them, so the Garmin
 rules see the same dive.
 
@@ -181,6 +183,9 @@ def _ccr_fields(t: int, depth: float, ambient: float) -> Dict[str, Any]:
     return fields
 
 
+_SIDEMOUNT_FIRST_SWITCH_S = 7 * 60  # the first change of sidemount cylinder
+
+
 def build_dummy_dive(variant: Optional[str] = "single_tank", ccr: bool = False) -> Dive:
     """A deterministic 32-minute synthetic dive (see the module docstring).
     `variant` only decides the tank count (2 for "sidemount", else 1) so
@@ -202,10 +207,12 @@ def build_dummy_dive(variant: Optional[str] = "single_tank", ccr: bool = False) 
 
         # Gas: ~1.8 bar/min at the surface, scaled by ambient pressure, so the
         # single cylinder is into the reserve (under 50 bar) by the safety stop;
-        # sidemount alternates cylinders every 5 minutes.
+        # sidemount stays on the first cylinder for the first 7 minutes, until
+        # the two are over 35 bar apart (past every brand's switch threshold,
+        # so the tank-switch cue shows), then alternates every 5 minutes.
         rate_bar_per_s = 1.8 / 60.0 * ambient
         if len(keys) == 2:
-            active = keys[(t // 300) % 2]
+            active = keys[0] if t < _SIDEMOUNT_FIRST_SWITCH_S else keys[((t - _SIDEMOUNT_FIRST_SWITCH_S) // 300 + 1) % 2]
             pressures[active] = max(20.0, pressures[active] - rate_bar_per_s * DUMMY_SAMPLE_S)
         else:
             pressures[keys[0]] = max(20.0, pressures[keys[0]] - rate_bar_per_s * DUMMY_SAMPLE_S)

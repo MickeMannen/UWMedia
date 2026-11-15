@@ -154,20 +154,20 @@
       },
       {
         "field": "primary_tank_pressure",
+        "box_pad": 0.04,
         "rel_x": 0.1883,
         "rel_y": 0.6502,
         "color": "#FFFFFF",
         "font_size": 134,
         "scale": 1.0,
         "unit_suffix": true,
-        "unit_scale": 0.3,
         "unit_dx": 0.0,
-        "unit_dy": -77.0,
         "unit_color": "#00ADED",
         "max_width": 200,
         "font_family": "Roboto Condensed",
         "valign": "bottom",
-        "unit_orientation": "stacked"
+        "unit_orientation": "stacked",
+        "unit_span": "digits"
       },
       {
         "field": "custom:PPO2",

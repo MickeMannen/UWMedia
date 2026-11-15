@@ -179,3 +179,14 @@ def test_apply_state_auto_returns_same_waypoint():
     wp = waypoint_at(dive, 600)
     assert apply_state(wp, "auto") is wp
     assert apply_state(wp, "not-a-state") is wp
+
+
+def test_sidemount_tanks_drift_far_enough_apart_to_cue_a_switch():
+    # the Overlay Designer's dummy sidemount dive passes 35 bar between the
+    # cylinders before the first change, so every brand's switch cue shows
+    from utils.hud_rules_engine import sidemount_switch_target
+    dive = build_dummy_dive("sidemount")
+    gaps = [abs(w.tanks["Left"].pressure_bar - w.tanks["Right"].pressure_bar) for w in dive.waypoints]
+    assert max(gaps) > 35
+    assert any(sidemount_switch_target("Garmin", "x50i", w) == "secondary" for w in dive.waypoints)
+    assert any(sidemount_switch_target("Shearwater", "Perdix 2", w) == "secondary" for w in dive.waypoints)

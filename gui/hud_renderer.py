@@ -132,7 +132,14 @@ def fitted_font_size(elem, size, main_str, suffix_str=None, suffix_scale=1.0, px
         if suffix_str:
             w += get_font(max(1, round(px * suffix_scale)), family, weight).getlength(suffix_str)
         if unit_after:
-            w += int(px * 0.08) + get_font(max(1, int(px * float(elem.get("unit_scale", 0.35)))), family, weight).getlength(unit_text)
+            if elem.get("unit_span") == "digits" and elem.get("unit_orientation") == "stacked":
+                unit_font = get_font(digit_span_unit_size(get_font(px, family, weight), unit_text, family, weight), family, weight)
+            else:
+                unit_font = get_font(max(1, int(px * float(elem.get("unit_scale", 0.35)))), family, weight)
+            if elem.get("unit_orientation") == "stacked":  # one letter wide
+                w += int(px * 0.08) + max(unit_font.getlength(ch) for ch in unit_text)
+            else:
+                w += int(px * 0.08) + unit_font.getlength(unit_text)
         return w
 
     if width(size) <= max_w:
@@ -189,16 +196,34 @@ def unit_suffix_text(elem, field):
     return U.unit_label(kind) if kind else ""
 
 
-def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale):
+def digit_span_unit_size(font, unit_text, family, weight):
+    """The font size at which `unit_text`, stacked one letter per line,
+    runs from the top of `font`'s digits to their baseline."""
+    _, digit_top, _, digit_bottom = font.getbbox("0")
+    probe = 100
+    probe_font = get_font(probe, family, weight)
+    letter_h = max(probe_font.getbbox(ch)[3] - probe_font.getbbox(ch)[1] for ch in unit_text)
+    span = (len(unit_text) - 1) * int(probe * STACKED_LINE_ADVANCE) + letter_h
+    return max(1, int(probe * (digit_bottom - digit_top) / span))
+
+
+def unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale, unit_text=""):
     """(x, y, unit_font, unit_size) for the unit drawn after a value: to the
     right of the value's run, baseline-aligned, or below its last part (the
     way a Perdix / Descent puts the "m" under the small decimals; with no
     small part - whole feet - it goes after the value). `unit_dx` /
-    `unit_dy` move it (skin px); `unit_scale` sizes it against the value."""
+    `unit_dy` move it (skin px); `unit_scale` sizes it against the value.
+    A stacked unit with `"unit_span": "digits"` is sized so its letters
+    run from the digits' top to their baseline (a Shearwater's B/A/R
+    beside the tank pressure, Perdix 2 manual p.40); `unit_dx` still moves it."""
+    family, weight = elem.get("font_family"), elem.get("font_weight")
+    dx = float(elem.get("unit_dx", 0.0)) * px_scale
+    if elem.get("unit_span") == "digits" and elem.get("unit_orientation") == "stacked" and unit_text:
+        unit_size = digit_span_unit_size(font, unit_text, family, weight)
+        return run_right + int(size * 0.06) + dx, font.getbbox("0")[1], get_font(unit_size, family, weight), unit_size
     scale = float(elem.get("unit_scale", 0.35))
     unit_size = max(1, int(size * scale))
-    unit_font = get_font(unit_size, elem.get("font_family"), elem.get("font_weight"))
-    dx = float(elem.get("unit_dx", 0.0)) * px_scale
+    unit_font = get_font(unit_size, family, weight)
     dy = float(elem.get("unit_dy", 0.0)) * px_scale
     main_bottom = font.getbbox(main_text)[3]
     unit_bbox = unit_font.getbbox("m")
@@ -229,13 +254,13 @@ def unit_align_shift(elem, font, main_text, suffix_text, suffix_font, size, unit
     if suffix_font is not None:
         suffix_x = run_right + float(elem.get("small_suffix_dx") or 0.0) * px_scale
         run_right = suffix_x + suffix_font.getlength(suffix_text)
-    x, _, unit_font, _ = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale)
+    x, _, unit_font, _ = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale, unit_text)
     extra = max(0.0, x + unit_font.getlength(unit_text) - run_right)
     return -extra if align == "right" else -extra / 2.0
 
 
 def _draw_unit_suffix(pil_img, draw, elem, unit_text, abs_x, abs_y, run_right, suffix_x, font, main_text, size, color_rgb, outline, px_scale):
-    x, y, unit_font, unit_size = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale)
+    x, y, unit_font, unit_size = unit_suffix_geometry(elem, font, main_text, size, run_right, suffix_x, px_scale, unit_text)
     x, y = int(round(x)), int(round(abs_y + y))
     colour = _rgb(elem["unit_color"]) if elem.get("unit_color") else color_rgb
     if elem.get("unit_orientation") in VERTICAL_ORIENTATIONS:
@@ -1343,7 +1368,13 @@ def _draw_state_badge(draw, elem, waypoint, manufacturer, model, skin_x, skin_y,
             draw.rounded_rectangle([x + left - pad, y + top - pad, x + right + pad, y + bottom + pad],
                                    radius=max(1, int(final_size * 0.1)), fill=color_rgb)
             draw.text((x, y), text, font=font, fill=(0, 0, 0))
+            box_bottom = y + bottom + pad
             y = line_y + int(pitch_size * spacing) + pad
+            if index + 1 < len(lines):
+                # the next line's ink starts a pad below the box, however
+                # tight the spacing (the Perdix 3's timer under SAFETY)
+                next_font = value_font if lines[index + 1][2] else label_font
+                y = max(y, box_bottom + pad - next_font.getbbox("0")[1])
             continue
         o_dist = max(1, int(final_size / 20))
         # The bundled fonts have no ✓ glyph - draw the Perdix's check mark as a
@@ -2114,16 +2145,17 @@ def _draw_tank_switch_arrows(draw, elem, target, manufacturer, model, skin_x, sk
         draw.polygon(pts, fill=colour)
 
 
-def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb, outline_rgb=None):
+def _draw_text_box(draw, abs_x, abs_y, font, text, size, box_rgb, outline_rgb=None, pad_share=0.15):
     """A filled rounded box behind `text` drawn at (abs_x, abs_y) - the way a
     Perdix highlights a tank to switch to (manual p.42) or a tank pressure
     below the reserve (p.40); with `outline_rgb` an outlined one (a
-    Descent's CC box, Mk3 manual p.24)."""
+    Descent's CC box, Mk3 manual p.24). `pad_share` is the margin round the
+    ink as a share of the font size (a Perdix's reserve box hugs the digits)."""
     left, top, right, bottom = font.getbbox(text)
-    pad = max(1, int(size * 0.15))
+    pad = max(1, int(size * pad_share))
     draw.rounded_rectangle(
         [abs_x + left - pad, abs_y + top - pad, abs_x + right + pad, abs_y + bottom + pad],
-        radius=max(1, int(size * 0.15)), fill=box_rgb,
+        radius=max(1, int(size * min(0.15, pad_share * 1.5))), fill=box_rgb,
         outline=outline_rgb, width=max(1, int(size * 0.08)) if outline_rgb else 0,
     )
 
@@ -2268,7 +2300,12 @@ def _draw_notice(draw, elem, notice, manufacturer, model, skin_x, skin_y, w_scal
             tri = int(height_px * 0.5)
             tx, ty = abs_x + pad, abs_y + (height_px - tri) // 2
             draw.polygon([(tx + tri // 2, ty), (tx, ty + tri), (tx + tri, ty + tri)], outline=colour, fill=None, width=max(1, tri // 10))
-            draw.text((tx + tri // 2 - cap_size // 5, ty + tri // 3), "!", font=cap_font, fill=colour)
+            # the "!" drawn to the triangle's size: a bar and a dot
+            stroke = max(1, tri // 10)
+            mid = tx + tri // 2
+            draw.line([(mid, ty + int(tri * 0.38)), (mid, ty + int(tri * 0.72))], fill=colour, width=stroke)
+            dot = max(1, stroke // 2 + 1)
+            draw.ellipse([mid - dot, ty + int(tri * 0.84) - dot, mid + dot, ty + int(tri * 0.84) + dot], fill=colour)
             inner_x = tx + tri + pad
         else:
             inner_x = abs_x + pad
@@ -2558,7 +2595,13 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
         from utils.hud_rules_engine import sidemount_switch_target
         switch_target = sidemount_switch_target(rules_manufacturer(layout), layout.get("model", "Perdix2"), waypoint)
 
-    for elem in linked_elements:
+    # A pop-up notice covers the screen under it, so it is drawn last, over a
+    # variant's elements that come after it in the merged list; one with
+    # `hide_others` takes the whole screen while it shows (a Mk3i's alerts).
+    hide_all = notice is not None and any(e.get("type") == "notice" and e.get("hide_others") and e.get("source") != "persistent" for e in linked_elements)
+    for elem in sorted(linked_elements, key=lambda e: e.get("type") == "notice" and e.get("source") != "persistent"):
+        if hide_all and elem.get("type") != "notice":
+            continue
         field = elem.get("field", "")
         if hud_state is not None and hud_state in (elem.get("hide_in_states") or ()):
             continue
@@ -2782,7 +2825,8 @@ def draw_telemetry_on_frame(frame, layout, waypoint, skin_info, waypoints=None):
                     box_rgb = _rgb(str(rule.get("color", "#00C800")))
                     color_rgb = _rgb(str(rule.get("text_color", "#000000")))
         if box_rgb is not None:
-            _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb, box_outline_rgb)
+            _draw_text_box(draw, abs_x, abs_y, font, val_str, final_size, box_rgb, box_outline_rgb,
+                           float(elem.get("box_pad", 0.15)))
             outline = False
 
         o_dist = max(1, int(final_size / 20))

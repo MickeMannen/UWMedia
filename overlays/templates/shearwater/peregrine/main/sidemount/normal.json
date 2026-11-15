@@ -35,6 +35,7 @@
     {
       "id": "primary_tank_pressure",
       "field": "primary_tank_pressure",
+      "box_pad": 0.04,
       "rel_x": 0.4012,
       "rel_y": 0.7834,
       "color": "#FFFFFF",
@@ -42,11 +43,10 @@
       "scale": 1.0,
       "valign": "bottom",
       "unit_suffix": true,
-      "unit_scale": 0.3,
       "unit_orientation": "stacked",
+      "unit_span": "digits",
       "unit_color": "#00ADED",
       "unit_dx": 0.0,
-      "unit_dy": -66.0,
       "max_width": 140,
       "hide_when_notice": true,
       "font_family": "Roboto Condensed"
@@ -85,6 +85,7 @@
     {
       "id": "secondary_tank_pressure",
       "field": "secondary_tank_pressure",
+      "box_pad": 0.04,
       "rel_x": 0.6012,
       "rel_y": 0.7834,
       "color": "#FFFFFF",
@@ -92,11 +93,10 @@
       "scale": 1.0,
       "valign": "bottom",
       "unit_suffix": true,
-      "unit_scale": 0.3,
       "unit_orientation": "stacked",
+      "unit_span": "digits",
       "unit_color": "#00ADED",
       "unit_dx": 0.0,
-      "unit_dy": -66.0,
       "max_width": 140,
       "hide_when_notice": true,
       "font_family": "Roboto Condensed"

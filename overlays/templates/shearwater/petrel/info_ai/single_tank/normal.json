@@ -34,6 +34,7 @@
     {
       "id": "primary_tank_pressure",
       "field": "primary_tank_pressure",
+      "box_pad": 0.04,
       "rel_x": 0.1333,
       "rel_y": 0.8498,
       "color": "#FFFFFF",
@@ -41,11 +42,10 @@
       "scale": 1.0,
       "valign": "bottom",
       "unit_suffix": true,
-      "unit_scale": 0.3,
       "unit_orientation": "stacked",
+      "unit_span": "digits",
       "unit_color": "#00ADED",
       "unit_dx": 0.0,
-      "unit_dy": -76.8,
       "max_width": 164,
       "hide_when_notice": true,
       "font_family": "Roboto Condensed"

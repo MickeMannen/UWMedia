@@ -120,7 +120,17 @@ with `"align_unit": true` counts the unit drawn after it in the aligned
 run, so a Peregrine's "45ft" ends where "15.7m" does. The
 `ascent_rate_value` field is the ascent rate as a number, in m/min or
 ft/min (0 when level or descending), as a Teric writes it beside its
-arrows.
+arrows. A stacked unit (`"unit_orientation": "stacked"`) with
+`"unit_span": "digits"` is sized so its letters run from the top of the
+digits to their baseline, the B/A/R beside a Shearwater's tank pressure.
+`box_pad` is the margin of a value's highlight box (the yellow / red box
+under a tank pressure below the reserve) as a share of the font size,
+0.15 by default; a Shearwater's box hugs the digits at 0.04.
+
+A notice element with `"hide_others": true` takes the whole screen while
+it shows: the page's other elements step aside, as on a Descent Mk3i,
+whose alerts replace the dive screen. A notice is always drawn after the
+page's other elements.
 
 `ascent_rate` bands colour a lit ascent chevron by m/min (`blink: true`
 flashes the band's colour against the unlit grey - the Perdix's red), and

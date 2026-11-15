@@ -385,7 +385,7 @@ def element_native_bounds(
     dx += unit_align_shift(elem, font, main, suffix, suffix_font if suffix else None, size, unit, align, 1.0)
     if unit:
         # the unit drawn after the value (gui.hud_renderer._draw_unit_suffix), skin px (scale 1)
-        ux, uy, unit_font, unit_size = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0)
+        ux, uy, unit_font, unit_size = unit_suffix_geometry(elem, font, main, size, right, suffix_x, 1.0, unit)
         ul, ut, ur, ub = unit_font.getbbox(unit)
         if elem.get("unit_orientation") in VERTICAL_ORIENTATIONS:
             # the box draw_oriented_text() paints from (ux, uy)
